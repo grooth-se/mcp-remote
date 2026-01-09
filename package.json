@@ -1,5 +1,5 @@
 {
-  "name": "mcp-remote",
+  "name": "@grooth-se/mcp-remote",
   "version": "1.0.0",
   "description": "Local proxy that connects MCP clients to remote MCP servers over SSE transport",
   "main": "dist/index.js",
@@ -7,6 +7,9 @@
   "bin": {
     "mcp-remote": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
