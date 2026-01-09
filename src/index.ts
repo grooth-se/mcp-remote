@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { program } from 'commander';
-import { startProxy } from './proxy.js';
+import { startProxy, TransportType } from './proxy.js';
 import {
   discoverOAuthEndpoints,
   performOAuthFlow,
@@ -13,6 +13,7 @@ import { logger } from './utils/logger.js';
 interface CliOptions {
   header?: string[];
   allowHttp?: boolean;
+  transport?: TransportType;
 }
 
 function parseHeaders(headerArgs: string[] = []): Record<string, string> {
@@ -63,14 +64,25 @@ async function handleOAuth(serverUrl: string): Promise<string | null> {
 async function main() {
   program
     .name('mcp-remote')
-    .description('Connect to a remote MCP server over SSE transport')
-    .version('1.0.0')
-    .argument('<server-url>', 'URL of the remote MCP server (e.g., https://example.com/sse)')
+    .description('Connect to a remote MCP server over HTTP or SSE transport')
+    .version('1.1.0')
+    .argument('<server-url>', 'URL of the remote MCP server (e.g., https://example.com/mcp)')
     .option('-H, --header <header...>', 'Add custom header (format: "Name: Value")')
     .option('--allow-http', 'Allow insecure HTTP connections (not recommended)')
+    .option(
+      '-t, --transport <type>',
+      'Transport type: "http" (Streamable HTTP) or "sse" (Server-Sent Events)',
+      'http'
+    )
     .action(async (serverUrl: string, options: CliOptions) => {
       try {
         const headers = parseHeaders(options.header);
+        const transport = options.transport as TransportType;
+
+        if (transport !== 'http' && transport !== 'sse') {
+          console.error(`Invalid transport type: ${transport}. Must be "http" or "sse"`);
+          process.exit(1);
+        }
 
         // Handle OAuth if no Authorization header provided
         if (!headers['Authorization'] && !headers['authorization']) {
@@ -80,12 +92,13 @@ async function main() {
           }
         }
 
-        logger.info('Starting mcp-remote', { serverUrl, allowHttp: options.allowHttp });
+        logger.info('Starting mcp-remote', { serverUrl, transport, allowHttp: options.allowHttp });
 
         await startProxy({
           serverUrl,
           headers,
           allowHttp: options.allowHttp,
+          transport,
         });
       } catch (error) {
         logger.error('Fatal error', { error });

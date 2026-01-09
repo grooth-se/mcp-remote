@@ -2,6 +2,8 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -13,14 +15,41 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from './utils/logger.js';
 
+export type TransportType = 'sse' | 'http';
+
 export interface ProxyOptions {
   serverUrl: string;
   headers?: Record<string, string>;
   allowHttp?: boolean;
+  transport?: TransportType;
+}
+
+function createTransport(
+  serverUrl: string,
+  headers: Record<string, string>,
+  transportType: TransportType
+): Transport {
+  const url = new URL(serverUrl);
+
+  if (transportType === 'http') {
+    logger.info('Using Streamable HTTP transport');
+    return new StreamableHTTPClientTransport(url, {
+      requestInit: {
+        headers,
+      },
+    });
+  } else {
+    logger.info('Using SSE transport');
+    return new SSEClientTransport(url, {
+      requestInit: {
+        headers,
+      },
+    });
+  }
 }
 
 export async function startProxy(options: ProxyOptions): Promise<void> {
-  const { serverUrl, headers = {}, allowHttp = false } = options;
+  const { serverUrl, headers = {}, allowHttp = false, transport = 'http' } = options;
 
   const url = new URL(serverUrl);
 
@@ -30,20 +59,16 @@ export async function startProxy(options: ProxyOptions): Promise<void> {
     );
   }
 
-  logger.info('Starting proxy', { serverUrl });
+  logger.info('Starting proxy', { serverUrl, transport });
 
-  // Create SSE transport to remote server
-  const sseTransport = new SSEClientTransport(new URL(serverUrl), {
-    requestInit: {
-      headers,
-    },
-  });
+  // Create transport to remote server
+  const remoteTransport = createTransport(serverUrl, headers, transport);
 
   // Create client to connect to remote server
   const remoteClient = new Client(
     {
       name: 'mcp-remote-proxy',
-      version: '1.0.0',
+      version: '1.1.0',
     },
     {
       capabilities: {},
@@ -51,14 +76,14 @@ export async function startProxy(options: ProxyOptions): Promise<void> {
   );
 
   // Connect to remote server
-  await remoteClient.connect(sseTransport);
+  await remoteClient.connect(remoteTransport);
   logger.info('Connected to remote server');
 
   // Create local server for stdio
   const localServer = new Server(
     {
       name: 'mcp-remote',
-      version: '1.0.0',
+      version: '1.1.0',
     },
     {
       capabilities: {

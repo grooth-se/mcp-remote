@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-mcp-remote is a local proxy that connects MCP clients to remote MCP servers over SSE (Server-Sent Events) transport. It handles authentication flows including OAuth and acts as a stdio-to-SSE bridge.
+mcp-remote is a local proxy that connects MCP clients to remote MCP servers. It supports both Streamable HTTP (default) and SSE transports, handles OAuth authentication, and acts as a stdio-to-remote bridge.
 
 ## Build Commands
 
@@ -20,15 +20,23 @@ npm run lint         # Type-check without emitting
 ## Usage Commands
 
 ```bash
-# Basic usage - connect to a remote MCP server
-npx mcp-remote https://remote.mcp.server/sse
+# Basic usage - connect using Streamable HTTP (default)
+npx @grooth-se/mcp-remote https://remote.mcp.server/mcp
+
+# Use SSE transport (legacy)
+npx @grooth-se/mcp-remote https://remote.mcp.server/sse --transport sse
 
 # With custom headers
-npx mcp-remote https://remote.mcp.server/sse --header "Authorization: Bearer <token>"
+npx @grooth-se/mcp-remote https://remote.mcp.server/mcp --header "Authorization: Bearer <token>"
 
 # Allow HTTP (non-HTTPS) connections
-npx mcp-remote http://localhost:8080/sse --allow-http
+npx @grooth-se/mcp-remote http://localhost:8080/mcp --allow-http
 ```
+
+## Transport Types
+
+- **http** (default): Streamable HTTP transport - uses POST requests with optional SSE streaming
+- **sse**: Legacy Server-Sent Events transport - uses GET for SSE stream + POST for messages
 
 ## Environment Variables
 
@@ -40,8 +48,8 @@ npx mcp-remote http://localhost:8080/sse --allow-http
 ```
 src/
 ├── index.ts          # CLI entry point (commander-based)
-├── proxy.ts          # stdio <-> SSE bridge using MCP SDK
-├── client.ts         # SSE client wrapper
+├── proxy.ts          # stdio <-> remote bridge using MCP SDK
+├── client.ts         # Client wrapper (unused, SDK transports used directly)
 ├── auth/
 │   ├── oauth.ts          # OAuth 2.0 PKCE flow
 │   ├── callback-server.ts # Localhost HTTP server for OAuth callback
@@ -54,7 +62,7 @@ src/
 ### Message Flow
 
 1. MCP client connects via stdio to mcp-remote
-2. mcp-remote establishes SSE connection to remote server
+2. mcp-remote establishes connection to remote server (HTTP or SSE)
 3. Request handlers in `proxy.ts` forward all MCP operations (tools, resources, prompts)
 4. Responses are proxied back through stdio
 
@@ -74,7 +82,19 @@ Configure in `claude_desktop_config.json`:
   "mcpServers": {
     "remote-server": {
       "command": "npx",
-      "args": ["mcp-remote", "https://remote.mcp.server/sse"]
+      "args": ["@grooth-se/mcp-remote", "https://remote.mcp.server/mcp"]
+    }
+  }
+}
+```
+
+For SSE transport:
+```json
+{
+  "mcpServers": {
+    "remote-server": {
+      "command": "npx",
+      "args": ["@grooth-se/mcp-remote", "https://remote.mcp.server/sse", "--transport", "sse"]
     }
   }
 }
