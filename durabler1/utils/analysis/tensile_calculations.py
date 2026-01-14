@@ -647,6 +647,61 @@ class TensileAnalyzer:
             coverage_factor=2.0
         )
 
+    def calculate_true_stress_at_fracture(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        area: float,
+        area_uncertainty: float
+    ) -> MeasuredValue:
+        """
+        Calculate true stress at fracture (end of test data).
+
+        True stress = Engineering stress * (1 + Engineering strain)
+        σ_true = σ_eng * (1 + ε_eng)
+
+        Uses the last data point (after filtering, this represents fracture).
+
+        Parameters
+        ----------
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain
+        area : float
+            Original cross-sectional area in mm^2
+        area_uncertainty : float
+            Uncertainty in area
+
+        Returns
+        -------
+        MeasuredValue
+            True stress at fracture with uncertainty in MPa
+        """
+        # Use last data point (fracture point after filtering)
+        eng_stress = stress[-1]
+        eng_strain = strain[-1]
+
+        # True stress at fracture
+        true_stress = eng_stress * (1 + eng_strain)
+
+        # Uncertainty propagation
+        u_stress = eng_stress * self.config.force_calibration_uncertainty
+        u_strain = self.config.extensometer_uncertainty / 50.0  # Approximate
+
+        u_combined = np.sqrt(
+            (u_stress * (1 + eng_strain))**2 +
+            (u_strain * eng_stress)**2
+        )
+        U = 2 * u_combined
+
+        return MeasuredValue(
+            value=round(true_stress, 1),
+            uncertainty=round(U, 1),
+            unit="MPa",
+            coverage_factor=2.0
+        )
+
     def calculate_ludwik_parameters(
         self,
         stress: np.ndarray,

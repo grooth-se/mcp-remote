@@ -153,7 +153,7 @@ class TensileTestApp:
 
     def _create_left_panel(self, parent):
         """Create left panel with specimen inputs only."""
-        left_frame = ttk.Frame(parent, width=350)
+        left_frame = ttk.Frame(parent, width=420)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         left_frame.grid_propagate(False)
 
@@ -202,27 +202,77 @@ class TensileTestApp:
 
         # Test info frame
         info_frame = ttk.LabelFrame(left_frame, text="Test Information", padding=10)
-        info_frame.pack(fill=tk.X, pady=5)
+        info_frame.pack(fill=tk.BOTH, expand=True, pady=5)
 
-        ttk.Label(info_frame, text="Specimen ID:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        row = 0
+        # Test project
+        ttk.Label(info_frame, text="Test project:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.test_project_var = tk.StringVar()
+        ttk.Entry(info_frame, textvariable=self.test_project_var, width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
+        row += 1
+
+        # Customer
+        ttk.Label(info_frame, text="Customer:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.customer_var = tk.StringVar()
+        ttk.Entry(info_frame, textvariable=self.customer_var, width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
+        row += 1
+
+        # Customer order
+        ttk.Label(info_frame, text="Customer order:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.customer_order_var = tk.StringVar()
+        ttk.Entry(info_frame, textvariable=self.customer_order_var, width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
+        row += 1
+
+        # Product and S/N
+        ttk.Label(info_frame, text="Product and S/N:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.product_sn_var = tk.StringVar()
+        ttk.Entry(info_frame, textvariable=self.product_sn_var, width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
+        row += 1
+
+        # Specimen ID
+        ttk.Label(info_frame, text="Specimen ID:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.specimen_id_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.specimen_id_var, width=25).grid(
-            row=0, column=1, sticky=tk.EW, pady=2)
+        ttk.Entry(info_frame, textvariable=self.specimen_id_var, width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
+        row += 1
 
-        ttk.Label(info_frame, text="Material:").grid(row=1, column=0, sticky=tk.W, pady=2)
+        # Test location and orientation
+        ttk.Label(info_frame, text="Location/Orientation:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.location_orientation_var = tk.StringVar()
+        ttk.Entry(info_frame, textvariable=self.location_orientation_var, width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
+        row += 1
+
+        # Material and HT condition
+        ttk.Label(info_frame, text="Material/HT cond.:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.material_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.material_var, width=25).grid(
-            row=1, column=1, sticky=tk.EW, pady=2)
+        ttk.Entry(info_frame, textvariable=self.material_var, width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
+        row += 1
 
-        ttk.Label(info_frame, text="Test Date:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        # Certificate number
+        ttk.Label(info_frame, text="Certificate number:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.certificate_var = tk.StringVar()
+        ttk.Entry(info_frame, textvariable=self.certificate_var, width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
+        row += 1
+
+        # Test Date (readonly, from file)
+        ttk.Label(info_frame, text="Test Date:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.date_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.date_var, state='readonly', width=25).grid(
-            row=2, column=1, sticky=tk.EW, pady=2)
+        ttk.Entry(info_frame, textvariable=self.date_var, state='readonly', width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
+        row += 1
 
-        ttk.Label(info_frame, text="File:").grid(row=3, column=0, sticky=tk.W, pady=2)
+        # File (readonly)
+        ttk.Label(info_frame, text="File:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.file_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.file_var, state='readonly', width=25).grid(
-            row=3, column=1, sticky=tk.EW, pady=2)
+        ttk.Entry(info_frame, textvariable=self.file_var, state='readonly', width=30).grid(
+            row=row, column=1, sticky=tk.EW, pady=2)
 
         info_frame.columnconfigure(1, weight=1)
 
@@ -306,10 +356,10 @@ class TensileTestApp:
         self.results_tree.heading("uncertainty", text="U (k=2)")
         self.results_tree.heading("unit", text="Unit")
 
-        self.results_tree.column("parameter", width=150)
-        self.results_tree.column("value", width=80, anchor=tk.E)
-        self.results_tree.column("uncertainty", width=80, anchor=tk.E)
-        self.results_tree.column("unit", width=50, anchor=tk.CENTER)
+        self.results_tree.column("parameter", width=130)
+        self.results_tree.column("value", width=70, anchor=tk.E)
+        self.results_tree.column("uncertainty", width=70, anchor=tk.E)
+        self.results_tree.column("unit", width=45, anchor=tk.CENTER)
 
         self.results_tree.pack(fill=tk.BOTH, expand=True)
 
@@ -548,6 +598,11 @@ class TensileTestApp:
                 self.stress, self.strain, force_filtered, area, area_unc
             )
 
+            # True stress at fracture (end of test data)
+            true_stress_fracture = analyzer.calculate_true_stress_at_fracture(
+                self.stress, self.strain, area, area_unc
+            )
+
             # Ludwik parameters (K, n)
             K, n = analyzer.calculate_ludwik_parameters(
                 self.stress, self.strain, E.value, Rp02.value
@@ -610,6 +665,7 @@ class TensileTestApp:
                 'Rp05': Rp05,
                 'Rm': Rm,
                 'true_stress_max': true_stress_max,
+                'true_stress_fracture': true_stress_fracture,
                 'K': K,
                 'n': n,
                 'A_percent': A_percent,
@@ -658,6 +714,7 @@ class TensileTestApp:
             ("Rp0.5 (Yield 0.5%)", self.current_results['Rp05']),
             ("Rm (Ultimate)", self.current_results['Rm']),
             ("σ_true at Rm", self.current_results['true_stress_max']),
+            ("σ_true at fracture", self.current_results['true_stress_fracture']),
         ]
 
         # Ludwik parameters (if calculated)
