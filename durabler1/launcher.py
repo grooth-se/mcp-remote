@@ -19,6 +19,7 @@ import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
 from pathlib import Path
+from PIL import Image, ImageTk
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent
@@ -48,6 +49,11 @@ def check_dependencies():
         import matplotlib
     except ImportError:
         missing.append('matplotlib')
+
+    try:
+        import PIL
+    except ImportError:
+        missing.append('Pillow')
 
     if missing:
         print("Missing required packages:")
@@ -86,11 +92,17 @@ class DurablerLauncher:
         header_frame = ttk.Frame(self.root, padding=20)
         header_frame.pack(fill=tk.X)
 
-        ttk.Label(
-            header_frame,
-            text="Durabler",
-            font=('Helvetica', 24, 'bold')
-        ).pack()
+        # Load and display logo
+        logo_path = PROJECT_ROOT / "durablersvart.png"
+        if logo_path.exists():
+            logo_img = Image.open(logo_path)
+            # Resize logo to fit header (max height 80px)
+            max_height = 80
+            ratio = max_height / logo_img.height
+            new_size = (int(logo_img.width * ratio), max_height)
+            logo_img = logo_img.resize(new_size, Image.Resampling.LANCZOS)
+            self.logo_photo = ImageTk.PhotoImage(logo_img)
+            ttk.Label(header_frame, image=self.logo_photo).pack(pady=(0, 10))
 
         ttk.Label(
             header_frame,

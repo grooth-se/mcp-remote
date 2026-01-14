@@ -10,9 +10,13 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from typing import Optional, Dict, Any
 import numpy as np
+from PIL import Image, ImageTk
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+
+# Project root for logo path
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 
 class TensileTestApp:
@@ -102,6 +106,19 @@ class TensileTestApp:
         """Create main toolbar with buttons."""
         toolbar = ttk.Frame(self.root)
         toolbar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+
+        # Load and display logo
+        logo_path = PROJECT_ROOT / "durablersvart.png"
+        if logo_path.exists():
+            logo_img = Image.open(logo_path)
+            # Resize logo to fit toolbar (max height 40px)
+            max_height = 40
+            ratio = max_height / logo_img.height
+            new_size = (int(logo_img.width * ratio), max_height)
+            logo_img = logo_img.resize(new_size, Image.Resampling.LANCZOS)
+            self.logo_photo = ImageTk.PhotoImage(logo_img)
+            ttk.Label(toolbar, image=self.logo_photo).pack(side=tk.LEFT, padx=(0, 10))
+            ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
 
         if self.parent_launcher:
             ttk.Button(toolbar, text="<< Back", command=self._on_close).pack(
