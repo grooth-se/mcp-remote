@@ -649,50 +649,65 @@ class TensileAnalyzer:
 
     def calculate_true_stress_at_fracture(
         self,
+        force: np.ndarray,
         stress: np.ndarray,
-        strain: np.ndarray,
-        area: float,
-        area_uncertainty: float
+        final_diameter: float,
+        final_diameter_std: float = 0.01
     ) -> MeasuredValue:
         """
-        Calculate true stress at fracture (end of test data).
+        Calculate true stress at fracture for round specimens.
 
-        True stress = Engineering stress * (1 + Engineering strain)
-        σ_true = σ_eng * (1 + ε_eng)
+        True stress at fracture = F_break / A_final
 
-        Uses the last data point (after filtering, this represents fracture).
+        Where F_break is the force at the significant stress drop point,
+        and A_final is the cross-section area calculated from final diameter df.
 
         Parameters
         ----------
+        force : np.ndarray
+            Force array in kN
         stress : np.ndarray
-            Engineering stress in MPa
-        strain : np.ndarray
-            Engineering strain
-        area : float
-            Original cross-sectional area in mm^2
-        area_uncertainty : float
-            Uncertainty in area
+            Engineering stress in MPa (used to find break point)
+        final_diameter : float
+            Final diameter df after fracture in mm
+        final_diameter_std : float
+            Standard deviation of final diameter measurement in mm
 
         Returns
         -------
         MeasuredValue
             True stress at fracture with uncertainty in MPa
         """
-        # Use last data point (fracture point after filtering)
-        eng_stress = stress[-1]
-        eng_strain = strain[-1]
+        # Find break point: significant stress drop (>50% from max)
+        max_stress_idx = np.argmax(stress)
+        max_stress = stress[max_stress_idx]
+
+        # Find first point after max where stress drops significantly
+        break_idx = len(stress) - 1  # Default to last point
+        for i in range(max_stress_idx, len(stress)):
+            if stress[i] < max_stress * 0.5:
+                break_idx = i
+                break
+
+        # Force at break (convert kN to N)
+        force_break = force[break_idx] * 1000  # N
+
+        # Final cross-section area from final diameter
+        area_final = np.pi * (final_diameter ** 2) / 4  # mm²
 
         # True stress at fracture
-        true_stress = eng_stress * (1 + eng_strain)
+        true_stress = force_break / area_final  # MPa (N/mm² = MPa)
 
         # Uncertainty propagation
-        u_stress = eng_stress * self.config.force_calibration_uncertainty
-        u_strain = self.config.extensometer_uncertainty / 50.0  # Approximate
+        # u(σ) = σ * sqrt((u_F/F)² + (2*u_d/d)²)
+        u_force = force_break * self.config.force_calibration_uncertainty
+        u_diameter = final_diameter_std
 
-        u_combined = np.sqrt(
-            (u_stress * (1 + eng_strain))**2 +
-            (u_strain * eng_stress)**2
+        u_relative = np.sqrt(
+            (u_force / force_break) ** 2 +
+            (2 * u_diameter / final_diameter) ** 2
         )
+        u_combined = true_stress * u_relative
         U = 2 * u_combined
 
         return MeasuredValue(

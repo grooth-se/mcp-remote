@@ -598,11 +598,6 @@ class TensileTestApp:
                 self.stress, self.strain, force_filtered, area, area_unc
             )
 
-            # True stress at fracture (end of test data)
-            true_stress_fracture = analyzer.calculate_true_stress_at_fracture(
-                self.stress, self.strain, area, area_unc
-            )
-
             # Ludwik parameters (K, n)
             K, n = analyzer.calculate_ludwik_parameters(
                 self.stress, self.strain, E.value, Rp02.value
@@ -647,14 +642,19 @@ class TensileTestApp:
                 except ValueError:
                     pass
 
-            # Calculate Z% for round specimens if final diameter provided
+            # Calculate Z% and true stress at fracture for round specimens if final diameter provided
             Z = None
+            true_stress_fracture = None
             if self.specimen_type.get() == "round":
                 final_d_str = self.dim_vars.get('final_diameter', tk.StringVar()).get()
                 if final_d_str:
                     try:
                         final_d = float(final_d_str)
                         Z = analyzer.calculate_reduction_of_area(diameter, final_d)
+                        # True stress at fracture = F_break / A_final
+                        true_stress_fracture = analyzer.calculate_true_stress_at_fracture(
+                            force_filtered, self.stress, final_d
+                        )
                     except ValueError:
                         pass
 
@@ -714,8 +714,11 @@ class TensileTestApp:
             ("Rp0.5 (Yield 0.5%)", self.current_results['Rp05']),
             ("Rm (Ultimate)", self.current_results['Rm']),
             ("σ_true at Rm", self.current_results['true_stress_max']),
-            ("σ_true at fracture", self.current_results['true_stress_fracture']),
         ]
+
+        # Add true stress at fracture if final diameter was provided (round specimens)
+        if self.current_results.get('true_stress_fracture'):
+            results.append(("σ_true at fracture", self.current_results['true_stress_fracture']))
 
         # Ludwik parameters (if calculated)
         if self.current_results.get('K') and self.current_results['K'].value > 0:
