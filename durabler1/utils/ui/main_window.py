@@ -246,7 +246,7 @@ class TensileTestApp:
                 ("Initial diameter d0 (mm):", "diameter", "9.97"),
                 ("d0 StdDev (mm):", "diameter_std", "0.01"),
                 ("Initial gauge length L0 (mm):", "gauge_length", "50.0"),
-                ("Initial parallel length Lc (mm):", "parallel_length", "60.0"),
+                ("Initial parallel length Lc (mm):", "parallel_length", "112.0"),
                 # Final measurements (after test)
                 ("Final diameter df (mm):", "final_diameter", ""),
                 ("Final gauge length L1 (mm):", "final_gauge_length", ""),
@@ -260,7 +260,7 @@ class TensileTestApp:
                 ("Initial thickness t0 (mm):", "thickness", "3.0"),
                 ("t0 StdDev (mm):", "thickness_std", "0.01"),
                 ("Initial gauge length L0 (mm):", "gauge_length", "50.0"),
-                ("Initial parallel length Lc (mm):", "parallel_length", "60.0"),
+                ("Initial parallel length Lc (mm):", "parallel_length", "112.0"),
                 # Final measurements (after test)
                 ("Final gauge length L1 (mm):", "final_gauge_length", ""),
                 ("Final parallel length Lf (mm):", "final_parallel_length", ""),
@@ -298,8 +298,8 @@ class TensileTestApp:
         plot_frame.columnconfigure(0, weight=1)
         plot_frame.rowconfigure(0, weight=1)
 
-        # Create matplotlib figure (60% of original size)
-        self.fig = Figure(figsize=(5, 4), dpi=100)
+        # Create matplotlib figure (smaller to give more space to results)
+        self.fig = Figure(figsize=(4.5, 3.5), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self._setup_empty_plot()
 
@@ -467,7 +467,34 @@ class TensileTestApp:
             displacement_zeroed = self.current_data.displacement - self.current_data.displacement[0]
             strain_disp = displacement_zeroed / parallel_length
 
-            # Store both strain arrays
+            # Filter out data after specimen break or negative extensometer
+            # Find cutoff index based on:
+            # 1. Significant stress drop after max stress (>50% drop = break)
+            # 2. Extensometer going negative
+            max_stress_idx = np.argmax(stress)
+            max_stress = stress[max_stress_idx]
+
+            # Find break point: first point after max where stress drops below 50%
+            cutoff_idx = len(stress)
+            for i in range(max_stress_idx, len(stress)):
+                if stress[i] < max_stress * 0.5:
+                    cutoff_idx = i
+                    break
+
+            # Also check for negative extensometer readings
+            negative_ext_idx = np.where(self.current_data.extension < 0)[0]
+            if len(negative_ext_idx) > 0 and negative_ext_idx[0] > max_stress_idx:
+                cutoff_idx = min(cutoff_idx, negative_ext_idx[0])
+
+            # Apply cutoff to all arrays
+            stress = stress[:cutoff_idx]
+            strain_ext = strain_ext[:cutoff_idx]
+            strain_disp = strain_disp[:cutoff_idx]
+            displacement_zeroed = displacement_zeroed[:cutoff_idx]
+            force_filtered = self.current_data.force[:cutoff_idx]
+            extension_filtered = self.current_data.extension[:cutoff_idx]
+
+            # Store both strain arrays (filtered)
             self.strain_extensometer = strain_ext
             self.strain_displacement = strain_disp
 
@@ -494,12 +521,12 @@ class TensileTestApp:
                 self.stress, self.strain, E.value, area, area_unc
             )
             Rm = analyzer.calculate_ultimate_tensile_strength(
-                self.current_data.force, area, area_unc
+                force_filtered, area, area_unc
             )
 
             # True stress at maximum force
             true_stress_max = analyzer.calculate_true_stress_at_break(
-                self.stress, self.strain, self.current_data.force, area, area_unc
+                self.stress, self.strain, force_filtered, area, area_unc
             )
 
             # Ludwik parameters (K, n)
@@ -507,19 +534,19 @@ class TensileTestApp:
                 self.stress, self.strain, E.value, Rp02.value
             )
 
-            # Elongation calculations - use appropriate extension/displacement
+            # Elongation calculations - use appropriate extension/displacement (filtered)
             if self.strain_source.get() == "extensometer":
-                extension_data = self.current_data.extension
+                extension_data = extension_filtered
                 ref_length = gauge_length
             else:
                 extension_data = displacement_zeroed
                 ref_length = parallel_length
 
             A_percent = analyzer.calculate_elongation_at_fracture(
-                extension_data, self.current_data.force, ref_length
+                extension_data, force_filtered, ref_length
             )
             Ag = analyzer.calculate_uniform_elongation(
-                extension_data, self.current_data.force, ref_length
+                extension_data, force_filtered, ref_length
             )
 
             # Calculate manual elongation from L1 if provided (post-test measurement)
