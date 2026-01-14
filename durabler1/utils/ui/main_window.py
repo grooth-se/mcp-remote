@@ -8,7 +8,7 @@ running ASTM E8/E8M calculations, and displaying results with plots.
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 import numpy as np
 
 from matplotlib.figure import Figure
@@ -19,41 +19,28 @@ class TensileTestApp:
     """
     Main Tkinter application for tensile test analysis.
 
-    Layout:
-    +----------------------------------------------------------+
-    |  Menu Bar (File, Analysis, Help)                         |
-    +----------------------------------------------------------+
-    |  Toolbar (Load, Analyze, Export)                         |
-    +----------------------------------------------------------+
-    |  Left Panel (350px)    |    Right Panel (Plot Area)      |
-    |  +------------------+  |  +---------------------------+  |
-    |  | Specimen Input   |  |  |                           |  |
-    |  | - Type selector  |  |  |    Stress-Strain Plot     |  |
-    |  | - Dimensions     |  |  |                           |  |
-    |  +------------------+  |  +---------------------------+  |
-    |  | Test Info        |  |  | Toolbar (zoom, pan, save) |  |
-    |  | - File path      |  |  +---------------------------+  |
-    |  | - Date, operator |  |                                 |
-    |  +------------------+  |                                 |
-    |  | Results Table    |  |                                 |
-    |  | - Rp0.2, Rm, E   |  |                                 |
-    |  | - A%, Ag, Z%     |  |                                 |
-    |  +------------------+  |                                 |
-    +----------------------------------------------------------+
-    |  Status Bar                                              |
-    +----------------------------------------------------------+
+    Parameters
+    ----------
+    parent_launcher : object, optional
+        Reference to parent launcher window to return to on close
     """
 
-    def __init__(self):
-        self.root = tk.Tk()
+    def __init__(self, parent_launcher: Optional[Any] = None):
+        self.parent_launcher = parent_launcher
+
+        self.root = tk.Toplevel() if parent_launcher else tk.Tk()
         self.root.title("Durabler - Tensile Test Analysis (ASTM E8/E8M)")
         self.root.geometry("1400x900")
+
+        # Handle window close
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # Data storage
         self.current_data = None
         self.current_results = None
         self.stress = None
         self.strain = None
+        self.strain_displacement = None  # Strain from crosshead displacement
 
         # Create UI components
         self._create_menu()
@@ -64,6 +51,12 @@ class TensileTestApp:
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
+
+    def _on_close(self):
+        """Handle window close - return to launcher if available."""
+        self.root.destroy()
+        if self.parent_launcher:
+            self.parent_launcher.show()
 
     def _create_menu(self):
         """Create application menu bar."""
@@ -79,7 +72,9 @@ class TensileTestApp:
         file_menu.add_separator()
         file_menu.add_command(label="Export Results...", command=self.export_results)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.root.quit)
+        if self.parent_launcher:
+            file_menu.add_command(label="Return to Launcher", command=self._on_close)
+        file_menu.add_command(label="Exit", command=self._exit_app)
 
         # Analysis menu
         analysis_menu = tk.Menu(menubar, tearoff=0)
@@ -97,10 +92,21 @@ class TensileTestApp:
         self.root.bind('<Control-o>', lambda e: self.load_csv_file())
         self.root.bind('<F5>', lambda e: self.run_analysis())
 
+    def _exit_app(self):
+        """Exit the entire application."""
+        if self.parent_launcher:
+            self.parent_launcher.root.quit()
+        self.root.quit()
+
     def _create_toolbar(self):
         """Create main toolbar with buttons."""
         toolbar = ttk.Frame(self.root)
         toolbar.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+
+        if self.parent_launcher:
+            ttk.Button(toolbar, text="<< Back", command=self._on_close).pack(
+                side=tk.LEFT, padx=2)
+            ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
 
         ttk.Button(toolbar, text="Load CSV", command=self.load_csv_file).pack(
             side=tk.LEFT, padx=2)
@@ -130,7 +136,8 @@ class TensileTestApp:
 
     def _create_left_panel(self, parent):
         """Create left panel with specimen input and results."""
-        left_frame = ttk.Frame(parent, width=380)
+        # Create scrollable frame for left panel
+        left_frame = ttk.Frame(parent, width=400)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         left_frame.grid_propagate(False)
 
@@ -155,6 +162,27 @@ class TensileTestApp:
         self.dim_frame.pack(fill=tk.X, pady=5)
         self.dim_vars: Dict[str, tk.StringVar] = {}
         self._create_dimension_fields()
+
+        # Strain source selection
+        strain_frame = ttk.LabelFrame(left_frame, text="Strain Source", padding=10)
+        strain_frame.pack(fill=tk.X, pady=5)
+
+        self.strain_source = tk.StringVar(value="extensometer")
+        ttk.Radiobutton(
+            strain_frame, text="Extensometer (recommended)",
+            variable=self.strain_source, value="extensometer"
+        ).pack(anchor=tk.W)
+        ttk.Radiobutton(
+            strain_frame, text="Crosshead displacement",
+            variable=self.strain_source, value="displacement"
+        ).pack(anchor=tk.W)
+
+        ttk.Label(
+            strain_frame,
+            text="Note: Crosshead strain uses parallel length (Lc)",
+            font=('Helvetica', 8, 'italic'),
+            foreground='gray'
+        ).pack(anchor=tk.W, pady=(5, 0))
 
         # Test info frame
         info_frame = ttk.LabelFrame(left_frame, text="Test Information", padding=10)
@@ -197,7 +225,7 @@ class TensileTestApp:
         self.results_tree.heading("uncertainty", text="U (k=2)")
         self.results_tree.heading("unit", text="Unit")
 
-        self.results_tree.column("parameter", width=120)
+        self.results_tree.column("parameter", width=130)
         self.results_tree.column("value", width=80, anchor=tk.E)
         self.results_tree.column("uncertainty", width=80, anchor=tk.E)
         self.results_tree.column("unit", width=50, anchor=tk.CENTER)
@@ -216,7 +244,8 @@ class TensileTestApp:
             fields = [
                 ("Diameter (mm):", "diameter", "9.97"),
                 ("Diameter StdDev (mm):", "diameter_std", "0.01"),
-                ("Gauge Length (mm):", "gauge_length", "50.0"),
+                ("Gauge Length L0 (mm):", "gauge_length", "50.0"),
+                ("Parallel Length Lc (mm):", "parallel_length", "60.0"),
                 ("Final Diameter (mm):", "final_diameter", ""),
             ]
         else:
@@ -225,7 +254,8 @@ class TensileTestApp:
                 ("Width StdDev (mm):", "width_std", "0.01"),
                 ("Thickness (mm):", "thickness", "3.0"),
                 ("Thickness StdDev (mm):", "thickness_std", "0.01"),
-                ("Gauge Length (mm):", "gauge_length", "50.0"),
+                ("Gauge Length L0 (mm):", "gauge_length", "50.0"),
+                ("Parallel Length Lc (mm):", "parallel_length", "60.0"),
             ]
 
         for i, (label, key, default) in enumerate(fields):
@@ -321,6 +351,8 @@ class TensileTestApp:
                     self.dim_vars['diameter'].set(str(metadata.diameter))
                 if metadata.gauge_length and 'gauge_length' in self.dim_vars:
                     self.dim_vars['gauge_length'].set(str(metadata.gauge_length))
+                if metadata.parallel_length and 'parallel_length' in self.dim_vars:
+                    self.dim_vars['parallel_length'].set(str(metadata.parallel_length))
                 if metadata.width and 'width' in self.dim_vars:
                     self.dim_vars['width'].set(str(metadata.width))
                 if metadata.thickness and 'thickness' in self.dim_vars:
@@ -340,9 +372,14 @@ class TensileTestApp:
         self.ax.plot(
             self.current_data.extension,
             self.current_data.force,
-            'b-', linewidth=0.5, label='Raw Data'
+            'b-', linewidth=0.5, label='Extensometer'
         )
-        self.ax.set_xlabel("Extension (mm)")
+        self.ax.plot(
+            self.current_data.displacement - self.current_data.displacement[0],
+            self.current_data.force,
+            'r-', linewidth=0.5, alpha=0.5, label='Crosshead'
+        )
+        self.ax.set_xlabel("Extension / Displacement (mm)")
         self.ax.set_ylabel("Force (kN)")
         self.ax.set_title(f"Raw Data: {self.current_data.test_run_name}")
         self.ax.grid(True, linestyle='--', alpha=0.7)
@@ -366,6 +403,7 @@ class TensileTestApp:
 
             # Build specimen from input fields
             gauge_length = float(self.dim_vars['gauge_length'].get())
+            parallel_length = float(self.dim_vars['parallel_length'].get())
 
             if self.specimen_type.get() == "round":
                 diameter = float(self.dim_vars['diameter'].get())
@@ -375,7 +413,7 @@ class TensileTestApp:
                     diameter=diameter,
                     diameter_std=diameter_std,
                     gauge_length=gauge_length,
-                    parallel_length=gauge_length * 1.2,
+                    parallel_length=parallel_length,
                     material=self.material_var.get()
                 )
                 area = specimen.area
@@ -392,23 +430,42 @@ class TensileTestApp:
                     thickness=thickness,
                     thickness_std=thickness_std,
                     gauge_length=gauge_length,
-                    parallel_length=gauge_length * 1.2,
+                    parallel_length=parallel_length,
                     material=self.material_var.get()
                 )
                 area = specimen.area
                 area_unc = specimen.area_uncertainty
 
-            # Calculate stress-strain
-            self.stress, self.strain = analyzer.calculate_stress_strain(
-                self.current_data.force,
-                self.current_data.extension,
-                area,
-                gauge_length
-            )
+            # Calculate stress (same for both strain sources)
+            stress = (self.current_data.force * 1000) / area  # MPa
 
-            # Calculate results
+            # Calculate strain from extensometer
+            strain_ext = self.current_data.extension / gauge_length
+
+            # Calculate strain from crosshead displacement
+            # Zero the displacement and use parallel length
+            displacement_zeroed = self.current_data.displacement - self.current_data.displacement[0]
+            strain_disp = displacement_zeroed / parallel_length
+
+            # Store both strain arrays
+            self.strain_extensometer = strain_ext
+            self.strain_displacement = strain_disp
+
+            # Select strain source based on user choice
+            if self.strain_source.get() == "extensometer":
+                self.strain = strain_ext
+                strain_label = "Extensometer"
+                reference_length = gauge_length
+            else:
+                self.strain = strain_disp
+                strain_label = "Crosshead"
+                reference_length = parallel_length
+
+            self.stress = stress
+
+            # Calculate results using selected strain
             E = analyzer.calculate_youngs_modulus(
-                self.stress, self.strain, area_unc, gauge_length
+                self.stress, self.strain, area_unc, reference_length
             )
             Rp02 = analyzer.calculate_yield_strength_rp02(
                 self.stress, self.strain, E.value, area, area_unc
@@ -416,11 +473,20 @@ class TensileTestApp:
             Rm = analyzer.calculate_ultimate_tensile_strength(
                 self.current_data.force, area, area_unc
             )
+
+            # Elongation calculations - use appropriate extension/displacement
+            if self.strain_source.get() == "extensometer":
+                extension_data = self.current_data.extension
+                ref_length = gauge_length
+            else:
+                extension_data = displacement_zeroed
+                ref_length = parallel_length
+
             A_percent = analyzer.calculate_elongation_at_fracture(
-                self.current_data.extension, self.current_data.force, gauge_length
+                extension_data, self.current_data.force, ref_length
             )
             Ag = analyzer.calculate_uniform_elongation(
-                self.current_data.extension, self.current_data.force, gauge_length
+                extension_data, self.current_data.force, ref_length
             )
 
             # Calculate Z% for round specimens if final diameter provided
@@ -441,7 +507,8 @@ class TensileTestApp:
                 'Rm': Rm,
                 'A_percent': A_percent,
                 'Ag': Ag,
-                'Z': Z
+                'Z': Z,
+                'strain_source': strain_label
             }
 
             # Update results display
@@ -450,7 +517,7 @@ class TensileTestApp:
             # Plot stress-strain with annotations
             self._plot_stress_strain()
 
-            self._update_status("Analysis complete")
+            self._update_status(f"Analysis complete (strain from {strain_label})")
 
         except ValueError as e:
             messagebox.showerror("Analysis Error", f"Invalid input:\n{e}")
@@ -467,6 +534,15 @@ class TensileTestApp:
 
         if not self.current_results:
             return
+
+        # Add strain source info
+        strain_source = self.current_results.get('strain_source', 'Extensometer')
+        self.results_tree.insert("", tk.END, values=(
+            f"Strain Source:",
+            strain_source,
+            "",
+            ""
+        ), tags=('info',))
 
         results = [
             ("E (Young's Modulus)", self.current_results['E']),
@@ -494,8 +570,15 @@ class TensileTestApp:
 
         self.ax.clear()
 
-        # Main curve
-        self.ax.plot(self.strain, self.stress, 'b-', linewidth=1, label='Stress-Strain')
+        # Plot both strain sources if available
+        if self.strain_extensometer is not None:
+            self.ax.plot(self.strain_extensometer, self.stress, 'b-', linewidth=1,
+                         alpha=0.3 if self.strain_source.get() != "extensometer" else 1.0,
+                         label='Extensometer')
+        if self.strain_displacement is not None:
+            self.ax.plot(self.strain_displacement, self.stress, 'r-', linewidth=1,
+                         alpha=0.3 if self.strain_source.get() != "displacement" else 1.0,
+                         label='Crosshead')
 
         E = self.current_results['E']
         Rp02 = self.current_results['Rp02']
@@ -532,7 +615,8 @@ class TensileTestApp:
             arrowprops=dict(arrowstyle='->', color='red', lw=1)
         )
 
-        self.ax.set_xlabel("Engineering Strain (mm/mm)")
+        strain_label = self.current_results.get('strain_source', 'Extensometer')
+        self.ax.set_xlabel(f"Engineering Strain (mm/mm) - {strain_label}")
         self.ax.set_ylabel("Engineering Stress (MPa)")
         self.ax.set_title(f"Tensile Test: {self.specimen_id_var.get()}")
         self.ax.legend(loc='lower right')
@@ -550,6 +634,8 @@ class TensileTestApp:
         self.current_results = None
         self.stress = None
         self.strain = None
+        self.strain_extensometer = None
+        self.strain_displacement = None
 
         # Clear treeview
         for item in self.results_tree.get_children():
@@ -581,8 +667,9 @@ class TensileTestApp:
             try:
                 with open(filepath, 'w') as f:
                     f.write("Parameter,Value,Uncertainty,Unit\n")
+                    f.write(f"Strain Source,{self.current_results.get('strain_source', '')},,\n")
                     for key, result in self.current_results.items():
-                        if result:
+                        if result and key != 'strain_source' and hasattr(result, 'value'):
                             f.write(f"{key},{result.value},{result.uncertainty},{result.unit}\n")
 
                 self._update_status(f"Exported to: {filepath}")
@@ -620,6 +707,9 @@ class TensileTestApp:
             "- Elongation at Fracture (A%)\n"
             "- Uniform Elongation (Ag)\n"
             "- Reduction of Area (Z%)\n\n"
+            "Strain sources:\n"
+            "- Extensometer (L0)\n"
+            "- Crosshead displacement (Lc)\n\n"
             "All results include expanded uncertainty (k=2)"
         )
 
