@@ -298,8 +298,8 @@ class TensileTestApp:
         plot_frame.columnconfigure(0, weight=1)
         plot_frame.rowconfigure(0, weight=1)
 
-        # Create matplotlib figure
-        self.fig = Figure(figsize=(8, 6), dpi=100)
+        # Create matplotlib figure (60% of original size)
+        self.fig = Figure(figsize=(5, 4), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self._setup_empty_plot()
 
@@ -647,87 +647,53 @@ class TensileTestApp:
         # Get results
         E = self.current_results['E']
         Rp02 = self.current_results['Rp02']
-        Rp05 = self.current_results['Rp05']
         Rm = self.current_results['Rm']
         E_mpa = E.value * 1000
 
         max_stress = np.max(self.stress)
-        max_strain = np.max(self.strain)
 
-        # Plot stress-strain curves
-        # Main curve (selected source) - solid, prominent
-        self.ax.plot(self.strain, self.stress, 'b-', linewidth=1.5,
-                     label=f'Stress-Strain ({self.current_results.get("strain_source", "Selected")})')
+        # Get max strain from both sources for axis limits
+        max_strain_ext = np.max(self.strain_extensometer) if self.strain_extensometer is not None else 0
+        max_strain_disp = np.max(self.strain_displacement) if self.strain_displacement is not None else 0
+        max_strain = max(max_strain_ext, max_strain_disp)
 
-        # Secondary curve (other source) - dashed, faded
-        if self.strain_source.get() == "extensometer" and self.strain_displacement is not None:
-            self.ax.plot(self.strain_displacement, self.stress, 'c--', linewidth=0.8,
-                         alpha=0.4, label='Crosshead (alt)')
-        elif self.strain_source.get() == "displacement" and self.strain_extensometer is not None:
-            self.ax.plot(self.strain_extensometer, self.stress, 'c--', linewidth=0.8,
-                         alpha=0.4, label='Extensometer (alt)')
+        # Plot both stress-strain curves
+        # Extensometer strain - dark red solid line
+        if self.strain_extensometer is not None:
+            self.ax.plot(self.strain_extensometer, self.stress,
+                        color='darkred', linestyle='-', linewidth=1.2,
+                        label='Extensometer')
 
-        # Elastic modulus line (from origin)
-        elastic_strain = np.linspace(0, Rp02.value / E_mpa * 1.2, 100)
-        elastic_stress = E_mpa * elastic_strain
-        self.ax.plot(elastic_strain, elastic_stress, 'k-', linewidth=1,
-                     alpha=0.6, label=f'E = {E.value:.0f} GPa')
+        # Displacement strain - black solid line
+        if self.strain_displacement is not None:
+            self.ax.plot(self.strain_displacement, self.stress,
+                        color='black', linestyle='-', linewidth=1.2,
+                        label='Displacement')
 
-        # 0.2% offset line for Rp0.2
+        # Elastic slope line for Rp0.2 (grey, dashed)
         offset_02 = 0.002
         max_strain_for_line = min(0.03, max_strain * 0.4)
         offset_strain_02 = np.linspace(offset_02, max_strain_for_line, 100)
         offset_stress_02 = E_mpa * (offset_strain_02 - offset_02)
-        # Only plot where stress is positive and below max
         valid_02 = offset_stress_02 < max_stress * 1.1
-        self.ax.plot(offset_strain_02[valid_02], offset_stress_02[valid_02], 'g--', linewidth=1,
-                     label='0.2% Offset')
+        self.ax.plot(offset_strain_02[valid_02], offset_stress_02[valid_02],
+                    color='grey', linestyle='--', linewidth=1,
+                    label=f'E = {E.value:.0f} GPa (0.2% offset)')
 
-        # 0.5% offset line for Rp0.5
-        offset_05 = 0.005
-        offset_strain_05 = np.linspace(offset_05, max_strain_for_line, 100)
-        offset_stress_05 = E_mpa * (offset_strain_05 - offset_05)
-        valid_05 = offset_stress_05 < max_stress * 1.1
-        self.ax.plot(offset_strain_05[valid_05], offset_stress_05[valid_05], 'm--', linewidth=1,
-                     alpha=0.7, label='0.5% Offset')
+        # Horizontal reference line at Rp0.2 (grey, dotted)
+        self.ax.axhline(y=Rp02.value, color='grey', linestyle=':', linewidth=1,
+                       label=f'Rp0.2 = {Rp02.value:.0f} MPa')
 
-        # Horizontal reference lines for Rp0.2 and Rm
-        self.ax.axhline(y=Rp02.value, color='green', linestyle=':', linewidth=0.8, alpha=0.7)
-        self.ax.axhline(y=Rm.value, color='red', linestyle=':', linewidth=0.8, alpha=0.7)
-
-        # Mark Rp0.2 point
-        rp02_strain = offset_02 + Rp02.value / E_mpa
-        self.ax.plot(rp02_strain, Rp02.value, 'go', markersize=8, zorder=5)
-        self.ax.annotate(
-            f'Rp0.2 = {Rp02.value:.0f} MPa',
-            xy=(rp02_strain, Rp02.value),
-            xytext=(rp02_strain + max_strain * 0.05, Rp02.value - max_stress * 0.08),
-            fontsize=9, fontweight='bold',
-            arrowprops=dict(arrowstyle='->', color='green', lw=1.5)
-        )
-
-        # Mark Rp0.5 point
-        rp05_strain = offset_05 + Rp05.value / E_mpa
-        self.ax.plot(rp05_strain, Rp05.value, 'mo', markersize=6, zorder=5)
-
-        # Mark Rm point
-        rm_idx = np.argmax(self.stress)
-        self.ax.plot(self.strain[rm_idx], Rm.value, 'ro', markersize=8, zorder=5)
-        self.ax.annotate(
-            f'Rm = {Rm.value:.0f} MPa',
-            xy=(self.strain[rm_idx], Rm.value),
-            xytext=(self.strain[rm_idx] + max_strain * 0.05, Rm.value + max_stress * 0.03),
-            fontsize=9, fontweight='bold',
-            arrowprops=dict(arrowstyle='->', color='red', lw=1.5)
-        )
+        # Horizontal reference line at Rm (grey, dash-dot)
+        self.ax.axhline(y=Rm.value, color='grey', linestyle='-.', linewidth=1,
+                       label=f'Rm = {Rm.value:.0f} MPa')
 
         # Labels and formatting
-        strain_label = self.current_results.get('strain_source', 'Extensometer')
-        self.ax.set_xlabel(f"Engineering Strain ε (mm/mm) - {strain_label}", fontsize=10)
-        self.ax.set_ylabel("Engineering Stress σ (MPa)", fontsize=10)
-        self.ax.set_title(f"Tensile Test: {self.specimen_id_var.get()}", fontsize=11, fontweight='bold')
-        self.ax.legend(loc='lower right', fontsize=8)
-        self.ax.grid(True, linestyle='--', alpha=0.5)
+        self.ax.set_xlabel("Engineering Strain ε (mm/mm)", fontsize=9)
+        self.ax.set_ylabel("Engineering Stress σ (MPa)", fontsize=9)
+        self.ax.set_title(f"Tensile Test: {self.specimen_id_var.get()}", fontsize=10, fontweight='bold')
+        self.ax.legend(loc='lower right', fontsize=7)
+        self.ax.grid(True, linestyle='--', alpha=0.4)
 
         # Set reasonable axis limits
         self.ax.set_xlim(left=0, right=max_strain * 1.05)
