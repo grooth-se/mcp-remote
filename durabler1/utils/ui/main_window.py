@@ -128,16 +128,15 @@ class TensileTestApp:
         main_frame.columnconfigure(1, weight=1)
         main_frame.rowconfigure(0, weight=1)
 
-        # Left panel
+        # Left panel (inputs only)
         self._create_left_panel(main_frame)
 
-        # Right panel (plot)
-        self._create_plot_panel(main_frame)
+        # Right panel (results table + plot)
+        self._create_right_panel(main_frame)
 
     def _create_left_panel(self, parent):
-        """Create left panel with specimen input and results."""
-        # Create scrollable frame for left panel
-        left_frame = ttk.Frame(parent, width=400)
+        """Create left panel with specimen inputs only."""
+        left_frame = ttk.Frame(parent, width=350)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         left_frame.grid_propagate(False)
 
@@ -210,28 +209,6 @@ class TensileTestApp:
 
         info_frame.columnconfigure(1, weight=1)
 
-        # Results frame
-        results_frame = ttk.LabelFrame(left_frame, text="Results (ASTM E8/E8M)", padding=10)
-        results_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-
-        # Create treeview for results
-        columns = ("parameter", "value", "uncertainty", "unit")
-        self.results_tree = ttk.Treeview(
-            results_frame, columns=columns, show="headings", height=10
-        )
-
-        self.results_tree.heading("parameter", text="Parameter")
-        self.results_tree.heading("value", text="Value")
-        self.results_tree.heading("uncertainty", text="U (k=2)")
-        self.results_tree.heading("unit", text="Unit")
-
-        self.results_tree.column("parameter", width=130)
-        self.results_tree.column("value", width=80, anchor=tk.E)
-        self.results_tree.column("uncertainty", width=80, anchor=tk.E)
-        self.results_tree.column("unit", width=50, anchor=tk.CENTER)
-
-        self.results_tree.pack(fill=tk.BOTH, expand=True)
-
     def _create_dimension_fields(self):
         """Create dimension entry fields based on specimen type."""
         # Clear existing fields
@@ -291,15 +268,40 @@ class TensileTestApp:
         """Update dimension fields when specimen type changes."""
         self._create_dimension_fields()
 
-    def _create_plot_panel(self, parent):
-        """Create matplotlib plot panel."""
-        plot_frame = ttk.Frame(parent)
-        plot_frame.grid(row=0, column=1, sticky="nsew")
-        plot_frame.columnconfigure(0, weight=1)
-        plot_frame.rowconfigure(0, weight=1)
+    def _create_right_panel(self, parent):
+        """Create right panel with results table on top and plot below."""
+        right_frame = ttk.Frame(parent)
+        right_frame.grid(row=0, column=1, sticky="nsew")
+        right_frame.columnconfigure(0, weight=1)
+        right_frame.rowconfigure(1, weight=1)  # Plot expands
 
-        # Create matplotlib figure (smaller to give more space to results)
-        self.fig = Figure(figsize=(4.5, 3.5), dpi=100)
+        # Results table (top)
+        results_frame = ttk.LabelFrame(right_frame, text="Results (ASTM E8/E8M)", padding=5)
+        results_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
+
+        columns = ("parameter", "value", "uncertainty", "unit")
+        self.results_tree = ttk.Treeview(
+            results_frame, columns=columns, show="headings", height=12
+        )
+
+        self.results_tree.heading("parameter", text="Parameter")
+        self.results_tree.heading("value", text="Value")
+        self.results_tree.heading("uncertainty", text="U (k=2)")
+        self.results_tree.heading("unit", text="Unit")
+
+        self.results_tree.column("parameter", width=150)
+        self.results_tree.column("value", width=80, anchor=tk.E)
+        self.results_tree.column("uncertainty", width=80, anchor=tk.E)
+        self.results_tree.column("unit", width=50, anchor=tk.CENTER)
+
+        self.results_tree.pack(fill=tk.BOTH, expand=True)
+
+        # Plot (bottom)
+        plot_frame = ttk.LabelFrame(right_frame, text="Stress-Strain Curve", padding=5)
+        plot_frame.grid(row=1, column=0, sticky="nsew")
+
+        # Create matplotlib figure (compact size)
+        self.fig = Figure(figsize=(5, 3), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self._setup_empty_plot()
 
