@@ -242,28 +242,48 @@ class TensileTestApp:
 
         if self.specimen_type.get() == "round":
             fields = [
-                ("Diameter (mm):", "diameter", "9.97"),
-                ("Diameter StdDev (mm):", "diameter_std", "0.01"),
-                ("Gauge Length L0 (mm):", "gauge_length", "50.0"),
-                ("Parallel Length Lc (mm):", "parallel_length", "60.0"),
-                ("Final Diameter (mm):", "final_diameter", ""),
+                # Initial measurements (before test)
+                ("Initial diameter d0 (mm):", "diameter", "9.97"),
+                ("d0 StdDev (mm):", "diameter_std", "0.01"),
+                ("Initial gauge length L0 (mm):", "gauge_length", "50.0"),
+                ("Initial parallel length Lc (mm):", "parallel_length", "60.0"),
+                # Final measurements (after test)
+                ("Final diameter df (mm):", "final_diameter", ""),
+                ("Final gauge length L1 (mm):", "final_gauge_length", ""),
+                ("Final parallel length Lf (mm):", "final_parallel_length", ""),
             ]
         else:
             fields = [
-                ("Width (mm):", "width", "12.5"),
-                ("Width StdDev (mm):", "width_std", "0.01"),
-                ("Thickness (mm):", "thickness", "3.0"),
-                ("Thickness StdDev (mm):", "thickness_std", "0.01"),
-                ("Gauge Length L0 (mm):", "gauge_length", "50.0"),
-                ("Parallel Length Lc (mm):", "parallel_length", "60.0"),
+                # Initial measurements (before test)
+                ("Initial width w0 (mm):", "width", "12.5"),
+                ("w0 StdDev (mm):", "width_std", "0.01"),
+                ("Initial thickness t0 (mm):", "thickness", "3.0"),
+                ("t0 StdDev (mm):", "thickness_std", "0.01"),
+                ("Initial gauge length L0 (mm):", "gauge_length", "50.0"),
+                ("Initial parallel length Lc (mm):", "parallel_length", "60.0"),
+                # Final measurements (after test)
+                ("Final gauge length L1 (mm):", "final_gauge_length", ""),
+                ("Final parallel length Lf (mm):", "final_parallel_length", ""),
             ]
 
-        for i, (label, key, default) in enumerate(fields):
-            ttk.Label(self.dim_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
+        row = 0
+        for label, key, default in fields:
+            # Add section header before final measurements
+            if key == "final_diameter" or (key == "final_gauge_length" and self.specimen_type.get() != "round"):
+                ttk.Separator(self.dim_frame, orient=tk.HORIZONTAL).grid(
+                    row=row, column=0, columnspan=2, sticky="ew", pady=5)
+                row += 1
+                ttk.Label(self.dim_frame, text="Post-test measurements:",
+                         font=('Helvetica', 9, 'italic')).grid(
+                    row=row, column=0, columnspan=2, sticky=tk.W, pady=2)
+                row += 1
+
+            ttk.Label(self.dim_frame, text=label).grid(row=row, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar(value=default)
             self.dim_vars[key] = var
             entry = ttk.Entry(self.dim_frame, textvariable=var, width=12)
-            entry.grid(row=i, column=1, sticky=tk.W, pady=2)
+            entry.grid(row=row, column=1, sticky=tk.W, pady=2)
+            row += 1
 
         self.dim_frame.columnconfigure(1, weight=1)
 
@@ -470,8 +490,21 @@ class TensileTestApp:
             Rp02 = analyzer.calculate_yield_strength_rp02(
                 self.stress, self.strain, E.value, area, area_unc
             )
+            Rp05 = analyzer.calculate_yield_strength_rp05(
+                self.stress, self.strain, E.value, area, area_unc
+            )
             Rm = analyzer.calculate_ultimate_tensile_strength(
                 self.current_data.force, area, area_unc
+            )
+
+            # True stress at maximum force
+            true_stress_max = analyzer.calculate_true_stress_at_break(
+                self.stress, self.strain, self.current_data.force, area, area_unc
+            )
+
+            # Ludwik parameters (K, n)
+            K, n = analyzer.calculate_ludwik_parameters(
+                self.stress, self.strain, E.value, Rp02.value
             )
 
             # Elongation calculations - use appropriate extension/displacement
@@ -489,6 +522,30 @@ class TensileTestApp:
                 extension_data, self.current_data.force, ref_length
             )
 
+            # Calculate manual elongation from L1 if provided (post-test measurement)
+            A_manual = None
+            final_L_str = self.dim_vars.get('final_gauge_length', tk.StringVar()).get()
+            if final_L_str:
+                try:
+                    final_L = float(final_L_str)
+                    # A% = (L1 - L0) / L0 * 100
+                    A_manual_value = ((final_L - gauge_length) / gauge_length) * 100
+                    # Uncertainty from measurement uncertainty (assume 0.1mm for ruler)
+                    u_length = 0.1  # mm
+                    u_combined = abs(A_manual_value) * np.sqrt(
+                        (u_length / abs(final_L - gauge_length))**2 +
+                        (u_length / gauge_length)**2
+                    ) if abs(final_L - gauge_length) > 0.001 else 0.5
+                    from ..models.test_result import MeasuredValue
+                    A_manual = MeasuredValue(
+                        value=round(A_manual_value, 2),
+                        uncertainty=round(2 * u_combined, 2),
+                        unit="%",
+                        coverage_factor=2.0
+                    )
+                except ValueError:
+                    pass
+
             # Calculate Z% for round specimens if final diameter provided
             Z = None
             if self.specimen_type.get() == "round":
@@ -504,8 +561,13 @@ class TensileTestApp:
             self.current_results = {
                 'E': E,
                 'Rp02': Rp02,
+                'Rp05': Rp05,
                 'Rm': Rm,
+                'true_stress_max': true_stress_max,
+                'K': K,
+                'n': n,
                 'A_percent': A_percent,
+                'A_manual': A_manual,
                 'Ag': Ag,
                 'Z': Z,
                 'strain_source': strain_label
@@ -546,11 +608,23 @@ class TensileTestApp:
 
         results = [
             ("E (Young's Modulus)", self.current_results['E']),
-            ("Rp0.2 (Yield)", self.current_results['Rp02']),
+            ("Rp0.2 (Yield 0.2%)", self.current_results['Rp02']),
+            ("Rp0.5 (Yield 0.5%)", self.current_results['Rp05']),
             ("Rm (Ultimate)", self.current_results['Rm']),
-            ("A% (Elongation)", self.current_results['A_percent']),
-            ("Ag (Uniform Elong.)", self.current_results['Ag']),
+            ("σ_true at Rm", self.current_results['true_stress_max']),
         ]
+
+        # Ludwik parameters (if calculated)
+        if self.current_results.get('K') and self.current_results['K'].value > 0:
+            results.append(("K (Ludwik coeff.)", self.current_results['K']))
+            results.append(("n (Strain hard. exp.)", self.current_results['n']))
+
+        # Elongation results
+        results.append(("A% (from test data)", self.current_results['A_percent']))
+        results.append(("Ag (Uniform Elong.)", self.current_results['Ag']))
+
+        if self.current_results.get('A_manual'):
+            results.append(("A% (from L1-L0)", self.current_results['A_manual']))
 
         if self.current_results.get('Z'):
             results.append(("Z% (Red. of Area)", self.current_results['Z']))
@@ -570,61 +644,94 @@ class TensileTestApp:
 
         self.ax.clear()
 
-        # Plot both strain sources if available
-        if self.strain_extensometer is not None:
-            self.ax.plot(self.strain_extensometer, self.stress, 'b-', linewidth=1,
-                         alpha=0.3 if self.strain_source.get() != "extensometer" else 1.0,
-                         label='Extensometer')
-        if self.strain_displacement is not None:
-            self.ax.plot(self.strain_displacement, self.stress, 'r-', linewidth=1,
-                         alpha=0.3 if self.strain_source.get() != "displacement" else 1.0,
-                         label='Crosshead')
-
+        # Get results
         E = self.current_results['E']
         Rp02 = self.current_results['Rp02']
+        Rp05 = self.current_results['Rp05']
         Rm = self.current_results['Rm']
-
-        # Offset line for Rp0.2
-        offset = 0.002
         E_mpa = E.value * 1000
-        max_strain_for_line = min(0.02, np.max(self.strain) * 0.3)
-        offset_strain = np.linspace(offset, max_strain_for_line, 100)
-        offset_stress = E_mpa * (offset_strain - offset)
-        self.ax.plot(offset_strain, offset_stress, 'g--', linewidth=0.8,
-                     label='0.2% Offset Line')
 
-        # Mark Rp0.2
-        rp02_strain = offset + Rp02.value / E_mpa
-        self.ax.plot(rp02_strain, Rp02.value, 'go', markersize=8)
+        max_stress = np.max(self.stress)
+        max_strain = np.max(self.strain)
+
+        # Plot stress-strain curves
+        # Main curve (selected source) - solid, prominent
+        self.ax.plot(self.strain, self.stress, 'b-', linewidth=1.5,
+                     label=f'Stress-Strain ({self.current_results.get("strain_source", "Selected")})')
+
+        # Secondary curve (other source) - dashed, faded
+        if self.strain_source.get() == "extensometer" and self.strain_displacement is not None:
+            self.ax.plot(self.strain_displacement, self.stress, 'c--', linewidth=0.8,
+                         alpha=0.4, label='Crosshead (alt)')
+        elif self.strain_source.get() == "displacement" and self.strain_extensometer is not None:
+            self.ax.plot(self.strain_extensometer, self.stress, 'c--', linewidth=0.8,
+                         alpha=0.4, label='Extensometer (alt)')
+
+        # Elastic modulus line (from origin)
+        elastic_strain = np.linspace(0, Rp02.value / E_mpa * 1.2, 100)
+        elastic_stress = E_mpa * elastic_strain
+        self.ax.plot(elastic_strain, elastic_stress, 'k-', linewidth=1,
+                     alpha=0.6, label=f'E = {E.value:.0f} GPa')
+
+        # 0.2% offset line for Rp0.2
+        offset_02 = 0.002
+        max_strain_for_line = min(0.03, max_strain * 0.4)
+        offset_strain_02 = np.linspace(offset_02, max_strain_for_line, 100)
+        offset_stress_02 = E_mpa * (offset_strain_02 - offset_02)
+        # Only plot where stress is positive and below max
+        valid_02 = offset_stress_02 < max_stress * 1.1
+        self.ax.plot(offset_strain_02[valid_02], offset_stress_02[valid_02], 'g--', linewidth=1,
+                     label='0.2% Offset')
+
+        # 0.5% offset line for Rp0.5
+        offset_05 = 0.005
+        offset_strain_05 = np.linspace(offset_05, max_strain_for_line, 100)
+        offset_stress_05 = E_mpa * (offset_strain_05 - offset_05)
+        valid_05 = offset_stress_05 < max_stress * 1.1
+        self.ax.plot(offset_strain_05[valid_05], offset_stress_05[valid_05], 'm--', linewidth=1,
+                     alpha=0.7, label='0.5% Offset')
+
+        # Horizontal reference lines for Rp0.2 and Rm
+        self.ax.axhline(y=Rp02.value, color='green', linestyle=':', linewidth=0.8, alpha=0.7)
+        self.ax.axhline(y=Rm.value, color='red', linestyle=':', linewidth=0.8, alpha=0.7)
+
+        # Mark Rp0.2 point
+        rp02_strain = offset_02 + Rp02.value / E_mpa
+        self.ax.plot(rp02_strain, Rp02.value, 'go', markersize=8, zorder=5)
         self.ax.annotate(
             f'Rp0.2 = {Rp02.value:.0f} MPa',
             xy=(rp02_strain, Rp02.value),
-            xytext=(rp02_strain + 0.01, Rp02.value - Rm.value * 0.1),
-            fontsize=9,
-            arrowprops=dict(arrowstyle='->', color='green', lw=1)
+            xytext=(rp02_strain + max_strain * 0.05, Rp02.value - max_stress * 0.08),
+            fontsize=9, fontweight='bold',
+            arrowprops=dict(arrowstyle='->', color='green', lw=1.5)
         )
 
-        # Mark Rm
+        # Mark Rp0.5 point
+        rp05_strain = offset_05 + Rp05.value / E_mpa
+        self.ax.plot(rp05_strain, Rp05.value, 'mo', markersize=6, zorder=5)
+
+        # Mark Rm point
         rm_idx = np.argmax(self.stress)
-        self.ax.plot(self.strain[rm_idx], Rm.value, 'ro', markersize=8)
+        self.ax.plot(self.strain[rm_idx], Rm.value, 'ro', markersize=8, zorder=5)
         self.ax.annotate(
             f'Rm = {Rm.value:.0f} MPa',
             xy=(self.strain[rm_idx], Rm.value),
-            xytext=(self.strain[rm_idx] + 0.01, Rm.value + Rm.value * 0.02),
-            fontsize=9,
-            arrowprops=dict(arrowstyle='->', color='red', lw=1)
+            xytext=(self.strain[rm_idx] + max_strain * 0.05, Rm.value + max_stress * 0.03),
+            fontsize=9, fontweight='bold',
+            arrowprops=dict(arrowstyle='->', color='red', lw=1.5)
         )
 
+        # Labels and formatting
         strain_label = self.current_results.get('strain_source', 'Extensometer')
-        self.ax.set_xlabel(f"Engineering Strain (mm/mm) - {strain_label}")
-        self.ax.set_ylabel("Engineering Stress (MPa)")
-        self.ax.set_title(f"Tensile Test: {self.specimen_id_var.get()}")
-        self.ax.legend(loc='lower right')
-        self.ax.grid(True, linestyle='--', alpha=0.7)
+        self.ax.set_xlabel(f"Engineering Strain ε (mm/mm) - {strain_label}", fontsize=10)
+        self.ax.set_ylabel("Engineering Stress σ (MPa)", fontsize=10)
+        self.ax.set_title(f"Tensile Test: {self.specimen_id_var.get()}", fontsize=11, fontweight='bold')
+        self.ax.legend(loc='lower right', fontsize=8)
+        self.ax.grid(True, linestyle='--', alpha=0.5)
 
         # Set reasonable axis limits
-        self.ax.set_xlim(left=0)
-        self.ax.set_ylim(bottom=0)
+        self.ax.set_xlim(left=0, right=max_strain * 1.05)
+        self.ax.set_ylim(bottom=0, top=max_stress * 1.1)
 
         self.fig.tight_layout()
         self.canvas.draw()

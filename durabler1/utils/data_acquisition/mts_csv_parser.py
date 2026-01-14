@@ -168,6 +168,12 @@ def parse_mts_csv(filepath: Path) -> MTSTestData:
     force = df[force_col].values if force_col else np.array([])
     extension = df[ext_col].values if ext_col else np.array([])
 
+    # Apply absolute value - MTS outputs negative values in machine coordinate system
+    # Tensile test: displacement increases, force increases until fracture
+    displacement = np.abs(displacement)
+    force = np.abs(force)
+    extension = np.abs(extension)
+
     return MTSTestData(
         time=time,
         displacement=displacement,

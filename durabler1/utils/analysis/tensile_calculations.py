@@ -506,3 +506,239 @@ class TensileAnalyzer:
             unit="%",
             coverage_factor=2.0
         )
+
+    def calculate_yield_strength_rp05(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        E_modulus: float,
+        area: float,
+        area_uncertainty: float
+    ) -> MeasuredValue:
+        """
+        Calculate 0.5% offset yield strength (Rp0.5) per ASTM E8.
+
+        Same method as Rp0.2 but with 0.5% strain offset.
+
+        Parameters
+        ----------
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain
+        E_modulus : float
+            Young's modulus in GPa
+        area : float
+            Cross-sectional area in mm^2
+        area_uncertainty : float
+            Uncertainty in area in mm^2
+
+        Returns
+        -------
+        MeasuredValue
+            Yield strength Rp0.5 with uncertainty in MPa
+        """
+        offset = 0.005  # 0.5%
+        E_mpa = E_modulus * 1000
+
+        offset_line = E_mpa * (strain - offset)
+        curve_minus_offset = stress - offset_line
+
+        valid_idx = strain > offset * 1.5
+
+        if not np.any(valid_idx):
+            raise ValueError("Insufficient strain data for Rp0.5 calculation")
+
+        curve_segment = curve_minus_offset[valid_idx]
+        strain_segment = strain[valid_idx]
+        stress_segment = stress[valid_idx]
+
+        sign_changes = np.where(np.diff(np.sign(curve_segment)))[0]
+
+        if len(sign_changes) == 0:
+            idx = np.argmin(np.abs(curve_segment))
+            yield_stress = stress_segment[idx]
+        else:
+            idx = sign_changes[0]
+            s0, s1 = strain_segment[idx], strain_segment[idx + 1]
+            c0, c1 = curve_segment[idx], curve_segment[idx + 1]
+
+            if c1 - c0 != 0:
+                yield_strain = s0 - c0 * (s1 - s0) / (c1 - c0)
+                yield_stress = E_mpa * (yield_strain - offset)
+            else:
+                yield_stress = stress_segment[idx]
+
+        u_area = yield_stress * (area_uncertainty / area)
+        u_force = yield_stress * self.config.force_calibration_uncertainty
+
+        if len(sign_changes) > 0 and idx + 1 < len(stress_segment):
+            u_interpolation = abs(stress_segment[idx + 1] - stress_segment[idx]) / 4
+        else:
+            u_interpolation = yield_stress * 0.01
+
+        u_combined = np.sqrt(u_area**2 + u_force**2 + u_interpolation**2)
+        U = 2 * u_combined
+
+        return MeasuredValue(
+            value=round(yield_stress, 1),
+            uncertainty=round(U, 1),
+            unit="MPa",
+            coverage_factor=2.0
+        )
+
+    def calculate_true_stress_at_break(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        force: np.ndarray,
+        area: float,
+        area_uncertainty: float
+    ) -> MeasuredValue:
+        """
+        Calculate true stress at the point of maximum force (before necking).
+
+        True stress = Engineering stress * (1 + Engineering strain)
+        σ_true = σ_eng * (1 + ε_eng)
+
+        This is valid up to the onset of necking (uniform elongation).
+
+        Parameters
+        ----------
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain
+        force : np.ndarray
+            Force in kN
+        area : float
+            Original cross-sectional area in mm^2
+        area_uncertainty : float
+            Uncertainty in area
+
+        Returns
+        -------
+        MeasuredValue
+            True stress at maximum force with uncertainty in MPa
+        """
+        max_force_idx = np.argmax(force)
+        eng_stress = stress[max_force_idx]
+        eng_strain = strain[max_force_idx]
+
+        # True stress at uniform elongation (before necking)
+        true_stress = eng_stress * (1 + eng_strain)
+
+        # Uncertainty propagation
+        u_stress = eng_stress * self.config.force_calibration_uncertainty
+        u_strain = self.config.extensometer_uncertainty / 50.0  # Approximate
+
+        # d(true_stress)/d(eng_stress) = (1 + eng_strain)
+        # d(true_stress)/d(eng_strain) = eng_stress
+        u_combined = np.sqrt(
+            (u_stress * (1 + eng_strain))**2 +
+            (u_strain * eng_stress)**2
+        )
+        U = 2 * u_combined
+
+        return MeasuredValue(
+            value=round(true_stress, 1),
+            uncertainty=round(U, 1),
+            unit="MPa",
+            coverage_factor=2.0
+        )
+
+    def calculate_ludwik_parameters(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        E_modulus: float,
+        Rp02: float
+    ) -> Tuple[MeasuredValue, MeasuredValue]:
+        """
+        Calculate Ludwik's law parameters (strain hardening).
+
+        Ludwik's equation: σ = K * ε_p^n
+
+        Where:
+        - σ is true stress
+        - ε_p is true plastic strain = ε_true - σ/E
+        - K is strength coefficient
+        - n is strain hardening exponent
+
+        Parameters
+        ----------
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain
+        E_modulus : float
+            Young's modulus in GPa
+        Rp02 : float
+            Yield strength Rp0.2 in MPa
+
+        Returns
+        -------
+        tuple[MeasuredValue, MeasuredValue]
+            (K, n) - strength coefficient (MPa) and strain hardening exponent
+        """
+        E_mpa = E_modulus * 1000
+
+        # Convert to true stress and true strain
+        true_stress = stress * (1 + strain)
+        true_strain = np.log(1 + strain)
+
+        # Plastic strain = total strain - elastic strain
+        plastic_strain = true_strain - true_stress / E_mpa
+
+        # Select plastic region: from yield to max stress
+        # Use points where stress > Rp02 and plastic strain > 0
+        mask = (stress > Rp02 * 1.05) & (plastic_strain > 0.001) & (plastic_strain < 0.5)
+
+        if np.sum(mask) < 10:
+            # Not enough data for reliable fit
+            return (
+                MeasuredValue(value=0, uncertainty=0, unit="MPa", coverage_factor=2.0),
+                MeasuredValue(value=0, uncertainty=0, unit="-", coverage_factor=2.0)
+            )
+
+        # Fit log(σ) = log(K) + n * log(ε_p)
+        log_stress = np.log(true_stress[mask])
+        log_strain = np.log(plastic_strain[mask])
+
+        # Remove any infinities or NaNs
+        valid = np.isfinite(log_stress) & np.isfinite(log_strain)
+        if np.sum(valid) < 5:
+            return (
+                MeasuredValue(value=0, uncertainty=0, unit="MPa", coverage_factor=2.0),
+                MeasuredValue(value=0, uncertainty=0, unit="-", coverage_factor=2.0)
+            )
+
+        log_stress = log_stress[valid]
+        log_strain = log_strain[valid]
+
+        # Linear regression
+        slope, intercept, r_value, p_value, std_err = stats.linregress(
+            log_strain, log_stress
+        )
+
+        n = slope
+        K = np.exp(intercept)
+
+        # Uncertainty from regression
+        u_n = std_err
+        u_K = K * std_err  # Approximate
+
+        return (
+            MeasuredValue(
+                value=round(K, 1),
+                uncertainty=round(2 * u_K, 1),
+                unit="MPa",
+                coverage_factor=2.0
+            ),
+            MeasuredValue(
+                value=round(n, 3),
+                uncertainty=round(2 * u_n, 3),
+                unit="-",
+                coverage_factor=2.0
+            )
+        )
