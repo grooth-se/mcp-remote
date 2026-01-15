@@ -157,33 +157,36 @@ class TensileTestApp:
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         left_frame.grid_propagate(False)
 
-        # Specimen type and yield type selection
-        specimen_frame = ttk.LabelFrame(left_frame, text="Specimen Geometry", padding=10)
+        # Specimen type, yield type, and strain source selection
+        specimen_frame = ttk.LabelFrame(left_frame, text="Specimen Geometry / Strain Source", padding=10)
         specimen_frame.pack(fill=tk.X, pady=5)
 
-        # Create two columns
+        # Create three columns
         geo_col = ttk.Frame(specimen_frame)
         geo_col.pack(side=tk.LEFT, anchor=tk.N)
 
         yield_col = ttk.Frame(specimen_frame)
-        yield_col.pack(side=tk.LEFT, anchor=tk.N, padx=(20, 0))
+        yield_col.pack(side=tk.LEFT, anchor=tk.N, padx=(15, 0))
+
+        strain_col = ttk.Frame(specimen_frame)
+        strain_col.pack(side=tk.LEFT, anchor=tk.N, padx=(15, 0))
 
         # Geometry type (left column)
         ttk.Label(geo_col, text="Geometry:", font=('Helvetica', 9, 'bold')).pack(anchor=tk.W)
         self.specimen_type = tk.StringVar(value="round")
         ttk.Radiobutton(
-            geo_col, text="Round (Cylindrical)",
+            geo_col, text="Round",
             variable=self.specimen_type, value="round",
             command=self._update_dimension_fields
         ).pack(anchor=tk.W)
         ttk.Radiobutton(
-            geo_col, text="Rectangular (Flat)",
+            geo_col, text="Rectangular",
             variable=self.specimen_type, value="rectangular",
             command=self._update_dimension_fields
         ).pack(anchor=tk.W)
 
-        # Yield type (right column)
-        ttk.Label(yield_col, text="Yield strength:", font=('Helvetica', 9, 'bold')).pack(anchor=tk.W)
+        # Yield type (middle column)
+        ttk.Label(yield_col, text="Yield:", font=('Helvetica', 9, 'bold')).pack(anchor=tk.W)
         self.yield_type = tk.StringVar(value="offset")
         ttk.Radiobutton(
             yield_col, text="Rp0.2 / Rp0.5",
@@ -194,32 +197,23 @@ class TensileTestApp:
             variable=self.yield_type, value="yield_point"
         ).pack(anchor=tk.W)
 
+        # Strain source (right column)
+        ttk.Label(strain_col, text="Strain:", font=('Helvetica', 9, 'bold')).pack(anchor=tk.W)
+        self.strain_source = tk.StringVar(value="extensometer")
+        ttk.Radiobutton(
+            strain_col, text="Extensometer",
+            variable=self.strain_source, value="extensometer"
+        ).pack(anchor=tk.W)
+        ttk.Radiobutton(
+            strain_col, text="Crosshead",
+            variable=self.strain_source, value="displacement"
+        ).pack(anchor=tk.W)
+
         # Dimension entry frame
         self.dim_frame = ttk.LabelFrame(left_frame, text="Dimensions", padding=10)
         self.dim_frame.pack(fill=tk.X, pady=5)
         self.dim_vars: Dict[str, tk.StringVar] = {}
         self._create_dimension_fields()
-
-        # Strain source selection
-        strain_frame = ttk.LabelFrame(left_frame, text="Strain Source", padding=10)
-        strain_frame.pack(fill=tk.X, pady=5)
-
-        self.strain_source = tk.StringVar(value="extensometer")
-        ttk.Radiobutton(
-            strain_frame, text="Extensometer (recommended)",
-            variable=self.strain_source, value="extensometer"
-        ).pack(anchor=tk.W)
-        ttk.Radiobutton(
-            strain_frame, text="Crosshead displacement",
-            variable=self.strain_source, value="displacement"
-        ).pack(anchor=tk.W)
-
-        ttk.Label(
-            strain_frame,
-            text="Note: Crosshead strain uses parallel length (Lc)",
-            font=('Helvetica', 8, 'italic'),
-            foreground='gray'
-        ).pack(anchor=tk.W, pady=(5, 0))
 
         # Test info frame
         info_frame = ttk.LabelFrame(left_frame, text="Test Information", padding=10)
