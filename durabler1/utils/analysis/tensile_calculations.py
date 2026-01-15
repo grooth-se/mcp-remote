@@ -587,6 +587,182 @@ class TensileAnalyzer:
             coverage_factor=2.0
         )
 
+    def calculate_upper_yield_strength_reh(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        area: float,
+        area_uncertainty: float
+    ) -> MeasuredValue:
+        """
+        Calculate upper yield strength ReH per ASTM E8 / ISO 6892-1.
+
+        ReH is the maximum stress at the onset of yielding, before the
+        stress drops during Lüders band formation (yield point elongation).
+
+        Parameters
+        ----------
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain
+        area : float
+            Cross-sectional area in mm^2
+        area_uncertainty : float
+            Uncertainty in area in mm^2
+
+        Returns
+        -------
+        MeasuredValue
+            Upper yield strength ReH with uncertainty in MPa
+        """
+        # Find the first local maximum in stress (upper yield point)
+        # Look in the early part of the curve (first 5% strain typically)
+        max_strain_search = 0.05
+        search_idx = strain < max_strain_search
+
+        if not np.any(search_idx):
+            search_idx = np.ones(len(strain), dtype=bool)
+
+        stress_search = stress[search_idx]
+
+        # Find local maxima by looking for sign changes in the derivative
+        # Use smoothing to avoid noise-induced false peaks
+        window = min(5, len(stress_search) // 10)
+        if window < 2:
+            window = 2
+
+        # Simple smoothing
+        stress_smooth = np.convolve(stress_search, np.ones(window)/window, mode='same')
+
+        # Find first significant peak (where derivative changes from + to -)
+        diff_stress = np.diff(stress_smooth)
+
+        # Look for first point where stress starts to decrease significantly
+        # after an initial rise
+        peak_idx = None
+        for i in range(len(diff_stress) - 1):
+            if diff_stress[i] > 0 and diff_stress[i + 1] < 0:
+                # Check if this is a significant peak (not just noise)
+                if i > 10:  # Skip very early points
+                    peak_idx = i + 1
+                    break
+
+        if peak_idx is None:
+            # No clear yield point, use maximum in search region
+            peak_idx = np.argmax(stress_search)
+
+        ReH = stress_search[peak_idx]
+
+        # Uncertainty calculation
+        u_area = ReH * (area_uncertainty / area)
+        u_force = ReH * self.config.force_calibration_uncertainty
+        u_peak = ReH * 0.005  # Peak detection uncertainty
+
+        u_combined = np.sqrt(u_area**2 + u_force**2 + u_peak**2)
+        U = 2 * u_combined
+
+        return MeasuredValue(
+            value=round(ReH, 1),
+            uncertainty=round(U, 1),
+            unit="MPa",
+            coverage_factor=2.0
+        )
+
+    def calculate_lower_yield_strength_rel(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        area: float,
+        area_uncertainty: float
+    ) -> MeasuredValue:
+        """
+        Calculate lower yield strength ReL per ASTM E8 / ISO 6892-1.
+
+        ReL is the lowest stress during Lüders band formation (yield point
+        elongation), excluding the initial transient effect.
+
+        Parameters
+        ----------
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain
+        area : float
+            Cross-sectional area in mm^2
+        area_uncertainty : float
+            Uncertainty in area in mm^2
+
+        Returns
+        -------
+        MeasuredValue
+            Lower yield strength ReL with uncertainty in MPa
+        """
+        # First find ReH to identify the yield point region
+        max_strain_search = 0.05
+        search_idx = strain < max_strain_search
+
+        if not np.any(search_idx):
+            search_idx = np.ones(len(strain), dtype=bool)
+
+        stress_search = stress[search_idx]
+        strain_search = strain[search_idx]
+
+        # Find the peak (ReH location)
+        window = min(5, len(stress_search) // 10)
+        if window < 2:
+            window = 2
+        stress_smooth = np.convolve(stress_search, np.ones(window)/window, mode='same')
+        diff_stress = np.diff(stress_smooth)
+
+        peak_idx = None
+        for i in range(len(diff_stress) - 1):
+            if diff_stress[i] > 0 and diff_stress[i + 1] < 0:
+                if i > 10:
+                    peak_idx = i + 1
+                    break
+
+        if peak_idx is None:
+            peak_idx = np.argmax(stress_search)
+
+        # ReL is the minimum stress in the Lüders region (after ReH)
+        # The Lüders region typically extends until strain hardening begins
+        # Look for minimum between ReH and where stress starts rising again
+
+        # Search from peak to end of search region
+        post_peak_stress = stress_search[peak_idx:]
+        post_peak_strain = strain_search[peak_idx:]
+
+        if len(post_peak_stress) < 5:
+            # Not enough data, use the value right after peak
+            ReL = stress_search[min(peak_idx + 5, len(stress_search) - 1)]
+        else:
+            # Find the minimum in the Lüders plateau region
+            # Exclude initial transient (first ~20% of post-peak region)
+            transient_skip = max(1, len(post_peak_stress) // 5)
+            luders_region = post_peak_stress[transient_skip:]
+
+            if len(luders_region) > 0:
+                min_idx = np.argmin(luders_region)
+                ReL = luders_region[min_idx]
+            else:
+                ReL = post_peak_stress[-1]
+
+        # Uncertainty calculation
+        u_area = ReL * (area_uncertainty / area)
+        u_force = ReL * self.config.force_calibration_uncertainty
+        u_detection = ReL * 0.005  # Detection uncertainty
+
+        u_combined = np.sqrt(u_area**2 + u_force**2 + u_detection**2)
+        U = 2 * u_combined
+
+        return MeasuredValue(
+            value=round(ReL, 1),
+            uncertainty=round(U, 1),
+            unit="MPa",
+            coverage_factor=2.0
+        )
+
     def calculate_true_stress_at_break(
         self,
         stress: np.ndarray,

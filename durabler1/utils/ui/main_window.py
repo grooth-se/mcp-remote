@@ -157,20 +157,41 @@ class TensileTestApp:
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         left_frame.grid_propagate(False)
 
-        # Specimen type selection
+        # Specimen type and yield type selection
         specimen_frame = ttk.LabelFrame(left_frame, text="Specimen Geometry", padding=10)
         specimen_frame.pack(fill=tk.X, pady=5)
 
+        # Create two columns
+        geo_col = ttk.Frame(specimen_frame)
+        geo_col.pack(side=tk.LEFT, anchor=tk.N)
+
+        yield_col = ttk.Frame(specimen_frame)
+        yield_col.pack(side=tk.LEFT, anchor=tk.N, padx=(20, 0))
+
+        # Geometry type (left column)
+        ttk.Label(geo_col, text="Geometry:", font=('Helvetica', 9, 'bold')).pack(anchor=tk.W)
         self.specimen_type = tk.StringVar(value="round")
         ttk.Radiobutton(
-            specimen_frame, text="Round (Cylindrical)",
+            geo_col, text="Round (Cylindrical)",
             variable=self.specimen_type, value="round",
             command=self._update_dimension_fields
         ).pack(anchor=tk.W)
         ttk.Radiobutton(
-            specimen_frame, text="Rectangular (Flat)",
+            geo_col, text="Rectangular (Flat)",
             variable=self.specimen_type, value="rectangular",
             command=self._update_dimension_fields
+        ).pack(anchor=tk.W)
+
+        # Yield type (right column)
+        ttk.Label(yield_col, text="Yield strength:", font=('Helvetica', 9, 'bold')).pack(anchor=tk.W)
+        self.yield_type = tk.StringVar(value="offset")
+        ttk.Radiobutton(
+            yield_col, text="Rp0.2 / Rp0.5",
+            variable=self.yield_type, value="offset"
+        ).pack(anchor=tk.W)
+        ttk.Radiobutton(
+            yield_col, text="ReH / ReL",
+            variable=self.yield_type, value="yield_point"
         ).pack(anchor=tk.W)
 
         # Dimension entry frame
@@ -583,12 +604,26 @@ class TensileTestApp:
             E = analyzer.calculate_youngs_modulus(
                 self.stress, self.strain, area_unc, reference_length
             )
+
+            # Calculate yield strengths based on yield type selection
+            yield_type = self.yield_type.get()
+
+            # Always calculate Rp0.2/Rp0.5 (needed for offset line in plot)
             Rp02 = analyzer.calculate_yield_strength_rp02(
                 self.stress, self.strain, E.value, area, area_unc
             )
             Rp05 = analyzer.calculate_yield_strength_rp05(
                 self.stress, self.strain, E.value, area, area_unc
             )
+
+            # Calculate ReH/ReL
+            ReH = analyzer.calculate_upper_yield_strength_reh(
+                self.stress, self.strain, area, area_unc
+            )
+            ReL = analyzer.calculate_lower_yield_strength_rel(
+                self.stress, self.strain, area, area_unc
+            )
+
             Rm = analyzer.calculate_ultimate_tensile_strength(
                 force_filtered, area, area_unc
             )
@@ -598,7 +633,7 @@ class TensileTestApp:
                 self.stress, self.strain, force_filtered, area, area_unc
             )
 
-            # Ludwik parameters (K, n)
+            # Ludwik parameters (K, n) - use Rp02 for calculation
             K, n = analyzer.calculate_ludwik_parameters(
                 self.stress, self.strain, E.value, Rp02.value
             )
@@ -663,6 +698,9 @@ class TensileTestApp:
                 'E': E,
                 'Rp02': Rp02,
                 'Rp05': Rp05,
+                'ReH': ReH,
+                'ReL': ReL,
+                'yield_type': yield_type,
                 'Rm': Rm,
                 'true_stress_max': true_stress_max,
                 'true_stress_fracture': true_stress_fracture,
@@ -708,13 +746,31 @@ class TensileTestApp:
             ""
         ), tags=('info',))
 
+        # Check yield type
+        yield_type = self.current_results.get('yield_type', 'offset')
+
         results = [
             ("E (Young's Modulus)", self.current_results['E']),
-            ("Rp0.2 (Yield 0.2%)", self.current_results['Rp02']),
-            ("Rp0.5 (Yield 0.5%)", self.current_results['Rp05']),
-            ("Rm (Ultimate)", self.current_results['Rm']),
-            ("σ_true at Rm", self.current_results['true_stress_max']),
         ]
+
+        # Show yield strengths - values shown for selected method, empty for other
+        if yield_type == 'offset':
+            # Rp0.2/Rp0.5 selected - show values
+            results.append(("Rp0.2 (Yield 0.2%)", self.current_results['Rp02']))
+            results.append(("Rp0.5 (Yield 0.5%)", self.current_results['Rp05']))
+            # ReH/ReL - show empty
+            results.append(("ReH (Upper Yield)", None))
+            results.append(("ReL (Lower Yield)", None))
+        else:
+            # ReH/ReL selected - show empty for Rp
+            results.append(("Rp0.2 (Yield 0.2%)", None))
+            results.append(("Rp0.5 (Yield 0.5%)", None))
+            # ReH/ReL - show values
+            results.append(("ReH (Upper Yield)", self.current_results['ReH']))
+            results.append(("ReL (Lower Yield)", self.current_results['ReL']))
+
+        results.append(("Rm (Ultimate)", self.current_results['Rm']))
+        results.append(("σ_true at Rm", self.current_results['true_stress_max']))
 
         # Add true stress at fracture if final diameter was provided (round specimens)
         if self.current_results.get('true_stress_fracture'):
@@ -736,12 +792,21 @@ class TensileTestApp:
             results.append(("Z% (Red. of Area)", self.current_results['Z']))
 
         for name, result in results:
-            self.results_tree.insert("", tk.END, values=(
-                name,
-                f"{result.value:.2f}",
-                f"+/-{result.uncertainty:.2f}",
-                result.unit
-            ))
+            if result is None:
+                # Empty row for non-selected yield type
+                self.results_tree.insert("", tk.END, values=(
+                    name,
+                    "",
+                    "",
+                    "MPa"
+                ))
+            else:
+                self.results_tree.insert("", tk.END, values=(
+                    name,
+                    f"{result.value:.2f}",
+                    f"+/-{result.uncertainty:.2f}",
+                    result.unit
+                ))
 
     def _plot_stress_strain(self):
         """Plot stress-strain curve with key points annotated."""
@@ -754,6 +819,7 @@ class TensileTestApp:
         E = self.current_results['E']
         Rp02 = self.current_results['Rp02']
         Rm = self.current_results['Rm']
+        yield_type = self.current_results.get('yield_type', 'offset')
         E_mpa = E.value * 1000
 
         max_stress = np.max(self.stress)
@@ -776,7 +842,7 @@ class TensileTestApp:
                         color='black', linestyle='-', linewidth=1.2,
                         label='Displacement')
 
-        # Elastic slope line for Rp0.2 (grey, dashed)
+        # Elastic slope line at 0.2% offset (always shown, grey, dashed)
         offset_02 = 0.002
         max_strain_for_line = min(0.03, max_strain * 0.4)
         offset_strain_02 = np.linspace(offset_02, max_strain_for_line, 100)
@@ -786,9 +852,19 @@ class TensileTestApp:
                     color='grey', linestyle='--', linewidth=1,
                     label=f'E = {E.value:.0f} GPa (0.2% offset)')
 
-        # Horizontal reference line at Rp0.2 (grey, dotted)
-        self.ax.axhline(y=Rp02.value, color='grey', linestyle=':', linewidth=1,
-                       label=f'Rp0.2 = {Rp02.value:.0f} MPa')
+        # Horizontal reference lines based on yield type
+        if yield_type == 'offset':
+            # Rp0.2 horizontal line (grey, dotted)
+            self.ax.axhline(y=Rp02.value, color='grey', linestyle=':', linewidth=1,
+                           label=f'Rp0.2 = {Rp02.value:.0f} MPa')
+        else:
+            # ReH and ReL horizontal lines
+            ReH = self.current_results['ReH']
+            ReL = self.current_results['ReL']
+            self.ax.axhline(y=ReH.value, color='grey', linestyle=':', linewidth=1,
+                           label=f'ReH = {ReH.value:.0f} MPa')
+            self.ax.axhline(y=ReL.value, color='grey', linestyle=':', linewidth=1,
+                           label=f'ReL = {ReL.value:.0f} MPa')
 
         # Horizontal reference line at Rm (grey, dash-dot)
         self.ax.axhline(y=Rm.value, color='grey', linestyle='-.', linewidth=1,
