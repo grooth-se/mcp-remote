@@ -693,6 +693,36 @@ class TensileTestApp:
                     except ValueError:
                         pass
 
+            # Calculate yield/tensile ratio
+            yield_tensile_ratio = None
+            if Rm and Rm.value > 0:
+                from ..models.test_result import MeasuredValue
+                if yield_type == 'offset' and Rp02 and Rp02.value > 0:
+                    ratio = Rp02.value / Rm.value
+                    # Uncertainty propagation: u_ratio = ratio * sqrt((u_Rp/Rp)^2 + (u_Rm/Rm)^2)
+                    u_ratio = ratio * np.sqrt(
+                        (Rp02.uncertainty / Rp02.value)**2 +
+                        (Rm.uncertainty / Rm.value)**2
+                    )
+                    yield_tensile_ratio = MeasuredValue(
+                        value=round(ratio, 3),
+                        uncertainty=round(2 * u_ratio / 2, 3),  # k=2
+                        unit="-",
+                        coverage_factor=2.0
+                    )
+                elif yield_type == 'yield_point' and ReH and ReH.value > 0:
+                    ratio = ReH.value / Rm.value
+                    u_ratio = ratio * np.sqrt(
+                        (ReH.uncertainty / ReH.value)**2 +
+                        (Rm.uncertainty / Rm.value)**2
+                    )
+                    yield_tensile_ratio = MeasuredValue(
+                        value=round(ratio, 3),
+                        uncertainty=round(2 * u_ratio / 2, 3),
+                        unit="-",
+                        coverage_factor=2.0
+                    )
+
             # Store results
             self.current_results = {
                 'E': E,
@@ -702,6 +732,7 @@ class TensileTestApp:
                 'ReL': ReL,
                 'yield_type': yield_type,
                 'Rm': Rm,
+                'yield_tensile_ratio': yield_tensile_ratio,
                 'true_stress_max': true_stress_max,
                 'true_stress_fracture': true_stress_fracture,
                 'K': K,
@@ -770,6 +801,12 @@ class TensileTestApp:
             results.append(("ReL (Lower Yield)", self.current_results['ReL']))
 
         results.append(("Rm (Ultimate)", self.current_results['Rm']))
+
+        # Yield/Tensile ratio
+        if self.current_results.get('yield_tensile_ratio'):
+            ratio_label = "Rp0.2/Rm" if yield_type == 'offset' else "ReH/Rm"
+            results.append((ratio_label, self.current_results['yield_tensile_ratio']))
+
         results.append(("σ_true at Rm", self.current_results['true_stress_max']))
 
         # Add true stress at fracture if final diameter was provided (round specimens)
@@ -933,18 +970,140 @@ class TensileTestApp:
             except Exception as e:
                 messagebox.showerror("Error", f"Export failed:\n{e}")
 
-    def export_pdf(self):
-        """Export results to PDF report."""
-        messagebox.showinfo(
-            "Info",
-            "PDF report generation will be implemented in a future update.\n\n"
-            "This will include:\n"
-            "- Accredited report header\n"
-            "- Specimen details\n"
-            "- Results with uncertainties\n"
-            "- Stress-strain curve\n"
-            "- Approval signatures"
+    def _generate_report_chart(self) -> Path:
+        """Generate a clean stress-strain chart for the report (no reference lines)."""
+        import tempfile
+        from matplotlib.figure import Figure
+
+        # Create a new figure for the report
+        fig = Figure(figsize=(7, 4), dpi=150)
+        ax = fig.add_subplot(111)
+
+        # Plot both stress-strain curves (clean, no reference lines)
+        if self.strain_extensometer is not None:
+            ax.plot(self.strain_extensometer, self.stress,
+                   color='darkred', linestyle='-', linewidth=1.2,
+                   label='Extensometer')
+
+        if self.strain_displacement is not None:
+            ax.plot(self.strain_displacement, self.stress,
+                   color='black', linestyle='-', linewidth=1.2,
+                   label='Displacement')
+
+        # Labels and formatting
+        ax.set_xlabel("Engineering Strain (mm/mm)", fontsize=10)
+        ax.set_ylabel("Engineering Stress (MPa)", fontsize=10)
+        ax.set_title(f"Stress-Strain Curve: {self.specimen_id_var.get()}", fontsize=11, fontweight='bold')
+        ax.legend(loc='lower right', fontsize=9)
+        ax.grid(True, linestyle='--', alpha=0.4)
+
+        # Set axis limits
+        max_strain = max(
+            np.max(self.strain_extensometer) if self.strain_extensometer is not None else 0,
+            np.max(self.strain_displacement) if self.strain_displacement is not None else 0
         )
+        max_stress = np.max(self.stress)
+        ax.set_xlim(left=0, right=max_strain * 1.05)
+        ax.set_ylim(bottom=0, top=max_stress * 1.1)
+
+        fig.tight_layout()
+
+        # Save to temp file
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+            chart_path = Path(tmp.name)
+            fig.savefig(chart_path, dpi=150, bbox_inches='tight', facecolor='white')
+
+        return chart_path
+
+    def export_pdf(self):
+        """Export results to Word report."""
+        if not self.current_results:
+            messagebox.showwarning("Warning", "No results to export. Run analysis first.")
+            return
+
+        # Ask for output file
+        filepath = filedialog.asksaveasfilename(
+            title="Export Report",
+            defaultextension=".docx",
+            filetypes=[("Word documents", "*.docx"), ("All files", "*.*")],
+            initialfile=f"Tensile_Report_{self.specimen_id_var.get()}.docx"
+        )
+
+        if not filepath:
+            return
+
+        try:
+            from ..reporting.word_report import TensileReportGenerator
+
+            self._update_status("Generating report...")
+
+            # Template and logo paths
+            template_path = PROJECT_ROOT / "templates" / "tensile_report_template.docx"
+            logo_path = PROJECT_ROOT / "durablersvart.png"
+
+            if not template_path.exists():
+                messagebox.showerror("Error", f"Template not found:\n{template_path}")
+                return
+
+            # Prepare test info
+            test_info = {
+                'test_project': self.test_project_var.get(),
+                'customer': self.customer_var.get(),
+                'customer_order': self.customer_order_var.get(),
+                'product_sn': self.product_sn_var.get(),
+                'specimen_id': self.specimen_id_var.get(),
+                'location_orientation': self.location_orientation_var.get(),
+                'material': self.material_var.get(),
+                'certificate_number': self.certificate_var.get(),
+                'test_date': self.date_var.get(),
+                'strain_source': self.current_results.get('strain_source', 'Extensometer'),
+            }
+
+            # Prepare dimensions
+            dimensions = {k: v.get() for k, v in self.dim_vars.items()}
+
+            # Get specimen and yield type
+            specimen_type = self.specimen_type.get()
+            yield_type = self.yield_type.get()
+
+            # Requirements (can be populated from UI in future)
+            requirements = {}
+
+            # Prepare report data
+            report_data = TensileReportGenerator.prepare_report_data(
+                test_info=test_info,
+                dimensions=dimensions,
+                results=self.current_results,
+                specimen_type=specimen_type,
+                yield_type=yield_type,
+                requirements=requirements
+            )
+
+            # Generate clean chart for report
+            chart_path = None
+            if self.stress is not None:
+                chart_path = self._generate_report_chart()
+
+            # Generate report
+            generator = TensileReportGenerator(template_path)
+            output_path = generator.generate_report(
+                output_path=Path(filepath),
+                data=report_data,
+                chart_path=chart_path,
+                logo_path=logo_path if logo_path.exists() else None
+            )
+
+            # Clean up temp chart
+            if chart_path and chart_path.exists():
+                chart_path.unlink()
+
+            self._update_status(f"Report exported: {filepath}")
+            messagebox.showinfo("Success", f"Report exported to:\n{filepath}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Report generation failed:\n{e}")
+            import traceback
+            traceback.print_exc()
 
     def show_about(self):
         """Show about dialog."""
