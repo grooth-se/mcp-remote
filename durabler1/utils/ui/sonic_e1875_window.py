@@ -141,7 +141,7 @@ class SonicTestApp:
 
     def _create_left_panel(self, parent):
         """Create left panel with specimen inputs."""
-        left_frame = ttk.Frame(parent, width=400)
+        left_frame = ttk.Frame(parent, width=480)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         left_frame.grid_propagate(False)
 
@@ -187,13 +187,17 @@ class SonicTestApp:
                 var.set("23")
             self.info_vars[key] = var
 
-            # Special handling for certificate number - add Browse button
+            # Special handling for certificate number - add Combobox with selection list
             if key == "certificate_number":
                 cert_frame = ttk.Frame(info_frame)
                 cert_frame.grid(row=row, column=1, sticky=tk.EW, pady=2)
-                ttk.Entry(cert_frame, textvariable=var, width=18).pack(side=tk.LEFT)
-                ttk.Button(cert_frame, text="Browse...", width=8,
-                          command=self._browse_certificate).pack(side=tk.LEFT, padx=5)
+                self.cert_combobox = ttk.Combobox(cert_frame, textvariable=var, width=22)
+                self.cert_combobox.pack(side=tk.LEFT)
+                self.cert_combobox.bind('<<ComboboxSelected>>', self._on_certificate_selected)
+                ttk.Button(cert_frame, text="↻", width=3,
+                          command=self._refresh_certificate_list).pack(side=tk.LEFT, padx=2)
+                # Load certificate list
+                self._refresh_certificate_list()
             else:
                 ttk.Entry(info_frame, textvariable=var, width=25).grid(
                     row=row, column=1, sticky=tk.EW, pady=2)
@@ -783,36 +787,46 @@ class SonicTestApp:
             import traceback
             traceback.print_exc()
 
-    def _browse_certificate(self):
-        """Open certificate lookup dialog and import selected certificate info."""
-        from utils.ui.certificate_lookup_dialog import show_certificate_lookup
+    def _refresh_certificate_list(self):
+        """Load certificate numbers from database into combobox."""
+        try:
+            from utils.database.certificate_db import CertificateDatabase
+            db = CertificateDatabase()
+            cert_numbers = db.get_certificate_numbers_list()
 
-        def on_certificate_selected(data: dict):
-            """Handle certificate selection."""
-            # Map certificate fields to test info fields
-            field_mapping = {
-                'certificate_number': 'certificate_number',
-                'test_project': 'test_project',
-                'customer': 'customer',
-                'customer_order': 'customer_order',
-                'product_sn': 'product_sn',
-                'specimen_id': 'specimen_id',
-                'location_orientation': 'location_orientation',
-                'material': 'material',
-                'temperature': 'temperature',
-                'test_date': 'test_date',
-            }
+            if hasattr(self, 'cert_combobox'):
+                self.cert_combobox['values'] = cert_numbers
+                if hasattr(self, 'statusbar'):
+                    self._update_status(f"Loaded {len(cert_numbers)} certificates")
+        except Exception as e:
+            print(f"Error loading certificates: {e}")
 
-            # Import values
-            for cert_field, info_field in field_mapping.items():
-                if cert_field in data and info_field in self.info_vars:
-                    value = data[cert_field]
-                    if value:
-                        self.info_vars[info_field].set(str(value))
+    def _on_certificate_selected(self, event):
+        """Handle certificate selection from combobox - populate test info fields."""
+        cert_number = self.info_vars['certificate_number'].get()
+        if not cert_number:
+            return
 
-            self._update_status(f"Imported certificate: {data.get('certificate_number', '')}")
+        try:
+            from utils.database.certificate_db import CertificateDatabase
+            db = CertificateDatabase()
+            cert = db.get_certificate_by_string(cert_number)
 
-        show_certificate_lookup(self.root, on_certificate_selected)
+            if cert:
+                # Populate fields from certificate
+                self.info_vars['test_project'].set(cert.test_project or "")
+                self.info_vars['customer'].set(cert.customer or "")
+                self.info_vars['customer_order'].set(cert.customer_order or "")
+                self.info_vars['product_sn'].set(cert.product_sn or "")
+                self.info_vars['specimen_id'].set(cert.specimen_id or "")
+                self.info_vars['location_orientation'].set(cert.location_orientation or "")
+                self.info_vars['material'].set(cert.material or "")
+                self.info_vars['temperature'].set(cert.temperature or "23")
+                self.info_vars['test_date'].set(cert.cert_date or "")
+
+                self._update_status(f"Loaded certificate: {cert_number}")
+        except Exception as e:
+            self._update_status(f"Error loading certificate: {e}")
 
     def show_about(self):
         """Show about dialog."""
