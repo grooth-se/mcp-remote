@@ -141,7 +141,7 @@ class SonicTestApp:
 
     def _create_left_panel(self, parent):
         """Create left panel with specimen inputs."""
-        left_frame = ttk.Frame(parent, width=480)
+        left_frame = ttk.Frame(parent, width=720)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         left_frame.grid_propagate(False)
 
@@ -387,10 +387,10 @@ class SonicTestApp:
         self.results_tree.heading("uncertainty", text="U (k=2)")
         self.results_tree.heading("unit", text="Unit")
 
-        self.results_tree.column("parameter", width=200)
-        self.results_tree.column("value", width=100, anchor=tk.E)
-        self.results_tree.column("uncertainty", width=100, anchor=tk.E)
-        self.results_tree.column("unit", width=80, anchor=tk.CENTER)
+        self.results_tree.column("parameter", width=140)
+        self.results_tree.column("value", width=70, anchor=tk.E)
+        self.results_tree.column("uncertainty", width=70, anchor=tk.E)
+        self.results_tree.column("unit", width=55, anchor=tk.CENTER)
 
         self.results_tree.pack(fill=tk.BOTH, expand=True)
 
@@ -398,7 +398,7 @@ class SonicTestApp:
         plot_frame = ttk.LabelFrame(right_frame, text="Velocity Measurements", padding=5)
         plot_frame.grid(row=1, column=0, sticky="nsew")
 
-        self.fig = Figure(figsize=(5, 3), dpi=100)
+        self.fig = Figure(figsize=(3.5, 2.5), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self._setup_empty_plot()
 
