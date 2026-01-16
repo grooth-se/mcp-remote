@@ -138,7 +138,7 @@ class DurablerLauncher:
             ("CTOD (ASTM E1820)", "J-integral method",
              self.launch_ctod_e1820, False),
             ("Fracture Toughness (KIC)", "ASTM E399",
-             self.launch_kic, False),
+             self.launch_kic, True),
             ("Vickers Hardness", "ISO 6507-1, ASTM E92",
              self.launch_vickers, False),
         ]
@@ -250,11 +250,12 @@ class DurablerLauncher:
         )
 
     def launch_kic(self):
-        """Launch KIC application."""
-        messagebox.showinfo(
-            "Coming Soon",
-            "Fracture Toughness KIC (ASTM E399) module is under development."
-        )
+        """Launch KIC E399 application."""
+        self.root.withdraw()  # Hide launcher
+
+        from utils.ui.kic_e399_window import KICTestApp
+        app = KICTestApp(parent_launcher=self)
+        app.run()
 
     def launch_vickers(self):
         """Launch Vickers hardness application."""
