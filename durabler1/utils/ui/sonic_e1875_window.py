@@ -167,6 +167,7 @@ class SonicTestApp:
 
         row = 0
         info_fields = [
+            ("Certificate number:", "certificate_number"),
             ("Test project:", "test_project"),
             ("Customer:", "customer"),
             ("Customer order:", "customer_order"),
@@ -174,7 +175,6 @@ class SonicTestApp:
             ("Specimen ID:", "specimen_id"),
             ("Location/Orientation:", "location_orientation"),
             ("Material:", "material"),
-            ("Certificate number:", "certificate_number"),
             ("Temperature (°C):", "temperature"),
             ("Test Date:", "test_date"),
         ]

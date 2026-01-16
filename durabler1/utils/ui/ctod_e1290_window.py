@@ -244,6 +244,20 @@ class CTODTestApp:
         info_frame.pack(fill=tk.X, pady=5)
 
         row = 0
+        # Certificate number - Combobox with selection list (at top)
+        ttk.Label(info_frame, text="Certificate number:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.certificate_number_var = tk.StringVar()
+        cert_frame = ttk.Frame(info_frame)
+        cert_frame.grid(row=row, column=1, sticky=tk.EW, pady=2)
+        self.cert_combobox = ttk.Combobox(cert_frame, textvariable=self.certificate_number_var, width=18)
+        self.cert_combobox.pack(side=tk.LEFT)
+        self.cert_combobox.bind('<<ComboboxSelected>>', self._on_certificate_selected)
+        ttk.Button(cert_frame, text="↻", width=3,
+                  command=self._refresh_certificate_list).pack(side=tk.LEFT, padx=2)
+        # Load certificate list
+        self._refresh_certificate_list()
+        row += 1
+
         ttk.Label(info_frame, text="Test project:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.test_project_var = tk.StringVar()
         ttk.Entry(info_frame, textvariable=self.test_project_var, width=25).grid(
@@ -284,19 +298,6 @@ class CTODTestApp:
         self.material_var = tk.StringVar()
         ttk.Entry(info_frame, textvariable=self.material_var, width=25).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
-        row += 1
-
-        ttk.Label(info_frame, text="Certificate number:").grid(row=row, column=0, sticky=tk.W, pady=2)
-        self.certificate_number_var = tk.StringVar()
-        cert_frame = ttk.Frame(info_frame)
-        cert_frame.grid(row=row, column=1, sticky=tk.EW, pady=2)
-        self.cert_combobox = ttk.Combobox(cert_frame, textvariable=self.certificate_number_var, width=18)
-        self.cert_combobox.pack(side=tk.LEFT)
-        self.cert_combobox.bind('<<ComboboxSelected>>', self._on_certificate_selected)
-        ttk.Button(cert_frame, text="↻", width=3,
-                  command=self._refresh_certificate_list).pack(side=tk.LEFT, padx=2)
-        # Load certificate list
-        self._refresh_certificate_list()
         row += 1
 
         ttk.Label(info_frame, text="Temperature (°C):").grid(row=row, column=0, sticky=tk.W, pady=2)
