@@ -35,7 +35,7 @@ class SonicTestApp:
 
         self.root = tk.Toplevel() if parent_launcher else tk.Tk()
         self.root.title("Durabler - Sonic Resonance Test (Modified ASTM E1875)")
-        self.root.geometry("1200x850")
+        self.root.geometry("1400x850")
 
         # Handle window close
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -379,7 +379,7 @@ class SonicTestApp:
 
         columns = ("parameter", "value", "uncertainty", "unit")
         self.results_tree = ttk.Treeview(
-            results_frame, columns=columns, show="headings", height=12
+            results_frame, columns=columns, show="headings", height=10
         )
 
         self.results_tree.heading("parameter", text="Parameter")
@@ -398,7 +398,7 @@ class SonicTestApp:
         plot_frame = ttk.LabelFrame(right_frame, text="Velocity Measurements", padding=5)
         plot_frame.grid(row=1, column=0, sticky="nsew")
 
-        self.fig = Figure(figsize=(3.5, 2.5), dpi=100)
+        self.fig = Figure(figsize=(3, 2), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self._setup_empty_plot()
 
