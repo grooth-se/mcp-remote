@@ -199,7 +199,7 @@ class SonicTestApp:
                 # Load certificate list
                 self._refresh_certificate_list()
             else:
-                ttk.Entry(info_frame, textvariable=var, width=25).grid(
+                ttk.Entry(info_frame, textvariable=var, width=38).grid(
                     row=row, column=1, sticky=tk.EW, pady=2)
             row += 1
 

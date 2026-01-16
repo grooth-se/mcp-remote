@@ -260,55 +260,55 @@ class CTODTestApp:
 
         ttk.Label(info_frame, text="Test project:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.test_project_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.test_project_var, width=25).grid(
+        ttk.Entry(info_frame, textvariable=self.test_project_var, width=38).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
         row += 1
 
         ttk.Label(info_frame, text="Customer:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.customer_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.customer_var, width=25).grid(
+        ttk.Entry(info_frame, textvariable=self.customer_var, width=38).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
         row += 1
 
         ttk.Label(info_frame, text="Customer order:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.customer_order_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.customer_order_var, width=25).grid(
+        ttk.Entry(info_frame, textvariable=self.customer_order_var, width=38).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
         row += 1
 
         ttk.Label(info_frame, text="Product/S/N:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.product_sn_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.product_sn_var, width=25).grid(
+        ttk.Entry(info_frame, textvariable=self.product_sn_var, width=38).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
         row += 1
 
         ttk.Label(info_frame, text="Specimen ID:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.specimen_id_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.specimen_id_var, width=25).grid(
+        ttk.Entry(info_frame, textvariable=self.specimen_id_var, width=38).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
         row += 1
 
         ttk.Label(info_frame, text="Location/Orientation:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.location_orientation_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.location_orientation_var, width=25).grid(
+        ttk.Entry(info_frame, textvariable=self.location_orientation_var, width=38).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
         row += 1
 
         ttk.Label(info_frame, text="Material:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.material_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.material_var, width=25).grid(
+        ttk.Entry(info_frame, textvariable=self.material_var, width=38).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
         row += 1
 
         ttk.Label(info_frame, text="Temperature (°C):").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.temperature_var = tk.StringVar(value="23")
-        ttk.Entry(info_frame, textvariable=self.temperature_var, width=25).grid(
+        ttk.Entry(info_frame, textvariable=self.temperature_var, width=38).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
         row += 1
 
         ttk.Label(info_frame, text="Test Date:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.date_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.date_var, state='readonly', width=25).grid(
+        ttk.Entry(info_frame, textvariable=self.date_var, state='readonly', width=38).grid(
             row=row, column=1, sticky=tk.EW, pady=2)
 
         info_frame.columnconfigure(1, weight=1)
