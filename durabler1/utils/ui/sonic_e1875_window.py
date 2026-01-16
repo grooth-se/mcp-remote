@@ -186,8 +186,17 @@ class SonicTestApp:
             if key == "temperature":
                 var.set("23")
             self.info_vars[key] = var
-            ttk.Entry(info_frame, textvariable=var, width=25).grid(
-                row=row, column=1, sticky=tk.EW, pady=2)
+
+            # Special handling for certificate number - add Browse button
+            if key == "certificate_number":
+                cert_frame = ttk.Frame(info_frame)
+                cert_frame.grid(row=row, column=1, sticky=tk.EW, pady=2)
+                ttk.Entry(cert_frame, textvariable=var, width=18).pack(side=tk.LEFT)
+                ttk.Button(cert_frame, text="Browse...", width=8,
+                          command=self._browse_certificate).pack(side=tk.LEFT, padx=5)
+            else:
+                ttk.Entry(info_frame, textvariable=var, width=25).grid(
+                    row=row, column=1, sticky=tk.EW, pady=2)
             row += 1
 
         info_frame.columnconfigure(1, weight=1)
@@ -773,6 +782,37 @@ class SonicTestApp:
             messagebox.showerror("Error", f"Failed to generate report:\n{str(e)}")
             import traceback
             traceback.print_exc()
+
+    def _browse_certificate(self):
+        """Open certificate lookup dialog and import selected certificate info."""
+        from utils.ui.certificate_lookup_dialog import show_certificate_lookup
+
+        def on_certificate_selected(data: dict):
+            """Handle certificate selection."""
+            # Map certificate fields to test info fields
+            field_mapping = {
+                'certificate_number': 'certificate_number',
+                'test_project': 'test_project',
+                'customer': 'customer',
+                'customer_order': 'customer_order',
+                'product_sn': 'product_sn',
+                'specimen_id': 'specimen_id',
+                'location_orientation': 'location_orientation',
+                'material': 'material',
+                'temperature': 'temperature',
+                'test_date': 'test_date',
+            }
+
+            # Import values
+            for cert_field, info_field in field_mapping.items():
+                if cert_field in data and info_field in self.info_vars:
+                    value = data[cert_field]
+                    if value:
+                        self.info_vars[info_field].set(str(value))
+
+            self._update_status(f"Imported certificate: {data.get('certificate_number', '')}")
+
+        show_certificate_lookup(self.root, on_certificate_selected)
 
     def show_about(self):
         """Show about dialog."""

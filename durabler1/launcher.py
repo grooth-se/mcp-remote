@@ -75,14 +75,14 @@ class DurablerLauncher:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Durabler - Mechanical Testing Analysis System")
-        self.root.geometry("500x600")
+        self.root.geometry("500x700")
         self.root.resizable(False, False)
 
         # Center window on screen
         self.root.update_idletasks()
         x = (self.root.winfo_screenwidth() - 500) // 2
-        y = (self.root.winfo_screenheight() - 600) // 2
-        self.root.geometry(f"500x600+{x}+{y}")
+        y = (self.root.winfo_screenheight() - 700) // 2
+        self.root.geometry(f"500x700+{x}+{y}")
 
         self._create_ui()
 
@@ -164,6 +164,30 @@ class DurablerLauncher:
                 foreground='gray'
             ).pack(side=tk.LEFT, padx=10)
 
+        # Administration frame
+        admin_frame = ttk.LabelFrame(
+            self.root, text="Administration", padding=10
+        )
+        admin_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+
+        # Certificate Register button
+        cert_frame = ttk.Frame(admin_frame)
+        cert_frame.pack(fill=tk.X, pady=5)
+
+        ttk.Button(
+            cert_frame,
+            text="Certificate Register",
+            command=self.launch_certificate_register,
+            width=30
+        ).pack(side=tk.LEFT)
+
+        ttk.Label(
+            cert_frame,
+            text="Manage test certificate numbers",
+            font=('Helvetica', 9),
+            foreground='gray'
+        ).pack(side=tk.LEFT, padx=10)
+
         # Footer
         footer_frame = ttk.Frame(self.root, padding=10)
         footer_frame.pack(fill=tk.X, side=tk.BOTTOM)
@@ -238,6 +262,14 @@ class DurablerLauncher:
             "Coming Soon",
             "Vickers Hardness (ISO 6507-1) module is under development."
         )
+
+    def launch_certificate_register(self):
+        """Launch certificate register application."""
+        self.root.withdraw()  # Hide launcher
+
+        from utils.ui.certificate_register_window import CertificateRegisterApp
+        app = CertificateRegisterApp(parent_launcher=self)
+        app.run()
 
     def show_about(self):
         """Show about dialog."""
