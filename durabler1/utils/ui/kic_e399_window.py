@@ -71,6 +71,8 @@ class KICTestApp:
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Load CSV...", command=self.load_csv_file,
                               accelerator="Ctrl+O")
+        file_menu.add_command(label="Load Excel...", command=self.load_excel_file,
+                              accelerator="Ctrl+E")
         file_menu.add_separator()
         file_menu.add_command(label="Export Report...", command=self.export_report)
         file_menu.add_separator()
@@ -92,6 +94,7 @@ class KICTestApp:
 
         # Keyboard shortcuts
         self.root.bind('<Control-o>', lambda e: self.load_csv_file())
+        self.root.bind('<Control-e>', lambda e: self.load_excel_file())
         self.root.bind('<F5>', lambda e: self.run_analysis())
 
     def _exit_app(self):
@@ -123,6 +126,8 @@ class KICTestApp:
             ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
 
         ttk.Button(toolbar, text="Load CSV", command=self.load_csv_file).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Load Excel", command=self.load_excel_file).pack(
             side=tk.LEFT, padx=2)
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
         ttk.Button(toolbar, text="Analyze", command=self.run_analysis).pack(
@@ -451,6 +456,124 @@ class KICTestApp:
             messagebox.showerror("Error", f"Failed to load CSV:\n{e}")
             import traceback
             traceback.print_exc()
+
+    def load_excel_file(self):
+        """Load MTS Excel Analysis Report file with specimen data."""
+        filepath = filedialog.askopenfilename(
+            title="Select MTS Excel Analysis Report",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+            initialdir=str(PROJECT_ROOT / "data" / "Testdataexport")
+        )
+
+        if not filepath:
+            return
+
+        try:
+            from utils.data_acquisition.kic_excel_parser import parse_kic_excel
+
+            excel_data = parse_kic_excel(Path(filepath))
+
+            # Set specimen type
+            self.specimen_type.set(excel_data.specimen_type)
+            self._update_dimension_fields()
+
+            # Populate dimension fields
+            self.dim_vars['W'].set(f"{excel_data.W:.2f}")
+            self.dim_vars['B'].set(f"{excel_data.B:.2f}")
+            self.dim_vars['a_0'].set(f"{excel_data.crack_length_average:.2f}")
+            if 'S' in self.dim_vars:
+                self.dim_vars['S'].set(f"{excel_data.S:.2f}")
+            if excel_data.B_n and excel_data.B_n != excel_data.B:
+                self.dim_vars['B_n'].set(f"{excel_data.B_n:.2f}")
+
+            # Populate material properties
+            self.material_vars['yield_strength'].set(f"{excel_data.yield_strength:.1f}")
+            self.material_vars['youngs_modulus'].set(f"{excel_data.youngs_modulus:.1f}")
+            self.material_vars['poissons_ratio'].set(f"{excel_data.poissons_ratio:.3f}")
+
+            # Populate test info
+            self.info_vars['specimen_id'].set(excel_data.specimen_id)
+            self.info_vars['temperature'].set(f"{excel_data.test_temperature:.1f}")
+
+            # Store MTS results for comparison
+            self.mts_results = excel_data.kic_results
+
+            self._update_status(f"Loaded Excel: {Path(filepath).name}")
+
+            # Display MTS results if available
+            if excel_data.kic_results.get('KQ', 0) > 0:
+                self._display_mts_results(excel_data)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load Excel:\n{e}")
+            import traceback
+            traceback.print_exc()
+
+    def _display_mts_results(self, excel_data):
+        """Display MTS analysis results in treeview."""
+        # Clear existing
+        for item in self.results_tree.get_children():
+            self.results_tree.delete(item)
+
+        r = excel_data.kic_results
+
+        # MTS Results section
+        self.results_tree.insert("", tk.END, values=("MTS Analysis Results", "", "", ""),
+                                  tags=('section',))
+
+        self.results_tree.insert("", tk.END, values=(
+            "P_max (MTS)",
+            f"{r.get('P_max', 0):.2f}",
+            "",
+            "kN"
+        ))
+
+        self.results_tree.insert("", tk.END, values=(
+            "P_Q (MTS)",
+            f"{r.get('PQ', 0):.2f}",
+            "",
+            "kN"
+        ))
+
+        pmax_pq = r.get('pmax_pq_ratio', 0)
+        ratio_tag = 'valid' if pmax_pq <= 1.10 else 'invalid'
+        self.results_tree.insert("", tk.END, values=(
+            "P_max/P_Q ratio",
+            f"{pmax_pq:.3f}",
+            "",
+            "-"
+        ), tags=(ratio_tag,))
+
+        self.results_tree.insert("", tk.END, values=(
+            "K_Q (MTS)",
+            f"{r.get('KQ', 0):.2f}",
+            "",
+            "MPa*sqrt(m)"
+        ))
+
+        self.results_tree.insert("", tk.END, values=(
+            "Type",
+            r.get('type', ''),
+            "",
+            ""
+        ))
+
+        # Validity section
+        self.results_tree.insert("", tk.END, values=("MTS Validity Checks", "", "", ""),
+                                  tags=('section',))
+
+        validity_items = [
+            ('P_max/P_Q <= 1.1', r.get('pmax_pq_valid', '')),
+            ('a/W in 0.45-0.55', r.get('aw_ratio_valid', '')),
+            ('Plane strain', r.get('plane_strain_valid', '')),
+            ('Loading rate', r.get('loading_rate_valid', '')),
+        ]
+
+        for label, value in validity_items:
+            tag = 'valid' if value == 'Yes' else 'invalid' if value == 'No' else 'warning'
+            self.results_tree.insert("", tk.END, values=(label, value, "", ""), tags=(tag,))
+
+        self._update_status("MTS results loaded - Load CSV and click Analyze to compare")
 
     def _plot_raw_data(self):
         """Plot raw force-displacement data."""

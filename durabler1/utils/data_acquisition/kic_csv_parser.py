@@ -109,6 +109,9 @@ def _parse_mts_metadata(filepath: Path) -> dict:
 
         # Parse metadata from first few lines
         for line in lines:
+            # Remove surrounding quotes if present
+            line = line.strip('"').strip("'").strip()
+
             if line.startswith('Test:'):
                 metadata['test_name'] = line.replace('Test:', '').strip()
             elif line.startswith('Test Run:'):
