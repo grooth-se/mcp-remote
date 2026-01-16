@@ -269,11 +269,18 @@ class TensileTestApp:
             row=row, column=1, sticky=tk.EW, pady=2)
         row += 1
 
-        # Certificate number
+        # Certificate number - Combobox with selection list
         ttk.Label(info_frame, text="Certificate number:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.certificate_var = tk.StringVar()
-        ttk.Entry(info_frame, textvariable=self.certificate_var, width=30).grid(
-            row=row, column=1, sticky=tk.EW, pady=2)
+        cert_frame = ttk.Frame(info_frame)
+        cert_frame.grid(row=row, column=1, sticky=tk.EW, pady=2)
+        self.cert_combobox = ttk.Combobox(cert_frame, textvariable=self.certificate_var, width=22)
+        self.cert_combobox.pack(side=tk.LEFT)
+        self.cert_combobox.bind('<<ComboboxSelected>>', self._on_certificate_selected)
+        ttk.Button(cert_frame, text="↻", width=3,
+                  command=self._refresh_certificate_list).pack(side=tk.LEFT, padx=2)
+        # Load certificate list
+        self._refresh_certificate_list()
         row += 1
 
         # Test Date (readonly, from file)
@@ -1098,6 +1105,45 @@ class TensileTestApp:
             messagebox.showerror("Error", f"Report generation failed:\n{e}")
             import traceback
             traceback.print_exc()
+
+    def _refresh_certificate_list(self):
+        """Load certificate numbers from database into combobox."""
+        try:
+            from utils.database.certificate_db import CertificateDatabase
+            db = CertificateDatabase()
+            cert_numbers = db.get_certificate_numbers_list()
+
+            if hasattr(self, 'cert_combobox'):
+                self.cert_combobox['values'] = cert_numbers
+                if hasattr(self, 'statusbar'):
+                    self._update_status(f"Loaded {len(cert_numbers)} certificates")
+        except Exception as e:
+            print(f"Error loading certificates: {e}")
+
+    def _on_certificate_selected(self, event):
+        """Handle certificate selection from combobox - populate test info fields."""
+        cert_number = self.certificate_var.get()
+        if not cert_number:
+            return
+
+        try:
+            from utils.database.certificate_db import CertificateDatabase
+            db = CertificateDatabase()
+            cert = db.get_certificate_by_string(cert_number)
+
+            if cert:
+                # Populate fields from certificate
+                self.test_project_var.set(cert.test_project or "")
+                self.customer_var.set(cert.customer or "")
+                self.customer_order_var.set(cert.customer_order or "")
+                self.product_sn_var.set(cert.product_sn or "")
+                self.specimen_id_var.set(cert.specimen_id or "")
+                self.location_orientation_var.set(cert.location_orientation or "")
+                self.material_var.set(cert.material or "")
+
+                self._update_status(f"Loaded certificate: {cert_number}")
+        except Exception as e:
+            self._update_status(f"Error loading certificate: {e}")
 
     def show_about(self):
         """Show about dialog."""
