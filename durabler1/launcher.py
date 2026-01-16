@@ -7,7 +7,7 @@ ISO 17025 compliant analysis for:
 - Tensile testing (ASTM E8/E8M)
 - Sonic Resonance (ASTM E1875)
 - FCGR (ASTM E647)
-- CTOD (ASTM E1820)
+- CTOD (ASTM E1290, E1820)
 - KIC (ASTM E399)
 - Vickers Hardness (ISO 6507-1)
 
@@ -130,11 +130,13 @@ class DurablerLauncher:
             ("Tensile Testing", "ASTM E8/E8M, ISO 6892-1",
              self.launch_tensile, True),
             ("Sonic Resonance", "ASTM E1875 (Modified)",
-             self.launch_sonic, False),
+             self.launch_sonic, True),
             ("Fatigue Crack Growth (FCGR)", "ASTM E647",
              self.launch_fcgr, False),
-            ("CTOD Testing", "ASTM E1820, E1290, BS 7448",
-             self.launch_ctod, False),
+            ("CTOD (ASTM E1290)", "BS 7448",
+             self.launch_ctod_e1290, True),
+            ("CTOD (ASTM E1820)", "J-integral method",
+             self.launch_ctod_e1820, False),
             ("Fracture Toughness (KIC)", "ASTM E399",
              self.launch_kic, False),
             ("Vickers Hardness", "ISO 6507-1, ASTM E92",
@@ -195,10 +197,11 @@ class DurablerLauncher:
 
     def launch_sonic(self):
         """Launch sonic resonance application."""
-        messagebox.showinfo(
-            "Coming Soon",
-            "Sonic Resonance (ASTM E1875) module is under development."
-        )
+        self.root.withdraw()  # Hide launcher
+
+        from utils.ui.sonic_e1875_window import SonicTestApp
+        app = SonicTestApp(parent_launcher=self)
+        app.run()
 
     def launch_fcgr(self):
         """Launch FCGR application."""
@@ -207,11 +210,19 @@ class DurablerLauncher:
             "Fatigue Crack Growth Rate (ASTM E647) module is under development."
         )
 
-    def launch_ctod(self):
-        """Launch CTOD application."""
+    def launch_ctod_e1290(self):
+        """Launch CTOD E1290 application."""
+        self.root.withdraw()  # Hide launcher
+
+        from utils.ui.ctod_e1290_window import CTODTestApp
+        app = CTODTestApp(parent_launcher=self)
+        app.run()
+
+    def launch_ctod_e1820(self):
+        """Launch CTOD E1820 application."""
         messagebox.showinfo(
             "Coming Soon",
-            "CTOD (ASTM E1820) module is under development."
+            "CTOD (ASTM E1820) J-integral method module is under development."
         )
 
     def launch_kic(self):
