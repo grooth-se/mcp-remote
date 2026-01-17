@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+import tempfile
 import numpy as np
 from PIL import Image, ImageTk
 
@@ -984,7 +985,113 @@ class FCGRTestApp:
             messagebox.showwarning("Warning", "No results to export. Run analysis first.")
             return
 
-        messagebox.showinfo("Info", "Word report generation not yet implemented.\nUse 'Export Results' for CSV export.")
+        # Ask for save location
+        filepath = filedialog.asksaveasfilename(
+            title="Save Word Report",
+            defaultextension=".docx",
+            filetypes=[("Word Documents", "*.docx")],
+            initialfile=f"FCGR_Report_{self.info_vars['specimen_id'].get()}.docx"
+        )
+
+        if not filepath:
+            return
+
+        try:
+            from utils.reporting.fcgr_word_report import FCGRReportGenerator
+
+            # Check if template exists
+            template_path = PROJECT_ROOT / "templates" / "fcgr_e647_report_template.docx"
+            if not template_path.exists():
+                messagebox.showerror("Error", f"Template not found: {template_path}\n\nRun scripts/create_fcgr_template.py to generate it.")
+                return
+
+            # Create temporary files for plots
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+
+                # Save Plot 1 (a vs N)
+                plot1_path = temp_path / "plot1_a_vs_N.png"
+                self.fig1.savefig(plot1_path, dpi=150, bbox_inches='tight', facecolor='white')
+
+                # Save Plot 2 (Paris law)
+                plot2_path = temp_path / "plot2_paris.png"
+                self.fig2.savefig(plot2_path, dpi=150, bbox_inches='tight', facecolor='white')
+
+                # Collect test information
+                test_info = {
+                    'test_project': self.info_vars['test_project'].get(),
+                    'customer': self.info_vars['customer'].get(),
+                    'specimen_id': self.info_vars['specimen_id'].get(),
+                    'material': self.info_vars['material'].get(),
+                    'certificate_number': self.certificate_number_var.get(),
+                    'test_date': self.info_vars['test_date'].get(),
+                }
+
+                # Collect specimen data
+                specimen_data = {
+                    'specimen_type': self.control_mode_var.get(),
+                    'W': self.specimen_vars['W'].get(),
+                    'B': self.specimen_vars['B'].get(),
+                    'B_n': self.specimen_vars['B_n'].get() or self.specimen_vars['B'].get(),
+                    'a_0': self.specimen_vars['a_0'].get(),
+                    'notch_height': self.specimen_vars.get('notch_height', tk.StringVar(value='0')).get(),
+                }
+
+                # Collect material data
+                material_data = {
+                    'yield_strength': self.material_vars['yield_strength'].get(),
+                    'ultimate_strength': self.material_vars['tensile_strength'].get(),
+                    'youngs_modulus': self.material_vars['youngs_modulus'].get(),
+                    'poissons_ratio': self.material_vars['poissons_ratio'].get() or '0.3',
+                }
+
+                # Collect test parameters
+                test_params = {
+                    'control_mode': self.control_mode_var.get(),
+                    'load_ratio': self.test_vars['load_ratio'].get(),
+                    'frequency': self.test_vars['frequency'].get(),
+                    'temperature': self.test_vars['temperature'].get(),
+                    'P_max': self.test_vars['P_max'].get(),
+                    'K_max': self.test_vars['K_max'].get(),
+                    'wave_shape': self.test_vars.get('wave_shape', tk.StringVar(value='Sine')).get() if hasattr(self, 'test_vars') and 'wave_shape' in self.test_vars else 'Sine',
+                    'environment': self.test_vars.get('environment', tk.StringVar(value='Laboratory Air')).get() if hasattr(self, 'test_vars') and 'environment' in self.test_vars else 'Laboratory Air',
+                    'dadn_method': 'Secant',
+                    'outlier_threshold': self.test_vars.get('outlier_pct', tk.StringVar(value='30')).get() if hasattr(self, 'test_vars') and 'outlier_pct' in self.test_vars else '30',
+                }
+
+                # Prepare report data
+                report_data = FCGRReportGenerator.prepare_report_data(
+                    test_info=test_info,
+                    specimen_data=specimen_data,
+                    material_data=material_data,
+                    test_params=test_params,
+                    results=self.current_results,
+                    validity_notes=self.current_results.validity_notes if self.current_results else None
+                )
+
+                # Generate report
+                generator = FCGRReportGenerator(template_path)
+
+                # Check for logo
+                logo_path = PROJECT_ROOT / "assets" / "logo.png"
+                if not logo_path.exists():
+                    logo_path = None
+
+                output_path = generator.generate_report(
+                    output_path=Path(filepath),
+                    data=report_data,
+                    plot1_path=plot1_path,
+                    plot2_path=plot2_path,
+                    logo_path=logo_path,
+                    photo_paths=self.crack_photos if self.crack_photos else None
+                )
+
+            messagebox.showinfo("Success", f"Report saved to:\n{output_path}")
+            self._set_status(f"Report exported: {output_path.name}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to generate report:\n{str(e)}")
+            self._set_status("Report generation failed")
 
     def _refresh_certificate_list(self):
         """Load certificate numbers from database into combobox."""
