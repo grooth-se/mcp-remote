@@ -246,18 +246,20 @@ class FCGRTestApp:
         test_frame = ttk.LabelFrame(left_frame, text="Test Parameters", padding=10)
         test_frame.pack(fill=tk.X, pady=5, padx=5)
 
-        # Control mode
+        # Control mode - put radio buttons in a sub-frame for better layout
         ttk.Label(test_frame, text="Control Mode:", font=('Helvetica', 9, 'bold')).grid(
             row=0, column=0, sticky=tk.W)
         self.control_mode = tk.StringVar(value="Load Control")
+        control_frame = ttk.Frame(test_frame)
+        control_frame.grid(row=0, column=1, sticky=tk.W)
         ttk.Radiobutton(
-            test_frame, text="Load Control",
+            control_frame, text="Load Control",
             variable=self.control_mode, value="Load Control"
-        ).grid(row=0, column=1, sticky=tk.W)
+        ).pack(side=tk.LEFT, padx=(0, 15))
         ttk.Radiobutton(
-            test_frame, text="Delta-K Control",
+            control_frame, text="Delta-K Control",
             variable=self.control_mode, value="Delta-K Control"
-        ).grid(row=0, column=2, sticky=tk.W)
+        ).pack(side=tk.LEFT)
 
         test_params = [
             ("Pmax (Maximum load, kN):", "P_max", ""),
