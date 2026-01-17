@@ -132,7 +132,7 @@ class DurablerLauncher:
             ("Sonic Resonance", "ASTM E1875 (Modified)",
              self.launch_sonic, True),
             ("Fatigue Crack Growth (FCGR)", "ASTM E647",
-             self.launch_fcgr, False),
+             self.launch_fcgr, True),
             ("CTOD (ASTM E1290)", "BS 7448",
              self.launch_ctod_e1290, True),
             ("CTOD (ASTM E1820)", "J-integral method",
@@ -229,10 +229,11 @@ class DurablerLauncher:
 
     def launch_fcgr(self):
         """Launch FCGR application."""
-        messagebox.showinfo(
-            "Coming Soon",
-            "Fatigue Crack Growth Rate (ASTM E647) module is under development."
-        )
+        self.root.withdraw()  # Hide launcher
+
+        from utils.ui.fcgr_e647_window import FCGRTestApp
+        app = FCGRTestApp(parent_launcher=self)
+        app.run()
 
     def launch_ctod_e1290(self):
         """Launch CTOD E1290 application."""
