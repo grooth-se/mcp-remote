@@ -49,6 +49,8 @@ class KICResult:
         Pmax/PQ ratio
     compliance : float
         Initial elastic compliance in mm/kN
+    r_squared : float
+        R-squared value from compliance linear fit
     is_valid : bool
         True if KIC is valid per ASTM E399
     validity_notes : List[str]
@@ -60,6 +62,7 @@ class KICResult:
     K_IC: Optional[MeasuredValue]
     P_ratio: float
     compliance: float
+    r_squared: float
     is_valid: bool
     validity_notes: List[str] = field(default_factory=list)
 
@@ -108,12 +111,18 @@ class KICAnalyzer:
     def calculate_compliance(self,
                             force: np.ndarray,
                             displacement: np.ndarray,
-                            lower_frac: float = 0.10,
-                            upper_frac: float = 0.50) -> Tuple[float, float, float]:
+                            lower_frac: float = 0.02,
+                            upper_frac: float = 0.07) -> Tuple[float, float, float]:
         """
         Calculate initial elastic compliance from load-displacement curve.
 
         Uses linear regression on the initial linear portion of the curve.
+        The displacement is zeroed (offset removed) before fitting.
+
+        Per ASTM E399, the compliance should be determined from the initial
+        linear elastic portion of the load-displacement record. Using 2-7%
+        of Pmax avoids seating effects at very low loads while capturing
+        the true elastic slope before significant plasticity develops.
 
         Parameters
         ----------
@@ -122,42 +131,53 @@ class KICAnalyzer:
         displacement : np.ndarray
             Displacement array in mm
         lower_frac : float
-            Lower bound of force range as fraction of Pmax (default 0.10)
+            Lower bound of force range as fraction of Pmax (default 0.02)
         upper_frac : float
-            Upper bound of force range as fraction of Pmax (default 0.50)
+            Upper bound of force range as fraction of Pmax (default 0.10)
 
         Returns
         -------
         Tuple[float, float, float]
-            (compliance in mm/kN, intercept in mm, R-squared value)
+            (compliance in mm/kN, displacement offset in mm, R-squared value)
         """
         P_max = np.max(force)
+
+        # Zero the displacement by subtracting the initial offset
+        disp_offset = np.min(displacement)
+        disp_zeroed = displacement - disp_offset
+
+        # Calculate compliance from the initial linear portion of the curve
+        # Use 2-7% of Pmax to avoid seating effects at very low loads
+        # while capturing true elastic slope before plasticity
         P_lower = P_max * lower_frac
         P_upper = P_max * upper_frac
 
-        # Select data in the linear region
         mask = (force >= P_lower) & (force <= P_upper)
+
         if np.sum(mask) < 10:
-            # Fall back to first 50% of data
-            n_points = len(force) // 2
+            # Fall back to first 10% of data points
+            n_points = max(10, len(force) // 10)
             mask = np.zeros(len(force), dtype=bool)
             mask[:n_points] = True
 
         P_linear = force[mask]
-        v_linear = displacement[mask]
+        v_linear = disp_zeroed[mask]
 
         # Linear regression: v = C * P + v0
         slope, intercept, r_value, p_value, std_err = stats.linregress(P_linear, v_linear)
-
-        compliance = slope  # mm/kN
         r_squared = r_value**2
+        best_compliance = slope if slope > 0 else 0.01
 
-        return compliance, intercept, r_squared
+        # Store the displacement offset for plotting
+        self._disp_offset = disp_offset
+
+        return best_compliance, disp_offset, r_squared
 
     def determine_PQ_secant_offset(self,
                                     force: np.ndarray,
                                     displacement: np.ndarray,
-                                    compliance: float) -> Tuple[float, int]:
+                                    compliance: float,
+                                    disp_offset: float = 0.0) -> Tuple[float, int]:
         """
         Determine PQ using the 5% secant offset method per ASTM E399.
 
@@ -172,6 +192,8 @@ class KICAnalyzer:
             Displacement array in mm
         compliance : float
             Initial elastic compliance in mm/kN
+        disp_offset : float
+            Displacement offset to subtract (seating, etc.)
 
         Returns
         -------
@@ -180,12 +202,15 @@ class KICAnalyzer:
 
         Notes
         -----
-        The 5% secant line: v = 1.05 * C * P
+        The 5% secant line: v = 1.05 * C * P (from zeroed origin)
         We find the intersection of this line with the load-displacement curve.
 
         If the 5% offset line doesn't intersect the curve before Pmax,
         then PQ = Pmax.
         """
+        # Zero the displacement
+        disp_zeroed = displacement - disp_offset
+
         # 5% offset compliance
         C_5 = compliance * 1.05
 
@@ -194,23 +219,23 @@ class KICAnalyzer:
         idx_max = np.argmax(force)
 
         # Look for intersection: curve crosses the 5% secant line
-        # Secant line: v_secant = C_5 * P
-        # Find where: displacement > C_5 * force (curve is to the right of secant)
+        # Secant line (from origin): v_secant = C_5 * P
+        # Find where: disp_zeroed > C_5 * force (curve is to the right of secant)
 
         # Calculate the 5% secant displacement for each force value
         v_secant = C_5 * force
 
         # Find where the actual displacement exceeds the secant line
-        diff = displacement - v_secant
+        diff = disp_zeroed - v_secant
 
-        # Start from the beginning and find first crossing after initial portion
-        # Skip first 5% of data to avoid noise at start
-        start_idx = max(10, len(force) // 20)
+        # Start from a point after initial noise (2% of data or 50 points)
+        start_idx = max(50, len(force) // 50)
 
         P_Q = P_max
         idx_Q = idx_max
 
         # Find first point where diff becomes positive (curve crosses secant)
+        # and force is above 10% of P_max
         for i in range(start_idx, idx_max):
             if diff[i] > 0 and force[i] > 0.1 * P_max:
                 # Interpolate to find exact crossing
@@ -223,6 +248,9 @@ class KICAnalyzer:
                     P_Q = force[i]
                     idx_Q = i
                 break
+
+        # Store for use in plotting
+        self._disp_zeroed = disp_zeroed
 
         return P_Q, idx_Q
 
@@ -397,8 +425,8 @@ class KICAnalyzer:
         validity_notes = []
 
         # Step 1: Calculate initial compliance
-        compliance, intercept, r_squared = self.calculate_compliance(force, displacement)
-        validity_notes.append(f"Compliance fit R^2 = {r_squared:.4f}")
+        compliance, disp_offset, r_squared = self.calculate_compliance(force, displacement)
+        validity_notes.append(f"Compliance = {compliance:.5f} mm/kN")
 
         # Step 2: Find Pmax
         P_max_val = float(np.max(force))
@@ -410,7 +438,7 @@ class KICAnalyzer:
         )
 
         # Step 3: Determine PQ using 5% secant offset
-        P_Q_val, idx_Q = self.determine_PQ_secant_offset(force, displacement, compliance)
+        P_Q_val, idx_Q = self.determine_PQ_secant_offset(force, displacement, compliance, disp_offset)
         P_Q_unc = P_Q_val * self.force_uncertainty * 2
         P_Q = MeasuredValue(
             value=P_Q_val,
@@ -470,6 +498,7 @@ class KICAnalyzer:
             K_IC=K_IC,
             P_ratio=P_ratio,
             compliance=compliance,
+            r_squared=r_squared,
             is_valid=is_valid,
             validity_notes=validity_notes
         )
@@ -495,7 +524,7 @@ class KICAnalyzer:
         dict
             Dictionary with plot data:
             - 'force': original force array
-            - 'displacement': original displacement array
+            - 'displacement': zeroed displacement array
             - 'elastic_line_x': x values for elastic compliance line
             - 'elastic_line_y': y values for elastic compliance line
             - 'secant_line_x': x values for 5% secant offset line
@@ -506,31 +535,42 @@ class KICAnalyzer:
         P_max = result.P_max.value
         compliance = result.compliance
 
-        # Elastic compliance line (through origin with slope 1/C)
-        # v = C * P, so P_line = v / C
-        v_max = np.max(displacement) * 1.1
+        # Zero the displacement (use stored offset if available)
+        disp_offset = getattr(self, '_disp_offset', np.min(displacement))
+        disp_zeroed = displacement - disp_offset
+
+        # Get max displacement for line extent
+        v_max = np.max(disp_zeroed) * 1.1
+
+        # Elastic compliance line from origin: v = C * P, so P = v / C
         elastic_x = np.array([0, v_max])
         elastic_y = np.array([0, v_max / compliance])
 
-        # 5% secant offset line
+        # 5% secant offset line from origin: v = C_5 * P, so P = v / C_5
         C_5 = compliance * 1.05
         secant_x = np.array([0, v_max])
         secant_y = np.array([0, v_max / C_5])
 
-        # PQ point
+        # Limit the lines to reasonable force range
+        max_line_force = P_max * 1.05
+        elastic_y = np.clip(elastic_y, 0, max_line_force)
+        elastic_x = compliance * elastic_y  # Recalculate x based on clipped y
+
+        secant_y = np.clip(secant_y, 0, max_line_force)
+        secant_x = C_5 * secant_y  # Recalculate x based on clipped y
+
+        # PQ point - find actual displacement at PQ on the zeroed curve
         P_Q_val = result.P_Q.value
-        v_Q = C_5 * P_Q_val  # Approximate displacement at PQ
-        # Better: find actual displacement at PQ
         idx_Q = np.argmin(np.abs(force - P_Q_val))
-        v_Q = displacement[idx_Q]
+        v_Q = disp_zeroed[idx_Q]
 
         # Pmax point
         idx_max = np.argmax(force)
-        v_max_point = displacement[idx_max]
+        v_max_point = disp_zeroed[idx_max]
 
         return {
             'force': force,
-            'displacement': displacement,
+            'displacement': disp_zeroed,
             'elastic_line_x': elastic_x,
             'elastic_line_y': elastic_y,
             'secant_line_x': secant_x,

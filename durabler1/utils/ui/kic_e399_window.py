@@ -44,6 +44,8 @@ class KICTestApp:
         # Data storage
         self.current_data = None
         self.current_results = None
+        self.precrack_measurements = []  # Store precrack measurements from Excel
+        self.crack_photo_path = None     # Path to crack surface photo
 
         # Create UI components
         self._create_menu()
@@ -73,6 +75,8 @@ class KICTestApp:
                               accelerator="Ctrl+O")
         file_menu.add_command(label="Load Excel...", command=self.load_excel_file,
                               accelerator="Ctrl+E")
+        file_menu.add_command(label="Load Crack Photo...", command=self.load_crack_photo,
+                              accelerator="Ctrl+P")
         file_menu.add_separator()
         file_menu.add_command(label="Export Report...", command=self.export_report)
         file_menu.add_separator()
@@ -95,6 +99,7 @@ class KICTestApp:
         # Keyboard shortcuts
         self.root.bind('<Control-o>', lambda e: self.load_csv_file())
         self.root.bind('<Control-e>', lambda e: self.load_excel_file())
+        self.root.bind('<Control-p>', lambda e: self.load_crack_photo())
         self.root.bind('<F5>', lambda e: self.run_analysis())
 
     def _exit_app(self):
@@ -128,6 +133,8 @@ class KICTestApp:
         ttk.Button(toolbar, text="Load CSV", command=self.load_csv_file).pack(
             side=tk.LEFT, padx=2)
         ttk.Button(toolbar, text="Load Excel", command=self.load_excel_file).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Load Photo", command=self.load_crack_photo).pack(
             side=tk.LEFT, padx=2)
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
         ttk.Button(toolbar, text="Analyze", command=self.run_analysis).pack(
@@ -498,6 +505,10 @@ class KICTestApp:
             # Store MTS results for comparison
             self.mts_results = excel_data.kic_results
 
+            # Store precrack measurements
+            self.precrack_measurements = excel_data.precrack_measurements
+            self.precrack_final_size = excel_data.precrack_final_size
+
             self._update_status(f"Loaded Excel: {Path(filepath).name}")
 
             # Display MTS results if available
@@ -516,6 +527,36 @@ class KICTestApp:
             self.results_tree.delete(item)
 
         r = excel_data.kic_results
+
+        # Precrack Measurements section
+        if excel_data.precrack_measurements:
+            self.results_tree.insert("", tk.END, values=("Precrack Measurements", "", "", ""),
+                                      tags=('section',))
+            for i, meas in enumerate(excel_data.precrack_measurements, 1):
+                self.results_tree.insert("", tk.END, values=(
+                    f"  Crack {i}",
+                    f"{meas:.2f}",
+                    "",
+                    "mm"
+                ))
+
+            # Show calculated average
+            avg_crack = excel_data.crack_length_average
+            self.results_tree.insert("", tk.END, values=(
+                "  Average (E399)",
+                f"{avg_crack:.2f}",
+                "",
+                "mm"
+            ))
+
+            # Show compliance-based final size
+            if excel_data.precrack_final_size > 0:
+                self.results_tree.insert("", tk.END, values=(
+                    "  Final (compliance)",
+                    f"{excel_data.precrack_final_size:.2f}",
+                    "",
+                    "mm"
+                ))
 
         # MTS Results section
         self.results_tree.insert("", tk.END, values=("MTS Analysis Results", "", "", ""),
@@ -574,6 +615,41 @@ class KICTestApp:
             self.results_tree.insert("", tk.END, values=(label, value, "", ""), tags=(tag,))
 
         self._update_status("MTS results loaded - Load CSV and click Analyze to compare")
+
+    def load_crack_photo(self):
+        """Load crack surface photo for inclusion in report."""
+        filepath = filedialog.askopenfilename(
+            title="Select Crack Surface Photo",
+            filetypes=[
+                ("Image files", "*.png *.jpg *.jpeg *.bmp *.tif *.tiff"),
+                ("PNG files", "*.png"),
+                ("JPEG files", "*.jpg *.jpeg"),
+                ("All files", "*.*")
+            ],
+            initialdir=str(PROJECT_ROOT / "data" / "Testdataexport")
+        )
+
+        if not filepath:
+            return
+
+        try:
+            # Verify it's a valid image
+            test_img = Image.open(filepath)
+            test_img.verify()
+
+            self.crack_photo_path = Path(filepath)
+            self._update_status(f"Loaded crack photo: {Path(filepath).name}")
+
+            # Show confirmation
+            messagebox.showinfo(
+                "Photo Loaded",
+                f"Crack surface photo loaded:\n{Path(filepath).name}\n\n"
+                "The photo will be included in the test report."
+            )
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load image:\n{e}")
+            self.crack_photo_path = None
 
     def _plot_raw_data(self):
         """Plot raw force-displacement data."""
@@ -677,6 +753,41 @@ class KICTestApp:
 
         r = self.current_results
 
+        # Precrack Measurements section (if available)
+        if self.precrack_measurements:
+            self.results_tree.insert("", tk.END, values=("Precrack Measurements", "", "", ""),
+                                      tags=('section',))
+            for i, meas in enumerate(self.precrack_measurements, 1):
+                self.results_tree.insert("", tk.END, values=(
+                    f"  Crack {i}",
+                    f"{meas:.2f}",
+                    "",
+                    "mm"
+                ))
+
+            # Calculate E399 average: (0.5*a1 + a2 + a3 + a4 + 0.5*a5) / 4
+            if len(self.precrack_measurements) == 5:
+                a = self.precrack_measurements
+                avg_crack = (0.5 * a[0] + a[1] + a[2] + a[3] + 0.5 * a[4]) / 4
+            else:
+                avg_crack = sum(self.precrack_measurements) / len(self.precrack_measurements)
+
+            self.results_tree.insert("", tk.END, values=(
+                "  Average (E399)",
+                f"{avg_crack:.2f}",
+                "",
+                "mm"
+            ))
+
+            # Show compliance-based final size if available
+            if hasattr(self, 'precrack_final_size') and self.precrack_final_size > 0:
+                self.results_tree.insert("", tk.END, values=(
+                    "  Final (compliance)",
+                    f"{self.precrack_final_size:.2f}",
+                    "",
+                    "mm"
+                ))
+
         # Test results section
         self.results_tree.insert("", tk.END, values=("Test Results", "", "", ""),
                                   tags=('section',))
@@ -775,36 +886,36 @@ class KICTestApp:
 
         self.ax.clear()
 
-        # Main curve
+        # Main curve - dark red
         self.ax.plot(
             plot_data['displacement'],
             plot_data['force'],
-            'b-', linewidth=0.8, label='Test data'
+            color='darkred', linestyle='-', linewidth=0.8, label='Test data'
         )
 
-        # Elastic compliance line
+        # Elastic compliance line - grey dashed
         self.ax.plot(
             plot_data['elastic_line_x'],
             plot_data['elastic_line_y'],
-            'k--', linewidth=1, alpha=0.7, label='Elastic compliance'
+            color='gray', linestyle='--', linewidth=1.2, alpha=0.8, label='Elastic compliance'
         )
 
-        # 5% secant offset line
+        # 5% secant offset line - grey dash-dot
         self.ax.plot(
             plot_data['secant_line_x'],
             plot_data['secant_line_y'],
-            'g--', linewidth=1, alpha=0.7, label='5% secant offset'
+            color='gray', linestyle='-.', linewidth=1.2, alpha=0.8, label='5% secant offset'
         )
 
-        # PQ point
+        # PQ point - gray
         pq_x, pq_y = plot_data['P_Q_point']
-        self.ax.plot(pq_x, pq_y, 'go', markersize=10, markerfacecolor='none',
-                     markeredgewidth=2, label=f'P_Q = {pq_y:.2f} kN')
+        self.ax.plot(pq_x, pq_y, 'o', markersize=10, markerfacecolor='none',
+                     markeredgecolor='gray', markeredgewidth=2, label=f'P_Q = {pq_y:.2f} kN')
 
-        # Pmax point
+        # Pmax point - black
         pmax_x, pmax_y = plot_data['P_max_point']
-        self.ax.plot(pmax_x, pmax_y, 'ro', markersize=10, markerfacecolor='none',
-                     markeredgewidth=2, label=f'P_max = {pmax_y:.2f} kN')
+        self.ax.plot(pmax_x, pmax_y, 'o', markersize=10, markerfacecolor='none',
+                     markeredgecolor='black', markeredgewidth=2, label=f'P_max = {pmax_y:.2f} kN')
 
         self.ax.set_xlabel("Displacement (mm)")
         self.ax.set_ylabel("Force (kN)")
@@ -838,7 +949,7 @@ class KICTestApp:
         self._update_status("Results cleared")
 
     def export_report(self):
-        """Export results to Word report."""
+        """Export results to Word report using CTOD E1290-style template."""
         if not self.current_results:
             messagebox.showwarning("Warning", "No results to export. Run analysis first.")
             return
@@ -857,52 +968,98 @@ class KICTestApp:
         try:
             from utils.reporting.kic_word_report import KICReportGenerator
 
-            # Build data dictionary
+            # Build test info dictionary
             test_info = {
                 'certificate_number': self.info_vars['certificate_number'].get(),
                 'test_project': self.info_vars['test_project'].get(),
                 'customer': self.info_vars['customer'].get(),
+                'customer_order': self.info_vars.get('customer_order', tk.StringVar()).get(),
+                'product_sn': self.info_vars.get('product_sn', tk.StringVar()).get(),
                 'specimen_id': self.info_vars['specimen_id'].get(),
+                'location_orientation': self.info_vars.get('location_orientation', tk.StringVar()).get(),
                 'material': self.info_vars['material'].get(),
                 'test_date': self.info_vars['test_date'].get(),
                 'temperature': self.info_vars['temperature'].get(),
             }
 
-            dimensions = {
+            # Build specimen data dictionary
+            specimen_data = {
                 'specimen_type': self.specimen_type.get(),
                 'W': self.dim_vars['W'].get(),
                 'B': self.dim_vars['B'].get(),
                 'a_0': self.dim_vars['a_0'].get(),
+                'notch_type': 'Fatigue pre-crack',
             }
             if 'S' in self.dim_vars:
-                dimensions['S'] = self.dim_vars['S'].get()
+                specimen_data['S'] = self.dim_vars['S'].get()
             if self.dim_vars.get('B_n') and self.dim_vars['B_n'].get():
-                dimensions['B_n'] = self.dim_vars['B_n'].get()
+                specimen_data['B_n'] = self.dim_vars['B_n'].get()
 
-            material_props = {
+            # Build material data dictionary
+            material_data = {
                 'yield_strength': self.material_vars['yield_strength'].get(),
+                'ultimate_strength': self.material_vars.get('ultimate_strength', tk.StringVar()).get(),
                 'youngs_modulus': self.material_vars['youngs_modulus'].get(),
                 'poissons_ratio': self.material_vars['poissons_ratio'].get(),
             }
+
+            # Build results dictionary from KICResult object
+            results_dict = {
+                'P_max': self.current_results.P_max,
+                'P_Q': self.current_results.P_Q,
+                'K_Q': self.current_results.K_Q,
+                'K_IC': self.current_results.K_IC,
+                'P_ratio': self.current_results.P_ratio,
+                'compliance': self.current_results.compliance,
+                'r_squared': self.current_results.r_squared,
+                'is_valid': self.current_results.is_valid,
+                'validity_notes': self.current_results.validity_notes,
+            }
+
+            # Prepare report data using CTOD E1290-style method
+            report_data = KICReportGenerator.prepare_report_data(
+                test_info=test_info,
+                specimen_data=specimen_data,
+                material_data=material_data,
+                results=results_dict,
+                crack_measurements=self.precrack_measurements if self.precrack_measurements else None
+            )
 
             # Save plot as temp image
             chart_path = Path(filepath).parent / "temp_kic_plot.png"
             self.fig.savefig(chart_path, dpi=150, bbox_inches='tight')
 
-            # Generate report
+            # Generate report using template
             template_path = PROJECT_ROOT / "templates" / "kic_e399_report_template.docx"
             logo_path = PROJECT_ROOT / "durablersvart.png"
 
             generator = KICReportGenerator(template_path if template_path.exists() else None)
-            output_path = generator.generate_report(
-                output_path=Path(filepath),
-                test_info=test_info,
-                dimensions=dimensions,
-                material_props=material_props,
-                results=self.current_results,
-                chart_path=chart_path if chart_path.exists() else None,
-                logo_path=logo_path if logo_path.exists() else None
-            )
+
+            # Prepare photo paths list
+            photo_paths = [Path(self.crack_photo_path)] if self.crack_photo_path else None
+
+            if template_path.exists():
+                # Use template-based generation (CTOD E1290 style)
+                output_path = generator.generate_from_template(
+                    output_path=Path(filepath),
+                    data=report_data,
+                    chart_path=chart_path if chart_path.exists() else None,
+                    logo_path=logo_path if logo_path.exists() else None,
+                    photo_paths=photo_paths
+                )
+            else:
+                # Fall back to scratch generation
+                output_path = generator.generate_report(
+                    output_path=Path(filepath),
+                    test_info=test_info,
+                    dimensions=specimen_data,
+                    material_props=material_data,
+                    results=self.current_results,
+                    chart_path=chart_path if chart_path.exists() else None,
+                    logo_path=logo_path if logo_path.exists() else None,
+                    precrack_measurements=self.precrack_measurements if self.precrack_measurements else None,
+                    crack_photo_path=self.crack_photo_path if self.crack_photo_path else None
+                )
 
             # Clean up temp chart
             if chart_path.exists():
