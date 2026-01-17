@@ -336,7 +336,7 @@ class FCGRTestApp:
         ).grid(row=0, column=2, sticky=tk.W)
 
         ttk.Label(options_frame, text="Outlier Threshold:").grid(row=1, column=0, sticky=tk.W)
-        self.outlier_threshold = tk.StringVar(value="6")
+        self.outlier_threshold = tk.StringVar(value="60")
         ttk.Entry(options_frame, textvariable=self.outlier_threshold, width=8).grid(
             row=1, column=1, sticky=tk.W)
         ttk.Label(options_frame, text="% deviation").grid(row=1, column=2, sticky=tk.W)
@@ -699,7 +699,7 @@ class FCGRTestApp:
                 try:
                     outlier_pct = float(self.outlier_threshold.get())
                 except ValueError:
-                    outlier_pct = 6.0
+                    outlier_pct = 60.0
 
                 # Analyze
                 self.current_results = analyzer.analyze_fcgr_data(
@@ -1056,7 +1056,7 @@ class FCGRTestApp:
                     'wave_shape': self.test_vars.get('wave_shape', tk.StringVar(value='Sine')).get() if hasattr(self, 'test_vars') and 'wave_shape' in self.test_vars else 'Sine',
                     'environment': self.test_vars.get('environment', tk.StringVar(value='Laboratory Air')).get() if hasattr(self, 'test_vars') and 'environment' in self.test_vars else 'Laboratory Air',
                     'dadn_method': self.dadn_method.get().capitalize(),
-                    'outlier_threshold': self.outlier_threshold.get() or '6',
+                    'outlier_threshold': self.outlier_threshold.get() or '60',
                 }
 
                 # Prepare report data
