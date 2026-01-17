@@ -242,34 +242,7 @@ class FCGRTestApp:
             variable=self.specimen_type, value="M(T)"
         ).grid(row=0, column=2, sticky=tk.W)
 
-        # Dimension entry frame
-        self.dim_frame = ttk.LabelFrame(left_frame, text="Dimensions (mm)", padding=10)
-        self.dim_frame.pack(fill=tk.X, pady=5, padx=5)
-        self.dim_vars: Dict[str, tk.StringVar] = {}
-        self._create_dimension_fields()
-
-        # Material properties frame
-        mat_frame = ttk.LabelFrame(left_frame, text="Material Properties", padding=10)
-        mat_frame.pack(fill=tk.X, pady=5, padx=5)
-
-        mat_fields = [
-            ("sigma_ys (Yield strength, MPa):", "yield_strength", "500"),
-            ("sigma_uts (Ultimate strength, MPa):", "ultimate_strength", "600"),
-            ("E (Young's modulus, GPa):", "youngs_modulus", "210"),
-            ("nu (Poisson's ratio):", "poissons_ratio", "0.3"),
-        ]
-
-        self.mat_vars: Dict[str, tk.StringVar] = {}
-        for i, (label, key, default) in enumerate(mat_fields):
-            ttk.Label(mat_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
-            var = tk.StringVar(value=default)
-            self.mat_vars[key] = var
-            ttk.Entry(mat_frame, textvariable=var).grid(
-                row=i, column=1, sticky=tk.EW, pady=2)
-
-        mat_frame.columnconfigure(1, weight=1)
-
-        # Test parameters frame
+        # Test parameters frame (moved up, after Specimen Geometry)
         test_frame = ttk.LabelFrame(left_frame, text="Test Parameters", padding=10)
         test_frame.pack(fill=tk.X, pady=5, padx=5)
 
@@ -287,6 +260,8 @@ class FCGRTestApp:
         ).grid(row=0, column=2, sticky=tk.W)
 
         test_params = [
+            ("Pmax (Maximum load, kN):", "P_max", ""),
+            ("Kmax (Maximum K, MPa√m):", "K_max", ""),
             ("R (Load ratio):", "load_ratio", "0.1"),
             ("Frequency (Hz):", "frequency", "10.0"),
             ("Temperature (C):", "temperature", "23"),
@@ -360,6 +335,33 @@ class FCGRTestApp:
         ttk.Entry(options_frame, textvariable=self.outlier_threshold, width=8).grid(
             row=1, column=1, sticky=tk.W)
         ttk.Label(options_frame, text="% deviation").grid(row=1, column=2, sticky=tk.W)
+
+        # Dimension entry frame (moved to bottom)
+        self.dim_frame = ttk.LabelFrame(left_frame, text="Dimensions (mm)", padding=10)
+        self.dim_frame.pack(fill=tk.X, pady=5, padx=5)
+        self.dim_vars: Dict[str, tk.StringVar] = {}
+        self._create_dimension_fields()
+
+        # Material properties frame (moved to bottom)
+        mat_frame = ttk.LabelFrame(left_frame, text="Material Properties", padding=10)
+        mat_frame.pack(fill=tk.X, pady=5, padx=5)
+
+        mat_fields = [
+            ("sigma_ys (Yield strength, MPa):", "yield_strength", "500"),
+            ("sigma_uts (Ultimate strength, MPa):", "ultimate_strength", "600"),
+            ("E (Young's modulus, GPa):", "youngs_modulus", "210"),
+            ("nu (Poisson's ratio):", "poissons_ratio", "0.3"),
+        ]
+
+        self.mat_vars: Dict[str, tk.StringVar] = {}
+        for i, (label, key, default) in enumerate(mat_fields):
+            ttk.Label(mat_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
+            var = tk.StringVar(value=default)
+            self.mat_vars[key] = var
+            ttk.Entry(mat_frame, textvariable=var).grid(
+                row=i, column=1, sticky=tk.EW, pady=2)
+
+        mat_frame.columnconfigure(1, weight=1)
 
     def _create_dimension_fields(self):
         """Create dimension entry fields."""
