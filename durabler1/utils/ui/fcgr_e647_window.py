@@ -349,10 +349,10 @@ class FCGRTestApp:
         ).grid(row=0, column=2, sticky=tk.W)
 
         ttk.Label(options_frame, text="Outlier Threshold:").grid(row=1, column=0, sticky=tk.W)
-        self.outlier_threshold = tk.StringVar(value="2.5")
+        self.outlier_threshold = tk.StringVar(value="30")
         ttk.Entry(options_frame, textvariable=self.outlier_threshold, width=8).grid(
             row=1, column=1, sticky=tk.W)
-        ttk.Label(options_frame, text="std dev").grid(row=1, column=2, sticky=tk.W)
+        ttk.Label(options_frame, text="% deviation").grid(row=1, column=2, sticky=tk.W)
 
     def _create_dimension_fields(self):
         """Create dimension entry fields."""
@@ -659,13 +659,20 @@ class FCGRTestApp:
                 # Calculate compliance per cycle
                 _, compliance = calculate_compliance_per_cycle(self.csv_data)
 
+                # Get outlier threshold percentage from UI
+                try:
+                    outlier_pct = float(self.outlier_threshold.get())
+                except ValueError:
+                    outlier_pct = 30.0
+
                 # Analyze
                 self.current_results = analyzer.analyze_fcgr_data(
                     cycles=cycles,
                     compliance=compliance,
                     P_max=P_max,
                     P_min=P_min,
-                    method=self.dadn_method.get()
+                    method=self.dadn_method.get(),
+                    outlier_percentage=outlier_pct
                 )
             elif self.excel_data is not None:
                 # Use Excel data (pre-calculated by MTS)
@@ -730,8 +737,25 @@ class FCGRTestApp:
             "Outliers Detected", f"{self.current_results.n_outliers}", "-", ""
         ))
 
-        # === Paris Law Results ===
-        add_section("Paris Law: da/dN = C * (Delta-K)^m")
+        # === Paris Law Results - Initial (all data) ===
+        paris_initial = self.current_results.paris_law_initial
+        if paris_initial:
+            add_section("Initial Paris Law (all data points)")
+            self.results_tree.insert("", tk.END, values=(
+                "Coefficient C (initial)", f"{paris_initial.C:.4e}", f"+/-{paris_initial.std_error_C:.2e}", "mm/cycle/(MPa*m^0.5)^m"
+            ))
+            self.results_tree.insert("", tk.END, values=(
+                "Exponent m (initial)", f"{paris_initial.m:.4f}", f"+/-{paris_initial.std_error_m:.4f}", ""
+            ))
+            self.results_tree.insert("", tk.END, values=(
+                "R² (initial)", f"{paris_initial.r_squared:.6f}", "-", ""
+            ))
+            self.results_tree.insert("", tk.END, values=(
+                "Points (initial)", f"{paris_initial.n_points}", "-", ""
+            ))
+
+        # === Paris Law Results - Final (after outlier removal) ===
+        add_section("Final Paris Law (excl. outliers)")
 
         paris = self.current_results.paris_law
         self.results_tree.insert("", tk.END, values=(
@@ -816,14 +840,25 @@ class FCGRTestApp:
                 self.ax2.loglog(dK_outlier[outlier_mask], dadN_outlier[outlier_mask], 'x',
                                 color='gray', markersize=5, label='Outliers')
 
-        # Paris law fit line - black
-        paris = self.current_results.paris_law
-        if paris.C > 0 and paris.m > 0:
-            dK_fit = np.logspace(np.log10(paris.delta_K_range[0]),
-                                 np.log10(paris.delta_K_range[1]), 50)
-            dadN_fit = paris.C * dK_fit**paris.m
-            self.ax2.loglog(dK_fit, dadN_fit, '-', color='black', linewidth=2,
-                            label=f'Paris fit: C={paris.C:.2e}, m={paris.m:.2f}')
+        # Paris law fit lines - both in black with different styles
+        paris_final = self.current_results.paris_law
+        paris_initial = self.current_results.paris_law_initial
+
+        # Plot initial regression line (all data) - dashed black
+        if paris_initial and paris_initial.C > 0 and paris_initial.m > 0:
+            dK_fit_init = np.logspace(np.log10(paris_initial.delta_K_range[0]),
+                                      np.log10(paris_initial.delta_K_range[1]), 50)
+            dadN_fit_init = paris_initial.C * dK_fit_init**paris_initial.m
+            self.ax2.loglog(dK_fit_init, dadN_fit_init, '--', color='black', linewidth=1.5,
+                            label=f'Initial fit (all data): C={paris_initial.C:.2e}, m={paris_initial.m:.2f}')
+
+        # Plot final regression line (without outliers) - solid black
+        if paris_final and paris_final.C > 0 and paris_final.m > 0:
+            dK_fit_final = np.logspace(np.log10(paris_final.delta_K_range[0]),
+                                       np.log10(paris_final.delta_K_range[1]), 50)
+            dadN_fit_final = paris_final.C * dK_fit_final**paris_final.m
+            self.ax2.loglog(dK_fit_final, dadN_fit_final, '-', color='black', linewidth=2,
+                            label=f'Final fit (excl. outliers): C={paris_final.C:.2e}, m={paris_final.m:.2f}')
 
         self.ax2.set_xlabel(r"$\Delta K$ (MPa$\sqrt{m}$)")
         self.ax2.set_ylabel("da/dN (mm/cycle)")

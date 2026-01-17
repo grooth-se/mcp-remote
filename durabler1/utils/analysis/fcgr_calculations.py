@@ -265,9 +265,16 @@ class FCGRAnalyzer:
     def paris_law_regression(self, delta_K: np.ndarray,
                              da_dN: np.ndarray,
                              exclude_outliers: bool = True,
-                             outlier_threshold: float = 2.5) -> ParisLawResult:
+                             outlier_percentage: float = 30.0) -> Tuple[ParisLawResult, ParisLawResult, np.ndarray]:
         """
-        Perform Paris law regression: da/dN = C * (Delta-K)^m
+        Perform Paris law regression with percentage-based outlier detection.
+
+        Method:
+        1. Run initial linear regression with all data points
+        2. Classify a point as outlier if da/dN deviates more than
+           the specified percentage from the regression line
+        3. Re-run regression without outliers
+        4. Return both regression results for plotting
 
         Uses log-log linear regression:
         log(da/dN) = log(C) + m * log(Delta-K)
@@ -279,94 +286,118 @@ class FCGRAnalyzer:
         da_dN : np.ndarray
             Crack growth rate array (mm/cycle)
         exclude_outliers : bool
-            If True, iteratively remove outliers
-        outlier_threshold : float
-            Number of standard deviations for outlier detection
+            If True, remove outliers based on percentage deviation
+        outlier_percentage : float
+            Percentage deviation threshold for outlier detection (e.g., 30 = 30%)
 
         Returns
         -------
-        ParisLawResult
-            Paris law coefficients C and m with statistics
+        Tuple[ParisLawResult, ParisLawResult, np.ndarray]
+            (initial_result, final_result, outlier_mask)
+            - initial_result: Paris law from all data points
+            - final_result: Paris law after removing outliers
+            - outlier_mask: Boolean array where True = outlier
         """
         # Filter valid data (positive values only)
         valid = (delta_K > 0) & (da_dN > 0)
         dK = delta_K[valid]
         dadN = da_dN[valid]
 
+        empty_result = ParisLawResult(C=0.0, m=0.0, r_squared=0.0, n_points=0)
         if len(dK) < 5:
-            return ParisLawResult(C=0.0, m=0.0, r_squared=0.0, n_points=0)
+            return empty_result, empty_result, np.zeros(len(delta_K), dtype=bool)
 
         # Log transform
         log_dK = np.log10(dK)
         log_dadN = np.log10(dadN)
 
-        # Iterative outlier removal
-        mask = np.ones(len(log_dK), dtype=bool)
+        # Step 1: Initial regression with ALL data points
+        slope_init, intercept_init, r_value_init, _, _ = stats.linregress(log_dK, log_dadN)
 
-        if exclude_outliers:
-            for iteration in range(5):  # Max 5 iterations
-                # Linear regression on current data
-                slope, intercept, r_value, p_value, std_err = stats.linregress(
-                    log_dK[mask], log_dadN[mask]
-                )
+        # Calculate initial Paris law parameters
+        m_init = slope_init
+        C_init = 10**intercept_init
+        r_squared_init = r_value_init**2
 
-                # Calculate residuals
-                predicted = intercept + slope * log_dK
-                residuals = log_dadN - predicted
+        # Calculate uncertainties for initial fit
+        n_init = len(dK)
+        y_pred_init = intercept_init + slope_init * log_dK
+        ss_res_init = np.sum((log_dadN - y_pred_init)**2)
+        ss_x_init = np.sum((log_dK - np.mean(log_dK))**2)
+        std_error_m_init = np.sqrt(ss_res_init / (n_init - 2) / ss_x_init) if ss_x_init > 0 and n_init > 2 else 0
+        std_error_logC_init = std_error_m_init * np.sqrt(np.sum(log_dK**2) / n_init) if n_init > 0 else 0
+        std_error_C_init = C_init * np.log(10) * std_error_logC_init
 
-                # Calculate standard deviation of residuals
-                std_resid = np.std(residuals[mask])
-
-                # Mark outliers
-                new_mask = np.abs(residuals) < outlier_threshold * std_resid
-
-                # Check convergence
-                if np.sum(new_mask) == np.sum(mask):
-                    break
-
-                mask = new_mask & mask
-
-                if np.sum(mask) < 5:
-                    break
-
-        # Final regression
-        slope, intercept, r_value, p_value, std_err = stats.linregress(
-            log_dK[mask], log_dadN[mask]
+        initial_result = ParisLawResult(
+            C=C_init,
+            m=m_init,
+            r_squared=r_squared_init,
+            n_points=n_init,
+            delta_K_range=(float(np.min(dK)), float(np.max(dK))),
+            da_dN_range=(float(np.min(dadN)), float(np.max(dadN))),
+            std_error_C=std_error_C_init,
+            std_error_m=std_error_m_init
         )
 
-        # Extract Paris law parameters
-        m = slope
-        C = 10**intercept
-        r_squared = r_value**2
+        # Step 2: Identify outliers based on percentage deviation
+        # Calculate predicted da/dN values from initial regression
+        dadN_predicted = C_init * dK**m_init
 
-        # Calculate uncertainties
-        n = np.sum(mask)
-        if n > 2:
-            # Standard error of slope (m)
-            x = log_dK[mask]
-            y = log_dadN[mask]
-            y_pred = intercept + slope * x
-            ss_res = np.sum((y - y_pred)**2)
-            ss_x = np.sum((x - np.mean(x))**2)
-            std_error_m = np.sqrt(ss_res / (n - 2) / ss_x) if ss_x > 0 else 0
+        # Calculate percentage deviation: |actual - predicted| / predicted * 100
+        percentage_deviation = np.abs(dadN - dadN_predicted) / dadN_predicted * 100
 
-            # Standard error of intercept (log C)
-            std_error_logC = std_error_m * np.sqrt(np.sum(x**2) / n) if n > 0 else 0
-            std_error_C = C * np.log(10) * std_error_logC
+        # Mark outliers (points deviating more than threshold percentage)
+        outlier_mask_valid = percentage_deviation > outlier_percentage
+
+        # Create full outlier mask (for original array size)
+        outlier_mask_full = np.zeros(len(delta_K), dtype=bool)
+        outlier_mask_full[valid] = outlier_mask_valid
+
+        if not exclude_outliers or np.sum(~outlier_mask_valid) < 5:
+            # Return initial result as both if not excluding or not enough points
+            return initial_result, initial_result, outlier_mask_full
+
+        # Step 3: Re-run regression WITHOUT outliers
+        mask = ~outlier_mask_valid
+        log_dK_clean = log_dK[mask]
+        log_dadN_clean = log_dadN[mask]
+        dK_clean = dK[mask]
+        dadN_clean = dadN[mask]
+
+        slope_final, intercept_final, r_value_final, _, _ = stats.linregress(
+            log_dK_clean, log_dadN_clean
+        )
+
+        # Calculate final Paris law parameters
+        m_final = slope_final
+        C_final = 10**intercept_final
+        r_squared_final = r_value_final**2
+
+        # Calculate uncertainties for final fit
+        n_final = len(dK_clean)
+        if n_final > 2:
+            y_pred_final = intercept_final + slope_final * log_dK_clean
+            ss_res_final = np.sum((log_dadN_clean - y_pred_final)**2)
+            ss_x_final = np.sum((log_dK_clean - np.mean(log_dK_clean))**2)
+            std_error_m_final = np.sqrt(ss_res_final / (n_final - 2) / ss_x_final) if ss_x_final > 0 else 0
+            std_error_logC_final = std_error_m_final * np.sqrt(np.sum(log_dK_clean**2) / n_final) if n_final > 0 else 0
+            std_error_C_final = C_final * np.log(10) * std_error_logC_final
         else:
-            std_error_m = 0
-            std_error_C = 0
+            std_error_m_final = 0
+            std_error_C_final = 0
 
-        return ParisLawResult(
-            C=C,
-            m=m,
-            r_squared=r_squared,
-            n_points=n,
-            delta_K_range=(float(np.min(dK[mask])), float(np.max(dK[mask]))),
-            da_dN_range=(float(np.min(dadN[mask])), float(np.max(dadN[mask]))),
-            std_error_C=std_error_C,
-            std_error_m=std_error_m
+        final_result = ParisLawResult(
+            C=C_final,
+            m=m_final,
+            r_squared=r_squared_final,
+            n_points=n_final,
+            delta_K_range=(float(np.min(dK_clean)), float(np.max(dK_clean))),
+            da_dN_range=(float(np.min(dadN_clean)), float(np.max(dadN_clean))),
+            std_error_C=std_error_C_final,
+            std_error_m=std_error_m_final
         )
+
+        return initial_result, final_result, outlier_mask_full
 
     def detect_outliers(self, delta_K: np.ndarray, da_dN: np.ndarray,
                         method: str = 'residual',
@@ -459,8 +490,8 @@ class FCGRAnalyzer:
         float
             Threshold Delta-K (MPa*sqrt(m)) or 0 if not determinable
         """
-        # Get Paris law fit
-        result = self.paris_law_regression(delta_K, da_dN, exclude_outliers=True)
+        # Get Paris law fit (use final result after outlier removal)
+        _, result, _ = self.paris_law_regression(delta_K, da_dN, exclude_outliers=True)
 
         if result.C <= 0 or result.m <= 0:
             return 0.0
@@ -549,7 +580,8 @@ class FCGRAnalyzer:
 
     def analyze_fcgr_data(self, cycles: np.ndarray, compliance: np.ndarray,
                           P_max: np.ndarray, P_min: np.ndarray,
-                          method: str = 'secant') -> FCGRResult:
+                          method: str = 'secant',
+                          outlier_percentage: float = 30.0) -> FCGRResult:
         """
         Perform complete FCGR analysis.
 
@@ -565,6 +597,8 @@ class FCGRAnalyzer:
             Minimum load array (kN)
         method : str
             da/dN calculation method: 'secant' or 'polynomial'
+        outlier_percentage : float
+            Percentage deviation threshold for outlier detection (default 30%)
 
         Returns
         -------
@@ -598,10 +632,13 @@ class FCGRAnalyzer:
             for dP, a in zip(delta_P_mid, a_valid)
         ])
 
-        # Detect outliers
-        outliers = self.detect_outliers(delta_K, da_dN, method='residual')
+        # Paris law regression with percentage-based outlier detection
+        # Returns both initial (all data) and final (without outliers) results
+        paris_initial, paris_final, outlier_mask = self.paris_law_regression(
+            delta_K, da_dN, exclude_outliers=True, outlier_percentage=outlier_percentage
+        )
 
-        # Create data points
+        # Create data points with outlier flags from regression
         data_points = []
         for i in range(len(N_valid)):
             point = FCGRDataPoint(
@@ -613,27 +650,25 @@ class FCGRAnalyzer:
                 P_min=float(np.interp(N_valid[i], cycles, P_min)),
                 compliance=float(np.interp(N_valid[i], cycles, compliance)),
                 is_valid=delta_K[i] > 0 and da_dN[i] > 0,
-                is_outlier=outliers[i] if i < len(outliers) else False
+                is_outlier=outlier_mask[i] if i < len(outlier_mask) else False
             )
             data_points.append(point)
 
-        # Paris law regression (excluding outliers)
-        valid_mask = np.array([p.is_valid and not p.is_outlier for p in data_points])
-        paris_result = self.paris_law_regression(
-            delta_K[valid_mask], da_dN[valid_mask], exclude_outliers=True
-        )
-
-        # Determine threshold
-        threshold_dK = self.determine_threshold_delta_K(
-            delta_K[valid_mask], da_dN[valid_mask]
-        )
+        # Determine threshold using final Paris law
+        threshold_dK = 0.0
+        if paris_final.C > 0 and paris_final.m > 0:
+            try:
+                threshold_dK = (1e-7 / paris_final.C)**(1.0 / paris_final.m)
+            except:
+                pass
 
         # Validate test
         is_valid, validity_notes = self.validate_fcgr_test(data_points)
 
         return FCGRResult(
             data_points=data_points,
-            paris_law=paris_result,
+            paris_law=paris_final,
+            paris_law_initial=paris_initial,
             threshold_delta_K=threshold_dK,
             final_crack_length=crack_lengths[-1] if len(crack_lengths) > 0 else 0.0,
             total_cycles=int(cycles[-1]) if len(cycles) > 0 else 0,
@@ -644,7 +679,8 @@ class FCGRAnalyzer:
     def analyze_from_raw_data(self, cycles: np.ndarray,
                               crack_lengths: np.ndarray,
                               P_max: np.ndarray, P_min: np.ndarray,
-                              method: str = 'secant') -> FCGRResult:
+                              method: str = 'secant',
+                              outlier_percentage: float = 30.0) -> FCGRResult:
         """
         Perform FCGR analysis from pre-calculated crack lengths.
 
@@ -663,6 +699,8 @@ class FCGRAnalyzer:
             Minimum load array (kN)
         method : str
             da/dN calculation method: 'secant' or 'polynomial'
+        outlier_percentage : float
+            Percentage deviation threshold for outlier detection (default 30%)
 
         Returns
         -------
@@ -693,10 +731,12 @@ class FCGRAnalyzer:
             for dP, a in zip(delta_P_mid, a_valid)
         ])
 
-        # Detect outliers
-        outliers = self.detect_outliers(delta_K, da_dN, method='residual')
+        # Paris law regression with percentage-based outlier detection
+        paris_initial, paris_final, outlier_mask = self.paris_law_regression(
+            delta_K, da_dN, exclude_outliers=True, outlier_percentage=outlier_percentage
+        )
 
-        # Create data points
+        # Create data points with outlier flags from regression
         data_points = []
         for i in range(len(N_valid)):
             point = FCGRDataPoint(
@@ -708,27 +748,25 @@ class FCGRAnalyzer:
                 P_min=float(P_min_mid[i]),
                 compliance=0.0,  # Not available from raw data
                 is_valid=delta_K[i] > 0 and da_dN[i] > 0,
-                is_outlier=outliers[i] if i < len(outliers) else False
+                is_outlier=outlier_mask[i] if i < len(outlier_mask) else False
             )
             data_points.append(point)
 
-        # Paris law regression (excluding outliers)
-        valid_mask = np.array([p.is_valid and not p.is_outlier for p in data_points])
-        paris_result = self.paris_law_regression(
-            delta_K[valid_mask], da_dN[valid_mask], exclude_outliers=True
-        )
-
-        # Determine threshold
-        threshold_dK = self.determine_threshold_delta_K(
-            delta_K[valid_mask], da_dN[valid_mask]
-        )
+        # Determine threshold using final Paris law
+        threshold_dK = 0.0
+        if paris_final.C > 0 and paris_final.m > 0:
+            try:
+                threshold_dK = (1e-7 / paris_final.C)**(1.0 / paris_final.m)
+            except:
+                pass
 
         # Validate test
         is_valid, validity_notes = self.validate_fcgr_test(data_points)
 
         return FCGRResult(
             data_points=data_points,
-            paris_law=paris_result,
+            paris_law=paris_final,
+            paris_law_initial=paris_initial,
             threshold_delta_K=threshold_dK,
             final_crack_length=crack_lengths[-1] if len(crack_lengths) > 0 else 0.0,
             total_cycles=int(cycles[-1]) if len(cycles) > 0 else 0,

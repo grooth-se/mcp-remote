@@ -286,7 +286,9 @@ class FCGRResult:
     data_points : List[FCGRDataPoint]
         All processed data points
     paris_law : ParisLawResult
-        Paris law fit results
+        Paris law fit results (after outlier removal)
+    paris_law_initial : ParisLawResult
+        Paris law fit results from all data (before outlier removal)
     threshold_delta_K : float
         Threshold Delta-K (if determined)
     final_crack_length : float
@@ -300,6 +302,7 @@ class FCGRResult:
     """
     data_points: List[FCGRDataPoint]
     paris_law: ParisLawResult
+    paris_law_initial: Optional[ParisLawResult] = None
     threshold_delta_K: float = 0.0
     final_crack_length: float = 0.0
     total_cycles: int = 0
