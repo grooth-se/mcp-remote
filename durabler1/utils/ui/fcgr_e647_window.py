@@ -161,8 +161,8 @@ class FCGRTestApp:
 
     def _create_left_panel(self, parent):
         """Create left panel with specimen inputs (scrollable)."""
-        # Create outer frame with fixed width
-        left_outer = ttk.Frame(parent, width=450)
+        # Create outer frame with fixed width - wider to fit text fields
+        left_outer = ttk.Frame(parent, width=520)
         left_outer.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         left_outer.grid_propagate(False)
         left_outer.rowconfigure(0, weight=1)
@@ -204,17 +204,17 @@ class FCGRTestApp:
         ttk.Label(files_frame, text="FCG CSV:").grid(row=0, column=0, sticky=tk.W, pady=1)
         self.csv_file_var = tk.StringVar(value="Not loaded")
         ttk.Label(files_frame, textvariable=self.csv_file_var, foreground='gray',
-                  width=35).grid(row=0, column=1, sticky=tk.W, pady=1)
+                  width=45).grid(row=0, column=1, sticky=tk.W, pady=1)
 
         ttk.Label(files_frame, text="Excel Data:").grid(row=1, column=0, sticky=tk.W, pady=1)
         self.excel_file_var = tk.StringVar(value="Not loaded")
         ttk.Label(files_frame, textvariable=self.excel_file_var, foreground='gray',
-                  width=35).grid(row=1, column=1, sticky=tk.W, pady=1)
+                  width=45).grid(row=1, column=1, sticky=tk.W, pady=1)
 
         ttk.Label(files_frame, text="Photos:").grid(row=2, column=0, sticky=tk.W, pady=1)
         self.photos_count_var = tk.StringVar(value="0 photos")
         ttk.Label(files_frame, textvariable=self.photos_count_var, foreground='gray',
-                  width=35).grid(row=2, column=1, sticky=tk.W, pady=1)
+                  width=45).grid(row=2, column=1, sticky=tk.W, pady=1)
 
         files_frame.columnconfigure(1, weight=1)
 
@@ -257,7 +257,7 @@ class FCGRTestApp:
             ttk.Label(mat_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar(value=default)
             self.mat_vars[key] = var
-            ttk.Entry(mat_frame, textvariable=var, width=12).grid(
+            ttk.Entry(mat_frame, textvariable=var, width=18).grid(
                 row=i, column=1, sticky=tk.W, pady=2)
 
         mat_frame.columnconfigure(1, weight=1)
@@ -290,7 +290,7 @@ class FCGRTestApp:
             ttk.Label(test_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar(value=default)
             self.test_vars[key] = var
-            ttk.Entry(test_frame, textvariable=var, width=12).grid(
+            ttk.Entry(test_frame, textvariable=var, width=18).grid(
                 row=i, column=1, sticky=tk.W, pady=2)
 
         test_frame.columnconfigure(1, weight=1)
@@ -305,7 +305,7 @@ class FCGRTestApp:
         self.certificate_number_var = tk.StringVar()
         cert_frame = ttk.Frame(info_frame)
         cert_frame.grid(row=row, column=1, sticky=tk.EW, pady=2)
-        self.cert_combobox = ttk.Combobox(cert_frame, textvariable=self.certificate_number_var, width=18)
+        self.cert_combobox = ttk.Combobox(cert_frame, textvariable=self.certificate_number_var, width=30)
         self.cert_combobox.pack(side=tk.LEFT)
         self.cert_combobox.bind('<<ComboboxSelected>>', self._on_certificate_selected)
         ttk.Button(cert_frame, text="Refresh", width=3,
@@ -327,7 +327,7 @@ class FCGRTestApp:
             var = tk.StringVar()
             self.info_vars[key] = var
             state = 'readonly' if key == 'test_date' else 'normal'
-            ttk.Entry(info_frame, textvariable=var, width=38, state=state).grid(
+            ttk.Entry(info_frame, textvariable=var, width=45, state=state).grid(
                 row=row, column=1, sticky=tk.EW, pady=2)
             row += 1
 
@@ -373,25 +373,27 @@ class FCGRTestApp:
             ttk.Label(self.dim_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar(value=default)
             self.dim_vars[key] = var
-            ttk.Entry(self.dim_frame, textvariable=var, width=12).grid(
+            ttk.Entry(self.dim_frame, textvariable=var, width=18).grid(
                 row=i, column=1, sticky=tk.W, pady=2)
 
         self.dim_frame.columnconfigure(1, weight=1)
 
     def _create_right_panel(self, parent):
-        """Create right panel with results table, dual plots, and photo viewer."""
+        """Create right panel with results table (top), dual plots (middle), and photos (bottom)."""
         right_frame = ttk.Frame(parent)
         right_frame.grid(row=0, column=1, sticky="nsew")
         right_frame.columnconfigure(0, weight=1)
-        right_frame.rowconfigure(1, weight=1)
+        right_frame.rowconfigure(0, weight=0)  # Results table - fixed height
+        right_frame.rowconfigure(1, weight=1)  # Plots - expandable
+        right_frame.rowconfigure(2, weight=0)  # Photos - fixed height
 
-        # Results table (top)
+        # === Row 0: Results table (top) ===
         results_frame = ttk.LabelFrame(right_frame, text="Results (ASTM E647)", padding=5)
         results_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
 
         columns = ("parameter", "value", "uncertainty", "unit")
         self.results_tree = ttk.Treeview(
-            results_frame, columns=columns, show="headings", height=8
+            results_frame, columns=columns, show="headings", height=10
         )
 
         self.results_tree.heading("parameter", text="Parameter")
@@ -399,26 +401,29 @@ class FCGRTestApp:
         self.results_tree.heading("uncertainty", text="U (k=2)")
         self.results_tree.heading("unit", text="Unit")
 
-        self.results_tree.column("parameter", width=200)
-        self.results_tree.column("value", width=120, anchor=tk.E)
-        self.results_tree.column("uncertainty", width=100, anchor=tk.E)
-        self.results_tree.column("unit", width=100, anchor=tk.CENTER)
+        self.results_tree.column("parameter", width=250)
+        self.results_tree.column("value", width=150, anchor=tk.E)
+        self.results_tree.column("uncertainty", width=120, anchor=tk.E)
+        self.results_tree.column("unit", width=150, anchor=tk.CENTER)
 
-        self.results_tree.pack(fill=tk.BOTH, expand=True)
+        # Add scrollbar to results
+        results_scroll = ttk.Scrollbar(results_frame, orient=tk.VERTICAL, command=self.results_tree.yview)
+        self.results_tree.configure(yscrollcommand=results_scroll.set)
+        self.results_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        results_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Bottom frame containing plots and photos
-        bottom_frame = ttk.Frame(right_frame)
-        bottom_frame.grid(row=1, column=0, sticky="nsew")
-        bottom_frame.columnconfigure(0, weight=1)
-        bottom_frame.columnconfigure(1, weight=1)
-        bottom_frame.columnconfigure(2, weight=0)  # Photos column
-        bottom_frame.rowconfigure(0, weight=1)
+        # === Row 1: Plots frame (middle) ===
+        plots_frame = ttk.Frame(right_frame)
+        plots_frame.grid(row=1, column=0, sticky="nsew", pady=5)
+        plots_frame.columnconfigure(0, weight=1)
+        plots_frame.columnconfigure(1, weight=1)
+        plots_frame.rowconfigure(0, weight=1)
 
         # Plot 1: Crack length vs Cycles (left)
-        plot1_frame = ttk.LabelFrame(bottom_frame, text="Crack Length vs Cycles", padding=5)
-        plot1_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 2))
+        plot1_frame = ttk.LabelFrame(plots_frame, text="Crack Length vs Cycles", padding=5)
+        plot1_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 3))
 
-        self.fig1 = Figure(figsize=(4, 3.5), dpi=100)
+        self.fig1 = Figure(figsize=(5, 4), dpi=100)
         self.ax1 = self.fig1.add_subplot(111)
         self._setup_empty_plot1()
 
@@ -431,11 +436,11 @@ class FCGRTestApp:
         self.toolbar1 = NavigationToolbar2Tk(self.canvas1, toolbar1_frame)
         self.toolbar1.update()
 
-        # Plot 2: da/dN vs Delta-K (Paris law plot, center)
-        plot2_frame = ttk.LabelFrame(bottom_frame, text="da/dN vs Delta-K (Paris Law)", padding=5)
-        plot2_frame.grid(row=0, column=1, sticky="nsew", padx=2)
+        # Plot 2: da/dN vs Delta-K (Paris law plot, right)
+        plot2_frame = ttk.LabelFrame(plots_frame, text="da/dN vs Delta-K (Paris Law)", padding=5)
+        plot2_frame.grid(row=0, column=1, sticky="nsew", padx=(3, 0))
 
-        self.fig2 = Figure(figsize=(4, 3.5), dpi=100)
+        self.fig2 = Figure(figsize=(5, 4), dpi=100)
         self.ax2 = self.fig2.add_subplot(111)
         self._setup_empty_plot2()
 
@@ -448,14 +453,25 @@ class FCGRTestApp:
         self.toolbar2 = NavigationToolbar2Tk(self.canvas2, toolbar2_frame)
         self.toolbar2.update()
 
-        # Photos (right side)
-        photos_frame = ttk.LabelFrame(bottom_frame, text="Crack Photos", padding=5)
-        photos_frame.grid(row=0, column=2, sticky="nsew", padx=(2, 0))
+        # === Row 2: Photos frame (bottom) ===
+        photos_frame = ttk.LabelFrame(right_frame, text="Crack Photos", padding=5)
+        photos_frame.grid(row=2, column=0, sticky="nsew", pady=(5, 0))
 
-        self.photos_listbox = tk.Listbox(photos_frame, height=8, width=20)
-        self.photos_listbox.pack(fill=tk.BOTH, expand=True, pady=2)
-        ttk.Button(photos_frame, text="Remove Selected", command=self.remove_photo).pack(
-            fill=tk.X, pady=2)
+        # Horizontal layout for photos section
+        photos_inner = ttk.Frame(photos_frame)
+        photos_inner.pack(fill=tk.BOTH, expand=True)
+
+        self.photos_listbox = tk.Listbox(photos_inner, height=4, width=60)
+        self.photos_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, pady=2)
+
+        photos_scroll = ttk.Scrollbar(photos_inner, orient=tk.VERTICAL, command=self.photos_listbox.yview)
+        self.photos_listbox.configure(yscrollcommand=photos_scroll.set)
+        photos_scroll.pack(side=tk.LEFT, fill=tk.Y, pady=2)
+
+        photos_buttons = ttk.Frame(photos_inner)
+        photos_buttons.pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Button(photos_buttons, text="Add Photos", command=self.add_photos).pack(fill=tk.X, pady=2)
+        ttk.Button(photos_buttons, text="Remove Selected", command=self.remove_photo).pack(fill=tk.X, pady=2)
 
     def _setup_empty_plot1(self):
         """Set up empty crack length vs cycles plot."""
