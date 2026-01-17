@@ -1029,20 +1029,20 @@ class FCGRTestApp:
 
                 # Collect specimen data
                 specimen_data = {
-                    'specimen_type': self.control_mode.get(),
-                    'W': self.specimen_vars['W'].get(),
-                    'B': self.specimen_vars['B'].get(),
-                    'B_n': self.specimen_vars['B_n'].get() or self.specimen_vars['B'].get(),
-                    'a_0': self.specimen_vars['a_0'].get(),
-                    'notch_height': self.specimen_vars.get('notch_height', tk.StringVar(value='0')).get(),
+                    'specimen_type': self.specimen_type.get(),
+                    'W': self.dim_vars['W'].get(),
+                    'B': self.dim_vars['B'].get(),
+                    'B_n': self.dim_vars['B_n'].get() or self.dim_vars['B'].get(),
+                    'a_0': self.dim_vars['a_0'].get(),
+                    'notch_height': self.dim_vars.get('notch_height', tk.StringVar(value='0')).get(),
                 }
 
                 # Collect material data
                 material_data = {
-                    'yield_strength': self.material_vars['yield_strength'].get(),
-                    'ultimate_strength': self.material_vars['tensile_strength'].get(),
-                    'youngs_modulus': self.material_vars['youngs_modulus'].get(),
-                    'poissons_ratio': self.material_vars['poissons_ratio'].get() or '0.3',
+                    'yield_strength': self.mat_vars['yield_strength'].get(),
+                    'ultimate_strength': self.mat_vars['ultimate_strength'].get(),
+                    'youngs_modulus': self.mat_vars['youngs_modulus'].get(),
+                    'poissons_ratio': self.mat_vars['poissons_ratio'].get() or '0.3',
                 }
 
                 # Collect test parameters
