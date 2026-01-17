@@ -566,6 +566,12 @@ class FCGRTestApp:
                 self.test_vars['frequency'].set(str(data.frequency))
                 self.test_vars['temperature'].set(str(data.test_temperature))
 
+                # Populate Pmax and Kmax from FCG results
+                if data.fcgr_results.get('final_P_max', 0) > 0:
+                    self.test_vars['P_max'].set(str(data.fcgr_results['final_P_max']))
+                if data.fcgr_results.get('final_K_max', 0) > 0:
+                    self.test_vars['K_max'].set(str(data.fcgr_results['final_K_max']))
+
                 self.info_vars['specimen_id'].set(data.specimen_id)
                 self.info_vars['material'].set(data.material)
 
