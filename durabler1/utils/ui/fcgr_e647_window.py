@@ -325,7 +325,7 @@ class FCGRTestApp:
         options_frame.pack(fill=tk.X, pady=5, padx=5)
 
         ttk.Label(options_frame, text="da/dN Method:").grid(row=0, column=0, sticky=tk.W)
-        self.dadn_method = tk.StringVar(value="secant")
+        self.dadn_method = tk.StringVar(value="polynomial")
         ttk.Radiobutton(
             options_frame, text="Secant",
             variable=self.dadn_method, value="secant"
@@ -336,7 +336,7 @@ class FCGRTestApp:
         ).grid(row=0, column=2, sticky=tk.W)
 
         ttk.Label(options_frame, text="Outlier Threshold:").grid(row=1, column=0, sticky=tk.W)
-        self.outlier_threshold = tk.StringVar(value="30")
+        self.outlier_threshold = tk.StringVar(value="6")
         ttk.Entry(options_frame, textvariable=self.outlier_threshold, width=8).grid(
             row=1, column=1, sticky=tk.W)
         ttk.Label(options_frame, text="% deviation").grid(row=1, column=2, sticky=tk.W)
@@ -699,7 +699,7 @@ class FCGRTestApp:
                 try:
                     outlier_pct = float(self.outlier_threshold.get())
                 except ValueError:
-                    outlier_pct = 30.0
+                    outlier_pct = 6.0
 
                 # Analyze
                 self.current_results = analyzer.analyze_fcgr_data(
@@ -1055,8 +1055,8 @@ class FCGRTestApp:
                     'K_max': self.test_vars['K_max'].get(),
                     'wave_shape': self.test_vars.get('wave_shape', tk.StringVar(value='Sine')).get() if hasattr(self, 'test_vars') and 'wave_shape' in self.test_vars else 'Sine',
                     'environment': self.test_vars.get('environment', tk.StringVar(value='Laboratory Air')).get() if hasattr(self, 'test_vars') and 'environment' in self.test_vars else 'Laboratory Air',
-                    'dadn_method': 'Secant',
-                    'outlier_threshold': self.test_vars.get('outlier_pct', tk.StringVar(value='30')).get() if hasattr(self, 'test_vars') and 'outlier_pct' in self.test_vars else '30',
+                    'dadn_method': self.dadn_method.get().capitalize(),
+                    'outlier_threshold': self.outlier_threshold.get() or '6',
                 }
 
                 # Prepare report data
@@ -1073,9 +1073,11 @@ class FCGRTestApp:
                 generator = FCGRReportGenerator(template_path)
 
                 # Check for logo
-                logo_path = PROJECT_ROOT / "assets" / "logo.png"
+                logo_path = PROJECT_ROOT / "templates" / "logo.png"
                 if not logo_path.exists():
-                    logo_path = None
+                    logo_path = PROJECT_ROOT / "durablersvart.png"
+                    if not logo_path.exists():
+                        logo_path = None
 
                 output_path = generator.generate_report(
                     output_path=Path(filepath),
