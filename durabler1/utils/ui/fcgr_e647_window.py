@@ -147,24 +147,25 @@ class FCGRTestApp:
             side=tk.LEFT, padx=2)
 
     def _create_main_panels(self):
-        """Create left and right panels."""
+        """Create left and right panels with 1:2 width ratio."""
         main_frame = ttk.Frame(self.root)
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        main_frame.columnconfigure(1, weight=1)
+        # Set column weights: left=1, right=2 (1/3 and 2/3 of width)
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.columnconfigure(1, weight=2)
         main_frame.rowconfigure(0, weight=1)
 
-        # Left panel (inputs)
+        # Left panel (inputs) - 1/3 of width
         self._create_left_panel(main_frame)
 
-        # Right panel (results + plots + photos)
+        # Right panel (results + plots + photos) - 2/3 of width
         self._create_right_panel(main_frame)
 
     def _create_left_panel(self, parent):
         """Create left panel with specimen inputs (scrollable)."""
-        # Create outer frame with fixed width - wider to fit text fields
-        left_outer = ttk.Frame(parent, width=520)
+        # Create outer frame - expands to fill 1/3 of window width
+        left_outer = ttk.Frame(parent)
         left_outer.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        left_outer.grid_propagate(False)
         left_outer.rowconfigure(0, weight=1)
         left_outer.columnconfigure(0, weight=1)
 
@@ -181,8 +182,14 @@ class FCGRTestApp:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
 
-        canvas.create_window((0, 0), window=left_frame, anchor="nw")
+        # Create window and store reference for resizing
+        canvas_window = canvas.create_window((0, 0), window=left_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Make inner frame expand to canvas width
+        def _on_canvas_configure(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+        canvas.bind("<Configure>", _on_canvas_configure)
 
         # Pack scrollbar and canvas
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -203,18 +210,18 @@ class FCGRTestApp:
 
         ttk.Label(files_frame, text="FCG CSV:").grid(row=0, column=0, sticky=tk.W, pady=1)
         self.csv_file_var = tk.StringVar(value="Not loaded")
-        ttk.Label(files_frame, textvariable=self.csv_file_var, foreground='gray',
-                  width=45).grid(row=0, column=1, sticky=tk.W, pady=1)
+        ttk.Label(files_frame, textvariable=self.csv_file_var, foreground='gray').grid(
+            row=0, column=1, sticky=tk.EW, pady=1)
 
         ttk.Label(files_frame, text="Excel Data:").grid(row=1, column=0, sticky=tk.W, pady=1)
         self.excel_file_var = tk.StringVar(value="Not loaded")
-        ttk.Label(files_frame, textvariable=self.excel_file_var, foreground='gray',
-                  width=45).grid(row=1, column=1, sticky=tk.W, pady=1)
+        ttk.Label(files_frame, textvariable=self.excel_file_var, foreground='gray').grid(
+            row=1, column=1, sticky=tk.EW, pady=1)
 
         ttk.Label(files_frame, text="Photos:").grid(row=2, column=0, sticky=tk.W, pady=1)
         self.photos_count_var = tk.StringVar(value="0 photos")
-        ttk.Label(files_frame, textvariable=self.photos_count_var, foreground='gray',
-                  width=45).grid(row=2, column=1, sticky=tk.W, pady=1)
+        ttk.Label(files_frame, textvariable=self.photos_count_var, foreground='gray').grid(
+            row=2, column=1, sticky=tk.EW, pady=1)
 
         files_frame.columnconfigure(1, weight=1)
 
@@ -257,8 +264,8 @@ class FCGRTestApp:
             ttk.Label(mat_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar(value=default)
             self.mat_vars[key] = var
-            ttk.Entry(mat_frame, textvariable=var, width=18).grid(
-                row=i, column=1, sticky=tk.W, pady=2)
+            ttk.Entry(mat_frame, textvariable=var).grid(
+                row=i, column=1, sticky=tk.EW, pady=2)
 
         mat_frame.columnconfigure(1, weight=1)
 
@@ -290,8 +297,8 @@ class FCGRTestApp:
             ttk.Label(test_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar(value=default)
             self.test_vars[key] = var
-            ttk.Entry(test_frame, textvariable=var, width=18).grid(
-                row=i, column=1, sticky=tk.W, pady=2)
+            ttk.Entry(test_frame, textvariable=var).grid(
+                row=i, column=1, sticky=tk.EW, pady=2)
 
         test_frame.columnconfigure(1, weight=1)
 
@@ -305,8 +312,8 @@ class FCGRTestApp:
         self.certificate_number_var = tk.StringVar()
         cert_frame = ttk.Frame(info_frame)
         cert_frame.grid(row=row, column=1, sticky=tk.EW, pady=2)
-        self.cert_combobox = ttk.Combobox(cert_frame, textvariable=self.certificate_number_var, width=30)
-        self.cert_combobox.pack(side=tk.LEFT)
+        self.cert_combobox = ttk.Combobox(cert_frame, textvariable=self.certificate_number_var)
+        self.cert_combobox.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.cert_combobox.bind('<<ComboboxSelected>>', self._on_certificate_selected)
         ttk.Button(cert_frame, text="Refresh", width=3,
                   command=self._refresh_certificate_list).pack(side=tk.LEFT, padx=2)
@@ -327,7 +334,7 @@ class FCGRTestApp:
             var = tk.StringVar()
             self.info_vars[key] = var
             state = 'readonly' if key == 'test_date' else 'normal'
-            ttk.Entry(info_frame, textvariable=var, width=45, state=state).grid(
+            ttk.Entry(info_frame, textvariable=var, state=state).grid(
                 row=row, column=1, sticky=tk.EW, pady=2)
             row += 1
 
@@ -373,8 +380,8 @@ class FCGRTestApp:
             ttk.Label(self.dim_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar(value=default)
             self.dim_vars[key] = var
-            ttk.Entry(self.dim_frame, textvariable=var, width=18).grid(
-                row=i, column=1, sticky=tk.W, pady=2)
+            ttk.Entry(self.dim_frame, textvariable=var).grid(
+                row=i, column=1, sticky=tk.EW, pady=2)
 
         self.dim_frame.columnconfigure(1, weight=1)
 
