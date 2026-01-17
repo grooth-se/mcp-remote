@@ -225,33 +225,31 @@ class FCGRTestApp:
 
         files_frame.columnconfigure(1, weight=1)
 
-        # Specimen type selection
-        specimen_frame = ttk.LabelFrame(left_frame, text="Specimen Geometry", padding=10)
+        # Specimen type and control mode selection
+        specimen_frame = ttk.LabelFrame(left_frame, text="Specimen Geometry & Control Mode", padding=10)
         specimen_frame.pack(fill=tk.X, pady=5, padx=5)
 
         # Specimen type radio buttons
         ttk.Label(specimen_frame, text="Type:", font=('Helvetica', 9, 'bold')).grid(
             row=0, column=0, sticky=tk.W)
         self.specimen_type = tk.StringVar(value="C(T)")
+        type_frame = ttk.Frame(specimen_frame)
+        type_frame.grid(row=0, column=1, sticky=tk.W)
         ttk.Radiobutton(
-            specimen_frame, text="C(T) Compact Tension",
+            type_frame, text="C(T) Compact Tension",
             variable=self.specimen_type, value="C(T)"
-        ).grid(row=0, column=1, sticky=tk.W)
+        ).pack(side=tk.LEFT, padx=(0, 15))
         ttk.Radiobutton(
-            specimen_frame, text="M(T) Middle Tension",
+            type_frame, text="M(T) Middle Tension",
             variable=self.specimen_type, value="M(T)"
-        ).grid(row=0, column=2, sticky=tk.W)
+        ).pack(side=tk.LEFT)
 
-        # Test parameters frame (moved up, after Specimen Geometry)
-        test_frame = ttk.LabelFrame(left_frame, text="Test Parameters", padding=10)
-        test_frame.pack(fill=tk.X, pady=5, padx=5)
-
-        # Control mode - put radio buttons in a sub-frame for better layout
-        ttk.Label(test_frame, text="Control Mode:", font=('Helvetica', 9, 'bold')).grid(
-            row=0, column=0, sticky=tk.W)
+        # Control mode radio buttons
+        ttk.Label(specimen_frame, text="Control Mode:", font=('Helvetica', 9, 'bold')).grid(
+            row=1, column=0, sticky=tk.W, pady=(5, 0))
         self.control_mode = tk.StringVar(value="Load Control")
-        control_frame = ttk.Frame(test_frame)
-        control_frame.grid(row=0, column=1, sticky=tk.W)
+        control_frame = ttk.Frame(specimen_frame)
+        control_frame.grid(row=1, column=1, sticky=tk.W, pady=(5, 0))
         ttk.Radiobutton(
             control_frame, text="Load Control",
             variable=self.control_mode, value="Load Control"
@@ -260,6 +258,10 @@ class FCGRTestApp:
             control_frame, text="Delta-K Control",
             variable=self.control_mode, value="Delta-K Control"
         ).pack(side=tk.LEFT)
+
+        # Test parameters frame
+        test_frame = ttk.LabelFrame(left_frame, text="Test Parameters", padding=10)
+        test_frame.pack(fill=tk.X, pady=5, padx=5)
 
         test_params = [
             ("Pmax (Maximum load, kN):", "P_max", ""),
@@ -270,7 +272,7 @@ class FCGRTestApp:
         ]
 
         self.test_vars: Dict[str, tk.StringVar] = {}
-        for i, (label, key, default) in enumerate(test_params, start=1):
+        for i, (label, key, default) in enumerate(test_params):
             ttk.Label(test_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar(value=default)
             self.test_vars[key] = var
