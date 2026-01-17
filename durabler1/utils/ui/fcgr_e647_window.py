@@ -1029,7 +1029,7 @@ class FCGRTestApp:
 
                 # Collect specimen data
                 specimen_data = {
-                    'specimen_type': self.control_mode_var.get(),
+                    'specimen_type': self.control_mode.get(),
                     'W': self.specimen_vars['W'].get(),
                     'B': self.specimen_vars['B'].get(),
                     'B_n': self.specimen_vars['B_n'].get() or self.specimen_vars['B'].get(),
@@ -1047,7 +1047,7 @@ class FCGRTestApp:
 
                 # Collect test parameters
                 test_params = {
-                    'control_mode': self.control_mode_var.get(),
+                    'control_mode': self.control_mode.get(),
                     'load_ratio': self.test_vars['load_ratio'].get(),
                     'frequency': self.test_vars['frequency'].get(),
                     'temperature': self.test_vars['temperature'].get(),
@@ -1087,11 +1087,11 @@ class FCGRTestApp:
                 )
 
             messagebox.showinfo("Success", f"Report saved to:\n{output_path}")
-            self._set_status(f"Report exported: {output_path.name}")
+            self._update_status(f"Report exported: {output_path.name}")
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to generate report:\n{str(e)}")
-            self._set_status("Report generation failed")
+            self._update_status("Report generation failed")
 
     def _refresh_certificate_list(self):
         """Load certificate numbers from database into combobox."""
