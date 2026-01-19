@@ -601,10 +601,23 @@ class TensileTestApp:
 
             self.stress = stress
 
-            # Calculate results using selected strain
-            E = analyzer.calculate_youngs_modulus(
-                self.stress, self.strain, area_unc, reference_length
+            # Calculate Rm first (needed for displacement E calculation)
+            Rm = analyzer.calculate_ultimate_tensile_strength(
+                force_filtered, area, area_unc
             )
+
+            # Calculate Young's modulus using appropriate method based on strain source
+            if self.strain_source.get() == "extensometer":
+                # Extensometer: use strain-based selection (default method)
+                E = analyzer.calculate_youngs_modulus(
+                    self.stress, self.strain, area_unc, reference_length
+                )
+            else:
+                # Displacement/Crosshead: use stress-based selection (15%-40% of Rm)
+                # This removes data affected by machine setup mismatch at low loads
+                E = analyzer.calculate_youngs_modulus_displacement(
+                    self.stress, self.strain, area_unc, reference_length, Rm.value
+                )
 
             # Calculate yield strengths based on yield type selection
             yield_type = self.yield_type.get()
@@ -625,9 +638,7 @@ class TensileTestApp:
                 self.stress, self.strain, area, area_unc
             )
 
-            Rm = analyzer.calculate_ultimate_tensile_strength(
-                force_filtered, area, area_unc
-            )
+            # Rm already calculated above (needed for displacement E calculation)
 
             # True stress at maximum force
             true_stress_max = analyzer.calculate_true_stress_at_break(

@@ -178,6 +178,94 @@ class TensileAnalyzer:
             coverage_factor=2.0
         )
 
+    def calculate_youngs_modulus_displacement(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        area_uncertainty: float,
+        reference_length: float,
+        Rm: float
+    ) -> MeasuredValue:
+        """
+        Calculate Young's modulus E from displacement/crosshead data.
+
+        Uses stress range 15%-40% of Rm to select the elastic region,
+        removing data affected by machine setup mismatch at low loads.
+
+        Parameters
+        ----------
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain (from displacement)
+        area_uncertainty : float
+            Uncertainty in cross-sectional area (mm^2)
+        reference_length : float
+            Reference length (parallel length Lc) in mm
+        Rm : float
+            Ultimate tensile strength in MPa
+
+        Returns
+        -------
+        MeasuredValue
+            Young's modulus with uncertainty in GPa
+        """
+        # Use stress range 15%-40% of Rm to avoid machine setup mismatch
+        min_stress = 0.15 * Rm
+        max_stress = 0.40 * Rm
+
+        # Select elastic region based on stress range
+        mask = (stress >= min_stress) & (stress <= max_stress)
+
+        if np.sum(mask) < 10:
+            # Try wider range if insufficient points
+            min_stress = 0.10 * Rm
+            max_stress = 0.50 * Rm
+            mask = (stress >= min_stress) & (stress <= max_stress)
+
+        if np.sum(mask) < 5:
+            raise ValueError("Insufficient data points in elastic region (15%-40% Rm)")
+
+        elastic_strain = strain[mask]
+        elastic_stress = stress[mask]
+
+        # Linear regression
+        slope, intercept, r_value, p_value, std_err = stats.linregress(
+            elastic_strain, elastic_stress
+        )
+
+        # E in GPa (slope is MPa/strain = MPa, divide by 1000 for GPa)
+        E = slope / 1000
+
+        # Uncertainty components:
+        # 1. Regression uncertainty (from fit)
+        u_regression = std_err / 1000
+
+        # 2. Area contribution
+        area_mean = np.mean(elastic_stress)
+        if area_mean > 0:
+            relative_area_unc = area_uncertainty / (area_mean * reference_length / 1000)
+            u_area = abs(E * relative_area_unc * 0.5)
+        else:
+            u_area = 0
+
+        # 3. Displacement uncertainty (higher than extensometer)
+        displacement_uncertainty = 0.01  # 0.01 mm typical for crosshead
+        u_displacement = E * displacement_uncertainty / reference_length
+
+        # Combined standard uncertainty
+        u_combined = np.sqrt(u_regression**2 + u_area**2 + u_displacement**2)
+
+        # Expanded uncertainty (k=2)
+        U = 2 * u_combined
+
+        return MeasuredValue(
+            value=round(E, 1),
+            uncertainty=round(U, 1),
+            unit="GPa",
+            coverage_factor=2.0
+        )
+
     def calculate_yield_strength_rp02(
         self,
         stress: np.ndarray,
