@@ -139,8 +139,8 @@ class DurablerLauncher:
              self.launch_ctod_e1820, False),
             ("Fracture Toughness (KIC)", "ASTM E399",
              self.launch_kic, True),
-            ("Vickers Hardness", "ISO 6507-1, ASTM E92",
-             self.launch_vickers, False),
+            ("Vickers Hardness", "ASTM E92, ISO 6507-1",
+             self.launch_vickers, True),
         ]
 
         for i, (name, standard, command, available) in enumerate(test_methods):
@@ -260,10 +260,11 @@ class DurablerLauncher:
 
     def launch_vickers(self):
         """Launch Vickers hardness application."""
-        messagebox.showinfo(
-            "Coming Soon",
-            "Vickers Hardness (ISO 6507-1) module is under development."
-        )
+        self.root.withdraw()  # Hide launcher
+
+        from utils.ui.vickers_e92_window import VickersTestApp
+        app = VickersTestApp(parent_launcher=self)
+        app.run()
 
     def launch_certificate_register(self):
         """Launch certificate register application."""
