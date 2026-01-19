@@ -143,19 +143,20 @@ class CertificateRegisterApp:
         """Create main content panels."""
         main_frame = ttk.Frame(self.root)
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(0, weight=1)
+        main_frame.columnconfigure(0, weight=1)  # Full width
+        main_frame.rowconfigure(0, weight=0)     # Top panel - input fields (fixed height)
+        main_frame.rowconfigure(1, weight=1)     # Bottom panel - certificate table (expands)
 
-        # Left panel - certificate list
-        self._create_list_panel(main_frame)
-
-        # Right panel - certificate details
+        # Top panel - certificate details/input fields
         self._create_details_panel(main_frame)
 
+        # Bottom panel - certificate list/table
+        self._create_list_panel(main_frame)
+
     def _create_list_panel(self, parent):
-        """Create left panel with certificate list."""
+        """Create bottom panel with certificate list."""
         list_frame = ttk.LabelFrame(parent, text="Certificates", padding=5)
-        list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        list_frame.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
 
         # Filter controls
         filter_frame = ttk.Frame(list_frame)
@@ -175,9 +176,9 @@ class CertificateRegisterApp:
             side=tk.LEFT)
 
         # Treeview for certificates
-        columns = ("cert_number", "date", "project", "customer", "standard")
+        columns = ("cert_number", "date", "project", "customer", "standard", "reported", "invoiced")
         self.cert_tree = ttk.Treeview(
-            list_frame, columns=columns, show="headings", height=25
+            list_frame, columns=columns, show="headings", height=15
         )
 
         self.cert_tree.heading("cert_number", text="Certificate No.")
@@ -185,12 +186,16 @@ class CertificateRegisterApp:
         self.cert_tree.heading("project", text="Project")
         self.cert_tree.heading("customer", text="Customer")
         self.cert_tree.heading("standard", text="Standard")
+        self.cert_tree.heading("reported", text="Reported")
+        self.cert_tree.heading("invoiced", text="Invoiced")
 
         self.cert_tree.column("cert_number", width=120)
         self.cert_tree.column("date", width=80)
-        self.cert_tree.column("project", width=100)
-        self.cert_tree.column("customer", width=100)
-        self.cert_tree.column("standard", width=80)
+        self.cert_tree.column("project", width=150)
+        self.cert_tree.column("customer", width=150)
+        self.cert_tree.column("standard", width=100)
+        self.cert_tree.column("reported", width=70, anchor=tk.CENTER)
+        self.cert_tree.column("invoiced", width=70, anchor=tk.CENTER)
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.cert_tree.yview)
@@ -203,13 +208,13 @@ class CertificateRegisterApp:
         self.cert_tree.bind('<<TreeviewSelect>>', self._on_certificate_select)
 
     def _create_details_panel(self, parent):
-        """Create right panel with certificate details."""
+        """Create top panel with certificate details/input fields."""
         details_frame = ttk.LabelFrame(parent, text="Certificate Details", padding=10)
-        details_frame.grid(row=0, column=1, sticky="nsew")
+        details_frame.grid(row=0, column=0, sticky="nsew")
 
         # Certificate number section
         cert_num_frame = ttk.Frame(details_frame)
-        cert_num_frame.pack(fill=tk.X, pady=(0, 10))
+        cert_num_frame.pack(fill=tk.X, pady=(0, 5))
 
         ttk.Label(cert_num_frame, text="Certificate Number:",
                   font=('Helvetica', 10, 'bold')).pack(side=tk.LEFT)
@@ -219,99 +224,92 @@ class CertificateRegisterApp:
 
         ttk.Separator(details_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
 
-        # Scrollable form
-        canvas = tk.Canvas(details_frame, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(details_frame, orient="vertical", command=canvas.yview)
-        form_frame = ttk.Frame(canvas)
+        # Form fields container - horizontal layout
+        form_frame = ttk.Frame(details_frame)
+        form_frame.pack(fill=tk.BOTH, expand=True)
+        form_frame.columnconfigure(0, weight=1)
+        form_frame.columnconfigure(1, weight=1)
+        form_frame.columnconfigure(2, weight=1)
+        form_frame.columnconfigure(3, weight=1)
 
-        form_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=form_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        # Form fields
         self.form_vars = {}
 
-        # Certificate info
+        # Column 0: Certificate Info
         cert_info_frame = ttk.LabelFrame(form_frame, text="Certificate Info", padding=10)
-        cert_info_frame.pack(fill=tk.X, pady=5, padx=5)
+        cert_info_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
         cert_fields = [
-            ("Year:", "year", 8),
-            ("Cert ID:", "cert_id", 8),
-            ("Revision:", "revision", 5),
-            ("Date:", "cert_date", 12),
+            ("Year:", "year"),
+            ("Cert ID:", "cert_id"),
+            ("Revision:", "revision"),
+            ("Date:", "cert_date"),
         ]
 
-        row = 0
-        for label, key, width in cert_fields:
+        for row, (label, key) in enumerate(cert_fields):
             ttk.Label(cert_info_frame, text=label).grid(row=row, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar()
             self.form_vars[key] = var
-            entry = ttk.Entry(cert_info_frame, textvariable=var, width=width)
-            entry.grid(row=row, column=1, sticky=tk.W, pady=2, padx=5)
-            row += 1
+            entry = ttk.Entry(cert_info_frame, textvariable=var)
+            entry.grid(row=row, column=1, sticky=tk.EW, pady=2, padx=5)
+        cert_info_frame.columnconfigure(1, weight=1)
 
-        # Test information
+        # Column 1: Test Information
         test_info_frame = ttk.LabelFrame(form_frame, text="Test Information", padding=10)
-        test_info_frame.pack(fill=tk.X, pady=5, padx=5)
+        test_info_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
         test_fields = [
-            ("Test Project:", "test_project", 20),
-            ("Project Name:", "project_name", 30),
-            ("Test Standard:", "test_standard", 20),
-            ("Customer:", "customer", 30),
-            ("Customer Order:", "customer_order", 20),
+            ("Test Project:", "test_project"),
+            ("Project Name:", "project_name"),
+            ("Test Standard:", "test_standard"),
+            ("Customer:", "customer"),
+            ("Customer Order:", "customer_order"),
         ]
 
-        row = 0
-        for label, key, width in test_fields:
+        for row, (label, key) in enumerate(test_fields):
             ttk.Label(test_info_frame, text=label).grid(row=row, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar()
             self.form_vars[key] = var
-            entry = ttk.Entry(test_info_frame, textvariable=var, width=width)
-            entry.grid(row=row, column=1, sticky=tk.W, pady=2, padx=5)
-            row += 1
+            entry = ttk.Entry(test_info_frame, textvariable=var)
+            entry.grid(row=row, column=1, sticky=tk.EW, pady=2, padx=5)
+        test_info_frame.columnconfigure(1, weight=1)
 
-        # Specimen information
+        # Column 2: Specimen Information
         specimen_frame = ttk.LabelFrame(form_frame, text="Specimen Information", padding=10)
-        specimen_frame.pack(fill=tk.X, pady=5, padx=5)
+        specimen_frame.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
 
         specimen_fields = [
-            ("Product:", "product", 30),
-            ("Product S/N:", "product_sn", 20),
-            ("Material:", "material", 30),
-            ("Specimen ID:", "specimen_id", 20),
-            ("Location/Orient.:", "location_orientation", 20),
-            ("Temperature:", "temperature", 10),
+            ("Product:", "product"),
+            ("Product S/N:", "product_sn"),
+            ("Material:", "material"),
+            ("Specimen ID:", "specimen_id"),
+            ("Location/Orient.:", "location_orientation"),
+            ("Temperature:", "temperature"),
         ]
 
-        row = 0
-        for label, key, width in specimen_fields:
+        for row, (label, key) in enumerate(specimen_fields):
             ttk.Label(specimen_frame, text=label).grid(row=row, column=0, sticky=tk.W, pady=2)
             var = tk.StringVar()
             self.form_vars[key] = var
-            entry = ttk.Entry(specimen_frame, textvariable=var, width=width)
-            entry.grid(row=row, column=1, sticky=tk.W, pady=2, padx=5)
-            row += 1
+            entry = ttk.Entry(specimen_frame, textvariable=var)
+            entry.grid(row=row, column=1, sticky=tk.EW, pady=2, padx=5)
+        specimen_frame.columnconfigure(1, weight=1)
+
+        # Column 3: Comment + Status
+        right_frame = ttk.Frame(form_frame)
+        right_frame.grid(row=0, column=3, sticky="nsew", padx=5, pady=5)
+        right_frame.rowconfigure(0, weight=1)
 
         # Comment
-        comment_frame = ttk.LabelFrame(form_frame, text="Comment", padding=10)
-        comment_frame.pack(fill=tk.X, pady=5, padx=5)
+        comment_frame = ttk.LabelFrame(right_frame, text="Comment", padding=10)
+        comment_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
 
         self.form_vars['comment'] = tk.StringVar()
-        comment_entry = ttk.Entry(comment_frame, textvariable=self.form_vars['comment'], width=50)
-        comment_entry.pack(fill=tk.X)
+        comment_entry = ttk.Entry(comment_frame, textvariable=self.form_vars['comment'])
+        comment_entry.pack(fill=tk.X, pady=5)
 
         # Status checkboxes
-        status_frame = ttk.LabelFrame(form_frame, text="Status", padding=10)
-        status_frame.pack(fill=tk.X, pady=5, padx=5)
+        status_frame = ttk.LabelFrame(right_frame, text="Status", padding=10)
+        status_frame.pack(fill=tk.X)
 
         self.reported_var = tk.BooleanVar()
         self.invoiced_var = tk.BooleanVar()
@@ -362,7 +360,9 @@ class CertificateRegisterApp:
                 cert.cert_date or "",
                 cert.test_project,
                 cert.customer,
-                cert.test_standard
+                cert.test_standard,
+                "Yes" if cert.reported else "No",
+                "Yes" if cert.invoiced else "No"
             ))
 
         count = len(certificates)
@@ -388,7 +388,9 @@ class CertificateRegisterApp:
                 cert.cert_date or "",
                 cert.test_project,
                 cert.customer,
-                cert.test_standard
+                cert.test_standard,
+                "Yes" if cert.reported else "No",
+                "Yes" if cert.invoiced else "No"
             ))
 
         count = len(certificates)
