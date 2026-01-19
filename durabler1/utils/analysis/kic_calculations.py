@@ -111,8 +111,8 @@ class KICAnalyzer:
     def calculate_compliance(self,
                             force: np.ndarray,
                             displacement: np.ndarray,
-                            lower_frac: float = 0.0,
-                            upper_frac: float = 0.30) -> Tuple[float, float, float]:
+                            lower_frac: float = 0.02,
+                            upper_frac: float = 0.15) -> Tuple[float, float, float]:
         """
         Calculate initial elastic compliance from load-displacement curve.
 
@@ -120,9 +120,9 @@ class KICAnalyzer:
         The displacement is zeroed (offset removed) before fitting.
 
         Per ASTM E399, the compliance should be determined from the initial
-        linear elastic portion of the load-displacement record. Using 0-30%
-        of Pmax provides a wider range for more accurate determination of
-        the elastic compliance line.
+        linear elastic portion of the load-displacement record. Using 2-15%
+        of Pmax avoids seating effects at very low loads while capturing
+        the true elastic slope before significant plasticity develops.
 
         Parameters
         ----------
@@ -131,9 +131,9 @@ class KICAnalyzer:
         displacement : np.ndarray
             Displacement array in mm
         lower_frac : float
-            Lower bound of force range as fraction of Pmax (default 0.0)
+            Lower bound of force range as fraction of Pmax (default 0.02)
         upper_frac : float
-            Upper bound of force range as fraction of Pmax (default 0.30)
+            Upper bound of force range as fraction of Pmax (default 0.15)
 
         Returns
         -------
@@ -147,7 +147,7 @@ class KICAnalyzer:
         disp_zeroed = displacement - disp_offset
 
         # Calculate compliance from the initial linear portion of the curve
-        # Use 0-30% of Pmax for more accurate elastic compliance determination
+        # Use 2-15% of Pmax to avoid seating effects while capturing elastic slope
         P_lower = P_max * lower_frac
         P_upper = P_max * upper_frac
 
