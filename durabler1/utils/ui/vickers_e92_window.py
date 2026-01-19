@@ -59,8 +59,8 @@ class VickersTestApp:
         # Create UI components
         self._create_menu()
         self._create_toolbar()
+        self._create_statusbar()  # Create statusbar before main panels
         self._create_main_panels()
-        self._create_statusbar()
 
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
