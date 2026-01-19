@@ -154,7 +154,9 @@ class CTODTestApp:
         """Create left and right panels."""
         main_frame = ttk.Frame(self.root)
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        main_frame.columnconfigure(1, weight=1)
+        # Proportional 1:2 layout (left = 1/3, right = 2/3)
+        main_frame.columnconfigure(0, weight=1)  # Left panel - 1/3 of width
+        main_frame.columnconfigure(1, weight=2)  # Right panel - 2/3 of width
         main_frame.rowconfigure(0, weight=1)
 
         # Left panel (inputs)
@@ -164,14 +166,34 @@ class CTODTestApp:
         self._create_right_panel(main_frame)
 
     def _create_left_panel(self, parent):
-        """Create left panel with specimen inputs."""
-        left_frame = ttk.Frame(parent, width=450)
+        """Create left panel with specimen inputs (scrollable)."""
+        left_frame = ttk.Frame(parent)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        left_frame.grid_propagate(False)
+
+        # Scrollable canvas
+        canvas = tk.Canvas(left_frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(left_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Make inner frame expand to canvas width
+        def on_canvas_configure(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+        canvas.bind("<Configure>", on_canvas_configure)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
         # Data Import display - shows imported file names
-        files_frame = ttk.LabelFrame(left_frame, text="Data Import", padding=10)
-        files_frame.pack(fill=tk.X, pady=5)
+        files_frame = ttk.LabelFrame(scrollable_frame, text="Data Import", padding=10)
+        files_frame.pack(fill=tk.X, pady=5, padx=5)
 
         ttk.Label(files_frame, text="Pre-crack CSV:").grid(row=0, column=0, sticky=tk.W, pady=1)
         self.precrack_file_var = tk.StringVar(value="Not loaded")
@@ -195,53 +217,9 @@ class CTODTestApp:
 
         files_frame.columnconfigure(1, weight=1)
 
-        # Specimen type selection
-        specimen_frame = ttk.LabelFrame(left_frame, text="Specimen Geometry", padding=10)
-        specimen_frame.pack(fill=tk.X, pady=5)
-
-        # Specimen type radio buttons
-        ttk.Label(specimen_frame, text="Type:", font=('Helvetica', 9, 'bold')).grid(
-            row=0, column=0, sticky=tk.W)
-        self.specimen_type = tk.StringVar(value="SE(B)")
-        ttk.Radiobutton(
-            specimen_frame, text="SE(B) Three-Point Bend",
-            variable=self.specimen_type, value="SE(B)"
-        ).grid(row=0, column=1, sticky=tk.W)
-        ttk.Radiobutton(
-            specimen_frame, text="C(T) Compact Tension",
-            variable=self.specimen_type, value="C(T)"
-        ).grid(row=0, column=2, sticky=tk.W)
-
-        # Dimension entry frame
-        self.dim_frame = ttk.LabelFrame(left_frame, text="Dimensions (mm)", padding=10)
-        self.dim_frame.pack(fill=tk.X, pady=5)
-        self.dim_vars: Dict[str, tk.StringVar] = {}
-        self._create_dimension_fields()
-
-        # Material properties frame
-        mat_frame = ttk.LabelFrame(left_frame, text="Material Properties", padding=10)
-        mat_frame.pack(fill=tk.X, pady=5)
-
-        mat_fields = [
-            ("σ_ys (Yield strength, MPa):", "yield_strength", "500"),
-            ("σ_uts (Ultimate strength, MPa):", "ultimate_strength", "600"),
-            ("E (Young's modulus, GPa):", "youngs_modulus", "210"),
-            ("ν (Poisson's ratio):", "poissons_ratio", "0.3"),
-        ]
-
-        self.mat_vars: Dict[str, tk.StringVar] = {}
-        for i, (label, key, default) in enumerate(mat_fields):
-            ttk.Label(mat_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
-            var = tk.StringVar(value=default)
-            self.mat_vars[key] = var
-            ttk.Entry(mat_frame, textvariable=var, width=12).grid(
-                row=i, column=1, sticky=tk.W, pady=2)
-
-        mat_frame.columnconfigure(1, weight=1)
-
-        # Test info frame
-        info_frame = ttk.LabelFrame(left_frame, text="Test Information", padding=10)
-        info_frame.pack(fill=tk.X, pady=5)
+        # Test info frame (moved up for visibility)
+        info_frame = ttk.LabelFrame(scrollable_frame, text="Test Information", padding=10)
+        info_frame.pack(fill=tk.X, pady=5, padx=5)
 
         row = 0
         # Certificate number - Combobox with selection list (at top)
@@ -312,6 +290,50 @@ class CTODTestApp:
             row=row, column=1, sticky=tk.EW, pady=2)
 
         info_frame.columnconfigure(1, weight=1)
+
+        # Specimen type selection
+        specimen_frame = ttk.LabelFrame(scrollable_frame, text="Specimen Geometry", padding=10)
+        specimen_frame.pack(fill=tk.X, pady=5, padx=5)
+
+        # Specimen type radio buttons
+        ttk.Label(specimen_frame, text="Type:", font=('Helvetica', 9, 'bold')).grid(
+            row=0, column=0, sticky=tk.W)
+        self.specimen_type = tk.StringVar(value="SE(B)")
+        ttk.Radiobutton(
+            specimen_frame, text="SE(B) Three-Point Bend",
+            variable=self.specimen_type, value="SE(B)"
+        ).grid(row=0, column=1, sticky=tk.W)
+        ttk.Radiobutton(
+            specimen_frame, text="C(T) Compact Tension",
+            variable=self.specimen_type, value="C(T)"
+        ).grid(row=0, column=2, sticky=tk.W)
+
+        # Dimension entry frame
+        self.dim_frame = ttk.LabelFrame(scrollable_frame, text="Dimensions (mm)", padding=10)
+        self.dim_frame.pack(fill=tk.X, pady=5, padx=5)
+        self.dim_vars: Dict[str, tk.StringVar] = {}
+        self._create_dimension_fields()
+
+        # Material properties frame
+        mat_frame = ttk.LabelFrame(scrollable_frame, text="Material Properties", padding=10)
+        mat_frame.pack(fill=tk.X, pady=5, padx=5)
+
+        mat_fields = [
+            ("σ_ys (Yield strength, MPa):", "yield_strength", "500"),
+            ("σ_uts (Ultimate strength, MPa):", "ultimate_strength", "600"),
+            ("E (Young's modulus, GPa):", "youngs_modulus", "210"),
+            ("ν (Poisson's ratio):", "poissons_ratio", "0.3"),
+        ]
+
+        self.mat_vars: Dict[str, tk.StringVar] = {}
+        for i, (label, key, default) in enumerate(mat_fields):
+            ttk.Label(mat_frame, text=label).grid(row=i, column=0, sticky=tk.W, pady=2)
+            var = tk.StringVar(value=default)
+            self.mat_vars[key] = var
+            ttk.Entry(mat_frame, textvariable=var, width=12).grid(
+                row=i, column=1, sticky=tk.W, pady=2)
+
+        mat_frame.columnconfigure(1, weight=1)
 
     def _create_dimension_fields(self):
         """Create dimension entry fields."""
