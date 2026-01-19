@@ -394,6 +394,8 @@ class VickersTestApp:
 
     def _setup_empty_plot(self):
         """Set up empty plot with labels."""
+        self.ax.set_facecolor('white')
+        self.fig.patch.set_facecolor('white')
         self.ax.set_xlabel("Reading Number")
         self.ax.set_ylabel("Hardness (HV)")
         self.ax.set_title("Vickers Hardness Profile")
@@ -565,21 +567,26 @@ class VickersTestApp:
 
         self.ax.clear()
 
+        # Set white background
+        self.ax.set_facecolor('white')
+        self.fig.patch.set_facecolor('white')
+
         readings = self.current_results.readings
         x = [r.reading_number for r in readings]
         y = [r.hardness_value for r in readings]
 
-        # Plot individual readings
-        self.ax.plot(x, y, 'bo-', markersize=8, linewidth=1.5, label='Readings')
+        # Plot individual readings - dark red color
+        self.ax.plot(x, y, color='darkred', marker='o', markersize=8,
+                    linewidth=1.5, label='Readings')
 
-        # Mean line
+        # Mean line - black dotted
         mean = self.current_results.mean_hardness.value
-        self.ax.axhline(y=mean, color='red', linestyle='--', linewidth=1.5,
+        self.ax.axhline(y=mean, color='black', linestyle=':', linewidth=1.5,
                        label=f'Mean = {mean:.1f}')
 
-        # Uncertainty band
+        # Uncertainty band - light gray
         unc = self.current_results.mean_hardness.uncertainty
-        self.ax.axhspan(mean - unc, mean + unc, alpha=0.2, color='red',
+        self.ax.axhspan(mean - unc, mean + unc, alpha=0.2, color='gray',
                        label=f'U (k=2) = ± {unc:.1f}')
 
         # Labels and formatting
@@ -635,21 +642,26 @@ class VickersTestApp:
         import tempfile
         from matplotlib.figure import Figure
 
-        fig = Figure(figsize=(7, 4), dpi=150)
+        fig = Figure(figsize=(7, 4), dpi=150, facecolor='white')
         ax = fig.add_subplot(111)
+        ax.set_facecolor('white')
 
         readings = self.current_results.readings
         x = [r.reading_number for r in readings]
         y = [r.hardness_value for r in readings]
 
-        ax.plot(x, y, 'bo-', markersize=8, linewidth=1.5, label='Readings')
+        # Dark red line and points
+        ax.plot(x, y, color='darkred', marker='o', markersize=8,
+               linewidth=1.5, label='Readings')
 
+        # Black dotted mean line
         mean = self.current_results.mean_hardness.value
-        ax.axhline(y=mean, color='red', linestyle='--', linewidth=1.5,
+        ax.axhline(y=mean, color='black', linestyle=':', linewidth=1.5,
                    label=f'Mean = {mean:.1f}')
 
+        # Gray uncertainty band
         unc = self.current_results.mean_hardness.uncertainty
-        ax.axhspan(mean - unc, mean + unc, alpha=0.2, color='red',
+        ax.axhspan(mean - unc, mean + unc, alpha=0.2, color='gray',
                    label=f'U (k=2) = ± {unc:.1f}')
 
         ax.set_xlabel("Reading Number", fontsize=10)
