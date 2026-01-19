@@ -167,6 +167,7 @@ class VickersReportGenerator:
 
     def _insert_logo(self, doc: Document, logo_path: Path):
         """Insert logo at {{logo}} placeholder."""
+        # Check paragraphs first
         for paragraph in doc.paragraphs:
             if '{{logo}}' in paragraph.text:
                 paragraph.clear()
@@ -174,6 +175,18 @@ class VickersReportGenerator:
                 run.add_picture(str(logo_path), width=Inches(1.5))
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 return
+
+        # Check tables (logo is in header table)
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        if '{{logo}}' in paragraph.text:
+                            paragraph.clear()
+                            run = paragraph.add_run()
+                            run.add_picture(str(logo_path), width=Inches(1.5))
+                            paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                            return
 
     def _insert_image(self, doc: Document, image_path: Path, placeholder: str, width=Inches(5)):
         """Insert image at specified placeholder."""
