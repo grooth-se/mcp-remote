@@ -2,7 +2,7 @@
 Create Vickers Hardness Report Template for ASTM E92.
 
 This script creates a Word document template with placeholders
-for the Vickers hardness test report.
+for the Vickers hardness test report, matching the Tensile report style.
 """
 
 from pathlib import Path
@@ -33,185 +33,192 @@ def create_vickers_template():
         section.left_margin = Cm(2)
         section.right_margin = Cm(2)
 
-    # Header with logo placeholder
-    header = doc.sections[0].header
-    header_para = header.paragraphs[0]
-    header_para.text = "{{logo}}"
-    header_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    # === HEADER WITH LOGO ===
+    header_table = doc.add_table(rows=1, cols=2)
+    header_table.autofit = False
+    header_table.columns[0].width = Inches(2)
+    header_table.columns[1].width = Inches(4.5)
 
-    # Title
-    title = doc.add_paragraph()
-    title_run = title.add_run("VICKERS HARDNESS TEST REPORT")
+    # Logo cell (left)
+    logo_cell = header_table.rows[0].cells[0]
+    logo_cell.text = "{{logo}}"
+
+    # Title cell (right)
+    title_cell = header_table.rows[0].cells[1]
+    title_para = title_cell.paragraphs[0]
+    title_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    title_run = title_para.add_run("VICKERS HARDNESS TEST REPORT")
     title_run.bold = True
-    title_run.font.size = Pt(16)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    # Subtitle
-    subtitle = doc.add_paragraph()
-    subtitle_run = subtitle.add_run("ASTM E92 / ISO 6507-1")
-    subtitle_run.font.size = Pt(11)
-    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_run.font.size = Pt(14)
+    title_para.add_run("\nASTM E92 / ISO 6507-1")
+    title_para.add_run("\nCertificate: {{certificate_number}}")
 
     doc.add_paragraph()
 
-    # Report information table
+    # === REPORT INFORMATION TABLE ===
+    doc.add_paragraph("REPORT INFORMATION").runs[0].bold = True
+
     report_table = doc.add_table(rows=2, cols=4)
     report_table.style = 'Table Grid'
 
-    headers = ['Report Number', 'Report Date', 'Certificate No.', 'Load Level']
-    values = ['{{report_number}}', '{{report_date}}', '{{certificate_number}}', '{{load_level}}']
+    report_data = [
+        ("Report Number:", "{{report_number}}", "Report Date:", "{{report_date}}"),
+        ("Load Level:", "{{load_level}}", "", ""),
+    ]
 
-    for i, (header, value) in enumerate(zip(headers, values)):
-        cell = report_table.rows[0].cells[i]
-        cell.text = header
-        set_cell_shading(cell, 'D9E2F3')
-        cell.paragraphs[0].runs[0].bold = True
-
-        report_table.rows[1].cells[i].text = value
+    for i, row_data in enumerate(report_data):
+        row = report_table.rows[i]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
+            if j % 2 == 0 and text:  # Labels
+                set_cell_shading(cell, "D9D9D9")
+                if cell.paragraphs[0].runs:
+                    cell.paragraphs[0].runs[0].bold = True
 
     doc.add_paragraph()
 
-    # Test Information section
-    info_heading = doc.add_paragraph()
-    info_run = info_heading.add_run("Test Information")
-    info_run.bold = True
-    info_run.font.size = Pt(12)
+    # === TEST INFORMATION TABLE ===
+    doc.add_paragraph("TEST INFORMATION").runs[0].bold = True
 
     info_table = doc.add_table(rows=4, cols=4)
     info_table.style = 'Table Grid'
 
     info_data = [
-        ('Test Project:', '{{test_project}}', 'Customer:', '{{customer}}'),
-        ('Specimen ID:', '{{specimen_id}}', 'Material:', '{{material}}'),
-        ('Test Date:', '{{test_date}}', 'Operator:', '{{operator}}'),
+        ("Test Project:", "{{test_project}}", "Customer:", "{{customer}}"),
+        ("Specimen ID:", "{{specimen_id}}", "Material:", "{{material}}"),
+        ("Test Date:", "{{test_date}}", "Operator:", "{{operator}}"),
+        ("Test Standard:", "ASTM E92", "Equipment:", "Vickers Hardness Tester"),
     ]
 
-    for row_idx, row_data in enumerate(info_data):
-        for col_idx, text in enumerate(row_data):
-            cell = info_table.rows[row_idx].cells[col_idx]
+    for i, row_data in enumerate(info_data):
+        row = info_table.rows[i]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
             cell.text = text
-            if col_idx % 2 == 0:  # Header cells
-                set_cell_shading(cell, 'F2F2F2')
+            if j % 2 == 0:  # Labels
+                set_cell_shading(cell, "D9D9D9")
                 cell.paragraphs[0].runs[0].bold = True
 
     doc.add_paragraph()
 
-    # Results section
-    results_heading = doc.add_paragraph()
-    results_run = results_heading.add_run("Test Results")
-    results_run.bold = True
-    results_run.font.size = Pt(12)
+    # === TEST RESULTS TABLE ===
+    doc.add_paragraph("TEST RESULTS").runs[0].bold = True
 
     results_table = doc.add_table(rows=7, cols=4)
     results_table.style = 'Table Grid'
 
-    # Results table header
+    # Header row
     header_row = results_table.rows[0]
-    headers = ['Parameter', 'Value', 'Uncertainty U (k=2)', 'Unit']
-    for i, header in enumerate(headers):
-        cell = header_row.cells[i]
+    headers = ["Parameter", "Value", "Uncertainty U (k=2)", "Unit"]
+    for j, header in enumerate(headers):
+        cell = header_row.cells[j]
         cell.text = header
-        set_cell_shading(cell, 'D9E2F3')
+        set_cell_shading(cell, "D9D9D9")
         cell.paragraphs[0].runs[0].bold = True
 
-    # Results data
     results_data = [
-        ('Mean Hardness', '{{mean_hardness}}', '± {{uncertainty}}', '{{unit}}'),
-        ('Standard Deviation', '{{std_dev}}', '-', '{{unit}}'),
-        ('Range (Max - Min)', '{{range}}', '-', '{{unit}}'),
-        ('Minimum Value', '{{min_value}}', '-', '{{unit}}'),
-        ('Maximum Value', '{{max_value}}', '-', '{{unit}}'),
-        ('Number of Readings', '{{n_readings}}', '-', '-'),
+        ("Mean Hardness", "{{mean_hardness}}", "± {{uncertainty}}", "{{unit}}"),
+        ("Standard Deviation", "{{std_dev}}", "-", "{{unit}}"),
+        ("Range (Max - Min)", "{{range}}", "-", "{{unit}}"),
+        ("Minimum Value", "{{min_value}}", "-", "{{unit}}"),
+        ("Maximum Value", "{{max_value}}", "-", "{{unit}}"),
+        ("Number of Readings", "{{n_readings}}", "-", "-"),
     ]
 
-    for row_idx, row_data in enumerate(results_data):
-        for col_idx, text in enumerate(row_data):
-            results_table.rows[row_idx + 1].cells[col_idx].text = text
+    for i, row_data in enumerate(results_data):
+        row = results_table.rows[i + 1]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
 
     doc.add_paragraph()
 
-    # Uncertainty Budget section
-    unc_heading = doc.add_paragraph()
-    unc_run = unc_heading.add_run("Uncertainty Budget (ISO 17025 / GUM)")
-    unc_run.bold = True
-    unc_run.font.size = Pt(12)
+    # === UNCERTAINTY BUDGET TABLE ===
+    doc.add_paragraph("UNCERTAINTY BUDGET (ISO 17025 / GUM)").runs[0].bold = True
 
     unc_table = doc.add_table(rows=7, cols=3)
     unc_table.style = 'Table Grid'
 
-    # Uncertainty table header
-    unc_headers = ['Source', 'Type', 'Value (HV)']
-    for i, header in enumerate(unc_headers):
-        cell = unc_table.rows[0].cells[i]
+    # Header row
+    unc_headers = ["Source", "Type", "Value (HV)"]
+    for j, header in enumerate(unc_headers):
+        cell = unc_table.rows[0].cells[j]
         cell.text = header
-        set_cell_shading(cell, 'D9E2F3')
+        set_cell_shading(cell, "D9D9D9")
         cell.paragraphs[0].runs[0].bold = True
 
     unc_data = [
-        ('Repeatability (std of mean)', 'A', '{{u_A}}'),
-        ('Machine calibration', 'B', '{{u_machine}}'),
-        ('Diagonal measurement', 'B', '{{u_diagonal}}'),
-        ('Force application', 'B', '{{u_force}}'),
-        ('Combined standard uncertainty', '-', '{{u_combined}}'),
-        ('Expanded uncertainty (k={{k}})', '-', '{{U_expanded}}'),
+        ("Repeatability (std of mean)", "A", "{{u_A}}"),
+        ("Machine calibration", "B", "{{u_machine}}"),
+        ("Diagonal measurement", "B", "{{u_diagonal}}"),
+        ("Force application", "B", "{{u_force}}"),
+        ("Combined standard uncertainty", "-", "{{u_combined}}"),
+        ("Expanded uncertainty (k={{k}})", "-", "{{U_expanded}}"),
     ]
 
-    for row_idx, row_data in enumerate(unc_data):
-        for col_idx, text in enumerate(row_data):
-            cell = unc_table.rows[row_idx + 1].cells[col_idx]
+    for i, row_data in enumerate(unc_data):
+        row = unc_table.rows[i + 1]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
             cell.text = text
-            if row_idx >= 4:  # Highlight combined/expanded rows
-                set_cell_shading(cell, 'FFF2CC')
+            if i >= 4:  # Highlight combined/expanded rows
+                set_cell_shading(cell, "FFF2CC")
 
     doc.add_paragraph()
 
-    # Hardness Profile Chart
-    chart_heading = doc.add_paragraph()
-    chart_run = chart_heading.add_run("Hardness Profile")
-    chart_run.bold = True
-    chart_run.font.size = Pt(12)
+    # === HARDNESS PROFILE CHART ===
+    doc.add_paragraph("HARDNESS PROFILE").runs[0].bold = True
 
     chart_para = doc.add_paragraph("{{chart}}")
     chart_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     doc.add_paragraph()
 
-    # Indent Photo
-    photo_heading = doc.add_paragraph()
-    photo_run = photo_heading.add_run("Indent Photograph")
-    photo_run.bold = True
-    photo_run.font.size = Pt(12)
+    # === INDENT PHOTOGRAPH ===
+    doc.add_paragraph("INDENT PHOTOGRAPH").runs[0].bold = True
 
     photo_para = doc.add_paragraph("{{photo}}")
     photo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     doc.add_paragraph()
 
-    # Signatures section
-    sig_heading = doc.add_paragraph()
-    sig_run = sig_heading.add_run("Signatures")
-    sig_run.bold = True
-    sig_run.font.size = Pt(12)
+    # === SIGNATURES TABLE ===
+    doc.add_paragraph("SIGNATURES").runs[0].bold = True
 
-    sig_table = doc.add_table(rows=2, cols=3)
+    sig_table = doc.add_table(rows=4, cols=3)
     sig_table.style = 'Table Grid'
 
-    sig_headers = ['Tested By', 'Reviewed By', 'Approved By']
-    for i, header in enumerate(sig_headers):
-        cell = sig_table.rows[0].cells[i]
+    sig_headers = ["", "Name", "Date"]
+    for j, header in enumerate(sig_headers):
+        cell = sig_table.rows[0].cells[j]
         cell.text = header
-        set_cell_shading(cell, 'F2F2F2')
-        cell.paragraphs[0].runs[0].bold = True
+        set_cell_shading(cell, "D9D9D9")
+        if cell.paragraphs[0].runs:
+            cell.paragraphs[0].runs[0].bold = True
 
-    # Empty signature cells
-    for i in range(3):
-        sig_table.rows[1].cells[i].text = "\n\n\n"
+    sig_rows = [
+        ("Tested by:", "", ""),
+        ("Reviewed by:", "", ""),
+        ("Approved by:", "", ""),
+    ]
+
+    for i, row_data in enumerate(sig_rows, start=1):
+        row = sig_table.rows[i]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
+            if j == 0:  # Label column
+                set_cell_shading(cell, "D9D9D9")
+                cell.paragraphs[0].runs[0].bold = True
 
     # Footer
-    footer = doc.sections[0].footer
-    footer_para = footer.paragraphs[0]
-    footer_para.text = "Report generated by Durabler - ISO 17025 Compliant Mechanical Testing System"
+    doc.add_paragraph()
+    footer_para = doc.add_paragraph()
     footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    footer_run = footer_para.add_run("Report generated by Durabler - ISO 17025 Compliant Mechanical Testing System")
+    footer_run.font.size = Pt(9)
+    footer_run.italic = True
 
     # Save template
     template_dir = Path(__file__).parent.parent / "templates"
