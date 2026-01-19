@@ -130,7 +130,9 @@ class SonicTestApp:
         """Create left and right panels."""
         main_frame = ttk.Frame(self.root)
         main_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        main_frame.columnconfigure(1, weight=1)
+        # Proportional 1:2 layout (left = 1/3, right = 2/3)
+        main_frame.columnconfigure(0, weight=1)  # Left panel - 1/3 of width
+        main_frame.columnconfigure(1, weight=2)  # Right panel - 2/3 of width
         main_frame.rowconfigure(0, weight=1)
 
         # Left panel (inputs)
@@ -141,9 +143,8 @@ class SonicTestApp:
 
     def _create_left_panel(self, parent):
         """Create left panel with specimen inputs."""
-        left_frame = ttk.Frame(parent, width=420)
+        left_frame = ttk.Frame(parent)
         left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        left_frame.grid_propagate(False)
 
         # Scrollable frame
         canvas = tk.Canvas(left_frame, highlightthickness=0)
@@ -155,8 +156,13 @@ class SonicTestApp:
             lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
         )
 
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas_window = canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Make inner frame expand to canvas width
+        def on_canvas_configure(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+        canvas.bind("<Configure>", on_canvas_configure)
 
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -191,15 +197,16 @@ class SonicTestApp:
             if key == "certificate_number":
                 cert_frame = ttk.Frame(info_frame)
                 cert_frame.grid(row=row, column=1, sticky=tk.EW, pady=2)
-                self.cert_combobox = ttk.Combobox(cert_frame, textvariable=var, width=22)
-                self.cert_combobox.pack(side=tk.LEFT)
+                cert_frame.columnconfigure(0, weight=1)
+                self.cert_combobox = ttk.Combobox(cert_frame, textvariable=var)
+                self.cert_combobox.grid(row=0, column=0, sticky=tk.EW)
                 self.cert_combobox.bind('<<ComboboxSelected>>', self._on_certificate_selected)
                 ttk.Button(cert_frame, text="↻", width=3,
-                          command=self._refresh_certificate_list).pack(side=tk.LEFT, padx=2)
+                          command=self._refresh_certificate_list).grid(row=0, column=1, padx=2)
                 # Load certificate list
                 self._refresh_certificate_list()
             else:
-                ttk.Entry(info_frame, textvariable=var, width=38).grid(
+                ttk.Entry(info_frame, textvariable=var).grid(
                     row=row, column=1, sticky=tk.EW, pady=2)
             row += 1
 
