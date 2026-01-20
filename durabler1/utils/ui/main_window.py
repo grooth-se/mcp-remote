@@ -735,6 +735,28 @@ class TensileTestApp:
                         coverage_factor=2.0
                     )
 
+            # Calculate rates at key points (Rp0.2, ReH, Rm)
+            # Filter time array same as other arrays
+            time_filtered = self.current_data.time[:cutoff_idx]
+
+            # Rates at Rp0.2
+            rates_rp02 = analyzer.calculate_rates_at_rp02(
+                time_filtered, stress, self.strain, displacement_zeroed, E.value
+            )
+            stress_rate_rp02, strain_rate_rp02, disp_rate_rp02 = rates_rp02
+
+            # Rates at ReH
+            rates_reh = analyzer.calculate_rates_at_reh(
+                time_filtered, stress, self.strain, displacement_zeroed
+            )
+            stress_rate_reh, strain_rate_reh, disp_rate_reh = rates_reh
+
+            # Rates at Rm
+            rates_rm = analyzer.calculate_rates_at_rm(
+                time_filtered, stress, self.strain, displacement_zeroed
+            )
+            stress_rate_rm, strain_rate_rm, disp_rate_rm = rates_rm
+
             # Store results
             self.current_results = {
                 'E': E,
@@ -753,7 +775,19 @@ class TensileTestApp:
                 'A_manual': A_manual,
                 'Ag': Ag,
                 'Z': Z,
-                'strain_source': strain_label
+                'strain_source': strain_label,
+                # Rates at Rp0.2
+                'stress_rate_rp02': stress_rate_rp02,
+                'strain_rate_rp02': strain_rate_rp02,
+                'disp_rate_rp02': disp_rate_rp02,
+                # Rates at ReH
+                'stress_rate_reh': stress_rate_reh,
+                'strain_rate_reh': strain_rate_reh,
+                'disp_rate_reh': disp_rate_reh,
+                # Rates at Rm
+                'stress_rate_rm': stress_rate_rm,
+                'strain_rate_rm': strain_rate_rm,
+                'disp_rate_rm': disp_rate_rm,
             }
 
             # Update results display
@@ -839,6 +873,33 @@ class TensileTestApp:
 
         if self.current_results.get('Z'):
             results.append(("Z% (Red. of Area)", self.current_results['Z']))
+
+        # Add rate calculations at key points
+        # Rates at yield point (Rp0.2 or ReH depending on yield type)
+        if yield_type == 'offset':
+            # Rates at Rp0.2
+            if self.current_results.get('stress_rate_rp02'):
+                results.append(("Stress Rate at Rp0.2", self.current_results['stress_rate_rp02']))
+            if self.current_results.get('strain_rate_rp02'):
+                results.append(("Strain Rate at Rp0.2", self.current_results['strain_rate_rp02']))
+            if self.current_results.get('disp_rate_rp02'):
+                results.append(("Disp. Rate at Rp0.2", self.current_results['disp_rate_rp02']))
+        else:
+            # Rates at ReH
+            if self.current_results.get('stress_rate_reh'):
+                results.append(("Stress Rate at ReH", self.current_results['stress_rate_reh']))
+            if self.current_results.get('strain_rate_reh'):
+                results.append(("Strain Rate at ReH", self.current_results['strain_rate_reh']))
+            if self.current_results.get('disp_rate_reh'):
+                results.append(("Disp. Rate at ReH", self.current_results['disp_rate_reh']))
+
+        # Rates at Rm (always shown)
+        if self.current_results.get('stress_rate_rm'):
+            results.append(("Stress Rate at Rm", self.current_results['stress_rate_rm']))
+        if self.current_results.get('strain_rate_rm'):
+            results.append(("Strain Rate at Rm", self.current_results['strain_rate_rm']))
+        if self.current_results.get('disp_rate_rm'):
+            results.append(("Disp. Rate at Rm", self.current_results['disp_rate_rm']))
 
         for name, result in results:
             if result is None:

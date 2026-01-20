@@ -1076,3 +1076,264 @@ class TensileAnalyzer:
                 coverage_factor=2.0
             )
         )
+
+    def calculate_rates_at_point(
+        self,
+        time: np.ndarray,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        displacement: np.ndarray,
+        point_index: int,
+        window: int = 10
+    ) -> Tuple[float, float, float]:
+        """
+        Calculate stress rate, strain rate, and displacement rate at a specific point.
+
+        Uses a local linear regression around the point for accurate rate calculation.
+
+        Parameters
+        ----------
+        time : np.ndarray
+            Time array in seconds
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain (mm/mm)
+        displacement : np.ndarray
+            Displacement in mm
+        point_index : int
+            Index of the point at which to calculate rates
+        window : int
+            Number of points before and after for local regression (default 10)
+
+        Returns
+        -------
+        Tuple[float, float, float]
+            (stress_rate MPa/s, strain_rate 1/s, displacement_rate mm/s)
+        """
+        # Ensure valid window bounds
+        start_idx = max(0, point_index - window)
+        end_idx = min(len(time), point_index + window + 1)
+
+        if end_idx - start_idx < 3:
+            # Not enough points for regression
+            return (0.0, 0.0, 0.0)
+
+        # Extract local data
+        t_local = time[start_idx:end_idx]
+        stress_local = stress[start_idx:end_idx]
+        strain_local = strain[start_idx:end_idx]
+        disp_local = displacement[start_idx:end_idx]
+
+        # Calculate rates using linear regression (slope = rate)
+        # Stress rate
+        if len(t_local) >= 2 and (t_local[-1] - t_local[0]) > 0:
+            stress_slope, _, _, _, _ = stats.linregress(t_local, stress_local)
+            strain_slope, _, _, _, _ = stats.linregress(t_local, strain_local)
+            disp_slope, _, _, _, _ = stats.linregress(t_local, disp_local)
+        else:
+            stress_slope = 0.0
+            strain_slope = 0.0
+            disp_slope = 0.0
+
+        return (stress_slope, strain_slope, disp_slope)
+
+    def calculate_rates_at_rp02(
+        self,
+        time: np.ndarray,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        displacement: np.ndarray,
+        E_modulus: float
+    ) -> Tuple[MeasuredValue, MeasuredValue, MeasuredValue]:
+        """
+        Calculate stress rate, strain rate, and displacement rate at Rp0.2.
+
+        Parameters
+        ----------
+        time : np.ndarray
+            Time array in seconds
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain (mm/mm)
+        displacement : np.ndarray
+            Displacement in mm
+        E_modulus : float
+            Young's modulus in GPa
+
+        Returns
+        -------
+        Tuple[MeasuredValue, MeasuredValue, MeasuredValue]
+            (stress_rate, strain_rate, displacement_rate)
+        """
+        # Find Rp0.2 point using offset method
+        offset = self.config.offset_strain  # 0.002
+        E_mpa = E_modulus * 1000
+
+        offset_line = E_mpa * (strain - offset)
+        curve_minus_offset = stress - offset_line
+
+        valid_idx = strain > offset * 1.5
+        if not np.any(valid_idx):
+            return self._create_zero_rates()
+
+        curve_segment = curve_minus_offset[valid_idx]
+        indices = np.where(valid_idx)[0]
+
+        sign_changes = np.where(np.diff(np.sign(curve_segment)))[0]
+
+        if len(sign_changes) == 0:
+            idx_local = np.argmin(np.abs(curve_segment))
+        else:
+            idx_local = sign_changes[0]
+
+        rp02_idx = indices[idx_local]
+
+        # Calculate rates at this point
+        stress_rate, strain_rate, disp_rate = self.calculate_rates_at_point(
+            time, stress, strain, displacement, rp02_idx
+        )
+
+        return self._create_rate_results(stress_rate, strain_rate, disp_rate)
+
+    def calculate_rates_at_reh(
+        self,
+        time: np.ndarray,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        displacement: np.ndarray
+    ) -> Tuple[MeasuredValue, MeasuredValue, MeasuredValue]:
+        """
+        Calculate stress rate, strain rate, and displacement rate at ReH.
+
+        Parameters
+        ----------
+        time : np.ndarray
+            Time array in seconds
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain (mm/mm)
+        displacement : np.ndarray
+            Displacement in mm
+
+        Returns
+        -------
+        Tuple[MeasuredValue, MeasuredValue, MeasuredValue]
+            (stress_rate, strain_rate, displacement_rate)
+        """
+        # Find ReH point (first local maximum in early part of curve)
+        max_strain_search = 0.05
+        search_idx = strain < max_strain_search
+
+        if not np.any(search_idx):
+            search_idx = np.ones(len(strain), dtype=bool)
+
+        stress_search = stress[search_idx]
+
+        # Smoothing and peak detection
+        window = min(5, len(stress_search) // 10)
+        if window < 2:
+            window = 2
+
+        stress_smooth = np.convolve(stress_search, np.ones(window)/window, mode='same')
+        diff_stress = np.diff(stress_smooth)
+
+        peak_idx = None
+        for i in range(len(diff_stress) - 1):
+            if diff_stress[i] > 0 and diff_stress[i + 1] < 0:
+                if i > 10:
+                    peak_idx = i + 1
+                    break
+
+        if peak_idx is None:
+            peak_idx = np.argmax(stress_search)
+
+        # Convert to global index
+        indices = np.where(search_idx)[0]
+        reh_idx = indices[peak_idx] if peak_idx < len(indices) else indices[-1]
+
+        # Calculate rates at this point
+        stress_rate, strain_rate, disp_rate = self.calculate_rates_at_point(
+            time, stress, strain, displacement, reh_idx
+        )
+
+        return self._create_rate_results(stress_rate, strain_rate, disp_rate)
+
+    def calculate_rates_at_rm(
+        self,
+        time: np.ndarray,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        displacement: np.ndarray
+    ) -> Tuple[MeasuredValue, MeasuredValue, MeasuredValue]:
+        """
+        Calculate stress rate, strain rate, and displacement rate at Rm.
+
+        Parameters
+        ----------
+        time : np.ndarray
+            Time array in seconds
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain (mm/mm)
+        displacement : np.ndarray
+            Displacement in mm
+
+        Returns
+        -------
+        Tuple[MeasuredValue, MeasuredValue, MeasuredValue]
+            (stress_rate, strain_rate, displacement_rate)
+        """
+        # Find Rm point (maximum stress)
+        rm_idx = np.argmax(stress)
+
+        # Calculate rates at this point
+        stress_rate, strain_rate, disp_rate = self.calculate_rates_at_point(
+            time, stress, strain, displacement, rm_idx
+        )
+
+        return self._create_rate_results(stress_rate, strain_rate, disp_rate)
+
+    def _create_rate_results(
+        self,
+        stress_rate: float,
+        strain_rate: float,
+        disp_rate: float
+    ) -> Tuple[MeasuredValue, MeasuredValue, MeasuredValue]:
+        """Create MeasuredValue objects for rate results."""
+        # Estimate uncertainties (5% typical for rate measurements)
+        u_stress = abs(stress_rate) * 0.05
+        u_strain = abs(strain_rate) * 0.05
+        u_disp = abs(disp_rate) * 0.05
+
+        return (
+            MeasuredValue(
+                value=round(stress_rate, 2),
+                uncertainty=round(2 * u_stress, 2),
+                unit="MPa/s",
+                coverage_factor=2.0
+            ),
+            MeasuredValue(
+                value=round(strain_rate, 6),
+                uncertainty=round(2 * u_strain, 6),
+                unit="1/s",
+                coverage_factor=2.0
+            ),
+            MeasuredValue(
+                value=round(disp_rate, 4),
+                uncertainty=round(2 * u_disp, 4),
+                unit="mm/s",
+                coverage_factor=2.0
+            )
+        )
+
+    def _create_zero_rates(self) -> Tuple[MeasuredValue, MeasuredValue, MeasuredValue]:
+        """Create zero rate results when calculation is not possible."""
+        return (
+            MeasuredValue(value=0.0, uncertainty=0.0, unit="MPa/s", coverage_factor=2.0),
+            MeasuredValue(value=0.0, uncertainty=0.0, unit="1/s", coverage_factor=2.0),
+            MeasuredValue(value=0.0, uncertainty=0.0, unit="mm/s", coverage_factor=2.0)
+        )
