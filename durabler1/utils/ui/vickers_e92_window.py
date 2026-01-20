@@ -84,6 +84,11 @@ class VickersTestApp:
         file_menu.add_separator()
         file_menu.add_command(label="Export Report...", command=self.export_report)
         file_menu.add_separator()
+        file_menu.add_command(label="Save to Database", command=self.save_to_database,
+                              accelerator="Ctrl+S")
+        file_menu.add_command(label="Load from Database...", command=self.load_from_database,
+                              accelerator="Ctrl+L")
+        file_menu.add_separator()
         if self.parent_launcher:
             file_menu.add_command(label="Return to Launcher", command=self._on_close)
         file_menu.add_command(label="Exit", command=self._exit_app)
@@ -102,6 +107,8 @@ class VickersTestApp:
 
         # Keyboard shortcuts
         self.root.bind('<F5>', lambda e: self.run_analysis())
+        self.root.bind('<Control-s>', lambda e: self.save_to_database())
+        self.root.bind('<Control-l>', lambda e: self.load_from_database())
 
     def _exit_app(self):
         """Exit the entire application."""
@@ -139,6 +146,14 @@ class VickersTestApp:
         ttk.Button(toolbar, text="Clear", command=self.clear_all).pack(
             side=tk.LEFT, padx=2)
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+
+        # Database buttons
+        ttk.Button(toolbar, text="Save DB", command=self.save_to_database).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Load DB", command=self.load_from_database).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+
         ttk.Button(toolbar, text="Export Report", command=self.export_report).pack(
             side=tk.LEFT, padx=2)
 
@@ -777,6 +792,301 @@ class VickersTestApp:
             "- Word report generation\n\n"
             "Uncertainty per GUM methodology (k=2)"
         )
+
+    def save_to_database(self):
+        """Save current Vickers test data to database."""
+        cert_num = self.certificate_var.get()
+        if not cert_num:
+            messagebox.showwarning("Warning", "Certificate number is required to save to database.")
+            return
+
+        if self.current_results is None:
+            messagebox.showwarning("Warning", "No results to save. Please run analysis first.")
+            return
+
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+            import io
+
+            self._update_status("Saving to database...")
+
+            db = TestDataDatabase()
+
+            # Check if test already exists
+            if db.test_exists(cert_num):
+                if not messagebox.askyesno("Confirm Overwrite",
+                        f"Test {cert_num} already exists in database.\nOverwrite?"):
+                    self._update_status("Save cancelled")
+                    return
+
+            # 1. Save test record
+            test_record = {
+                'certificate_number': cert_num,
+                'test_type': 'VICKERS',
+                'test_standard': 'ASTM E92',
+                'test_project': self.test_project_var.get(),
+                'customer': self.customer_var.get(),
+                'specimen_id': self.specimen_id_var.get(),
+                'material': self.material_var.get(),
+                'test_date': self.test_date_var.get(),
+                'operator': self.operator_var.get(),
+                'test_equipment': 'Vickers Hardness Tester',
+                'comments': '',
+                'is_valid': True,
+                'validity_notes': [],
+            }
+
+            test_id = db.save_test_record(test_record)
+
+            # 2. Save hardness readings as raw data
+            readings = []
+            for i, var_dict in enumerate(self.reading_vars):
+                hv_val = var_dict['hardness'].get()
+                loc_val = var_dict.get('location', tk.StringVar()).get() if 'location' in var_dict else ''
+                if hv_val:
+                    try:
+                        readings.append({
+                            'reading_number': i + 1,
+                            'hardness': float(hv_val),
+                            'location': loc_val,
+                        })
+                    except ValueError:
+                        pass
+
+            if readings:
+                raw_data = {
+                    'hardness_readings': readings,
+                    'load_level': self.load_level_var.get(),
+                }
+                db.save_raw_data(test_id, 'main', raw_data)
+
+            # 3. Save results
+            if self.current_results:
+                results_list = []
+                for param_name, result in self.current_results.items():
+                    if hasattr(result, 'value') and hasattr(result, 'uncertainty'):
+                        results_list.append({
+                            'parameter_name': param_name,
+                            'value': result.value,
+                            'uncertainty': result.uncertainty,
+                            'unit': getattr(result, 'unit', ''),
+                            'is_valid': True,
+                        })
+
+                if results_list:
+                    db.save_test_results_batch(test_id, results_list)
+
+            # 4. Save plot if available
+            if hasattr(self, 'fig') and self.fig:
+                buf = io.BytesIO()
+                self.fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+                buf.seek(0)
+                db.save_plot(test_id, buf.read(), description='Hardness Profile')
+
+            # 5. Save photo if available
+            if self.photo_path and self.photo_path.exists():
+                with open(self.photo_path, 'rb') as f:
+                    photo_data = f.read()
+                db.save_photo(test_id, photo_data, description='Indent Photo')
+
+            self._update_status(f"Saved to database: {cert_num}")
+            messagebox.showinfo("Success", f"Vickers test saved to database:\n{cert_num}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save to database:\n{e}")
+            import traceback
+            traceback.print_exc()
+
+    def load_from_database(self):
+        """Load Vickers test data from database."""
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+
+            db = TestDataDatabase()
+
+            # Get list of available tests
+            cert_numbers = db.get_certificate_numbers_list(test_type='VICKERS')
+
+            if not cert_numbers:
+                messagebox.showinfo("Info", "No Vickers tests found in database.")
+                return
+
+            # Create selection dialog
+            dialog = tk.Toplevel(self.root)
+            dialog.title("Load from Database")
+            dialog.geometry("500x400")
+            dialog.transient(self.root)
+            dialog.grab_set()
+
+            # Search frame
+            search_frame = ttk.Frame(dialog, padding=10)
+            search_frame.pack(fill=tk.X)
+
+            ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
+            search_var = tk.StringVar()
+            search_entry = ttk.Entry(search_frame, textvariable=search_var, width=30)
+            search_entry.pack(side=tk.LEFT, padx=5)
+
+            # List frame
+            list_frame = ttk.Frame(dialog, padding=10)
+            list_frame.pack(fill=tk.BOTH, expand=True)
+
+            # Create treeview with columns
+            columns = ('certificate', 'date', 'project', 'customer', 'specimen')
+            tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=12)
+
+            tree.heading('certificate', text='Certificate')
+            tree.heading('date', text='Date')
+            tree.heading('project', text='Project')
+            tree.heading('customer', text='Customer')
+            tree.heading('specimen', text='Specimen ID')
+
+            tree.column('certificate', width=120)
+            tree.column('date', width=80)
+            tree.column('project', width=100)
+            tree.column('customer', width=100)
+            tree.column('specimen', width=80)
+
+            scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=tree.yview)
+            tree.configure(yscrollcommand=scrollbar.set)
+
+            tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+            # Populate list
+            def refresh_list(search_term=''):
+                tree.delete(*tree.get_children())
+                if search_term:
+                    tests = db.search_tests(search_term, test_type='VICKERS')
+                else:
+                    tests = db.get_all_tests(test_type='VICKERS')
+
+                for test in tests:
+                    tree.insert('', tk.END, values=(
+                        test.get('certificate_number', ''),
+                        test.get('test_date', ''),
+                        test.get('test_project', ''),
+                        test.get('customer', ''),
+                        test.get('specimen_id', '')
+                    ))
+
+            refresh_list()
+
+            def on_search(*args):
+                refresh_list(search_var.get())
+
+            search_var.trace('w', on_search)
+
+            # Button frame
+            btn_frame = ttk.Frame(dialog, padding=10)
+            btn_frame.pack(fill=tk.X)
+
+            selected_cert = [None]
+
+            def on_load():
+                selection = tree.selection()
+                if not selection:
+                    messagebox.showwarning("Warning", "Please select a test to load.")
+                    return
+                item = tree.item(selection[0])
+                selected_cert[0] = item['values'][0]
+                dialog.destroy()
+
+            def on_cancel():
+                dialog.destroy()
+
+            ttk.Button(btn_frame, text="Load", command=on_load).pack(side=tk.RIGHT, padx=5)
+            ttk.Button(btn_frame, text="Cancel", command=on_cancel).pack(side=tk.RIGHT)
+
+            # Double-click to load
+            def on_double_click(event):
+                on_load()
+            tree.bind('<Double-1>', on_double_click)
+
+            # Wait for dialog
+            self.root.wait_window(dialog)
+
+            if selected_cert[0]:
+                self._load_test_from_db(selected_cert[0])
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load from database:\n{e}")
+            import traceback
+            traceback.print_exc()
+
+    def _load_test_from_db(self, certificate_number: str):
+        """Load specific Vickers test from database."""
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+
+            self._update_status(f"Loading {certificate_number}...")
+
+            db = TestDataDatabase()
+
+            # Get test record
+            record = db.get_test_record(certificate_number)
+            if not record:
+                messagebox.showerror("Error", f"Test not found: {certificate_number}")
+                return
+
+            test_id = record['id']
+
+            # Load and populate test info
+            self.certificate_var.set(record.get('certificate_number', ''))
+            self.test_project_var.set(record.get('test_project', ''))
+            self.customer_var.set(record.get('customer', ''))
+            self.specimen_id_var.set(record.get('specimen_id', ''))
+            self.material_var.set(record.get('material', ''))
+            self.test_date_var.set(record.get('test_date', ''))
+            self.operator_var.set(record.get('operator', ''))
+
+            # Load hardness readings
+            raw_data = db.get_raw_data(test_id, 'main')
+            if raw_data:
+                # Set load level
+                if raw_data.get('load_level'):
+                    self.load_level_var.set(raw_data['load_level'])
+
+                # Populate hardness readings
+                readings = raw_data.get('hardness_readings', [])
+
+                # Update number of readings
+                if readings:
+                    self.qty_var.set(str(len(readings)))
+                    self._update_reading_fields()
+
+                    for i, reading in enumerate(readings):
+                        if i < len(self.reading_vars):
+                            hv = reading.get('hardness', '')
+                            loc = reading.get('location', '')
+                            self.reading_vars[i]['hardness'].set(str(hv) if hv else '')
+                            if 'location' in self.reading_vars[i]:
+                                self.reading_vars[i]['location'].set(loc)
+
+            # Load results
+            results = db.get_test_results(test_id)
+            if results:
+                from ..models.test_result import MeasuredValue
+                self.current_results = {}
+
+                for r in results:
+                    param = r.get('parameter_name')
+                    self.current_results[param] = MeasuredValue(
+                        value=r.get('value', 0),
+                        uncertainty=r.get('uncertainty', 0),
+                        unit=r.get('unit', ''),
+                        coverage_factor=r.get('coverage_factor', 2.0)
+                    )
+
+                # Display results
+                self._display_results()
+
+            self._update_status(f"Loaded from database: {certificate_number}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load test:\n{e}")
+            import traceback
+            traceback.print_exc()
 
     def run(self):
         """Start the application main loop."""

@@ -89,6 +89,15 @@ class CertificateRegisterApp:
         edit_menu.add_separator()
         edit_menu.add_command(label="Create Revision", command=self._create_revision)
 
+        # Test Data menu
+        data_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Test Data", menu=data_menu)
+        data_menu.add_command(label="Search Test Data...", command=self._search_test_data,
+                             accelerator="Ctrl+T")
+        data_menu.add_command(label="Show All Test Data", command=self._show_all_test_data)
+        data_menu.add_separator()
+        data_menu.add_command(label="View Selected Test Data", command=self._view_test_data)
+
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -97,6 +106,7 @@ class CertificateRegisterApp:
         # Keyboard shortcuts
         self.root.bind('<Control-n>', lambda e: self._new_certificate())
         self.root.bind('<Control-s>', lambda e: self._save_certificate())
+        self.root.bind('<Control-t>', lambda e: self._search_test_data())
 
     def _exit_app(self):
         """Exit the application."""
@@ -176,7 +186,7 @@ class CertificateRegisterApp:
             side=tk.LEFT)
 
         # Treeview for certificates
-        columns = ("cert_number", "date", "project", "customer", "standard", "reported", "invoiced")
+        columns = ("cert_number", "date", "project", "customer", "standard", "reported", "invoiced", "test_data")
         self.cert_tree = ttk.Treeview(
             list_frame, columns=columns, show="headings", height=15
         )
@@ -188,14 +198,16 @@ class CertificateRegisterApp:
         self.cert_tree.heading("standard", text="Standard")
         self.cert_tree.heading("reported", text="Reported")
         self.cert_tree.heading("invoiced", text="Invoiced")
+        self.cert_tree.heading("test_data", text="Test Data")
 
         self.cert_tree.column("cert_number", width=120)
         self.cert_tree.column("date", width=80)
-        self.cert_tree.column("project", width=150)
-        self.cert_tree.column("customer", width=150)
-        self.cert_tree.column("standard", width=100)
-        self.cert_tree.column("reported", width=70, anchor=tk.CENTER)
-        self.cert_tree.column("invoiced", width=70, anchor=tk.CENTER)
+        self.cert_tree.column("project", width=130)
+        self.cert_tree.column("customer", width=130)
+        self.cert_tree.column("standard", width=90)
+        self.cert_tree.column("reported", width=60, anchor=tk.CENTER)
+        self.cert_tree.column("invoiced", width=60, anchor=tk.CENTER)
+        self.cert_tree.column("test_data", width=70, anchor=tk.CENTER)
 
         # Scrollbar
         scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.cert_tree.yview)
@@ -354,7 +366,11 @@ class CertificateRegisterApp:
         # Load certificates
         certificates = self.db.get_all_certificates(year=year)
 
+        # Check which certificates have test data
+        test_data_certs = self._get_certificates_with_test_data()
+
         for cert in certificates:
+            has_test_data = cert.certificate_number in test_data_certs
             self.cert_tree.insert("", tk.END, iid=cert.id, values=(
                 cert.certificate_number_with_rev,
                 cert.cert_date or "",
@@ -362,11 +378,13 @@ class CertificateRegisterApp:
                 cert.customer,
                 cert.test_standard,
                 "Yes" if cert.reported else "No",
-                "Yes" if cert.invoiced else "No"
+                "Yes" if cert.invoiced else "No",
+                "Yes" if has_test_data else "-"
             ))
 
         count = len(certificates)
-        self._update_status(f"Loaded {count} certificates")
+        data_count = len([c for c in certificates if c.certificate_number in test_data_certs])
+        self._update_status(f"Loaded {count} certificates ({data_count} with test data)")
 
     def _search_certificates(self):
         """Search certificates by search term."""
@@ -382,7 +400,11 @@ class CertificateRegisterApp:
         # Search
         certificates = self.db.search_certificates(search_term)
 
+        # Check which certificates have test data
+        test_data_certs = self._get_certificates_with_test_data()
+
         for cert in certificates:
+            has_test_data = cert.certificate_number in test_data_certs
             self.cert_tree.insert("", tk.END, iid=cert.id, values=(
                 cert.certificate_number_with_rev,
                 cert.cert_date or "",
@@ -390,7 +412,8 @@ class CertificateRegisterApp:
                 cert.customer,
                 cert.test_standard,
                 "Yes" if cert.reported else "No",
-                "Yes" if cert.invoiced else "No"
+                "Yes" if cert.invoiced else "No",
+                "Yes" if has_test_data else "-"
             ))
 
         count = len(certificates)
@@ -579,6 +602,180 @@ class CertificateRegisterApp:
             "associated test information.\n\n"
             "Certificate format: DUR-YYYY-NNNN Rev.R"
         )
+
+    def _get_certificates_with_test_data(self) -> set:
+        """Get set of certificate numbers that have test data stored."""
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+            test_db = TestDataDatabase()
+            cert_numbers = test_db.get_certificate_numbers_list()
+            return set(cert_numbers)
+        except Exception:
+            return set()
+
+    def _search_test_data(self):
+        """Open test data search dialog."""
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+
+            test_db = TestDataDatabase()
+
+            # Create search dialog
+            dialog = tk.Toplevel(self.root)
+            dialog.title("Search Test Data")
+            dialog.geometry("800x500")
+            dialog.transient(self.root)
+            dialog.grab_set()
+
+            # Search frame
+            search_frame = ttk.Frame(dialog, padding=10)
+            search_frame.pack(fill=tk.X)
+
+            ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
+            search_var = tk.StringVar()
+            search_entry = ttk.Entry(search_frame, textvariable=search_var, width=30)
+            search_entry.pack(side=tk.LEFT, padx=5)
+
+            ttk.Label(search_frame, text="Test Type:").pack(side=tk.LEFT, padx=(10, 0))
+            type_var = tk.StringVar(value="All")
+            type_combo = ttk.Combobox(search_frame, textvariable=type_var, width=12,
+                                       values=["All", "TENSILE", "FCGR", "KIC", "CTOD", "SONIC", "VICKERS"],
+                                       state="readonly")
+            type_combo.pack(side=tk.LEFT, padx=5)
+
+            # Results frame
+            results_frame = ttk.Frame(dialog, padding=10)
+            results_frame.pack(fill=tk.BOTH, expand=True)
+
+            # Create treeview
+            columns = ('certificate', 'type', 'date', 'project', 'customer', 'specimen', 'material')
+            tree = ttk.Treeview(results_frame, columns=columns, show='headings', height=15)
+
+            tree.heading('certificate', text='Certificate')
+            tree.heading('type', text='Test Type')
+            tree.heading('date', text='Date')
+            tree.heading('project', text='Project')
+            tree.heading('customer', text='Customer')
+            tree.heading('specimen', text='Specimen ID')
+            tree.heading('material', text='Material')
+
+            tree.column('certificate', width=120)
+            tree.column('type', width=70)
+            tree.column('date', width=80)
+            tree.column('project', width=100)
+            tree.column('customer', width=100)
+            tree.column('specimen', width=80)
+            tree.column('material', width=100)
+
+            scrollbar = ttk.Scrollbar(results_frame, orient=tk.VERTICAL, command=tree.yview)
+            tree.configure(yscrollcommand=scrollbar.set)
+
+            tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+            # Populate list
+            def refresh_list():
+                tree.delete(*tree.get_children())
+                search_term = search_var.get().strip()
+                test_type = type_var.get() if type_var.get() != "All" else None
+
+                if search_term:
+                    tests = test_db.search_tests(search_term, test_type=test_type)
+                else:
+                    tests = test_db.get_all_tests(test_type=test_type)
+
+                for test in tests:
+                    tree.insert('', tk.END, values=(
+                        test.get('certificate_number', ''),
+                        test.get('test_type', ''),
+                        test.get('test_date', ''),
+                        test.get('test_project', ''),
+                        test.get('customer', ''),
+                        test.get('specimen_id', ''),
+                        test.get('material', '')
+                    ))
+
+            refresh_list()
+
+            def on_search(*args):
+                refresh_list()
+
+            search_var.trace('w', on_search)
+            type_combo.bind('<<ComboboxSelected>>', lambda e: refresh_list())
+
+            # Button frame
+            btn_frame = ttk.Frame(dialog, padding=10)
+            btn_frame.pack(fill=tk.X)
+
+            ttk.Button(btn_frame, text="Refresh", command=refresh_list).pack(side=tk.LEFT)
+            ttk.Button(btn_frame, text="Close", command=dialog.destroy).pack(side=tk.RIGHT)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to search test data:\n{e}")
+            import traceback
+            traceback.print_exc()
+
+    def _show_all_test_data(self):
+        """Show all test data with type filter."""
+        self._search_test_data()
+
+    def _view_test_data(self):
+        """View test data for the selected certificate."""
+        if not self.current_certificate:
+            messagebox.showwarning("Warning", "No certificate selected")
+            return
+
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+
+            cert_num = self.current_certificate.certificate_number
+            test_db = TestDataDatabase()
+
+            # Check if test data exists
+            if not test_db.test_exists(cert_num):
+                messagebox.showinfo("Info", f"No test data stored for {cert_num}")
+                return
+
+            # Get test record
+            record = test_db.get_test_record(cert_num)
+            if not record:
+                messagebox.showerror("Error", f"Could not retrieve test data for {cert_num}")
+                return
+
+            # Show test data summary
+            test_type = record.get('test_type', 'Unknown')
+            test_date = record.get('test_date', '')
+            specimen = record.get('specimen_id', '')
+            material = record.get('material', '')
+
+            # Get results summary
+            test_id = record.get('id')
+            results = test_db.get_test_results(test_id) if test_id else []
+            result_count = len(results)
+
+            # Get plots and photos count
+            blobs = test_db.get_test_blobs(test_id) if test_id else []
+            plot_count = len([b for b in blobs if b.get('blob_type') == 'plot'])
+            photo_count = len([b for b in blobs if b.get('blob_type') == 'photo'])
+
+            summary = (
+                f"Certificate: {cert_num}\n"
+                f"Test Type: {test_type}\n"
+                f"Test Date: {test_date}\n"
+                f"Specimen ID: {specimen}\n"
+                f"Material: {material}\n\n"
+                f"Stored Data:\n"
+                f"- Results: {result_count} parameters\n"
+                f"- Plots: {plot_count}\n"
+                f"- Photos: {photo_count}"
+            )
+
+            messagebox.showinfo(f"Test Data - {cert_num}", summary)
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to view test data:\n{e}")
+            import traceback
+            traceback.print_exc()
 
     def run(self):
         """Start the application main loop."""

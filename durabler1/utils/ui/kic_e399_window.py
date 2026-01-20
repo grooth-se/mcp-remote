@@ -80,6 +80,11 @@ class KICTestApp:
         file_menu.add_separator()
         file_menu.add_command(label="Export Report...", command=self.export_report)
         file_menu.add_separator()
+        file_menu.add_command(label="Save to Database", command=self.save_to_database,
+                              accelerator="Ctrl+S")
+        file_menu.add_command(label="Load from Database...", command=self.load_from_database,
+                              accelerator="Ctrl+L")
+        file_menu.add_separator()
         if self.parent_launcher:
             file_menu.add_command(label="Return to Launcher", command=self._on_close)
         file_menu.add_command(label="Exit", command=self._exit_app)
@@ -100,6 +105,8 @@ class KICTestApp:
         self.root.bind('<Control-o>', lambda e: self.load_csv_file())
         self.root.bind('<Control-e>', lambda e: self.load_excel_file())
         self.root.bind('<Control-p>', lambda e: self.load_crack_photo())
+        self.root.bind('<Control-s>', lambda e: self.save_to_database())
+        self.root.bind('<Control-l>', lambda e: self.load_from_database())
         self.root.bind('<F5>', lambda e: self.run_analysis())
 
     def _exit_app(self):
@@ -142,6 +149,14 @@ class KICTestApp:
         ttk.Button(toolbar, text="Clear", command=self.clear_results).pack(
             side=tk.LEFT, padx=2)
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+
+        # Database buttons
+        ttk.Button(toolbar, text="Save DB", command=self.save_to_database).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Load DB", command=self.load_from_database).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+
         ttk.Button(toolbar, text="Export Report", command=self.export_report).pack(
             side=tk.LEFT, padx=2)
 
@@ -1088,6 +1103,297 @@ class KICTestApp:
             "All results include measurement uncertainty\n"
             "following GUM methodology (k=2)."
         )
+
+    def save_to_database(self):
+        """Save current KIC test data to database."""
+        cert_num = self.info_vars['certificate_number'].get()
+        if not cert_num:
+            messagebox.showwarning("Warning", "Certificate number is required to save to database.")
+            return
+
+        if self.current_data is None and self.current_results is None:
+            messagebox.showwarning("Warning", "No test data loaded. Please load CSV data first.")
+            return
+
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+            import io
+
+            self._update_status("Saving to database...")
+
+            db = TestDataDatabase()
+
+            # Check if test already exists
+            if db.test_exists(cert_num):
+                if not messagebox.askyesno("Confirm Overwrite",
+                        f"Test {cert_num} already exists in database.\nOverwrite?"):
+                    self._update_status("Save cancelled")
+                    return
+
+            # 1. Save test record
+            test_record = {
+                'certificate_number': cert_num,
+                'test_type': 'KIC',
+                'test_standard': 'ASTM E399',
+                'test_project': self.info_vars['test_project'].get(),
+                'customer': self.info_vars['customer'].get(),
+                'specimen_id': self.info_vars['specimen_id'].get(),
+                'material': self.info_vars['material'].get(),
+                'test_date': self.info_vars['test_date'].get(),
+                'temperature': self.info_vars['temperature'].get(),
+                'test_equipment': 'MTS Landmark 500kN',
+                'comments': '',
+                'is_valid': True,
+                'validity_notes': [],
+            }
+
+            test_id = db.save_test_record(test_record)
+
+            # 2. Save specimen geometry
+            geometry = {
+                'specimen_type': self.specimen_type.get(),
+            }
+            for key, var in self.dim_vars.items():
+                val = var.get()
+                if val:
+                    try:
+                        geometry[key] = float(val)
+                    except ValueError:
+                        geometry[key] = None
+
+            db.save_specimen_geometry(test_id, geometry)
+
+            # 3. Save raw CSV data if available
+            if self.current_data is not None:
+                raw_data = {
+                    'time': getattr(self.current_data, 'time', None),
+                    'force': getattr(self.current_data, 'force', None),
+                    'displacement': getattr(self.current_data, 'displacement', None),
+                    'extension': getattr(self.current_data, 'extension', None),
+                    'source_file': self.file_var.get(),
+                }
+                db.save_raw_data(test_id, 'main', raw_data)
+
+            # 4. Save crack measurements
+            if self.precrack_measurements:
+                db.save_crack_measurement(test_id, 'precrack', self.precrack_measurements)
+
+            # 5. Save results
+            if self.current_results:
+                results_list = []
+                for param_name, result in self.current_results.items():
+                    if hasattr(result, 'value') and hasattr(result, 'uncertainty'):
+                        results_list.append({
+                            'parameter_name': param_name,
+                            'value': result.value,
+                            'uncertainty': result.uncertainty,
+                            'unit': getattr(result, 'unit', ''),
+                            'is_valid': True,
+                        })
+
+                if results_list:
+                    db.save_test_results_batch(test_id, results_list)
+
+            # 6. Save plot if available
+            if hasattr(self, 'fig') and self.fig:
+                buf = io.BytesIO()
+                self.fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+                buf.seek(0)
+                db.save_plot(test_id, buf.read(), description='Force vs COD Curve')
+
+            # 7. Save crack photo if available
+            if self.crack_photo_path and self.crack_photo_path.exists():
+                with open(self.crack_photo_path, 'rb') as f:
+                    photo_data = f.read()
+                db.save_photo(test_id, photo_data, description='Crack Surface')
+
+            self._update_status(f"Saved to database: {cert_num}")
+            messagebox.showinfo("Success", f"KIC test saved to database:\n{cert_num}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save to database:\n{e}")
+            import traceback
+            traceback.print_exc()
+
+    def load_from_database(self):
+        """Load KIC test data from database."""
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+
+            db = TestDataDatabase()
+
+            # Get list of available tests
+            cert_numbers = db.get_certificate_numbers_list(test_type='KIC')
+
+            if not cert_numbers:
+                messagebox.showinfo("Info", "No KIC tests found in database.")
+                return
+
+            # Create selection dialog
+            dialog = tk.Toplevel(self.root)
+            dialog.title("Load from Database")
+            dialog.geometry("500x400")
+            dialog.transient(self.root)
+            dialog.grab_set()
+
+            # Search frame
+            search_frame = ttk.Frame(dialog, padding=10)
+            search_frame.pack(fill=tk.X)
+
+            ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
+            search_var = tk.StringVar()
+            search_entry = ttk.Entry(search_frame, textvariable=search_var, width=30)
+            search_entry.pack(side=tk.LEFT, padx=5)
+
+            # List frame
+            list_frame = ttk.Frame(dialog, padding=10)
+            list_frame.pack(fill=tk.BOTH, expand=True)
+
+            # Create treeview with columns
+            columns = ('certificate', 'date', 'project', 'customer', 'specimen')
+            tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=12)
+
+            tree.heading('certificate', text='Certificate')
+            tree.heading('date', text='Date')
+            tree.heading('project', text='Project')
+            tree.heading('customer', text='Customer')
+            tree.heading('specimen', text='Specimen ID')
+
+            tree.column('certificate', width=120)
+            tree.column('date', width=80)
+            tree.column('project', width=100)
+            tree.column('customer', width=100)
+            tree.column('specimen', width=80)
+
+            scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=tree.yview)
+            tree.configure(yscrollcommand=scrollbar.set)
+
+            tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+            # Populate list
+            def refresh_list(search_term=''):
+                tree.delete(*tree.get_children())
+                if search_term:
+                    tests = db.search_tests(search_term, test_type='KIC')
+                else:
+                    tests = db.get_all_tests(test_type='KIC')
+
+                for test in tests:
+                    tree.insert('', tk.END, values=(
+                        test.get('certificate_number', ''),
+                        test.get('test_date', ''),
+                        test.get('test_project', ''),
+                        test.get('customer', ''),
+                        test.get('specimen_id', '')
+                    ))
+
+            refresh_list()
+
+            def on_search(*args):
+                refresh_list(search_var.get())
+
+            search_var.trace('w', on_search)
+
+            # Button frame
+            btn_frame = ttk.Frame(dialog, padding=10)
+            btn_frame.pack(fill=tk.X)
+
+            selected_cert = [None]
+
+            def on_load():
+                selection = tree.selection()
+                if not selection:
+                    messagebox.showwarning("Warning", "Please select a test to load.")
+                    return
+                item = tree.item(selection[0])
+                selected_cert[0] = item['values'][0]
+                dialog.destroy()
+
+            def on_cancel():
+                dialog.destroy()
+
+            ttk.Button(btn_frame, text="Load", command=on_load).pack(side=tk.RIGHT, padx=5)
+            ttk.Button(btn_frame, text="Cancel", command=on_cancel).pack(side=tk.RIGHT)
+
+            # Double-click to load
+            def on_double_click(event):
+                on_load()
+            tree.bind('<Double-1>', on_double_click)
+
+            # Wait for dialog
+            self.root.wait_window(dialog)
+
+            if selected_cert[0]:
+                self._load_test_from_db(selected_cert[0])
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load from database:\n{e}")
+            import traceback
+            traceback.print_exc()
+
+    def _load_test_from_db(self, certificate_number: str):
+        """Load specific KIC test from database."""
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+
+            self._update_status(f"Loading {certificate_number}...")
+
+            db = TestDataDatabase()
+
+            # Get test record
+            record = db.get_test_record(certificate_number)
+            if not record:
+                messagebox.showerror("Error", f"Test not found: {certificate_number}")
+                return
+
+            test_id = record['id']
+
+            # Load and populate test info
+            self.info_vars['certificate_number'].set(record.get('certificate_number', ''))
+            self.info_vars['test_project'].set(record.get('test_project', ''))
+            self.info_vars['customer'].set(record.get('customer', ''))
+            self.info_vars['specimen_id'].set(record.get('specimen_id', ''))
+            self.info_vars['material'].set(record.get('material', ''))
+            self.info_vars['test_date'].set(record.get('test_date', ''))
+            self.info_vars['temperature'].set(record.get('temperature', ''))
+
+            # Load specimen geometry
+            geometry = db.get_specimen_geometry(test_id)
+            if geometry:
+                spec_type = geometry.get('specimen_type', 'SE(B)')
+                self.specimen_type.set(spec_type)
+                self._update_dimension_fields()
+
+                for key, var in self.dim_vars.items():
+                    val = geometry.get(key)
+                    if val is not None:
+                        var.set(str(val))
+
+            # Load results
+            results = db.get_test_results(test_id)
+            if results:
+                from ..models.test_result import MeasuredValue
+                self.current_results = {}
+
+                for r in results:
+                    param = r.get('parameter_name')
+                    self.current_results[param] = MeasuredValue(
+                        value=r.get('value', 0),
+                        uncertainty=r.get('uncertainty', 0),
+                        unit=r.get('unit', ''),
+                        coverage_factor=r.get('coverage_factor', 2.0)
+                    )
+
+                # Display results
+                self._display_results()
+
+            self._update_status(f"Loaded from database: {certificate_number}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load test:\n{e}")
+            import traceback
+            traceback.print_exc()
 
     def run(self):
         """Start the application main loop."""

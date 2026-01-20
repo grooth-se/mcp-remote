@@ -70,6 +70,11 @@ class SonicTestApp:
         file_menu.add_command(label="Export Results...", command=self.export_results)
         file_menu.add_command(label="Export Report...", command=self.export_report)
         file_menu.add_separator()
+        file_menu.add_command(label="Save to Database", command=self.save_to_database,
+                              accelerator="Ctrl+S")
+        file_menu.add_command(label="Load from Database...", command=self.load_from_database,
+                              accelerator="Ctrl+L")
+        file_menu.add_separator()
         if self.parent_launcher:
             file_menu.add_command(label="Return to Launcher", command=self._on_close)
         file_menu.add_command(label="Exit", command=self._exit_app)
@@ -88,6 +93,8 @@ class SonicTestApp:
 
         # Keyboard shortcuts
         self.root.bind('<F5>', lambda e: self.run_analysis())
+        self.root.bind('<Control-s>', lambda e: self.save_to_database())
+        self.root.bind('<Control-l>', lambda e: self.load_from_database())
 
     def _exit_app(self):
         """Exit the entire application."""
@@ -123,6 +130,14 @@ class SonicTestApp:
         ttk.Button(toolbar, text="Clear", command=self.clear_results).pack(
             side=tk.LEFT, padx=2)
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+
+        # Database buttons
+        ttk.Button(toolbar, text="Save DB", command=self.save_to_database).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Load DB", command=self.load_from_database).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+
         ttk.Button(toolbar, text="Export Report", command=self.export_report).pack(
             side=tk.LEFT, padx=2)
 
@@ -850,6 +865,331 @@ class SonicTestApp:
             "From longitudinal and shear wave velocities.\n\n"
             "All results include expanded uncertainty (k=2)"
         )
+
+    def save_to_database(self):
+        """Save current Sonic test data to database."""
+        cert_num = self.info_vars['certificate_number'].get()
+        if not cert_num:
+            messagebox.showwarning("Warning", "Certificate number is required to save to database.")
+            return
+
+        if self.current_results is None:
+            messagebox.showwarning("Warning", "No results to save. Please run analysis first.")
+            return
+
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+            import io
+
+            self._update_status("Saving to database...")
+
+            db = TestDataDatabase()
+
+            # Check if test already exists
+            if db.test_exists(cert_num):
+                if not messagebox.askyesno("Confirm Overwrite",
+                        f"Test {cert_num} already exists in database.\nOverwrite?"):
+                    self._update_status("Save cancelled")
+                    return
+
+            # 1. Save test record
+            test_record = {
+                'certificate_number': cert_num,
+                'test_type': 'SONIC',
+                'test_standard': 'Modified ASTM E1875',
+                'test_project': self.info_vars['test_project'].get(),
+                'customer': self.info_vars['customer'].get(),
+                'customer_order': self.info_vars.get('customer_order', tk.StringVar()).get(),
+                'product_sn': self.info_vars.get('product_sn', tk.StringVar()).get(),
+                'specimen_id': self.info_vars['specimen_id'].get(),
+                'location_orientation': self.info_vars.get('location_orientation', tk.StringVar()).get(),
+                'material': self.info_vars['material'].get(),
+                'test_date': self.info_vars.get('test_date', tk.StringVar()).get(),
+                'temperature': self.info_vars.get('temperature', tk.StringVar()).get(),
+                'test_equipment': 'Ultrasonic Equipment',
+                'comments': '',
+                'is_valid': True,
+                'validity_notes': [],
+            }
+
+            test_id = db.save_test_record(test_record)
+
+            # 2. Save specimen geometry
+            geometry = {
+                'specimen_type': self.specimen_shape.get(),
+                'mass': float(self.mass_var.get()) if self.mass_var.get() else None,
+            }
+            for key, var in self.dim_vars.items():
+                val = var.get()
+                if val:
+                    try:
+                        geometry[key] = float(val)
+                    except ValueError:
+                        geometry[key] = None
+
+            db.save_specimen_geometry(test_id, geometry)
+
+            # 3. Save velocity readings as raw data
+            vl_readings = []
+            vs_readings = []
+            for i in range(3):
+                vl_key = f'vl_{i+1}'
+                vs_key = f'vs_{i+1}'
+                if vl_key in self.velocity_vars and self.velocity_vars[vl_key].get():
+                    try:
+                        vl_readings.append(float(self.velocity_vars[vl_key].get()))
+                    except ValueError:
+                        pass
+                if vs_key in self.velocity_vars and self.velocity_vars[vs_key].get():
+                    try:
+                        vs_readings.append(float(self.velocity_vars[vs_key].get()))
+                    except ValueError:
+                        pass
+
+            if vl_readings or vs_readings:
+                raw_data = {
+                    'longitudinal_velocities': vl_readings,
+                    'shear_velocities': vs_readings,
+                }
+                db.save_raw_data(test_id, 'velocities', raw_data)
+
+            # 4. Save results
+            if self.current_results:
+                results_list = []
+                for param_name, result in self.current_results.items():
+                    if hasattr(result, 'value') and hasattr(result, 'uncertainty'):
+                        results_list.append({
+                            'parameter_name': param_name,
+                            'value': result.value,
+                            'uncertainty': result.uncertainty,
+                            'unit': getattr(result, 'unit', ''),
+                            'is_valid': True,
+                        })
+
+                if results_list:
+                    db.save_test_results_batch(test_id, results_list)
+
+            # 5. Save plot if available
+            if hasattr(self, 'fig') and self.fig:
+                buf = io.BytesIO()
+                self.fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+                buf.seek(0)
+                db.save_plot(test_id, buf.read(), description='Elastic Moduli Results')
+
+            self._update_status(f"Saved to database: {cert_num}")
+            messagebox.showinfo("Success", f"Sonic test saved to database:\n{cert_num}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save to database:\n{e}")
+            import traceback
+            traceback.print_exc()
+
+    def load_from_database(self):
+        """Load Sonic test data from database."""
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+
+            db = TestDataDatabase()
+
+            # Get list of available tests
+            cert_numbers = db.get_certificate_numbers_list(test_type='SONIC')
+
+            if not cert_numbers:
+                messagebox.showinfo("Info", "No Sonic tests found in database.")
+                return
+
+            # Create selection dialog
+            dialog = tk.Toplevel(self.root)
+            dialog.title("Load from Database")
+            dialog.geometry("500x400")
+            dialog.transient(self.root)
+            dialog.grab_set()
+
+            # Search frame
+            search_frame = ttk.Frame(dialog, padding=10)
+            search_frame.pack(fill=tk.X)
+
+            ttk.Label(search_frame, text="Search:").pack(side=tk.LEFT)
+            search_var = tk.StringVar()
+            search_entry = ttk.Entry(search_frame, textvariable=search_var, width=30)
+            search_entry.pack(side=tk.LEFT, padx=5)
+
+            # List frame
+            list_frame = ttk.Frame(dialog, padding=10)
+            list_frame.pack(fill=tk.BOTH, expand=True)
+
+            # Create treeview with columns
+            columns = ('certificate', 'date', 'project', 'customer', 'specimen')
+            tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=12)
+
+            tree.heading('certificate', text='Certificate')
+            tree.heading('date', text='Date')
+            tree.heading('project', text='Project')
+            tree.heading('customer', text='Customer')
+            tree.heading('specimen', text='Specimen ID')
+
+            tree.column('certificate', width=120)
+            tree.column('date', width=80)
+            tree.column('project', width=100)
+            tree.column('customer', width=100)
+            tree.column('specimen', width=80)
+
+            scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=tree.yview)
+            tree.configure(yscrollcommand=scrollbar.set)
+
+            tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+            # Populate list
+            def refresh_list(search_term=''):
+                tree.delete(*tree.get_children())
+                if search_term:
+                    tests = db.search_tests(search_term, test_type='SONIC')
+                else:
+                    tests = db.get_all_tests(test_type='SONIC')
+
+                for test in tests:
+                    tree.insert('', tk.END, values=(
+                        test.get('certificate_number', ''),
+                        test.get('test_date', ''),
+                        test.get('test_project', ''),
+                        test.get('customer', ''),
+                        test.get('specimen_id', '')
+                    ))
+
+            refresh_list()
+
+            def on_search(*args):
+                refresh_list(search_var.get())
+
+            search_var.trace('w', on_search)
+
+            # Button frame
+            btn_frame = ttk.Frame(dialog, padding=10)
+            btn_frame.pack(fill=tk.X)
+
+            selected_cert = [None]
+
+            def on_load():
+                selection = tree.selection()
+                if not selection:
+                    messagebox.showwarning("Warning", "Please select a test to load.")
+                    return
+                item = tree.item(selection[0])
+                selected_cert[0] = item['values'][0]
+                dialog.destroy()
+
+            def on_cancel():
+                dialog.destroy()
+
+            ttk.Button(btn_frame, text="Load", command=on_load).pack(side=tk.RIGHT, padx=5)
+            ttk.Button(btn_frame, text="Cancel", command=on_cancel).pack(side=tk.RIGHT)
+
+            # Double-click to load
+            def on_double_click(event):
+                on_load()
+            tree.bind('<Double-1>', on_double_click)
+
+            # Wait for dialog
+            self.root.wait_window(dialog)
+
+            if selected_cert[0]:
+                self._load_test_from_db(selected_cert[0])
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load from database:\n{e}")
+            import traceback
+            traceback.print_exc()
+
+    def _load_test_from_db(self, certificate_number: str):
+        """Load specific Sonic test from database."""
+        try:
+            from utils.database.test_data_db import TestDataDatabase
+
+            self._update_status(f"Loading {certificate_number}...")
+
+            db = TestDataDatabase()
+
+            # Get test record
+            record = db.get_test_record(certificate_number)
+            if not record:
+                messagebox.showerror("Error", f"Test not found: {certificate_number}")
+                return
+
+            test_id = record['id']
+
+            # Load and populate test info
+            self.info_vars['certificate_number'].set(record.get('certificate_number', ''))
+            self.info_vars['test_project'].set(record.get('test_project', ''))
+            self.info_vars['customer'].set(record.get('customer', ''))
+            if 'customer_order' in self.info_vars:
+                self.info_vars['customer_order'].set(record.get('customer_order', ''))
+            if 'product_sn' in self.info_vars:
+                self.info_vars['product_sn'].set(record.get('product_sn', ''))
+            self.info_vars['specimen_id'].set(record.get('specimen_id', ''))
+            if 'location_orientation' in self.info_vars:
+                self.info_vars['location_orientation'].set(record.get('location_orientation', ''))
+            self.info_vars['material'].set(record.get('material', ''))
+            if 'temperature' in self.info_vars:
+                self.info_vars['temperature'].set(record.get('temperature', ''))
+            if 'test_date' in self.info_vars:
+                self.info_vars['test_date'].set(record.get('test_date', ''))
+
+            # Load specimen geometry
+            geometry = db.get_specimen_geometry(test_id)
+            if geometry:
+                spec_type = geometry.get('specimen_type', 'Cylindrical')
+                self.specimen_shape.set(spec_type)
+                self._on_shape_change()
+
+                if geometry.get('mass'):
+                    self.mass_var.set(str(geometry['mass']))
+
+                for key, var in self.dim_vars.items():
+                    val = geometry.get(key)
+                    if val is not None:
+                        var.set(str(val))
+
+            # Load velocity readings
+            raw_data = db.get_raw_data(test_id, 'velocities')
+            if raw_data:
+                vl_readings = raw_data.get('longitudinal_velocities', [])
+                vs_readings = raw_data.get('shear_velocities', [])
+
+                for i, vl in enumerate(vl_readings[:3]):
+                    key = f'vl_{i+1}'
+                    if key in self.velocity_vars:
+                        self.velocity_vars[key].set(str(vl))
+
+                for i, vs in enumerate(vs_readings[:3]):
+                    key = f'vs_{i+1}'
+                    if key in self.velocity_vars:
+                        self.velocity_vars[key].set(str(vs))
+
+            # Load results
+            results = db.get_test_results(test_id)
+            if results:
+                from ..models.test_result import MeasuredValue
+                self.current_results = {}
+
+                for r in results:
+                    param = r.get('parameter_name')
+                    self.current_results[param] = MeasuredValue(
+                        value=r.get('value', 0),
+                        uncertainty=r.get('uncertainty', 0),
+                        unit=r.get('unit', ''),
+                        coverage_factor=r.get('coverage_factor', 2.0)
+                    )
+
+                # Display results
+                self._display_results()
+
+            self._update_status(f"Loaded from database: {certificate_number}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load test:\n{e}")
+            import traceback
+            traceback.print_exc()
 
     def _update_status(self, message: str):
         """Update status bar."""
