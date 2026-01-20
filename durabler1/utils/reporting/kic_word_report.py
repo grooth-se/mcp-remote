@@ -562,6 +562,8 @@ class KICReportGenerator:
         data['test_standard'] = 'ASTM E399'
         data['test_equipment'] = 'MTS Landmark 500kN'
         data['test_temperature'] = test_info.get('temperature', '23')
+        data['temperature'] = test_info.get('temperature', '23')
+        data['operator'] = test_info.get('operator', '')
 
         # Specimen geometry
         data['specimen_type'] = specimen_data.get('specimen_type', 'C(T)')
@@ -638,6 +640,7 @@ class KICReportGenerator:
         else:
             data['P_ratio'] = '-'
             data['P_ratio_valid'] = '-'
+        data['P_ratio_req'] = '≤ 1.10'  # E399 requirement
 
         # Compliance
         compliance = results.get('compliance')
@@ -719,6 +722,17 @@ class KICReportGenerator:
             raise FileNotFoundError(f"Template not found: {self.template_path}")
 
         doc = Document(self.template_path)
+
+        # Replace placeholders in page headers
+        for section in doc.sections:
+            header = section.header
+            for paragraph in header.paragraphs:
+                self._replace_in_paragraph(paragraph, data, chart_path, logo_path, photo_paths)
+            for table in header.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            self._replace_in_paragraph(paragraph, data, chart_path, logo_path, photo_paths)
 
         # Replace placeholders in paragraphs
         for paragraph in doc.paragraphs:

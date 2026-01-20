@@ -213,13 +213,13 @@ def create_kic_template():
         cell.paragraphs[0].runs[0].bold = True
 
     results_data = [
-        ("Maximum Force (Pₘₐₓ)", "{{P_max}}", "{{P_max_uncertainty}}", "{{P_max_req}}", "kN"),
-        ("Conditional Force (P_Q)", "{{P_Q}}", "{{P_Q_uncertainty}}", "{{P_Q_req}}", "kN"),
+        ("Maximum Force (Pₘₐₓ)", "{{P_max_value}}", "{{P_max_uncertainty}}", "{{P_max_req}}", "kN"),
+        ("Conditional Force (P_Q)", "{{P_Q_value}}", "{{P_Q_uncertainty}}", "{{P_Q_req}}", "kN"),
         ("Pₘₐₓ/P_Q Ratio", "{{P_ratio}}", "-", "{{P_ratio_req}}", "-"),
-        ("Conditional K_Q", "{{K_Q}}", "{{K_Q_uncertainty}}", "{{K_Q_req}}", "MPa√m"),
-        ("Fracture Toughness K_IC", "{{K_IC}}", "{{K_IC_uncertainty}}", "{{K_IC_req}}", "MPa√m"),
+        ("Conditional K_Q", "{{K_Q_value}}", "{{K_Q_uncertainty}}", "{{K_Q_req}}", "MPa√m"),
+        ("Fracture Toughness K_IC", "{{K_IC_value}}", "{{K_IC_uncertainty}}", "{{K_IC_req}}", "MPa√m"),
         ("Initial Compliance", "{{compliance}}", "-", "-", "mm/kN"),
-        ("Validity Status", "{{is_valid}}", "-", "-", "-"),
+        ("Validity Status", "{{validity_status}}", "-", "-", "-"),
     ]
 
     for i, row_data in enumerate(results_data):
@@ -235,6 +235,14 @@ def create_kic_template():
 
     chart_para = doc.add_paragraph("{{chart}}")
     chart_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph()
+
+    # === FRACTURE SURFACE PHOTO ===
+    doc.add_paragraph("FRACTURE SURFACE").runs[0].bold = True
+
+    photo_para = doc.add_paragraph("{{photos}}")
+    photo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     doc.add_paragraph()
 
