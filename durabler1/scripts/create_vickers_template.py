@@ -178,12 +178,12 @@ def create_vickers_template():
     # === TEST RESULTS TABLE ===
     doc.add_paragraph("TEST RESULTS").runs[0].bold = True
 
-    results_table = doc.add_table(rows=7, cols=4)
+    results_table = doc.add_table(rows=7, cols=5)
     results_table.style = 'Table Grid'
 
     # Header row
     header_row = results_table.rows[0]
-    headers = ["Parameter", "Value", "Uncertainty U (k=2)", "Unit"]
+    headers = ["Parameter", "Value", "U (k=2)", "Requirement", "Unit"]
     for j, header in enumerate(headers):
         cell = header_row.cells[j]
         cell.text = header
@@ -191,12 +191,12 @@ def create_vickers_template():
         cell.paragraphs[0].runs[0].bold = True
 
     results_data = [
-        ("Mean Hardness", "{{mean_hardness}}", "± {{uncertainty}}", "{{unit}}"),
-        ("Standard Deviation", "{{std_dev}}", "-", "{{unit}}"),
-        ("Range (Max - Min)", "{{range}}", "-", "{{unit}}"),
-        ("Minimum Value", "{{min_value}}", "-", "{{unit}}"),
-        ("Maximum Value", "{{max_value}}", "-", "{{unit}}"),
-        ("Number of Readings", "{{n_readings}}", "-", "-"),
+        ("Mean Hardness", "{{mean_hardness}}", "± {{uncertainty}}", "{{hardness_req}}", "{{unit}}"),
+        ("Standard Deviation", "{{std_dev}}", "-", "-", "{{unit}}"),
+        ("Range (Max - Min)", "{{range}}", "-", "-", "{{unit}}"),
+        ("Minimum Value", "{{min_value}}", "-", "-", "{{unit}}"),
+        ("Maximum Value", "{{max_value}}", "-", "-", "{{unit}}"),
+        ("Number of Readings", "{{n_readings}}", "-", "-", "-"),
     ]
 
     for i, row_data in enumerate(results_data):

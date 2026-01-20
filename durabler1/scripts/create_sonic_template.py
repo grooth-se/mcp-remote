@@ -232,11 +232,11 @@ def create_template():
     results_heading = doc.add_paragraph()
     results_heading.add_run("Test Results").bold = True
 
-    results_table = doc.add_table(rows=7, cols=4)
+    results_table = doc.add_table(rows=7, cols=5)
     results_table.style = 'Table Grid'
 
     # Header row
-    res_headers = ["Parameter", "Value", "U (k=2)", "Unit"]
+    res_headers = ["Parameter", "Value", "U (k=2)", "Requirement", "Unit"]
     for i, header in enumerate(res_headers):
         cell = results_table.rows[0].cells[i]
         cell.text = header
@@ -246,12 +246,12 @@ def create_template():
 
     # Results rows
     results_data = [
-        ("Poisson's Ratio (ν)", "{{poissons_ratio}}", "{{poissons_ratio_unc}}", "-"),
-        ("Shear Modulus (G)", "{{shear_modulus}}", "{{shear_modulus_unc}}", "GPa"),
-        ("Young's Modulus (E)", "{{youngs_modulus}}", "{{youngs_modulus_unc}}", "GPa"),
-        ("Flexural Frequency (ff)", "{{flexural_frequency}}", "{{flexural_frequency_unc}}", "Hz"),
-        ("Torsional Frequency (ft)", "{{torsional_frequency}}", "{{torsional_frequency_unc}}", "Hz"),
-        ("Validity", "{{validity_status}}", "-", "-"),
+        ("Poisson's Ratio (ν)", "{{poissons_ratio}}", "{{poissons_ratio_unc}}", "{{poissons_ratio_req}}", "-"),
+        ("Shear Modulus (G)", "{{shear_modulus}}", "{{shear_modulus_unc}}", "{{shear_modulus_req}}", "GPa"),
+        ("Young's Modulus (E)", "{{youngs_modulus}}", "{{youngs_modulus_unc}}", "{{youngs_modulus_req}}", "GPa"),
+        ("Flexural Frequency (ff)", "{{flexural_frequency}}", "{{flexural_frequency_unc}}", "-", "Hz"),
+        ("Torsional Frequency (ft)", "{{torsional_frequency}}", "{{torsional_frequency_unc}}", "-", "Hz"),
+        ("Validity", "{{validity_status}}", "-", "-", "-"),
     ]
 
     for i, row_data in enumerate(results_data):

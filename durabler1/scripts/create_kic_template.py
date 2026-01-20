@@ -216,31 +216,32 @@ def create_kic_template():
 
     # Results section
     doc.add_heading('4. Test Results', level=1)
-    table = doc.add_table(rows=8, cols=4)
+    table = doc.add_table(rows=8, cols=5)
     table.style = 'Table Grid'
 
     # Header
-    result_headers = ['Parameter', 'Value', 'U (k=2)', 'Unit']
+    result_headers = ['Parameter', 'Value', 'U (k=2)', 'Requirement', 'Unit']
     for i, header in enumerate(result_headers):
         table.rows[0].cells[i].text = header
         table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
         set_cell_shading(table.rows[0].cells[i], 'D9D9D9')
 
     result_fields = [
-        ('Maximum Force P_max', '{{P_max}}', '±{{P_max_uncertainty}}', 'kN'),
-        ('Conditional Force P_Q', '{{P_Q}}', '±{{P_Q_uncertainty}}', 'kN'),
-        ('P_max/P_Q Ratio', '{{P_ratio}}', '-', '-'),
-        ('Conditional K_Q', '{{K_Q}}', '±{{K_Q_uncertainty}}', 'MPa√m'),
-        ('Fracture Toughness K_IC', '{{K_IC}}', '±{{K_IC_uncertainty}}', 'MPa√m'),
-        ('Initial Compliance', '{{compliance}}', '-', 'mm/kN'),
-        ('Validity Status', '{{is_valid}}', '-', '-'),
+        ('Maximum Force P_max', '{{P_max}}', '±{{P_max_uncertainty}}', '{{P_max_req}}', 'kN'),
+        ('Conditional Force P_Q', '{{P_Q}}', '±{{P_Q_uncertainty}}', '{{P_Q_req}}', 'kN'),
+        ('P_max/P_Q Ratio', '{{P_ratio}}', '-', '{{P_ratio_req}}', '-'),
+        ('Conditional K_Q', '{{K_Q}}', '±{{K_Q_uncertainty}}', '{{K_Q_req}}', 'MPa√m'),
+        ('Fracture Toughness K_IC', '{{K_IC}}', '±{{K_IC_uncertainty}}', '{{K_IC_req}}', 'MPa√m'),
+        ('Initial Compliance', '{{compliance}}', '-', '-', 'mm/kN'),
+        ('Validity Status', '{{is_valid}}', '-', '-', '-'),
     ]
 
-    for i, (param, value, unc, unit) in enumerate(result_fields):
+    for i, (param, value, unc, req, unit) in enumerate(result_fields):
         table.rows[i+1].cells[0].text = param
         table.rows[i+1].cells[1].text = value
         table.rows[i+1].cells[2].text = unc
-        table.rows[i+1].cells[3].text = unit
+        table.rows[i+1].cells[3].text = req
+        table.rows[i+1].cells[4].text = unit
 
     doc.add_paragraph()
 

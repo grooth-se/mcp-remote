@@ -176,12 +176,12 @@ def create_tensile_template():
     # === TEST RESULTS TABLE ===
     doc.add_paragraph("TEST RESULTS").runs[0].bold = True
 
-    results_table = doc.add_table(rows=8, cols=4)
+    results_table = doc.add_table(rows=9, cols=5)
     results_table.style = 'Table Grid'
 
     # Header row
     header_row = results_table.rows[0]
-    headers = ["Parameter", "Value", "Uncertainty U (k=2)", "Unit"]
+    headers = ["Parameter", "Value", "U (k=2)", "Requirement", "Unit"]
     for j, header in enumerate(headers):
         cell = header_row.cells[j]
         cell.text = header
@@ -189,13 +189,14 @@ def create_tensile_template():
         cell.paragraphs[0].runs[0].bold = True
 
     results_data = [
-        ("Young's Modulus (E)", "{{E}}", "{{E_uncertainty}}", "GPa"),
-        ("Yield Strength (Rp0.2)", "{{Rp02}}", "{{Rp02_uncertainty}}", "MPa"),
-        ("Upper Yield (ReH)", "{{ReH}}", "{{ReH_uncertainty}}", "MPa"),
-        ("Lower Yield (ReL)", "{{ReL}}", "{{ReL_uncertainty}}", "MPa"),
-        ("Tensile Strength (Rm)", "{{Rm}}", "{{Rm_uncertainty}}", "MPa"),
-        ("Elongation A5 (L1-L0)", "{{A5_value}}", "{{A5_uncertainty}}", "%"),
-        ("Reduction of Area (Z)", "{{Z}}", "{{Z_uncertainty}}", "%"),
+        ("Young's Modulus (E)", "{{E}}", "{{E_uncertainty}}", "{{E_req}}", "GPa"),
+        ("Yield Strength (Rp0.2)", "{{Rp02}}", "{{Rp02_uncertainty}}", "{{Rp02_req}}", "MPa"),
+        ("Upper Yield (ReH)", "{{ReH}}", "{{ReH_uncertainty}}", "{{ReH_req}}", "MPa"),
+        ("Lower Yield (ReL)", "{{ReL}}", "{{ReL_uncertainty}}", "{{ReL_req}}", "MPa"),
+        ("Tensile Strength (Rm)", "{{Rm}}", "{{Rm_uncertainty}}", "{{Rm_req}}", "MPa"),
+        ("Rp0.2/Rm Ratio", "{{yield_tensile_ratio}}", "-", "{{ratio_req}}", "-"),
+        ("Elongation A5 (L1-L0)", "{{A5_value}}", "{{A5_uncertainty}}", "{{A5_req}}", "%"),
+        ("Reduction of Area (Z)", "{{Z}}", "{{Z_uncertainty}}", "{{Z_req}}", "%"),
     ]
 
     for i, row_data in enumerate(results_data):

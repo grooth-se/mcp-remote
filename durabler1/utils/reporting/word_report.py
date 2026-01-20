@@ -267,6 +267,7 @@ class TensileReportGenerator:
         else:
             data['E'] = '-'
             data['E_uncertainty'] = '-'
+        data['E_req'] = requirements.get('E', '-')
 
         # Yield strengths - show values only for selected method
         # Template uses {{Rp02}}, {{Rp02_uncertainty}}, etc.
@@ -410,6 +411,7 @@ class TensileReportGenerator:
                     data['yield_tensile_ratio'] = '-'
         else:
             data['yield_tensile_ratio'] = '-'
+        data['ratio_req'] = requirements.get('ratio', '-')
 
         # Validity notes
         data['validity_statement'] = 'The test results comply with the requirements and are considered valid.'
