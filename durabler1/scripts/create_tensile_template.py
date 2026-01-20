@@ -1,15 +1,14 @@
 """
-Create Vickers Hardness Report Template for ASTM E92.
+Create Tensile Test Report Template for ASTM E8/E8M.
 
 This script creates a Word document template with placeholders
-for the Vickers hardness test report, matching the Tensile report style.
+for the tensile test report, with consistent layout matching other reports.
 """
 
 from pathlib import Path
 from docx import Document
 from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
@@ -19,6 +18,24 @@ def set_cell_shading(cell, color):
     shading = OxmlElement('w:shd')
     shading.set(qn('w:fill'), color)
     cell._tc.get_or_add_tcPr().append(shading)
+
+
+def add_page_number_field(paragraph):
+    """Add a PAGE field to the paragraph."""
+    run = paragraph.add_run()
+    fldChar1 = OxmlElement('w:fldChar')
+    fldChar1.set(qn('w:fldCharType'), 'begin')
+
+    instrText = OxmlElement('w:instrText')
+    instrText.set(qn('xml:space'), 'preserve')
+    instrText.text = "PAGE"
+
+    fldChar2 = OxmlElement('w:fldChar')
+    fldChar2.set(qn('w:fldCharType'), 'end')
+
+    run._r.append(fldChar1)
+    run._r.append(instrText)
+    run._r.append(fldChar2)
 
 
 def add_page_header(doc):
@@ -51,27 +68,7 @@ def add_page_header(doc):
     page_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     page_run = page_para.add_run("Page ")
     page_run.font.size = Pt(9)
-
-    # Add page number field
     add_page_number_field(page_para)
-
-
-def add_page_number_field(paragraph):
-    """Add a PAGE field to the paragraph."""
-    run = paragraph.add_run()
-    fldChar1 = OxmlElement('w:fldChar')
-    fldChar1.set(qn('w:fldCharType'), 'begin')
-
-    instrText = OxmlElement('w:instrText')
-    instrText.set(qn('xml:space'), 'preserve')
-    instrText.text = "PAGE"
-
-    fldChar2 = OxmlElement('w:fldChar')
-    fldChar2.set(qn('w:fldCharType'), 'end')
-
-    run._r.append(fldChar1)
-    run._r.append(instrText)
-    run._r.append(fldChar2)
 
 
 def add_page_footer(doc):
@@ -95,15 +92,15 @@ def add_page_footer(doc):
     footer_run.italic = True
 
 
-def create_vickers_template():
-    """Create Vickers hardness report template."""
+def create_tensile_template():
+    """Create Tensile test report template."""
     doc = Document()
 
     # Set narrow margins
     sections = doc.sections
     for section in sections:
-        section.top_margin = Cm(2.5)  # Extra space for header
-        section.bottom_margin = Cm(2.5)  # Extra space for footer
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(2.5)
         section.left_margin = Cm(2)
         section.right_margin = Cm(2)
         section.header_distance = Cm(0.5)
@@ -118,50 +115,28 @@ def create_vickers_template():
     # === TITLE ===
     title_para = doc.add_paragraph()
     title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title_run = title_para.add_run("VICKERS HARDNESS TEST REPORT")
+    title_run = title_para.add_run("TENSILE TEST REPORT")
     title_run.bold = True
     title_run.font.size = Pt(14)
 
     subtitle_para = doc.add_paragraph()
     subtitle_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    subtitle_para.add_run("ASTM E92 / ISO 6507-1")
-
-    doc.add_paragraph()
-
-    # === REPORT INFORMATION TABLE ===
-    doc.add_paragraph("REPORT INFORMATION").runs[0].bold = True
-
-    report_table = doc.add_table(rows=2, cols=4)
-    report_table.style = 'Table Grid'
-
-    report_data = [
-        ("Report Number:", "{{report_number}}", "Report Date:", "{{report_date}}"),
-        ("Load Level:", "{{load_level}}", "", ""),
-    ]
-
-    for i, row_data in enumerate(report_data):
-        row = report_table.rows[i]
-        for j, text in enumerate(row_data):
-            cell = row.cells[j]
-            cell.text = text
-            if j % 2 == 0 and text:  # Labels
-                set_cell_shading(cell, "D9D9D9")
-                if cell.paragraphs[0].runs:
-                    cell.paragraphs[0].runs[0].bold = True
+    subtitle_para.add_run("ASTM E8/E8M / ISO 6892-1")
 
     doc.add_paragraph()
 
     # === TEST INFORMATION TABLE (no certificate number) ===
     doc.add_paragraph("TEST INFORMATION").runs[0].bold = True
 
-    info_table = doc.add_table(rows=4, cols=4)
+    info_table = doc.add_table(rows=5, cols=4)
     info_table.style = 'Table Grid'
 
     info_data = [
         ("Test Project:", "{{test_project}}", "Customer:", "{{customer}}"),
         ("Specimen ID:", "{{specimen_id}}", "Material:", "{{material}}"),
         ("Test Date:", "{{test_date}}", "Operator:", "{{operator}}"),
-        ("Test Standard:", "ASTM E92", "Equipment:", "Vickers Hardness Tester"),
+        ("Test Standard:", "{{test_standard}}", "Temperature:", "{{temperature}} °C"),
+        ("Test Equipment:", "{{test_equipment}}", "Strain Source:", "{{strain_source}}"),
     ]
 
     for i, row_data in enumerate(info_data):
@@ -175,10 +150,33 @@ def create_vickers_template():
 
     doc.add_paragraph()
 
+    # === SPECIMEN GEOMETRY TABLE ===
+    doc.add_paragraph("SPECIMEN GEOMETRY").runs[0].bold = True
+
+    geom_table = doc.add_table(rows=3, cols=4)
+    geom_table.style = 'Table Grid'
+
+    geom_data = [
+        ("Specimen Type:", "{{specimen_type}}", "Gauge Length (mm):", "{{gauge_length}}"),
+        ("Width (mm):", "{{width}}", "Thickness (mm):", "{{thickness}}"),
+        ("Diameter (mm):", "{{diameter}}", "Cross-Section Area (mm²):", "{{cross_section_area}}"),
+    ]
+
+    for i, row_data in enumerate(geom_data):
+        row = geom_table.rows[i]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
+            if j % 2 == 0:  # Labels
+                set_cell_shading(cell, "D9D9D9")
+                cell.paragraphs[0].runs[0].bold = True
+
+    doc.add_paragraph()
+
     # === TEST RESULTS TABLE ===
     doc.add_paragraph("TEST RESULTS").runs[0].bold = True
 
-    results_table = doc.add_table(rows=7, cols=4)
+    results_table = doc.add_table(rows=13, cols=4)
     results_table.style = 'Table Grid'
 
     # Header row
@@ -191,12 +189,18 @@ def create_vickers_template():
         cell.paragraphs[0].runs[0].bold = True
 
     results_data = [
-        ("Mean Hardness", "{{mean_hardness}}", "± {{uncertainty}}", "{{unit}}"),
-        ("Standard Deviation", "{{std_dev}}", "-", "{{unit}}"),
-        ("Range (Max - Min)", "{{range}}", "-", "{{unit}}"),
-        ("Minimum Value", "{{min_value}}", "-", "{{unit}}"),
-        ("Maximum Value", "{{max_value}}", "-", "{{unit}}"),
-        ("Number of Readings", "{{n_readings}}", "-", "-"),
+        ("Young's Modulus (E)", "{{E}}", "{{E_uncertainty}}", "GPa"),
+        ("Yield Strength (Rp0.2)", "{{Rp02}}", "{{Rp02_uncertainty}}", "MPa"),
+        ("Upper Yield (ReH)", "{{ReH}}", "{{ReH_uncertainty}}", "MPa"),
+        ("Lower Yield (ReL)", "{{ReL}}", "{{ReL_uncertainty}}", "MPa"),
+        ("Tensile Strength (Rm)", "{{Rm}}", "{{Rm_uncertainty}}", "MPa"),
+        ("Elongation at Fracture (A)", "{{A}}", "{{A_uncertainty}}", "%"),
+        ("Uniform Elongation (Ag)", "{{Ag}}", "{{Ag_uncertainty}}", "%"),
+        ("Reduction of Area (Z)", "{{Z}}", "{{Z_uncertainty}}", "%"),
+        ("Stress Rate at Yield", "{{stress_rate_yield}}", "-", "MPa/s"),
+        ("Strain Rate at Yield", "{{strain_rate_yield}}", "-", "1/s"),
+        ("Stress Rate at Rm", "{{stress_rate_rm}}", "-", "MPa/s"),
+        ("Strain Rate at Rm", "{{strain_rate_rm}}", "-", "1/s"),
     ]
 
     for i, row_data in enumerate(results_data):
@@ -207,52 +211,18 @@ def create_vickers_template():
 
     doc.add_paragraph()
 
-    # === UNCERTAINTY BUDGET TABLE ===
-    doc.add_paragraph("UNCERTAINTY BUDGET (ISO 17025 / GUM)").runs[0].bold = True
-
-    unc_table = doc.add_table(rows=7, cols=3)
-    unc_table.style = 'Table Grid'
-
-    # Header row
-    unc_headers = ["Source", "Type", "Value (HV)"]
-    for j, header in enumerate(unc_headers):
-        cell = unc_table.rows[0].cells[j]
-        cell.text = header
-        set_cell_shading(cell, "D9D9D9")
-        cell.paragraphs[0].runs[0].bold = True
-
-    unc_data = [
-        ("Repeatability (std of mean)", "A", "{{u_A}}"),
-        ("Machine calibration", "B", "{{u_machine}}"),
-        ("Diagonal measurement", "B", "{{u_diagonal}}"),
-        ("Force application", "B", "{{u_force}}"),
-        ("Combined standard uncertainty", "-", "{{u_combined}}"),
-        ("Expanded uncertainty (k={{k}})", "-", "{{U_expanded}}"),
-    ]
-
-    for i, row_data in enumerate(unc_data):
-        row = unc_table.rows[i + 1]
-        for j, text in enumerate(row_data):
-            cell = row.cells[j]
-            cell.text = text
-            if i >= 4:  # Highlight combined/expanded rows
-                set_cell_shading(cell, "FFF2CC")
-
-    doc.add_paragraph()
-
-    # === HARDNESS PROFILE CHART ===
-    doc.add_paragraph("HARDNESS PROFILE").runs[0].bold = True
+    # === STRESS-STRAIN CURVE ===
+    doc.add_paragraph("STRESS-STRAIN CURVE").runs[0].bold = True
 
     chart_para = doc.add_paragraph("{{chart}}")
     chart_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     doc.add_paragraph()
 
-    # === INDENT PHOTOGRAPH ===
-    doc.add_paragraph("INDENT PHOTOGRAPH").runs[0].bold = True
+    # === VALIDITY NOTES ===
+    doc.add_paragraph("NOTES").runs[0].bold = True
 
-    photo_para = doc.add_paragraph("{{photo}}")
-    photo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    notes_para = doc.add_paragraph("{{validity_notes}}")
 
     doc.add_paragraph()
 
@@ -271,9 +241,9 @@ def create_vickers_template():
             cell.paragraphs[0].runs[0].bold = True
 
     sig_rows = [
-        ("Tested by:", "", ""),
-        ("Reviewed by:", "", ""),
-        ("Approved by:", "", ""),
+        ("Tested by:", "{{tested_by}}", "{{tested_date}}"),
+        ("Reviewed by:", "{{reviewed_by}}", "{{reviewed_date}}"),
+        ("Approved by:", "{{approved_by}}", "{{approved_date}}"),
     ]
 
     for i, row_data in enumerate(sig_rows, start=1):
@@ -288,7 +258,7 @@ def create_vickers_template():
     # Save template
     template_dir = Path(__file__).parent.parent / "templates"
     template_dir.mkdir(exist_ok=True)
-    template_path = template_dir / "vickers_e92_report_template.docx"
+    template_path = template_dir / "tensile_report_template.docx"
     doc.save(template_path)
 
     print(f"Template created: {template_path}")
@@ -296,4 +266,4 @@ def create_vickers_template():
 
 
 if __name__ == "__main__":
-    create_vickers_template()
+    create_tensile_template()

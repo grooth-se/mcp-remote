@@ -71,6 +71,17 @@ class VickersReportGenerator:
         # Prepare replacement data
         data = self._prepare_report_data(test_info, results, uncertainty_budget)
 
+        # Replace placeholders in page headers
+        for section in doc.sections:
+            header = section.header
+            for paragraph in header.paragraphs:
+                self._replace_placeholders(paragraph, data)
+            for table in header.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            self._replace_placeholders(paragraph, data)
+
         # Replace placeholders in paragraphs
         for paragraph in doc.paragraphs:
             self._replace_placeholders(paragraph, data)
@@ -82,7 +93,7 @@ class VickersReportGenerator:
                     for paragraph in cell.paragraphs:
                         self._replace_placeholders(paragraph, data)
 
-        # Insert logo
+        # Insert logo in header
         if logo_path and logo_path.exists():
             self._insert_logo(doc, logo_path)
 
@@ -167,16 +178,37 @@ class VickersReportGenerator:
 
     def _insert_logo(self, doc: Document, logo_path: Path):
         """Insert logo at {{logo}} placeholder."""
-        # Check paragraphs first
+        # Check page header first (new template location)
+        for section in doc.sections:
+            header = section.header
+            for paragraph in header.paragraphs:
+                if '{{logo}}' in paragraph.text:
+                    paragraph.clear()
+                    run = paragraph.add_run()
+                    run.add_picture(str(logo_path), height=Cm(1.5))
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                    return
+            for table in header.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            if '{{logo}}' in paragraph.text:
+                                paragraph.clear()
+                                run = paragraph.add_run()
+                                run.add_picture(str(logo_path), height=Cm(1.5))
+                                paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                                return
+
+        # Check body paragraphs
         for paragraph in doc.paragraphs:
             if '{{logo}}' in paragraph.text:
                 paragraph.clear()
                 run = paragraph.add_run()
-                run.add_picture(str(logo_path), width=Inches(1.5))
+                run.add_picture(str(logo_path), height=Cm(1.5))
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 return
 
-        # Check tables (logo is in header table)
+        # Check body tables
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
@@ -184,7 +216,7 @@ class VickersReportGenerator:
                         if '{{logo}}' in paragraph.text:
                             paragraph.clear()
                             run = paragraph.add_run()
-                            run.add_picture(str(logo_path), width=Inches(1.5))
+                            run.add_picture(str(logo_path), height=Cm(1.5))
                             paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
                             return
 

@@ -1,11 +1,12 @@
 """
-Script to create the Sonic Resonance (E1875) report Word template.
+Script to create the CTOD E1290 report Word template.
 """
 
 from pathlib import Path
 from docx import Document
-from docx.shared import Inches, Cm, Pt
+from docx.shared import Inches, Cm, Pt, Twips
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
@@ -18,7 +19,8 @@ def set_cell_shading(cell, color):
 
 
 def set_table_column_widths(table, widths_inches):
-    """Set column widths for a table."""
+    """Set column widths for a table using XML for reliable results."""
+    # Disable auto-fit
     tbl = table._tbl
     tblPr = tbl.tblPr if tbl.tblPr is not None else OxmlElement('w:tblPr')
     tblLayout = OxmlElement('w:tblLayout')
@@ -27,6 +29,7 @@ def set_table_column_widths(table, widths_inches):
     if tbl.tblPr is None:
         tbl.insert(0, tblPr)
 
+    # Set widths for each cell in each row
     for row in table.rows:
         for idx, width in enumerate(widths_inches):
             if idx < len(row.cells):
@@ -34,7 +37,7 @@ def set_table_column_widths(table, widths_inches):
                 tc = cell._tc
                 tcPr = tc.get_or_add_tcPr()
                 tcW = OxmlElement('w:tcW')
-                tcW.set(qn('w:w'), str(int(width * 1440)))
+                tcW.set(qn('w:w'), str(int(width * 1440)))  # 1440 twips per inch
                 tcW.set(qn('w:type'), 'dxa')
                 existing = tcPr.find(qn('w:tcW'))
                 if existing is not None:
@@ -132,13 +135,14 @@ def create_template():
 
     # Title
     title_para = doc.add_paragraph()
-    title_run = title_para.add_run("SONIC RESONANCE TEST REPORT")
+    title_run = title_para.add_run("CTOD TEST REPORT")
     title_run.bold = True
     title_run.font.size = Pt(16)
     title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+    # Add standard reference below title
     std_para = doc.add_paragraph()
-    std_run = std_para.add_run("Modified ASTM E1875 - Ultrasonic Method")
+    std_run = std_para.add_run("ASTM E1290 / BS 7448")
     std_run.font.size = Pt(11)
     std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
@@ -155,8 +159,8 @@ def create_template():
         ("Test Project:", "{{test_project}}", "Customer:", "{{customer}}"),
         ("Customer Order:", "{{customer_order}}", "Test Date:", "{{test_date}}"),
         ("Product/S/N:", "{{product_sn}}", "Test Standard:", "{{test_standard}}"),
-        ("Material:", "{{material}}", "Specimen ID:", "{{specimen_id}}"),
-        ("Location/Orient.:", "{{location_orientation}}", "Test Temperature:", "{{temperature}} °C"),
+        ("Material/HT:", "{{material}}", "Specimen ID:", "{{specimen_id}}"),
+        ("Location/Orient.:", "{{location_orientation}}", "Test Temperature:", "{{test_temperature}} °C"),
         ("Test Equipment:", "{{test_equipment}}", "", ""),
     ]
 
@@ -165,22 +169,24 @@ def create_template():
         for j, text in enumerate(row_data):
             cell = row.cells[j]
             cell.text = text
-            if j % 2 == 0 and text:
+            if j % 2 == 0 and text:  # Labels
                 cell.paragraphs[0].runs[0].bold = True
                 set_cell_shading(cell, 'E8E8E8')
 
     doc.add_paragraph()
 
-    # Specimen Geometry Table
+    # Specimen Dimensions Table
     dim_heading = doc.add_paragraph()
     dim_heading.add_run("Specimen Geometry").bold = True
 
-    dim_table = doc.add_table(rows=2, cols=6)
+    dim_table = doc.add_table(rows=4, cols=6)
     dim_table.style = 'Table Grid'
 
     dim_data = [
-        ("Type:", "{{specimen_type}}", "Diameter (mm):", "{{diameter}}", "Side (mm):", "{{side_length}}"),
-        ("Length (mm):", "{{length}}", "Mass (g):", "{{mass}}", "Density (kg/m³):", "{{density}}"),
+        ("Type:", "{{specimen_type}}", "W (mm):", "{{W}}", "B (mm):", "{{B}}"),
+        ("Bₙ (mm):", "{{B_n}}", "a₀ (mm):", "{{a_0}}", "S (mm):", "{{S}}"),
+        ("a₀/W:", "{{a_W_ratio}}", "aᶠ (mm):", "{{a_f}}", "Δa (mm):", "{{delta_a}}"),
+        ("Notch Type:", "{{notch_type}}", "Side Grooves:", "{{side_grooves}}", "", ""),
     ]
 
     for i, row_data in enumerate(dim_data):
@@ -188,43 +194,32 @@ def create_template():
         for j, text in enumerate(row_data):
             cell = row.cells[j]
             cell.text = text
-            if j % 2 == 0 and text:
+            if j % 2 == 0 and text:  # Labels
                 cell.paragraphs[0].runs[0].bold = True
                 set_cell_shading(cell, 'E8E8E8')
 
     doc.add_paragraph()
 
-    # Velocity Measurements Table
-    vel_heading = doc.add_paragraph()
-    vel_heading.add_run("Ultrasonic Velocity Measurements").bold = True
+    # Material Properties Table
+    mat_heading = doc.add_paragraph()
+    mat_heading.add_run("Material Properties").bold = True
 
-    vel_table = doc.add_table(rows=3, cols=5)
-    vel_table.style = 'Table Grid'
+    mat_table = doc.add_table(rows=2, cols=6)
+    mat_table.style = 'Table Grid'
 
-    # Header row
-    vel_headers = ["Wave Type", "V₁ (m/s)", "V₂ (m/s)", "V₃ (m/s)", "Average (m/s)"]
-    for i, header in enumerate(vel_headers):
-        cell = vel_table.rows[0].cells[i]
-        cell.text = header
-        cell.paragraphs[0].runs[0].bold = True
-        set_cell_shading(cell, 'D0D0D0')
-        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    mat_data = [
+        ("σᵧₛ (MPa):", "{{yield_strength}}", "σᵤₜₛ (MPa):", "{{ultimate_strength}}", "E (GPa):", "{{youngs_modulus}}"),
+        ("ν:", "{{poissons_ratio}}", "", "", "", ""),
+    ]
 
-    # Longitudinal row
-    long_data = ["Longitudinal (Vl)", "{{vl1}}", "{{vl2}}", "{{vl3}}", "{{vl_avg}}"]
-    for i, text in enumerate(long_data):
-        cell = vel_table.rows[1].cells[i]
-        cell.text = text
-        if i == 0:
-            set_cell_shading(cell, 'F0F0F0')
-
-    # Shear row
-    shear_data = ["Shear (Vs)", "{{vs1}}", "{{vs2}}", "{{vs3}}", "{{vs_avg}}"]
-    for i, text in enumerate(shear_data):
-        cell = vel_table.rows[2].cells[i]
-        cell.text = text
-        if i == 0:
-            set_cell_shading(cell, 'F0F0F0')
+    for i, row_data in enumerate(mat_data):
+        row = mat_table.rows[i]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
+            if j % 2 == 0 and text:  # Labels
+                cell.paragraphs[0].runs[0].bold = True
+                set_cell_shading(cell, 'E8E8E8')
 
     doc.add_paragraph()
 
@@ -232,26 +227,33 @@ def create_template():
     results_heading = doc.add_paragraph()
     results_heading.add_run("Test Results").bold = True
 
-    results_table = doc.add_table(rows=7, cols=4)
+    results_table = doc.add_table(rows=9, cols=6)
     results_table.style = 'Table Grid'
 
+    # Set column widths (added Requirement column)
+    widths = [2.0, 0.65, 0.65, 0.6, 1.2, 0.8]
+    set_table_column_widths(results_table, widths)
+
     # Header row
-    res_headers = ["Parameter", "Value", "U (k=2)", "Unit"]
-    for i, header in enumerate(res_headers):
-        cell = results_table.rows[0].cells[i]
+    header_row = results_table.rows[0]
+    headers = ["Parameter", "Value", "U (k=2)", "Unit", "Requirement", "Validity"]
+    for i, header in enumerate(headers):
+        cell = header_row.cells[i]
         cell.text = header
         cell.paragraphs[0].runs[0].bold = True
         set_cell_shading(cell, 'D0D0D0')
         cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    # Results rows
+    # Results rows (added requirement column placeholder)
     results_data = [
-        ("Poisson's Ratio (ν)", "{{poissons_ratio}}", "{{poissons_ratio_unc}}", "-"),
-        ("Shear Modulus (G)", "{{shear_modulus}}", "{{shear_modulus_unc}}", "GPa"),
-        ("Young's Modulus (E)", "{{youngs_modulus}}", "{{youngs_modulus_unc}}", "GPa"),
-        ("Flexural Frequency (ff)", "{{flexural_frequency}}", "{{flexural_frequency_unc}}", "Hz"),
-        ("Torsional Frequency (ft)", "{{torsional_frequency}}", "{{torsional_frequency_unc}}", "Hz"),
-        ("Validity", "{{validity_status}}", "-", "-"),
+        ("Pₘₐₓ (Maximum Force)", "{{P_max_value}}", "{{P_max_uncertainty}}", "kN", "{{P_max_req}}", "-"),
+        ("CMOD at Pₘₐₓ", "{{CMOD_max_value}}", "{{CMOD_max_uncertainty}}", "mm", "{{CMOD_max_req}}", "-"),
+        ("K at Pₘₐₓ", "{{K_max_value}}", "{{K_max_uncertainty}}", "MPa√m", "{{K_max_req}}", "-"),
+        ("δc (CTOD at cleavage)", "{{delta_c_value}}", "{{delta_c_uncertainty}}", "mm", "{{delta_c_req}}", "{{delta_c_valid}}"),
+        ("δu (CTOD with growth)", "{{delta_u_value}}", "{{delta_u_uncertainty}}", "mm", "{{delta_u_req}}", "{{delta_u_valid}}"),
+        ("δm (CTOD at Pₘₐₓ)", "{{delta_m_value}}", "{{delta_m_uncertainty}}", "mm", "{{delta_m_req}}", "{{delta_m_valid}}"),
+        ("CTOD Type Reported", "{{ctod_type}}", "-", "-", "-", "-"),
+        ("Elastic Compliance", "{{compliance}}", "-", "mm/kN", "-", "-"),
     ]
 
     for i, row_data in enumerate(results_data):
@@ -259,14 +261,14 @@ def create_template():
         for j, text in enumerate(row_data):
             cell = row.cells[j]
             cell.text = text
-            if j == 0:
+            if j == 0:  # Parameter column
                 set_cell_shading(cell, 'F0F0F0')
 
     doc.add_paragraph()
 
     # Chart placeholder
     chart_heading = doc.add_paragraph()
-    chart_heading.add_run("Velocity Measurements Chart").bold = True
+    chart_heading.add_run("Force vs CMOD Curve").bold = True
 
     chart_para = doc.add_paragraph()
     chart_para.add_run("{{chart}}")
@@ -274,12 +276,51 @@ def create_template():
 
     doc.add_paragraph()
 
-    # Validity Notes
-    validity_heading = doc.add_paragraph()
-    validity_heading.add_run("Notes").bold = True
+    # Crack Surface Photos section
+    photos_heading = doc.add_paragraph()
+    photos_heading.add_run("Crack Surface Documentation").bold = True
 
-    validity_para = doc.add_paragraph()
-    validity_para.add_run("{{validity_notes}}")
+    photo_para = doc.add_paragraph()
+    photo_para.add_run("{{photos}}")
+    photo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph()
+
+    # 9-Point Crack Measurements Table
+    crack_heading = doc.add_paragraph()
+    crack_heading.add_run("Crack Length Measurements (9-Point Average per E1290)").bold = True
+
+    crack_table = doc.add_table(rows=2, cols=10)
+    crack_table.style = 'Table Grid'
+
+    # Header row
+    crack_headers = ["Pos.", "a₁", "a₂", "a₃", "a₄", "a₅", "a₆", "a₇", "a₈", "a₉"]
+    for i, header in enumerate(crack_headers):
+        cell = crack_table.rows[0].cells[i]
+        cell.text = header
+        cell.paragraphs[0].runs[0].bold = True
+        set_cell_shading(cell, 'D0D0D0')
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # Data row
+    crack_data = ["mm", "{{a1}}", "{{a2}}", "{{a3}}", "{{a4}}", "{{a5}}",
+                  "{{a6}}", "{{a7}}", "{{a8}}", "{{a9}}"]
+    for i, text in enumerate(crack_data):
+        cell = crack_table.rows[1].cells[i]
+        cell.text = text
+        if i == 0:
+            set_cell_shading(cell, 'E8E8E8')
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph()
+
+    # Validity statement
+    validity = doc.add_paragraph()
+    validity.add_run("Validity Status: ").bold = True
+    validity.add_run("{{validity_status}}")
+
+    validity_stmt = doc.add_paragraph()
+    validity_stmt.add_run("{{validity_statement}}")
 
     doc.add_paragraph()
 
@@ -310,7 +351,7 @@ def create_template():
             set_cell_shading(cell, 'E8E8E8')
 
     # Save
-    output_path = Path(__file__).parent.parent / "templates" / "sonic_e1875_report_template.docx"
+    output_path = Path(__file__).parent.parent / "templates" / "ctod_e1290_report_template.docx"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(output_path)
     print(f"Template saved to: {output_path}")

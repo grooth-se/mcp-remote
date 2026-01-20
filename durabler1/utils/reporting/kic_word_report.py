@@ -395,6 +395,21 @@ class KICReportGenerator:
                 '{{validity_notes}}': '\n'.join(results.validity_notes) if results.validity_notes else '',
             })
 
+        # Replace in page headers
+        for section in doc.sections:
+            header = section.header
+            for para in header.paragraphs:
+                for key, value in replacements.items():
+                    if key in para.text:
+                        para.text = para.text.replace(key, str(value))
+            for table in header.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for para in cell.paragraphs:
+                            for key, value in replacements.items():
+                                if key in para.text:
+                                    para.text = para.text.replace(key, str(value))
+
         # Replace in paragraphs
         for para in doc.paragraphs:
             for key, value in replacements.items():
@@ -419,14 +434,46 @@ class KICReportGenerator:
                     run.add_picture(str(chart_path), width=Inches(5.5))
                     break
 
-        # Insert logo if placeholder exists
+        # Insert logo if placeholder exists (check header first, then body)
         if logo_path and logo_path.exists():
-            for para in doc.paragraphs:
-                if '{{logo}}' in para.text:
-                    para.text = ''
-                    run = para.add_run()
-                    run.add_picture(str(logo_path), width=Inches(2))
+            logo_inserted = False
+            # Check page header first
+            for section in doc.sections:
+                if logo_inserted:
                     break
+                header = section.header
+                for para in header.paragraphs:
+                    if '{{logo}}' in para.text:
+                        para.text = ''
+                        run = para.add_run()
+                        run.add_picture(str(logo_path), height=Cm(1.5))
+                        logo_inserted = True
+                        break
+                if not logo_inserted:
+                    for table in header.tables:
+                        for row in table.rows:
+                            for cell in row.cells:
+                                for para in cell.paragraphs:
+                                    if '{{logo}}' in para.text:
+                                        para.text = ''
+                                        run = para.add_run()
+                                        run.add_picture(str(logo_path), height=Cm(1.5))
+                                        logo_inserted = True
+                                        break
+                                if logo_inserted:
+                                    break
+                            if logo_inserted:
+                                break
+                        if logo_inserted:
+                            break
+            # If not in header, check body paragraphs
+            if not logo_inserted:
+                for para in doc.paragraphs:
+                    if '{{logo}}' in para.text:
+                        para.text = ''
+                        run = para.add_run()
+                        run.add_picture(str(logo_path), width=Inches(2))
+                        break
 
         # Insert crack photo if placeholder exists
         if crack_photo_path and crack_photo_path.exists():

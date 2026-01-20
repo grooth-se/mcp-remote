@@ -59,6 +59,17 @@ class SonicReportGenerator:
         """
         doc = Document(self.template_path)
 
+        # Replace placeholders in page headers
+        for section in doc.sections:
+            header = section.header
+            for paragraph in header.paragraphs:
+                self._replace_in_paragraph(paragraph, data, chart_path, logo_path)
+            for table in header.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            self._replace_in_paragraph(paragraph, data, chart_path, logo_path)
+
         # Replace placeholders in paragraphs
         for paragraph in doc.paragraphs:
             self._replace_in_paragraph(paragraph, data, chart_path, logo_path)

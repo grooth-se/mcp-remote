@@ -21,6 +21,78 @@ def set_cell_shading(cell, color):
     cell._tc.get_or_add_tcPr().append(shading_elm)
 
 
+def add_page_number_field(paragraph):
+    """Add a PAGE field to the paragraph."""
+    run = paragraph.add_run()
+    fldChar1 = OxmlElement('w:fldChar')
+    fldChar1.set(qn('w:fldCharType'), 'begin')
+
+    instrText = OxmlElement('w:instrText')
+    instrText.set(qn('xml:space'), 'preserve')
+    instrText.text = "PAGE"
+
+    fldChar2 = OxmlElement('w:fldChar')
+    fldChar2.set(qn('w:fldCharType'), 'end')
+
+    run._r.append(fldChar1)
+    run._r.append(instrText)
+    run._r.append(fldChar2)
+
+
+def add_page_header(doc):
+    """Add page header with Certificate No and page number on right side."""
+    section = doc.sections[0]
+    header = section.header
+
+    # Create a table for header layout (logo left, certificate right)
+    header_table = header.add_table(rows=1, cols=2, width=Inches(6.5))
+    header_table.autofit = False
+    header_table.columns[0].width = Inches(2)
+    header_table.columns[1].width = Inches(4.5)
+
+    # Logo cell (left)
+    logo_cell = header_table.rows[0].cells[0]
+    logo_para = logo_cell.paragraphs[0]
+    logo_para.add_run("{{logo}}")
+    logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    # Certificate and page number cell (right)
+    cert_cell = header_table.rows[0].cells[1]
+    cert_para = cert_cell.paragraphs[0]
+    cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cert_run = cert_para.add_run("Certificate No: {{certificate_number}}")
+    cert_run.font.size = Pt(10)
+    cert_run.bold = True
+
+    # Add page number on new line
+    page_para = cert_cell.add_paragraph()
+    page_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    page_run = page_para.add_run("Page ")
+    page_run.font.size = Pt(9)
+    add_page_number_field(page_para)
+
+
+def add_page_footer(doc):
+    """Add page footer with legal text."""
+    section = doc.sections[0]
+    footer = section.footer
+
+    footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+    footer_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+    footer_text = (
+        "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
+        "Durabler standard terms and conditions, which are available at durabler.se. This document shall "
+        "not be reproduced other than in full, except with prior written approval of the issuer. The results "
+        "pertain only to the item(s) as sampled by the client unless otherwise indicated. "
+        "Durabler a part of Subseatec S AB, Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
+    )
+
+    footer_run = footer_para.add_run(footer_text)
+    footer_run.font.size = Pt(7)
+    footer_run.italic = True
+
+
 def create_fcgr_template():
     """Create the FCGR E647 report template."""
     doc = Document()
@@ -28,34 +100,31 @@ def create_fcgr_template():
     # Set narrow margins
     sections = doc.sections
     for section in sections:
-        section.top_margin = Cm(1.5)
-        section.bottom_margin = Cm(1.5)
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(2.5)
         section.left_margin = Cm(2)
         section.right_margin = Cm(2)
+        section.header_distance = Cm(0.5)
+        section.footer_distance = Cm(0.5)
 
-    # === HEADER WITH LOGO ===
-    header_table = doc.add_table(rows=1, cols=2)
-    header_table.autofit = False
-    header_table.columns[0].width = Inches(2)
-    header_table.columns[1].width = Inches(4.5)
+    # Add page header and footer
+    add_page_header(doc)
+    add_page_footer(doc)
 
-    # Logo cell
-    logo_cell = header_table.rows[0].cells[0]
-    logo_cell.text = "{{logo}}"
-
-    # Title cell
-    title_cell = header_table.rows[0].cells[1]
-    title_para = title_cell.paragraphs[0]
-    title_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    # === TITLE ===
+    title_para = doc.add_paragraph()
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title_run = title_para.add_run("FATIGUE CRACK GROWTH RATE TEST REPORT")
     title_run.bold = True
     title_run.font.size = Pt(14)
-    title_para.add_run("\nASTM E647")
-    title_para.add_run("\nCertificate: {{certificate_number}}")
+
+    subtitle_para = doc.add_paragraph()
+    subtitle_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    subtitle_para.add_run("ASTM E647")
 
     doc.add_paragraph()
 
-    # === TEST INFORMATION TABLE ===
+    # === TEST INFORMATION TABLE (no certificate number) ===
     doc.add_paragraph("TEST INFORMATION").runs[0].bold = True
 
     info_table = doc.add_table(rows=4, cols=4)
@@ -64,7 +133,7 @@ def create_fcgr_template():
     info_data = [
         ("Test Project:", "{{test_project}}", "Customer:", "{{customer}}"),
         ("Specimen ID:", "{{specimen_id}}", "Material:", "{{material}}"),
-        ("Test Date:", "{{test_date}}", "Temperature:", "{{temperature}} C"),
+        ("Test Date:", "{{test_date}}", "Temperature:", "{{temperature}} °C"),
         ("Test Standard:", "{{test_standard}}", "Equipment:", "{{test_equipment}}"),
     ]
 
@@ -136,7 +205,7 @@ def create_fcgr_template():
     param_data = [
         ("Control Mode:", "{{control_mode}}", "Wave Shape:", "{{wave_shape}}"),
         ("Load Ratio R:", "{{load_ratio}}", "Frequency (Hz):", "{{frequency}}"),
-        ("Maximum Load Pmax (kN):", "{{P_max}}", "Maximum Kmax (MPa*m^0.5):", "{{K_max}}"),
+        ("Maximum Load Pmax (kN):", "{{P_max}}", "Maximum Kmax (MPa√m):", "{{K_max}}"),
         ("Environment:", "{{environment}}", "da/dN Method:", "{{dadn_method}}"),
     ]
 
@@ -152,7 +221,7 @@ def create_fcgr_template():
     doc.add_paragraph()
 
     # === PARIS LAW RESULTS TABLE ===
-    doc.add_paragraph("PARIS LAW RESULTS: da/dN = C * (Delta-K)^m").runs[0].bold = True
+    doc.add_paragraph("PARIS LAW RESULTS: da/dN = C × (ΔK)^m").runs[0].bold = True
 
     paris_table = doc.add_table(rows=6, cols=4)
     paris_table.style = 'Table Grid'
@@ -161,7 +230,7 @@ def create_fcgr_template():
         ("Coefficient C:", "{{paris_C}}", "Exponent m:", "{{paris_m}}"),
         ("C Std Error:", "{{paris_C_error}}", "m Std Error:", "{{paris_m_error}}"),
         ("R-squared:", "{{paris_r_squared}}", "Data Points:", "{{paris_n_points}}"),
-        ("Delta-K Min (MPa*m^0.5):", "{{delta_K_min}}", "Delta-K Max (MPa*m^0.5):", "{{delta_K_max}}"),
+        ("ΔK Min (MPa√m):", "{{delta_K_min}}", "ΔK Max (MPa√m):", "{{delta_K_max}}"),
         ("da/dN Min (mm/cycle):", "{{da_dN_min}}", "da/dN Max (mm/cycle):", "{{da_dN_max}}"),
         ("Outliers Removed:", "{{n_outliers}}", "Outlier Threshold:", "{{outlier_threshold}}%"),
     ]
@@ -185,7 +254,7 @@ def create_fcgr_template():
 
     summary_data = [
         ("Total Cycles:", "{{total_cycles}}", "Valid Data Points:", "{{n_valid_points}}"),
-        ("Final Crack Length (mm):", "{{final_crack_length}}", "Threshold Delta-K:", "{{threshold_delta_K}}"),
+        ("Final Crack Length (mm):", "{{final_crack_length}}", "Threshold ΔK:", "{{threshold_delta_K}}"),
         ("Validity Status:", "{{is_valid}}", "", ""),
     ]
 
@@ -214,7 +283,7 @@ def create_fcgr_template():
     plot_table.rows[0].cells[0].paragraphs[0].runs[0].bold = True
 
     # Plot 2 title
-    plot_table.rows[0].cells[1].text = "da/dN vs Delta-K (Paris Law)"
+    plot_table.rows[0].cells[1].text = "da/dN vs ΔK (Paris Law)"
     plot_table.rows[0].cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
     plot_table.rows[0].cells[1].paragraphs[0].runs[0].bold = True
 

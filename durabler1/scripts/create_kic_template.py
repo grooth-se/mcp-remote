@@ -13,24 +13,112 @@ try:
     from docx.shared import Inches, Pt, Cm
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
 except ImportError:
     print("Error: python-docx is required. Install with: pip install python-docx")
     exit(1)
+
+
+def set_cell_shading(cell, color):
+    """Set cell background color."""
+    shading = OxmlElement('w:shd')
+    shading.set(qn('w:fill'), color)
+    cell._tc.get_or_add_tcPr().append(shading)
+
+
+def add_page_number_field(paragraph):
+    """Add a PAGE field to the paragraph."""
+    run = paragraph.add_run()
+    fldChar1 = OxmlElement('w:fldChar')
+    fldChar1.set(qn('w:fldCharType'), 'begin')
+
+    instrText = OxmlElement('w:instrText')
+    instrText.set(qn('xml:space'), 'preserve')
+    instrText.text = "PAGE"
+
+    fldChar2 = OxmlElement('w:fldChar')
+    fldChar2.set(qn('w:fldCharType'), 'end')
+
+    run._r.append(fldChar1)
+    run._r.append(instrText)
+    run._r.append(fldChar2)
+
+
+def add_page_header(doc):
+    """Add page header with Certificate No and page number on right side."""
+    section = doc.sections[0]
+    header = section.header
+
+    # Create a table for header layout (logo left, certificate right)
+    header_table = header.add_table(rows=1, cols=2, width=Inches(6.5))
+    header_table.autofit = False
+    header_table.columns[0].width = Inches(2)
+    header_table.columns[1].width = Inches(4.5)
+
+    # Logo cell (left)
+    logo_cell = header_table.rows[0].cells[0]
+    logo_para = logo_cell.paragraphs[0]
+    logo_para.add_run("{{logo}}")
+    logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    # Certificate and page number cell (right)
+    cert_cell = header_table.rows[0].cells[1]
+    cert_para = cert_cell.paragraphs[0]
+    cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    cert_run = cert_para.add_run("Certificate No: {{certificate_number}}")
+    cert_run.font.size = Pt(10)
+    cert_run.bold = True
+
+    # Add page number on new line
+    page_para = cert_cell.add_paragraph()
+    page_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    page_run = page_para.add_run("Page ")
+    page_run.font.size = Pt(9)
+    add_page_number_field(page_para)
+
+
+def add_page_footer(doc):
+    """Add page footer with legal text."""
+    section = doc.sections[0]
+    footer = section.footer
+
+    footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+    footer_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+    footer_text = (
+        "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
+        "Durabler standard terms and conditions, which are available at durabler.se. This document shall "
+        "not be reproduced other than in full, except with prior written approval of the issuer. The results "
+        "pertain only to the item(s) as sampled by the client unless otherwise indicated. "
+        "Durabler a part of Subseatec S AB, Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
+    )
+
+    footer_run = footer_para.add_run(footer_text)
+    footer_run.font.size = Pt(7)
+    footer_run.italic = True
 
 
 def create_kic_template():
     """Create KIC report template with placeholders."""
     doc = Document()
 
-    # Set up styles
+    # Set up styles and margins
     style = doc.styles['Normal']
     style.font.name = 'Calibri'
     style.font.size = Pt(11)
 
-    # Logo placeholder
-    logo_para = doc.add_paragraph()
-    logo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    logo_para.add_run('{{logo}}')
+    for section in doc.sections:
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(2.5)
+        section.left_margin = Cm(2)
+        section.right_margin = Cm(2)
+        section.header_distance = Cm(0.5)
+        section.footer_distance = Cm(0.5)
+
+    # Add page header and footer
+    add_page_header(doc)
+    add_page_footer(doc)
 
     # Title
     title = doc.add_heading('KIC Fracture Toughness Test Report', level=0)
@@ -51,19 +139,18 @@ def create_kic_template():
 
     doc.add_paragraph()
 
-    # Test Information section
+    # Test Information section (no certificate number in table)
     doc.add_heading('1. Test Information', level=1)
-    table = doc.add_table(rows=8, cols=2)
+    table = doc.add_table(rows=7, cols=2)
     table.style = 'Table Grid'
 
     info_fields = [
-        ('Certificate Number:', '{{certificate_number}}'),
         ('Test Project:', '{{test_project}}'),
         ('Customer:', '{{customer}}'),
         ('Specimen ID:', '{{specimen_id}}'),
         ('Material:', '{{material}}'),
         ('Test Date:', '{{test_date}}'),
-        ('Test Temperature:', '{{temperature}} C'),
+        ('Test Temperature:', '{{temperature}} °C'),
         ('Test Standard:', 'ASTM E399'),
     ]
 
@@ -71,6 +158,7 @@ def create_kic_template():
         table.rows[i].cells[0].text = label
         table.rows[i].cells[1].text = placeholder
         table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+        set_cell_shading(table.rows[i].cells[0], 'D9D9D9')
 
     doc.add_paragraph()
 
@@ -84,6 +172,7 @@ def create_kic_template():
     for i, header in enumerate(headers):
         table.rows[0].cells[i].text = header
         table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+        set_cell_shading(table.rows[0].cells[i], 'D9D9D9')
 
     dim_fields = [
         ('Specimen Type', '{{specimen_type}}', '-'),
@@ -110,11 +199,12 @@ def create_kic_template():
     for i, header in enumerate(headers):
         table.rows[0].cells[i].text = header
         table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+        set_cell_shading(table.rows[0].cells[i], 'D9D9D9')
 
     mat_fields = [
-        ('Yield Strength sigma_ys', '{{yield_strength}}', 'MPa'),
+        ('Yield Strength σ_ys', '{{yield_strength}}', 'MPa'),
         ("Young's Modulus E", '{{youngs_modulus}}', 'GPa'),
-        ("Poisson's Ratio nu", '{{poissons_ratio}}', '-'),
+        ("Poisson's Ratio ν", '{{poissons_ratio}}', '-'),
     ]
 
     for i, (param, placeholder, unit) in enumerate(mat_fields):
@@ -134,13 +224,14 @@ def create_kic_template():
     for i, header in enumerate(result_headers):
         table.rows[0].cells[i].text = header
         table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+        set_cell_shading(table.rows[0].cells[i], 'D9D9D9')
 
     result_fields = [
-        ('Maximum Force P_max', '{{P_max}}', '+/-{{P_max_uncertainty}}', 'kN'),
-        ('Conditional Force P_Q', '{{P_Q}}', '+/-{{P_Q_uncertainty}}', 'kN'),
+        ('Maximum Force P_max', '{{P_max}}', '±{{P_max_uncertainty}}', 'kN'),
+        ('Conditional Force P_Q', '{{P_Q}}', '±{{P_Q_uncertainty}}', 'kN'),
         ('P_max/P_Q Ratio', '{{P_ratio}}', '-', '-'),
-        ('Conditional K_Q', '{{K_Q}}', '+/-{{K_Q_uncertainty}}', 'MPa*sqrt(m)'),
-        ('Fracture Toughness K_IC', '{{K_IC}}', '+/-{{K_IC_uncertainty}}', 'MPa*sqrt(m)'),
+        ('Conditional K_Q', '{{K_Q}}', '±{{K_Q_uncertainty}}', 'MPa√m'),
+        ('Fracture Toughness K_IC', '{{K_IC}}', '±{{K_IC_uncertainty}}', 'MPa√m'),
         ('Initial Compliance', '{{compliance}}', '-', 'mm/kN'),
         ('Validity Status', '{{is_valid}}', '-', '-'),
     ]
@@ -181,10 +272,10 @@ def create_kic_template():
     doc.add_paragraph('Validity requirements per ASTM E399:')
     notes = [
         '- a/W ratio must be between 0.45 and 0.55',
-        '- B >= 2.5(K_Q/sigma_ys)^2 for plane-strain conditions',
-        '- a >= 2.5(K_Q/sigma_ys)^2',
-        '- (W-a) >= 2.5(K_Q/sigma_ys)^2',
-        '- P_max/P_Q <= 1.10',
+        '- B ≥ 2.5(K_Q/σ_ys)² for plane-strain conditions',
+        '- a ≥ 2.5(K_Q/σ_ys)²',
+        '- (W-a) ≥ 2.5(K_Q/σ_ys)²',
+        '- P_max/P_Q ≤ 1.10',
     ]
     for note in notes:
         doc.add_paragraph(note)
@@ -200,24 +291,12 @@ def create_kic_template():
     for i, header in enumerate(approval_headers):
         table.rows[0].cells[i].text = header
         table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+        set_cell_shading(table.rows[0].cells[i], 'D9D9D9')
 
     approval_roles = ['Tested by:', 'Reviewed by:', 'Approved by:']
     for i, role in enumerate(approval_roles):
         table.rows[i+1].cells[0].text = role
-
-    doc.add_paragraph()
-    doc.add_paragraph()
-
-    # Footer
-    footer = doc.add_paragraph()
-    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer_run = footer.add_run('Durabler - Mechanical Testing Analysis System')
-    footer_run.font.size = Pt(9)
-
-    footer2 = doc.add_paragraph()
-    footer2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer2_run = footer2.add_run('ISO 17025 Accredited Laboratory')
-    footer2_run.font.size = Pt(9)
+        set_cell_shading(table.rows[i+1].cells[0], 'D9D9D9')
 
     return doc
 
