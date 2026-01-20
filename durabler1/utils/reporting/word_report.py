@@ -180,6 +180,8 @@ class TensileReportGenerator:
         Dict[str, Any]
             Flattened dictionary ready for template
         """
+        import math
+
         data = {}
         requirements = requirements or {}
 
@@ -203,21 +205,32 @@ class TensileReportGenerator:
         data['humidity'] = test_info.get('humidity', '50')
         data['comments'] = test_info.get('comments', '')
 
-        # Specimen dimensions
-        data['geometry_type'] = 'Round' if specimen_type == 'round' else 'Rectangular'
+        # Additional test info keys for template compatibility
+        data['operator'] = test_info.get('test_engineer', '')
+        data['temperature'] = test_info.get('temperature', '23')
 
+        # Specimen dimensions - template-compatible keys
+        data['geometry_type'] = 'Round' if specimen_type == 'round' else 'Rectangular'
+        data['specimen_type'] = 'Round' if specimen_type == 'round' else 'Rectangular'
+        data['gauge_length'] = dimensions.get('gauge_length', '')
+        data['width'] = dimensions.get('width', '-') if specimen_type == 'rectangular' else '-'
+        data['thickness'] = dimensions.get('thickness', '-') if specimen_type == 'rectangular' else '-'
+        data['diameter'] = dimensions.get('diameter', '-') if specimen_type == 'round' else '-'
+
+        # Calculate cross-section area
         if specimen_type == 'round':
             data['d0'] = dimensions.get('diameter', '')
             data['df'] = dimensions.get('final_diameter', '-')
             data['w0'] = '-'
             data['t0'] = '-'
             if dimensions.get('diameter'):
-                import math
                 d = float(dimensions['diameter'])
                 area = math.pi * d**2 / 4
                 data['initial_area'] = f"{area:.2f}"
+                data['cross_section_area'] = f"{area:.2f}"
             else:
                 data['initial_area'] = ''
+                data['cross_section_area'] = ''
         else:
             data['d0'] = '-'
             data['df'] = '-'
@@ -226,75 +239,157 @@ class TensileReportGenerator:
             if dimensions.get('width') and dimensions.get('thickness'):
                 area = float(dimensions['width']) * float(dimensions['thickness'])
                 data['initial_area'] = f"{area:.2f}"
+                data['cross_section_area'] = f"{area:.2f}"
             else:
                 data['initial_area'] = ''
+                data['cross_section_area'] = ''
 
         data['L0'] = dimensions.get('gauge_length', '')
         data['L1'] = dimensions.get('final_gauge_length', '-')
         data['Lc'] = dimensions.get('parallel_length', '')
 
         # Helper to extract value and uncertainty from MeasuredValue objects
-        def get_result(key, default_value='', default_unc=''):
+        def get_result(key, default_value='-', default_unc='-'):
             result = results.get(key)
             if result and hasattr(result, 'value'):
                 return f"{result.value:.1f}", f"±{result.uncertainty:.1f}"
             return default_value, default_unc
 
+        def get_result_raw(key):
+            """Get raw MeasuredValue object."""
+            return results.get(key)
+
+        # Young's modulus (E) - template uses {{E}}, {{E_uncertainty}}
+        E_result = get_result_raw('E')
+        if E_result and hasattr(E_result, 'value'):
+            data['E'] = f"{E_result.value:.1f}"
+            data['E_uncertainty'] = f"±{E_result.uncertainty:.1f}"
+        else:
+            data['E'] = '-'
+            data['E_uncertainty'] = '-'
+
         # Yield strengths - show values only for selected method
+        # Template uses {{Rp02}}, {{Rp02_uncertainty}}, etc.
         if yield_type == 'offset':
             Rp02_val, Rp02_unc = get_result('Rp02')
             Rp05_val, Rp05_unc = get_result('Rp05')
-            data['Rp02_value'] = Rp02_val
+            # Template-compatible keys (simple names)
+            data['Rp02'] = Rp02_val
             data['Rp02_uncertainty'] = Rp02_unc
+            # Legacy keys (with _value suffix)
+            data['Rp02_value'] = Rp02_val
             data['Rp02_req'] = requirements.get('Rp02', '-')
             data['Rp05_value'] = Rp05_val
             data['Rp05_uncertainty'] = Rp05_unc
             data['Rp05_req'] = requirements.get('Rp05', '-')
-            data['ReH_value'] = '-'
+            # ReH/ReL not applicable
+            data['ReH'] = '-'
             data['ReH_uncertainty'] = '-'
+            data['ReH_value'] = '-'
             data['ReH_req'] = '-'
-            data['ReL_value'] = '-'
+            data['ReL'] = '-'
             data['ReL_uncertainty'] = '-'
+            data['ReL_value'] = '-'
             data['ReL_req'] = '-'
         else:
-            data['Rp02_value'] = '-'
+            # Offset values not applicable
+            data['Rp02'] = '-'
             data['Rp02_uncertainty'] = '-'
+            data['Rp02_value'] = '-'
             data['Rp02_req'] = '-'
             data['Rp05_value'] = '-'
             data['Rp05_uncertainty'] = '-'
             data['Rp05_req'] = '-'
+            # ReH/ReL values
             ReH_val, ReH_unc = get_result('ReH')
             ReL_val, ReL_unc = get_result('ReL')
-            data['ReH_value'] = ReH_val
+            data['ReH'] = ReH_val
             data['ReH_uncertainty'] = ReH_unc
+            data['ReH_value'] = ReH_val
             data['ReH_req'] = requirements.get('ReH', '-')
-            data['ReL_value'] = ReL_val
+            data['ReL'] = ReL_val
             data['ReL_uncertainty'] = ReL_unc
+            data['ReL_value'] = ReL_val
             data['ReL_req'] = requirements.get('ReL', '-')
 
-        # Ultimate tensile strength
+        # Ultimate tensile strength - template uses {{Rm}}, {{Rm_uncertainty}}
         Rm_val, Rm_unc = get_result('Rm')
-        data['Rm_value'] = Rm_val
+        data['Rm'] = Rm_val
         data['Rm_uncertainty'] = Rm_unc
+        data['Rm_value'] = Rm_val
         data['Rm_req'] = requirements.get('Rm', '-')
 
-        # Elongation A5 from L1-L0 (manual measurement)
+        # Elongation - template uses {{A}}, {{A_uncertainty}}
+        # Use A_percent (from test data) for the main A value
+        A_val, A_unc = get_result('A_percent')
+        data['A'] = A_val
+        data['A_uncertainty'] = A_unc
+
+        # A5 from L1-L0 (manual measurement)
         A5_val, A5_unc = get_result('A_manual')
-        data['A5_value'] = A5_val if A5_val else '-'
-        data['A5_uncertainty'] = A5_unc if A5_unc else '-'
+        data['A5_value'] = A5_val if A5_val != '-' else '-'
+        data['A5_uncertainty'] = A5_unc if A5_unc != '-' else '-'
         data['A5_req'] = requirements.get('A5', '-')
 
-        # Reduction of area (Z%)
+        # Uniform elongation (Ag) - template uses {{Ag}}, {{Ag_uncertainty}}
+        Ag_val, Ag_unc = get_result('Ag')
+        data['Ag'] = Ag_val
+        data['Ag_uncertainty'] = Ag_unc
+
+        # Reduction of area (Z%) - template uses {{Z}}, {{Z_uncertainty}}
         Z_val, Z_unc = get_result('Z')
-        data['Z_value'] = Z_val if Z_val else '-'
-        data['Z_uncertainty'] = Z_unc if Z_unc else '-'
+        data['Z'] = Z_val
+        data['Z_uncertainty'] = Z_unc
+        data['Z_value'] = Z_val
         data['Z_req'] = requirements.get('Z', '-')
+
+        # Rate calculations - template uses {{stress_rate_yield}}, {{strain_rate_yield}}, etc.
+        # For yield point, use Rp0.2 rates for offset method, ReH rates for yield_point method
+        if yield_type == 'offset':
+            stress_rate_yield = get_result_raw('stress_rate_rp02')
+            strain_rate_yield = get_result_raw('strain_rate_rp02')
+        else:
+            stress_rate_yield = get_result_raw('stress_rate_reh')
+            strain_rate_yield = get_result_raw('strain_rate_reh')
+
+        # Format stress rate at yield
+        if stress_rate_yield and hasattr(stress_rate_yield, 'value'):
+            data['stress_rate_yield'] = f"{stress_rate_yield.value:.1f}"
+        else:
+            data['stress_rate_yield'] = '-'
+
+        # Format strain rate at yield (use scientific notation for small values)
+        if strain_rate_yield and hasattr(strain_rate_yield, 'value'):
+            val = strain_rate_yield.value
+            if abs(val) < 0.01:
+                data['strain_rate_yield'] = f"{val:.2e}"
+            else:
+                data['strain_rate_yield'] = f"{val:.4f}"
+        else:
+            data['strain_rate_yield'] = '-'
+
+        # Rates at Rm
+        stress_rate_rm = get_result_raw('stress_rate_rm')
+        strain_rate_rm = get_result_raw('strain_rate_rm')
+
+        if stress_rate_rm and hasattr(stress_rate_rm, 'value'):
+            data['stress_rate_rm'] = f"{stress_rate_rm.value:.1f}"
+        else:
+            data['stress_rate_rm'] = '-'
+
+        if strain_rate_rm and hasattr(strain_rate_rm, 'value'):
+            val = strain_rate_rm.value
+            if abs(val) < 0.01:
+                data['strain_rate_rm'] = f"{val:.2e}"
+            else:
+                data['strain_rate_rm'] = f"{val:.4f}"
+        else:
+            data['strain_rate_rm'] = '-'
 
         # Yield/Tensile ratio (Rp0.2/Rm or ReH/Rm)
         data['ratio_label'] = 'Rp0.2/Rm' if yield_type == 'offset' else 'ReH/Rm'
         if Rm_val and Rm_val != '-':
             if yield_type == 'offset':
-                Rp02_val, _ = get_result('Rp02')
                 if Rp02_val and Rp02_val != '-':
                     try:
                         ratio = float(Rp02_val) / float(Rm_val)
@@ -304,10 +399,10 @@ class TensileReportGenerator:
                 else:
                     data['yield_tensile_ratio'] = '-'
             else:
-                ReH_val, _ = get_result('ReH')
-                if ReH_val and ReH_val != '-':
+                ReH_val_check = data.get('ReH', '-')
+                if ReH_val_check and ReH_val_check != '-':
                     try:
-                        ratio = float(ReH_val) / float(Rm_val)
+                        ratio = float(ReH_val_check) / float(Rm_val)
                         data['yield_tensile_ratio'] = f"{ratio:.3f}"
                     except (ValueError, ZeroDivisionError):
                         data['yield_tensile_ratio'] = '-'
@@ -316,9 +411,10 @@ class TensileReportGenerator:
         else:
             data['yield_tensile_ratio'] = '-'
 
-        # Validity
+        # Validity notes
         data['validity_statement'] = 'The test results comply with the requirements and are considered valid.'
         data['validity_status'] = 'VALID'
+        data['validity_notes'] = ''
 
         # Signatures (to be filled manually)
         data['tested_by'] = ''
