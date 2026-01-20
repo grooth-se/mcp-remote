@@ -712,12 +712,13 @@ class SonicTestApp:
             messagebox.showwarning("Warning", "No results to export. Run analysis first.")
             return
 
-        # Get output file path
+        # Get output file path - use certificate number as filename
+        cert_num = self.info_vars['certificate_number'].get() or self.info_vars['specimen_id'].get() or 'Unknown'
         filepath = filedialog.asksaveasfilename(
             defaultextension=".docx",
             filetypes=[("Word Document", "*.docx")],
             title="Save Sonic Test Report",
-            initialfile=f"Sonic_Report_{self.info_vars['specimen_id'].get() or 'Unknown'}.docx"
+            initialfile=f"{cert_num}.docx"
         )
 
         if not filepath:

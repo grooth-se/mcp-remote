@@ -954,12 +954,13 @@ class KICTestApp:
             messagebox.showwarning("Warning", "No results to export. Run analysis first.")
             return
 
-        # Get output path
+        # Get output path - use certificate number as filename
+        cert_num = self.info_vars['certificate_number'].get() or self.info_vars['specimen_id'].get()
         filepath = filedialog.asksaveasfilename(
             title="Export Report",
             defaultextension=".docx",
             filetypes=[("Word documents", "*.docx"), ("All files", "*.*")],
-            initialfile=f"KIC_Report_{self.info_vars['specimen_id'].get()}.docx"
+            initialfile=f"{cert_num}.docx"
         )
 
         if not filepath:

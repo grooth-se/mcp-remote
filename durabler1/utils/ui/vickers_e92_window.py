@@ -693,11 +693,13 @@ class VickersTestApp:
             messagebox.showwarning("Warning", "No results to export. Run analysis first.")
             return
 
+        # Use certificate number as filename
+        cert_num = self.certificate_var.get() or self.specimen_id_var.get()
         filepath = filedialog.asksaveasfilename(
             title="Export Report",
             defaultextension=".docx",
             filetypes=[("Word documents", "*.docx"), ("All files", "*.*")],
-            initialfile=f"Vickers_Report_{self.specimen_id_var.get()}.docx"
+            initialfile=f"{cert_num}.docx"
         )
 
         if not filepath:

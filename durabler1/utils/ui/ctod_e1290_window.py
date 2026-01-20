@@ -924,12 +924,13 @@ class CTODTestApp:
             messagebox.showwarning("Warning", "No results to export. Run analysis first.")
             return
 
-        # Get output file path
+        # Get output file path - use certificate number as filename
+        cert_num = self.certificate_number_var.get() or self.specimen_id_var.get() or 'Unknown'
         filepath = filedialog.asksaveasfilename(
             defaultextension=".docx",
             filetypes=[("Word Document", "*.docx")],
             title="Save CTOD Report",
-            initialfile=f"CTOD_Report_{self.specimen_id_var.get() or 'Unknown'}.docx"
+            initialfile=f"{cert_num}.docx"
         )
 
         if not filepath:

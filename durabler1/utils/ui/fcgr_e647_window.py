@@ -985,12 +985,13 @@ class FCGRTestApp:
             messagebox.showwarning("Warning", "No results to export. Run analysis first.")
             return
 
-        # Ask for save location
+        # Ask for save location - use certificate number as filename
+        cert_num = self.info_vars['certificate_number'].get() or self.info_vars['specimen_id'].get()
         filepath = filedialog.asksaveasfilename(
             title="Save Word Report",
             defaultextension=".docx",
             filetypes=[("Word Documents", "*.docx")],
-            initialfile=f"FCGR_Report_{self.info_vars['specimen_id'].get()}.docx"
+            initialfile=f"{cert_num}.docx"
         )
 
         if not filepath:

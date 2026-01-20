@@ -1102,12 +1102,13 @@ class TensileTestApp:
             messagebox.showwarning("Warning", "No results to export. Run analysis first.")
             return
 
-        # Ask for output file
+        # Ask for output file - use certificate number as filename
+        cert_num = self.certificate_var.get() or self.specimen_id_var.get()
         filepath = filedialog.asksaveasfilename(
             title="Export Report",
             defaultextension=".docx",
             filetypes=[("Word documents", "*.docx"), ("All files", "*.*")],
-            initialfile=f"Tensile_Report_{self.specimen_id_var.get()}.docx"
+            initialfile=f"{cert_num}.docx"
         )
 
         if not filepath:
