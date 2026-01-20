@@ -986,7 +986,7 @@ class FCGRTestApp:
             return
 
         # Ask for save location - use certificate number as filename
-        cert_num = self.info_vars['certificate_number'].get() or self.info_vars['specimen_id'].get()
+        cert_num = self.certificate_number_var.get() or self.info_vars['specimen_id'].get()
         filepath = filedialog.asksaveasfilename(
             title="Save Word Report",
             defaultextension=".docx",
