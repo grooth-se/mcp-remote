@@ -3,21 +3,15 @@
 Create KIC E399 Report Template.
 
 Generates a Word document template for KIC fracture toughness test reports
-with placeholders for test data.
+with placeholders for test data. Layout matches other test report templates.
 """
 
 from pathlib import Path
-
-try:
-    from docx import Document
-    from docx.shared import Inches, Pt, Cm
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.enum.table import WD_TABLE_ALIGNMENT
-    from docx.oxml.ns import qn
-    from docx.oxml import OxmlElement
-except ImportError:
-    print("Error: python-docx is required. Install with: pip install python-docx")
-    exit(1)
+from docx import Document
+from docx.shared import Inches, Pt, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 
 
 def set_cell_shading(cell, color):
@@ -103,11 +97,7 @@ def create_kic_template():
     """Create KIC report template with placeholders."""
     doc = Document()
 
-    # Set up styles and margins
-    style = doc.styles['Normal']
-    style.font.name = 'Calibri'
-    style.font.size = Pt(11)
-
+    # Set narrow margins
     for section in doc.sections:
         section.top_margin = Cm(2.5)
         section.bottom_margin = Cm(2.5)
@@ -120,203 +110,179 @@ def create_kic_template():
     add_page_header(doc)
     add_page_footer(doc)
 
-    # Title
-    title = doc.add_heading('KIC Fracture Toughness Test Report', level=0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # === TITLE ===
+    title_para = doc.add_paragraph()
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_run = title_para.add_run("KIC FRACTURE TOUGHNESS TEST REPORT")
+    title_run.bold = True
+    title_run.font.size = Pt(14)
 
-    # Standard reference
-    subtitle = doc.add_paragraph('ASTM E399 - Standard Test Method for Linear-Elastic')
-    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    subtitle2 = doc.add_paragraph('Plane-Strain Fracture Toughness of Metallic Materials')
-    subtitle2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    doc.add_paragraph()
-
-    # Report number
-    report_para = doc.add_paragraph()
-    report_para.add_run('Report Number: ').bold = True
-    report_para.add_run('{{report_number}}')
+    subtitle_para = doc.add_paragraph()
+    subtitle_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    subtitle_para.add_run("ASTM E399")
 
     doc.add_paragraph()
 
-    # Test Information section (no certificate number in table)
-    doc.add_heading('1. Test Information', level=1)
-    table = doc.add_table(rows=7, cols=2)
-    table.style = 'Table Grid'
+    # === TEST INFORMATION TABLE ===
+    doc.add_paragraph("TEST INFORMATION").runs[0].bold = True
 
-    info_fields = [
-        ('Test Project:', '{{test_project}}'),
-        ('Customer:', '{{customer}}'),
-        ('Specimen ID:', '{{specimen_id}}'),
-        ('Material:', '{{material}}'),
-        ('Test Date:', '{{test_date}}'),
-        ('Test Temperature:', '{{temperature}} °C'),
-        ('Test Standard:', 'ASTM E399'),
+    info_table = doc.add_table(rows=5, cols=4)
+    info_table.style = 'Table Grid'
+
+    info_data = [
+        ("Test Project:", "{{test_project}}", "Customer:", "{{customer}}"),
+        ("Specimen ID:", "{{specimen_id}}", "Material:", "{{material}}"),
+        ("Test Date:", "{{test_date}}", "Temperature:", "{{temperature}} °C"),
+        ("Test Standard:", "ASTM E399", "Operator:", "{{operator}}"),
+        ("Test Equipment:", "{{test_equipment}}", "", ""),
     ]
 
-    for i, (label, placeholder) in enumerate(info_fields):
-        table.rows[i].cells[0].text = label
-        table.rows[i].cells[1].text = placeholder
-        table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
-        set_cell_shading(table.rows[i].cells[0], 'D9D9D9')
+    for i, row_data in enumerate(info_data):
+        row = info_table.rows[i]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
+            if j % 2 == 0 and text:  # Labels
+                set_cell_shading(cell, "D9D9D9")
+                if cell.paragraphs[0].runs:
+                    cell.paragraphs[0].runs[0].bold = True
 
     doc.add_paragraph()
 
-    # Specimen Dimensions section
-    doc.add_heading('2. Specimen Dimensions', level=1)
-    table = doc.add_table(rows=7, cols=3)
-    table.style = 'Table Grid'
+    # === SPECIMEN GEOMETRY TABLE ===
+    doc.add_paragraph("SPECIMEN GEOMETRY").runs[0].bold = True
 
-    # Header
-    headers = ['Parameter', 'Value', 'Unit']
-    for i, header in enumerate(headers):
-        table.rows[0].cells[i].text = header
-        table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
-        set_cell_shading(table.rows[0].cells[i], 'D9D9D9')
+    geom_table = doc.add_table(rows=4, cols=4)
+    geom_table.style = 'Table Grid'
 
-    dim_fields = [
-        ('Specimen Type', '{{specimen_type}}', '-'),
-        ('Width W', '{{W}}', 'mm'),
-        ('Thickness B', '{{B}}', 'mm'),
-        ('Net Thickness B_n', '{{B_n}}', 'mm'),
-        ('Crack Length a_0', '{{a_0}}', 'mm'),
-        ('Span S (SE(B) only)', '{{S}}', 'mm'),
+    geom_data = [
+        ("Specimen Type:", "{{specimen_type}}", "W (mm):", "{{W}}"),
+        ("B (mm):", "{{B}}", "Bₙ (mm):", "{{B_n}}"),
+        ("a₀ (mm):", "{{a_0}}", "S (mm):", "{{S}}"),
+        ("a₀/W:", "{{a_W_ratio}}", "", ""),
     ]
 
-    for i, (param, placeholder, unit) in enumerate(dim_fields):
-        table.rows[i+1].cells[0].text = param
-        table.rows[i+1].cells[1].text = placeholder
-        table.rows[i+1].cells[2].text = unit
+    for i, row_data in enumerate(geom_data):
+        row = geom_table.rows[i]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
+            if j % 2 == 0 and text:  # Labels
+                set_cell_shading(cell, "D9D9D9")
+                if cell.paragraphs[0].runs:
+                    cell.paragraphs[0].runs[0].bold = True
 
     doc.add_paragraph()
 
-    # Material Properties section
-    doc.add_heading('3. Material Properties', level=1)
-    table = doc.add_table(rows=4, cols=3)
-    table.style = 'Table Grid'
+    # === MATERIAL PROPERTIES TABLE ===
+    doc.add_paragraph("MATERIAL PROPERTIES").runs[0].bold = True
 
-    # Header
-    for i, header in enumerate(headers):
-        table.rows[0].cells[i].text = header
-        table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
-        set_cell_shading(table.rows[0].cells[i], 'D9D9D9')
+    mat_table = doc.add_table(rows=2, cols=4)
+    mat_table.style = 'Table Grid'
 
-    mat_fields = [
-        ('Yield Strength σ_ys', '{{yield_strength}}', 'MPa'),
-        ("Young's Modulus E", '{{youngs_modulus}}', 'GPa'),
-        ("Poisson's Ratio ν", '{{poissons_ratio}}', '-'),
+    mat_data = [
+        ("σᵧₛ (MPa):", "{{yield_strength}}", "E (GPa):", "{{youngs_modulus}}"),
+        ("ν:", "{{poissons_ratio}}", "", ""),
     ]
 
-    for i, (param, placeholder, unit) in enumerate(mat_fields):
-        table.rows[i+1].cells[0].text = param
-        table.rows[i+1].cells[1].text = placeholder
-        table.rows[i+1].cells[2].text = unit
+    for i, row_data in enumerate(mat_data):
+        row = mat_table.rows[i]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
+            if j % 2 == 0 and text:  # Labels
+                set_cell_shading(cell, "D9D9D9")
+                if cell.paragraphs[0].runs:
+                    cell.paragraphs[0].runs[0].bold = True
 
     doc.add_paragraph()
 
-    # Results section
-    doc.add_heading('4. Test Results', level=1)
-    table = doc.add_table(rows=8, cols=5)
-    table.style = 'Table Grid'
+    # === TEST RESULTS TABLE ===
+    doc.add_paragraph("TEST RESULTS").runs[0].bold = True
 
-    # Header
-    result_headers = ['Parameter', 'Value', 'U (k=2)', 'Requirement', 'Unit']
-    for i, header in enumerate(result_headers):
-        table.rows[0].cells[i].text = header
-        table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
-        set_cell_shading(table.rows[0].cells[i], 'D9D9D9')
+    results_table = doc.add_table(rows=8, cols=5)
+    results_table.style = 'Table Grid'
 
-    result_fields = [
-        ('Maximum Force P_max', '{{P_max}}', '±{{P_max_uncertainty}}', '{{P_max_req}}', 'kN'),
-        ('Conditional Force P_Q', '{{P_Q}}', '±{{P_Q_uncertainty}}', '{{P_Q_req}}', 'kN'),
-        ('P_max/P_Q Ratio', '{{P_ratio}}', '-', '{{P_ratio_req}}', '-'),
-        ('Conditional K_Q', '{{K_Q}}', '±{{K_Q_uncertainty}}', '{{K_Q_req}}', 'MPa√m'),
-        ('Fracture Toughness K_IC', '{{K_IC}}', '±{{K_IC_uncertainty}}', '{{K_IC_req}}', 'MPa√m'),
-        ('Initial Compliance', '{{compliance}}', '-', '-', 'mm/kN'),
-        ('Validity Status', '{{is_valid}}', '-', '-', '-'),
+    # Header row
+    header_row = results_table.rows[0]
+    headers = ["Parameter", "Value", "U (k=2)", "Requirement", "Unit"]
+    for j, header in enumerate(headers):
+        cell = header_row.cells[j]
+        cell.text = header
+        set_cell_shading(cell, "D9D9D9")
+        cell.paragraphs[0].runs[0].bold = True
+
+    results_data = [
+        ("Maximum Force (Pₘₐₓ)", "{{P_max}}", "{{P_max_uncertainty}}", "{{P_max_req}}", "kN"),
+        ("Conditional Force (P_Q)", "{{P_Q}}", "{{P_Q_uncertainty}}", "{{P_Q_req}}", "kN"),
+        ("Pₘₐₓ/P_Q Ratio", "{{P_ratio}}", "-", "{{P_ratio_req}}", "-"),
+        ("Conditional K_Q", "{{K_Q}}", "{{K_Q_uncertainty}}", "{{K_Q_req}}", "MPa√m"),
+        ("Fracture Toughness K_IC", "{{K_IC}}", "{{K_IC_uncertainty}}", "{{K_IC_req}}", "MPa√m"),
+        ("Initial Compliance", "{{compliance}}", "-", "-", "mm/kN"),
+        ("Validity Status", "{{is_valid}}", "-", "-", "-"),
     ]
 
-    for i, (param, value, unc, req, unit) in enumerate(result_fields):
-        table.rows[i+1].cells[0].text = param
-        table.rows[i+1].cells[1].text = value
-        table.rows[i+1].cells[2].text = unc
-        table.rows[i+1].cells[3].text = req
-        table.rows[i+1].cells[4].text = unit
+    for i, row_data in enumerate(results_data):
+        row = results_table.rows[i + 1]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
 
     doc.add_paragraph()
 
-    # Force-Displacement Plot section
-    doc.add_heading('5. Force vs Displacement', level=1)
-    chart_para = doc.add_paragraph()
+    # === FORCE vs DISPLACEMENT CURVE ===
+    doc.add_paragraph("FORCE vs DISPLACEMENT CURVE").runs[0].bold = True
+
+    chart_para = doc.add_paragraph("{{chart}}")
     chart_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    chart_para.add_run('{{chart}}')
 
     doc.add_paragraph()
 
-    # Validity Assessment section
-    doc.add_heading('6. Validity Assessment per ASTM E399', level=1)
+    # === VALIDITY NOTES ===
+    doc.add_paragraph("NOTES").runs[0].bold = True
 
-    validity_para = doc.add_paragraph()
-    validity_para.add_run('Overall Validity: ').bold = True
-    validity_para.add_run('{{is_valid}}')
-
-    doc.add_paragraph()
-    doc.add_paragraph('Validity Checks:')
-    doc.add_paragraph('{{validity_notes}}')
+    notes_para = doc.add_paragraph("{{validity_notes}}")
 
     doc.add_paragraph()
 
-    # Notes section
-    doc.add_heading('7. Notes', level=1)
-    doc.add_paragraph('The 5% secant offset method was used to determine P_Q per ASTM E399.')
-    doc.add_paragraph()
-    doc.add_paragraph('Validity requirements per ASTM E399:')
-    notes = [
-        '- a/W ratio must be between 0.45 and 0.55',
-        '- B ≥ 2.5(K_Q/σ_ys)² for plane-strain conditions',
-        '- a ≥ 2.5(K_Q/σ_ys)²',
-        '- (W-a) ≥ 2.5(K_Q/σ_ys)²',
-        '- P_max/P_Q ≤ 1.10',
+    # === SIGNATURES TABLE ===
+    doc.add_paragraph("SIGNATURES").runs[0].bold = True
+
+    sig_table = doc.add_table(rows=4, cols=3)
+    sig_table.style = 'Table Grid'
+
+    sig_headers = ["", "Name", "Date"]
+    for j, header in enumerate(sig_headers):
+        cell = sig_table.rows[0].cells[j]
+        cell.text = header
+        set_cell_shading(cell, "D9D9D9")
+        if cell.paragraphs[0].runs:
+            cell.paragraphs[0].runs[0].bold = True
+
+    sig_rows = [
+        ("Tested by:", "{{tested_by}}", "{{tested_date}}"),
+        ("Reviewed by:", "{{reviewed_by}}", "{{reviewed_date}}"),
+        ("Approved by:", "{{approved_by}}", "{{approved_date}}"),
     ]
-    for note in notes:
-        doc.add_paragraph(note)
 
-    doc.add_paragraph()
+    for i, row_data in enumerate(sig_rows, start=1):
+        row = sig_table.rows[i]
+        for j, text in enumerate(row_data):
+            cell = row.cells[j]
+            cell.text = text
+            if j == 0:  # Label column
+                set_cell_shading(cell, "D9D9D9")
+                cell.paragraphs[0].runs[0].bold = True
 
-    # Approval section
-    doc.add_heading('8. Approval', level=1)
-    table = doc.add_table(rows=4, cols=3)
-    table.style = 'Table Grid'
-
-    approval_headers = ['Role', 'Name', 'Date/Signature']
-    for i, header in enumerate(approval_headers):
-        table.rows[0].cells[i].text = header
-        table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
-        set_cell_shading(table.rows[0].cells[i], 'D9D9D9')
-
-    approval_roles = ['Tested by:', 'Reviewed by:', 'Approved by:']
-    for i, role in enumerate(approval_roles):
-        table.rows[i+1].cells[0].text = role
-        set_cell_shading(table.rows[i+1].cells[0], 'D9D9D9')
-
-    return doc
-
-
-def main():
-    """Create and save the KIC report template."""
-    # Determine output path
-    script_dir = Path(__file__).parent
-    project_root = script_dir.parent
-    template_dir = project_root / 'templates'
+    # Save template
+    template_dir = Path(__file__).parent.parent / "templates"
     template_dir.mkdir(exist_ok=True)
+    template_path = template_dir / "kic_e399_report_template.docx"
+    doc.save(template_path)
 
-    output_path = template_dir / 'kic_e399_report_template.docx'
-
-    print(f"Creating KIC E399 report template...")
-    doc = create_kic_template()
-    doc.save(output_path)
-    print(f"Template saved to: {output_path}")
+    print(f"Template created: {template_path}")
+    return template_path
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    create_kic_template()
