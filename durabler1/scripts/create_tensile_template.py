@@ -176,7 +176,7 @@ def create_tensile_template():
     # === TEST RESULTS TABLE ===
     doc.add_paragraph("TEST RESULTS").runs[0].bold = True
 
-    results_table = doc.add_table(rows=13, cols=4)
+    results_table = doc.add_table(rows=8, cols=4)
     results_table.style = 'Table Grid'
 
     # Header row
@@ -194,13 +194,8 @@ def create_tensile_template():
         ("Upper Yield (ReH)", "{{ReH}}", "{{ReH_uncertainty}}", "MPa"),
         ("Lower Yield (ReL)", "{{ReL}}", "{{ReL_uncertainty}}", "MPa"),
         ("Tensile Strength (Rm)", "{{Rm}}", "{{Rm_uncertainty}}", "MPa"),
-        ("Elongation at Fracture (A)", "{{A}}", "{{A_uncertainty}}", "%"),
-        ("Uniform Elongation (Ag)", "{{Ag}}", "{{Ag_uncertainty}}", "%"),
+        ("Elongation A5 (L1-L0)", "{{A5_value}}", "{{A5_uncertainty}}", "%"),
         ("Reduction of Area (Z)", "{{Z}}", "{{Z_uncertainty}}", "%"),
-        ("Stress Rate at Yield", "{{stress_rate_yield}}", "-", "MPa/s"),
-        ("Strain Rate at Yield", "{{strain_rate_yield}}", "-", "1/s"),
-        ("Stress Rate at Rm", "{{stress_rate_rm}}", "-", "MPa/s"),
-        ("Strain Rate at Rm", "{{strain_rate_rm}}", "-", "1/s"),
     ]
 
     for i, row_data in enumerate(results_data):
