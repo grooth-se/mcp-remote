@@ -1,15 +1,22 @@
-# Durabler - Tensile Test Analysis System
+# Durabler - Mechanical Testing Analysis System
 # Python 3.11+
 
 # Data processing
 numpy>=1.24.0
 pandas>=2.0.0
 scipy>=1.10.0
+openpyxl>=3.1.0          # Excel file support
 
 # Plotting
 matplotlib>=3.7.0
 
-# PDF generation (for future report phase)
+# Image handling
+Pillow>=10.0.0           # PIL for image processing
+
+# Word document generation
+python-docx>=1.0.0       # Word report generation
+
+# PDF generation (for future use)
 reportlab>=4.0.0
 Jinja2>=3.1.0
 
