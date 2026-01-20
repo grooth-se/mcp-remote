@@ -911,10 +911,18 @@ class TensileTestApp:
                     "MPa"
                 ))
             else:
+                # Use scientific notation for very small values (like strain rate)
+                if abs(result.value) < 0.01 and result.value != 0:
+                    value_str = f"{result.value:.2e}"
+                    uncert_str = f"+/-{result.uncertainty:.2e}"
+                else:
+                    value_str = f"{result.value:.2f}"
+                    uncert_str = f"+/-{result.uncertainty:.2f}"
+
                 self.results_tree.insert("", tk.END, values=(
                     name,
-                    f"{result.value:.2f}",
-                    f"+/-{result.uncertainty:.2f}",
+                    value_str,
+                    uncert_str,
                     result.unit
                 ))
 
