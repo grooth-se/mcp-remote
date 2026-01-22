@@ -675,6 +675,227 @@ class TensileAnalyzer:
             coverage_factor=2.0
         )
 
+    def calculate_yield_strength_rp02_displacement(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        E_modulus: float,
+        Rm: float,
+        area: float,
+        area_uncertainty: float
+    ) -> MeasuredValue:
+        """
+        Calculate 0.2% offset yield strength (Rp0.2) for displacement/crosshead data.
+
+        This method uses strain at 30% of Rm as the baseline reference point
+        to compensate for initial misalignment in the test equipment. The strain
+        baseline is shifted so that strain at 30% Rm becomes the reference zero.
+
+        NOTE: This method should ONLY be used for displacement/crosshead data,
+        NOT for extensometer data.
+
+        Parameters
+        ----------
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain (from displacement)
+        E_modulus : float
+            Young's modulus in GPa
+        Rm : float
+            Ultimate tensile strength in MPa
+        area : float
+            Cross-sectional area in mm^2
+        area_uncertainty : float
+            Uncertainty in area in mm^2
+
+        Returns
+        -------
+        MeasuredValue
+            Yield strength Rp0.2 with uncertainty in MPa
+        """
+        offset = self.config.offset_strain  # 0.002 (0.2%)
+        E_mpa = E_modulus * 1000  # Convert GPa to MPa
+
+        # Find strain at 30% of Rm (baseline reference point)
+        target_stress = 0.30 * Rm
+
+        # Find the index closest to 30% Rm on the ascending part of the curve
+        # Use only the portion before max stress to avoid post-necking data
+        max_idx = np.argmax(stress)
+        ascending_stress = stress[:max_idx + 1]
+        ascending_strain = strain[:max_idx + 1]
+
+        # Find index where stress is closest to 30% Rm
+        baseline_idx = np.argmin(np.abs(ascending_stress - target_stress))
+        strain_baseline = ascending_strain[baseline_idx]
+
+        # Shift strain so that strain at 30% Rm becomes the reference
+        strain_corrected = strain - strain_baseline
+
+        # Apply standard offset method with corrected strain
+        # Offset line: sigma = E * (epsilon_corrected - offset)
+        offset_line = E_mpa * (strain_corrected - offset)
+        curve_minus_offset = stress - offset_line
+
+        # Find region after corrected strain exceeds offset
+        valid_idx = strain_corrected > offset * 1.5
+
+        if not np.any(valid_idx):
+            raise ValueError("Insufficient strain data for yield calculation (displacement method)")
+
+        curve_segment = curve_minus_offset[valid_idx]
+        strain_segment = strain_corrected[valid_idx]
+        stress_segment = stress[valid_idx]
+
+        # Find sign change (zero crossing)
+        sign_changes = np.where(np.diff(np.sign(curve_segment)))[0]
+
+        if len(sign_changes) == 0:
+            # If no crossing found, find point closest to zero
+            idx = np.argmin(np.abs(curve_segment))
+            yield_stress = stress_segment[idx]
+        else:
+            # Linear interpolation at first crossing
+            idx = sign_changes[0]
+            s0, s1 = strain_segment[idx], strain_segment[idx + 1]
+            c0, c1 = curve_segment[idx], curve_segment[idx + 1]
+
+            if c1 - c0 != 0:
+                yield_strain = s0 - c0 * (s1 - s0) / (c1 - c0)
+                yield_stress = E_mpa * (yield_strain - offset)
+            else:
+                yield_stress = stress_segment[idx]
+
+        # Uncertainty calculation
+        u_area = yield_stress * (area_uncertainty / area)
+        u_force = yield_stress * self.config.force_calibration_uncertainty
+        # Additional uncertainty from baseline determination
+        u_baseline = yield_stress * 0.01  # ~1% from baseline selection
+
+        if len(sign_changes) > 0 and idx + 1 < len(stress_segment):
+            u_interpolation = abs(stress_segment[idx + 1] - stress_segment[idx]) / 4
+        else:
+            u_interpolation = yield_stress * 0.01
+
+        u_combined = np.sqrt(u_area**2 + u_force**2 + u_interpolation**2 + u_baseline**2)
+        U = 2 * u_combined
+
+        return MeasuredValue(
+            value=round(yield_stress, 1),
+            uncertainty=round(U, 1),
+            unit="MPa",
+            coverage_factor=2.0
+        )
+
+    def calculate_yield_strength_rp05_displacement(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+        E_modulus: float,
+        Rm: float,
+        area: float,
+        area_uncertainty: float
+    ) -> MeasuredValue:
+        """
+        Calculate 0.5% offset yield strength (Rp0.5) for displacement/crosshead data.
+
+        This method uses strain at 30% of Rm as the baseline reference point
+        to compensate for initial misalignment in the test equipment. The strain
+        baseline is shifted so that strain at 30% Rm becomes the reference zero.
+
+        NOTE: This method should ONLY be used for displacement/crosshead data,
+        NOT for extensometer data.
+
+        Parameters
+        ----------
+        stress : np.ndarray
+            Engineering stress in MPa
+        strain : np.ndarray
+            Engineering strain (from displacement)
+        E_modulus : float
+            Young's modulus in GPa
+        Rm : float
+            Ultimate tensile strength in MPa
+        area : float
+            Cross-sectional area in mm^2
+        area_uncertainty : float
+            Uncertainty in area in mm^2
+
+        Returns
+        -------
+        MeasuredValue
+            Yield strength Rp0.5 with uncertainty in MPa
+        """
+        offset = 0.005  # 0.5%
+        E_mpa = E_modulus * 1000  # Convert GPa to MPa
+
+        # Find strain at 30% of Rm (baseline reference point)
+        target_stress = 0.30 * Rm
+
+        # Find the index closest to 30% Rm on the ascending part of the curve
+        max_idx = np.argmax(stress)
+        ascending_stress = stress[:max_idx + 1]
+        ascending_strain = strain[:max_idx + 1]
+
+        # Find index where stress is closest to 30% Rm
+        baseline_idx = np.argmin(np.abs(ascending_stress - target_stress))
+        strain_baseline = ascending_strain[baseline_idx]
+
+        # Shift strain so that strain at 30% Rm becomes the reference
+        strain_corrected = strain - strain_baseline
+
+        # Apply standard offset method with corrected strain
+        offset_line = E_mpa * (strain_corrected - offset)
+        curve_minus_offset = stress - offset_line
+
+        # Find region after corrected strain exceeds offset
+        valid_idx = strain_corrected > offset * 1.5
+
+        if not np.any(valid_idx):
+            raise ValueError("Insufficient strain data for Rp0.5 calculation (displacement method)")
+
+        curve_segment = curve_minus_offset[valid_idx]
+        strain_segment = strain_corrected[valid_idx]
+        stress_segment = stress[valid_idx]
+
+        # Find sign change (zero crossing)
+        sign_changes = np.where(np.diff(np.sign(curve_segment)))[0]
+
+        if len(sign_changes) == 0:
+            idx = np.argmin(np.abs(curve_segment))
+            yield_stress = stress_segment[idx]
+        else:
+            idx = sign_changes[0]
+            s0, s1 = strain_segment[idx], strain_segment[idx + 1]
+            c0, c1 = curve_segment[idx], curve_segment[idx + 1]
+
+            if c1 - c0 != 0:
+                yield_strain = s0 - c0 * (s1 - s0) / (c1 - c0)
+                yield_stress = E_mpa * (yield_strain - offset)
+            else:
+                yield_stress = stress_segment[idx]
+
+        # Uncertainty calculation
+        u_area = yield_stress * (area_uncertainty / area)
+        u_force = yield_stress * self.config.force_calibration_uncertainty
+        u_baseline = yield_stress * 0.01  # Baseline determination uncertainty
+
+        if len(sign_changes) > 0 and idx + 1 < len(stress_segment):
+            u_interpolation = abs(stress_segment[idx + 1] - stress_segment[idx]) / 4
+        else:
+            u_interpolation = yield_stress * 0.01
+
+        u_combined = np.sqrt(u_area**2 + u_force**2 + u_interpolation**2 + u_baseline**2)
+        U = 2 * u_combined
+
+        return MeasuredValue(
+            value=round(yield_stress, 1),
+            uncertainty=round(U, 1),
+            unit="MPa",
+            coverage_factor=2.0
+        )
+
     def calculate_upper_yield_strength_reh(
         self,
         stress: np.ndarray,

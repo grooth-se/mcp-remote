@@ -635,12 +635,23 @@ class TensileTestApp:
             yield_type = self.yield_type.get()
 
             # Always calculate Rp0.2/Rp0.5 (needed for offset line in plot)
-            Rp02 = analyzer.calculate_yield_strength_rp02(
-                self.stress, self.strain, E.value, area, area_unc
-            )
-            Rp05 = analyzer.calculate_yield_strength_rp05(
-                self.stress, self.strain, E.value, area, area_unc
-            )
+            # Use displacement-specific method for crosshead data (30% Rm baseline correction)
+            if self.strain_source.get() == "extensometer":
+                Rp02 = analyzer.calculate_yield_strength_rp02(
+                    self.stress, self.strain, E.value, area, area_unc
+                )
+                Rp05 = analyzer.calculate_yield_strength_rp05(
+                    self.stress, self.strain, E.value, area, area_unc
+                )
+            else:
+                # Displacement/Crosshead: use 30% Rm as strain baseline reference
+                # This compensates for initial misalignment in test equipment
+                Rp02 = analyzer.calculate_yield_strength_rp02_displacement(
+                    self.stress, self.strain, E.value, Rm.value, area, area_unc
+                )
+                Rp05 = analyzer.calculate_yield_strength_rp05_displacement(
+                    self.stress, self.strain, E.value, Rm.value, area, area_unc
+                )
 
             # Calculate ReH/ReL
             ReH = analyzer.calculate_upper_yield_strength_reh(
