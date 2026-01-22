@@ -68,6 +68,9 @@ class VickersTestApp:
 
     def _on_close(self):
         """Handle window close - return to launcher if available."""
+        # Unbind mousewheel to prevent errors after window closes
+        if hasattr(self, '_scroll_canvas'):
+            self.root.unbind_all("<MouseWheel>")
         self.root.destroy()
         if self.parent_launcher:
             self.parent_launcher.show()
@@ -199,10 +202,12 @@ class VickersTestApp:
         canvas.grid(row=0, column=0, sticky="nsew")
         scrollbar.grid(row=0, column=1, sticky="ns")
 
-        # Mouse wheel scrolling
+        # Mouse wheel scrolling - store reference for cleanup
+        self._scroll_canvas = canvas
         def on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", on_mousewheel)
+            if self._scroll_canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        self._mousewheel_binding = canvas.bind_all("<MouseWheel>", on_mousewheel)
 
         # Build content in scrollable frame
         self._build_left_content(self.scrollable_frame)
