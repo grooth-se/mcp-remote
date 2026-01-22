@@ -984,10 +984,27 @@ class TensileTestApp:
                         label='Displacement')
 
         # Elastic slope line at 0.2% offset (always shown, grey, dashed)
+        # For displacement data, use 30% Rm baseline correction
         offset_02 = 0.002
-        max_strain_for_line = min(0.03, max_strain * 0.4)
-        offset_strain_02 = np.linspace(offset_02, max_strain_for_line, 100)
-        offset_stress_02 = E_mpa * (offset_strain_02 - offset_02)
+        strain_baseline = 0.0  # Default for extensometer
+
+        if self.strain_source.get() != "extensometer" and self.strain_displacement is not None:
+            # Calculate baseline correction for displacement data (same as in calculation)
+            target_stress = 0.30 * Rm.value
+            max_idx = np.argmax(self.stress)
+            ascending_stress = self.stress[:max_idx + 1]
+            ascending_strain = self.strain_displacement[:max_idx + 1]
+            ref_idx = np.argmin(np.abs(ascending_stress - target_stress))
+            strain_ref = ascending_strain[ref_idx]
+            stress_ref = ascending_stress[ref_idx]
+            # x-intercept of elastic line through 30% Rm point
+            strain_baseline = strain_ref - stress_ref / E_mpa
+
+        # Offset line starts from (strain_baseline + offset, 0) with slope E
+        offset_start = strain_baseline + offset_02
+        max_strain_for_line = min(0.03 + strain_baseline, max_strain * 0.4)
+        offset_strain_02 = np.linspace(offset_start, max_strain_for_line, 100)
+        offset_stress_02 = E_mpa * (offset_strain_02 - offset_start)
         valid_02 = offset_stress_02 < max_stress * 1.1
         self.ax.plot(offset_strain_02[valid_02], offset_stress_02[valid_02],
                     color='grey', linestyle='--', linewidth=1,
