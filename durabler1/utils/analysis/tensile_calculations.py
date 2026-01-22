@@ -687,9 +687,11 @@ class TensileAnalyzer:
         """
         Calculate 0.2% offset yield strength (Rp0.2) for displacement/crosshead data.
 
-        This method uses strain at 30% of Rm as the baseline reference point
-        to compensate for initial misalignment in the test equipment. The strain
-        baseline is shifted so that strain at 30% Rm becomes the reference zero.
+        This method uses the point at 30% of Rm as a reference to establish the
+        elastic line baseline, compensating for initial misalignment in the test
+        equipment. The elastic line is drawn through the 30% Rm point with slope E,
+        and its x-intercept (strain at zero stress) is used as the origin for the
+        0.2% offset calculation.
 
         NOTE: This method should ONLY be used for displacement/crosshead data,
         NOT for extensometer data.
@@ -717,7 +719,7 @@ class TensileAnalyzer:
         offset = self.config.offset_strain  # 0.002 (0.2%)
         E_mpa = E_modulus * 1000  # Convert GPa to MPa
 
-        # Find strain at 30% of Rm (baseline reference point)
+        # Find the point at 30% of Rm as reference for the elastic line
         target_stress = 0.30 * Rm
 
         # Find the index closest to 30% Rm on the ascending part of the curve
@@ -727,11 +729,19 @@ class TensileAnalyzer:
         ascending_strain = strain[:max_idx + 1]
 
         # Find index where stress is closest to 30% Rm
-        baseline_idx = np.argmin(np.abs(ascending_stress - target_stress))
-        strain_baseline = ascending_strain[baseline_idx]
+        ref_idx = np.argmin(np.abs(ascending_stress - target_stress))
+        strain_ref = ascending_strain[ref_idx]
+        stress_ref = ascending_stress[ref_idx]
 
-        # Shift strain so that strain at 30% Rm becomes the reference
-        strain_corrected = strain - strain_baseline
+        # Calculate the x-intercept (strain at zero stress) of the elastic line
+        # passing through the reference point with slope E
+        # Elastic line: sigma = E * (epsilon - epsilon_0)
+        # At reference point: stress_ref = E * (strain_ref - epsilon_0)
+        # So: epsilon_0 = strain_ref - stress_ref / E
+        strain_zero = strain_ref - stress_ref / E_mpa
+
+        # Shift strain so that the elastic line x-intercept becomes the origin
+        strain_corrected = strain - strain_zero
 
         # Apply standard offset method with corrected strain
         # Offset line: sigma = E * (epsilon_corrected - offset)
@@ -800,9 +810,11 @@ class TensileAnalyzer:
         """
         Calculate 0.5% offset yield strength (Rp0.5) for displacement/crosshead data.
 
-        This method uses strain at 30% of Rm as the baseline reference point
-        to compensate for initial misalignment in the test equipment. The strain
-        baseline is shifted so that strain at 30% Rm becomes the reference zero.
+        This method uses the point at 30% of Rm as a reference to establish the
+        elastic line baseline, compensating for initial misalignment in the test
+        equipment. The elastic line is drawn through the 30% Rm point with slope E,
+        and its x-intercept (strain at zero stress) is used as the origin for the
+        0.5% offset calculation.
 
         NOTE: This method should ONLY be used for displacement/crosshead data,
         NOT for extensometer data.
@@ -830,7 +842,7 @@ class TensileAnalyzer:
         offset = 0.005  # 0.5%
         E_mpa = E_modulus * 1000  # Convert GPa to MPa
 
-        # Find strain at 30% of Rm (baseline reference point)
+        # Find the point at 30% of Rm as reference for the elastic line
         target_stress = 0.30 * Rm
 
         # Find the index closest to 30% Rm on the ascending part of the curve
@@ -839,11 +851,19 @@ class TensileAnalyzer:
         ascending_strain = strain[:max_idx + 1]
 
         # Find index where stress is closest to 30% Rm
-        baseline_idx = np.argmin(np.abs(ascending_stress - target_stress))
-        strain_baseline = ascending_strain[baseline_idx]
+        ref_idx = np.argmin(np.abs(ascending_stress - target_stress))
+        strain_ref = ascending_strain[ref_idx]
+        stress_ref = ascending_stress[ref_idx]
 
-        # Shift strain so that strain at 30% Rm becomes the reference
-        strain_corrected = strain - strain_baseline
+        # Calculate the x-intercept (strain at zero stress) of the elastic line
+        # passing through the reference point with slope E
+        # Elastic line: sigma = E * (epsilon - epsilon_0)
+        # At reference point: stress_ref = E * (strain_ref - epsilon_0)
+        # So: epsilon_0 = strain_ref - stress_ref / E
+        strain_zero = strain_ref - stress_ref / E_mpa
+
+        # Shift strain so that the elastic line x-intercept becomes the origin
+        strain_corrected = strain - strain_zero
 
         # Apply standard offset method with corrected strain
         offset_line = E_mpa * (strain_corrected - offset)
