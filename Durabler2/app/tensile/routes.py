@@ -384,26 +384,52 @@ def specimen():
 
             else:
                 # Yield point method: ReH, ReL
+                # Note: These values are only valid for materials with a clear yield point
+                # (Lüders band/yield plateau), typically mild steel.
                 try:
-                    ReH = analyzer.calculate_upper_yield_strength(stress, strain, area, area_unc)
-                except Exception:
+                    ReH = analyzer.calculate_upper_yield_strength_reh(stress, strain, area, area_unc)
+                    # Validate: ReH should be at least 50% of Rm for typical steel
+                    if ReH and ReH.value < Rm.value * 0.5:
+                        print(f"ReH={ReH.value} MPa rejected (< 50% of Rm={Rm.value})")
+                        ReH = None
+                except Exception as e:
+                    print(f"ReH calculation failed: {e}")
                     ReH = None
 
                 try:
-                    ReL = analyzer.calculate_lower_yield_strength(stress, strain, area, area_unc)
-                except Exception:
+                    ReL = analyzer.calculate_lower_yield_strength_rel(stress, strain, area, area_unc)
+                    # Validate: ReL should be at least 45% of Rm and <= ReH
+                    if ReL and ReL.value < Rm.value * 0.45:
+                        print(f"ReL={ReL.value} MPa rejected (< 45% of Rm={Rm.value})")
+                        ReL = None
+                    elif ReL and ReH and ReL.value > ReH.value:
+                        print(f"ReL={ReL.value} MPa rejected (> ReH={ReH.value})")
+                        ReL = None
+                except Exception as e:
+                    print(f"ReL calculation failed: {e}")
                     ReL = None
 
                 # ReH/ReL from displacement
                 try:
-                    ReH_disp = analyzer.calculate_upper_yield_strength(stress_disp, strain_disp, area, area_unc)
+                    ReH_disp = analyzer.calculate_upper_yield_strength_reh(stress_disp, strain_disp, area, area_unc)
+                    if ReH_disp and ReH_disp.value < Rm.value * 0.5:
+                        ReH_disp = None
                 except Exception:
                     ReH_disp = None
 
                 try:
-                    ReL_disp = analyzer.calculate_lower_yield_strength(stress_disp, strain_disp, area, area_unc)
+                    ReL_disp = analyzer.calculate_lower_yield_strength_rel(stress_disp, strain_disp, area, area_unc)
+                    if ReL_disp and ReL_disp.value < Rm.value * 0.45:
+                        ReL_disp = None
+                    elif ReL_disp and ReH_disp and ReL_disp.value > ReH_disp.value:
+                        ReL_disp = None
                 except Exception:
                     ReL_disp = None
+
+                # If no valid ReH/ReL found, this material likely doesn't have a yield plateau
+                # User should use offset method (Rp0.2) instead
+                if not ReH and not ReL:
+                    flash('No clear yield point detected. Consider using Offset method (Rp0.2) for this material.', 'warning')
 
             # ===== ELONGATION AND REDUCTION OF AREA =====
 
