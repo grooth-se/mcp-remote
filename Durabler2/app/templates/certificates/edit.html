@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'New Certificate' if is_new else 'Edit ' + cert.certificate_number }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('certificates.index') }}">Certificates</a></li>
+        {% if not is_new %}
+        <li class="breadcrumb-item"><a href="{{ url_for('certificates.view', cert_id=cert.id) }}">{{ cert.certificate_number }}</a></li>
+        <li class="breadcrumb-item active">Edit</li>
+        {% else %}
+        <li class="breadcrumb-item active">New Certificate</li>
+        {% endif %}
+    </ol>
+</nav>
+
+<div class="card shadow">
+    <div class="card-header bg-{{ 'primary' if is_new else 'secondary' }} text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-{{ 'plus-circle' if is_new else 'pencil' }}"></i>
+            {{ 'New Certificate' if is_new else 'Edit Certificate' }}
+        </h4>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            {{ form.hidden_tag() }}
+
+            <!-- Certificate Number Display -->
+            <div class="alert alert-info mb-4">
+                <h5 class="mb-0">
+                    <i class="bi bi-tag"></i>
+                    Certificate: <strong id="cert-number-display">
+                        DUR-{{ form.year.data or '----' }}-{{ form.cert_id.data or '----' }}
+                        {% if form.revision.data and form.revision.data > 1 %}Rev.{{ form.revision.data }}{% endif %}
+                    </strong>
+                </h5>
+            </div>
+
+            <div class="row">
+                <!-- Column 1: Certificate Info -->
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-header"><h6 class="mb-0">Certificate Info</h6></div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                {{ form.year.label(class="form-label") }}
+                                {{ form.year(class="form-control", id="year-input") }}
+                                {% for error in form.year.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.cert_id.label(class="form-label") }}
+                                {{ form.cert_id(class="form-control", id="cert-id-input") }}
+                                {% for error in form.cert_id.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.revision.label(class="form-label") }}
+                                {{ form.revision(class="form-control", readonly=not is_new) }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.cert_date.label(class="form-label") }}
+                                {{ form.cert_date(class="form-control", type="date") }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 2: Test Information -->
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-header"><h6 class="mb-0">Test Information</h6></div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                {{ form.test_project.label(class="form-label") }}
+                                {{ form.test_project(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.project_name.label(class="form-label") }}
+                                {{ form.project_name(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.test_standard.label(class="form-label") }}
+                                {{ form.test_standard(class="form-select") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.customer.label(class="form-label") }}
+                                {{ form.customer(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.customer_order.label(class="form-label") }}
+                                {{ form.customer_order(class="form-control") }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 3: Specimen Information -->
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-header"><h6 class="mb-0">Specimen Information</h6></div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                {{ form.product.label(class="form-label") }}
+                                {{ form.product(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.product_sn.label(class="form-label") }}
+                                {{ form.product_sn(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.material.label(class="form-label") }}
+                                {{ form.material(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.specimen_id.label(class="form-label") }}
+                                {{ form.specimen_id(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.location_orientation.label(class="form-label") }}
+                                {{ form.location_orientation(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.temperature.label(class="form-label") }}
+                                {{ form.temperature(class="form-control", placeholder="e.g., 23°C") }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 4: Comment & Status -->
+                <div class="col-md-3">
+                    <div class="card mb-3">
+                        <div class="card-header"><h6 class="mb-0">Comment</h6></div>
+                        <div class="card-body">
+                            {{ form.comment(class="form-control", rows="4") }}
+                        </div>
+                    </div>
+                    <div class="card mb-3">
+                        <div class="card-header"><h6 class="mb-0">Status</h6></div>
+                        <div class="card-body">
+                            <div class="form-check mb-2">
+                                {{ form.reported(class="form-check-input") }}
+                                {{ form.reported.label(class="form-check-label") }}
+                            </div>
+                            <div class="form-check">
+                                {{ form.invoiced(class="form-check-input") }}
+                                {{ form.invoiced.label(class="form-check-label") }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{{ url_for('certificates.index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Cancel
+                </a>
+                <div>
+                    {% if not is_new %}
+                    <form method="POST" action="{{ url_for('certificates.create_revision', cert_id=cert.id) }}"
+                          class="d-inline">
+                        <button type="submit" class="btn btn-outline-info me-2">
+                            <i class="bi bi-files"></i> Create Revision
+                        </button>
+                    </form>
+                    {% endif %}
+                    {{ form.submit(class="btn btn-success btn-lg") }}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Update certificate number display when year/id changes
+document.addEventListener('DOMContentLoaded', function() {
+    const yearInput = document.getElementById('year-input');
+    const certIdInput = document.getElementById('cert-id-input');
+    const display = document.getElementById('cert-number-display');
+
+    function updateDisplay() {
+        const year = yearInput.value || '----';
+        const certId = certIdInput.value || '----';
+        display.textContent = `DUR-${year}-${certId}`;
+    }
+
+    yearInput.addEventListener('input', updateDisplay);
+    certIdInput.addEventListener('input', updateDisplay);
+
+    {% if is_new %}
+    // Auto-fetch next ID when year changes
+    yearInput.addEventListener('change', function() {
+        fetch(`{{ url_for('certificates.next_id') }}?year=${this.value}`)
+            .then(response => response.json())
+            .then(data => {
+                certIdInput.value = data.next_id;
+                updateDisplay();
+            });
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}{{ test.test_id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('tensile.index') }}">Tensile Tests</a></li>
+        <li class="breadcrumb-item active">{{ test.test_id }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-arrow-down-up"></i> {{ test.test_id }}</h2>
+        <span class="badge bg-{{ 'info' if test.status == 'ANALYZED' else 'success' if test.status == 'APPROVED' else 'warning' }}">
+            {{ test.status }}
+        </span>
+    </div>
+    <div>
+        <a href="{{ url_for('tensile.report', test_id=test.id) }}" class="btn btn-primary">
+            <i class="bi bi-file-pdf"></i> Generate Report
+        </a>
+        <a href="{{ url_for('tensile.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Test Information -->
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Test Information</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Specimen ID:</dt>
+                    <dd class="col-7">{{ test.specimen_id or '-' }}</dd>
+
+                    <dt class="col-5">Material:</dt>
+                    <dd class="col-7">{{ test.material or '-' }}</dd>
+
+                    <dt class="col-5">Batch:</dt>
+                    <dd class="col-7">{{ test.batch_number or '-' }}</dd>
+
+                    <dt class="col-5">Standard:</dt>
+                    <dd class="col-7">{{ test.test_standard }}</dd>
+
+                    <dt class="col-5">Test Date:</dt>
+                    <dd class="col-7">{{ test.test_date.strftime('%Y-%m-%d %H:%M') if test.test_date else '-' }}</dd>
+
+                    <dt class="col-5">Temperature:</dt>
+                    <dd class="col-7">{{ test.temperature|default('-', true) }} °C</dd>
+
+                    <dt class="col-5">Operator:</dt>
+                    <dd class="col-7">{{ test.operator.username if test.operator else '-' }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <!-- Specimen Geometry -->
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-rulers"></i> Specimen Geometry</h5>
+            </div>
+            <div class="card-body">
+                {% if test.geometry %}
+                <dl class="row mb-0">
+                    <dt class="col-6">Type:</dt>
+                    <dd class="col-6 text-capitalize">{{ test.geometry.type }}</dd>
+
+                    {% if test.geometry.type == 'round' %}
+                    <dt class="col-6">Diameter d₀:</dt>
+                    <dd class="col-6">{{ "%.2f"|format(test.geometry.diameter) }} mm</dd>
+                    {% if test.geometry.final_diameter %}
+                    <dt class="col-6">Final df:</dt>
+                    <dd class="col-6">{{ "%.2f"|format(test.geometry.final_diameter) }} mm</dd>
+                    {% endif %}
+                    {% else %}
+                    <dt class="col-6">Width w₀:</dt>
+                    <dd class="col-6">{{ "%.2f"|format(test.geometry.width) }} mm</dd>
+                    <dt class="col-6">Thickness t₀:</dt>
+                    <dd class="col-6">{{ "%.2f"|format(test.geometry.thickness) }} mm</dd>
+                    {% endif %}
+
+                    <dt class="col-6">Gauge Length:</dt>
+                    <dd class="col-6">{{ "%.1f"|format(test.geometry.gauge_length) }} mm</dd>
+
+                    <dt class="col-6">Area A₀:</dt>
+                    <dd class="col-6">{{ "%.2f"|format(test.geometry.area) }} mm²</dd>
+                </dl>
+                {% else %}
+                <p class="text-muted">No geometry data</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Summary -->
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Results</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm results-table mb-0">
+                    <tbody>
+                        {% if results.get('Rp0.2') %}
+                        <tr>
+                            <th>Rp0.2</th>
+                            <td class="text-end">
+                                <strong>{{ "%.1f"|format(results['Rp0.2'].value) }}</strong>
+                                <span class="text-muted">± {{ "%.1f"|format(results['Rp0.2'].uncertainty) }}</span>
+                                MPa
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {% if results.get('Rm') %}
+                        <tr>
+                            <th>Rm</th>
+                            <td class="text-end">
+                                <strong>{{ "%.1f"|format(results['Rm'].value) }}</strong>
+                                <span class="text-muted">± {{ "%.1f"|format(results['Rm'].uncertainty) }}</span>
+                                MPa
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {% if results.get('E') %}
+                        <tr>
+                            <th>E</th>
+                            <td class="text-end">
+                                <strong>{{ "%.1f"|format(results['E'].value) }}</strong>
+                                <span class="text-muted">± {{ "%.1f"|format(results['E'].uncertainty) }}</span>
+                                GPa
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {% if results.get('A%') %}
+                        <tr>
+                            <th>A%</th>
+                            <td class="text-end">
+                                <strong>{{ "%.2f"|format(results['A%'].value) }}</strong>
+                                <span class="text-muted">± {{ "%.2f"|format(results['A%'].uncertainty) }}</span>
+                                %
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {% if results.get('Ag') %}
+                        <tr>
+                            <th>Ag</th>
+                            <td class="text-end">
+                                <strong>{{ "%.2f"|format(results['Ag'].value) }}</strong>
+                                <span class="text-muted">± {{ "%.2f"|format(results['Ag'].uncertainty) }}</span>
+                                %
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {% if results.get('Z%') %}
+                        <tr>
+                            <th>Z%</th>
+                            <td class="text-end">
+                                <strong>{{ "%.1f"|format(results['Z%'].value) }}</strong>
+                                <span class="text-muted">± {{ "%.1f"|format(results['Z%'].uncertainty) }}</span>
+                                %
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stress-Strain Plot -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Stress-Strain Curve</h5>
+    </div>
+    <div class="card-body">
+        {% if plot_html %}
+        <div class="plot-container">
+            {{ plot_html | safe }}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-bar-chart display-4"></i>
+            <p>Plot not available. Raw data file may be missing.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Results Table with Uncertainty Details -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-table"></i> Detailed Results</h5>
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th class="text-end">Value</th>
+                    <th class="text-end">Uncertainty (k=2)</th>
+                    <th class="text-end">Relative Uncertainty</th>
+                    <th>Unit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for name, result in results.items() %}
+                <tr>
+                    <td><strong>{{ name }}</strong></td>
+                    <td class="text-end">{{ "%.4g"|format(result.value) }}</td>
+                    <td class="text-end">± {{ "%.2g"|format(result.uncertainty) }}</td>
+                    <td class="text-end">
+                        {% if result.value != 0 %}
+                        {{ "%.2f"|format(result.uncertainty / result.value * 100) }}%
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>{{ result.unit }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle"></i>
+            Expanded uncertainties (k=2, 95% confidence level) following GUM methodology.
+        </p>
+    </div>
+</div>
+
+<!-- Actions -->
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between">
+            <div>
+                <a href="{{ url_for('tensile.report', test_id=test.id) }}" class="btn btn-primary">
+                    <i class="bi bi-file-pdf"></i> Generate Report
+                </a>
+                {% if test.certificate %}
+                <a href="{{ url_for('certificates.view', cert_id=test.certificate.id) }}" class="btn btn-outline-info ms-2">
+                    <i class="bi bi-journal-text"></i> {{ test.certificate.certificate_number_with_rev }}
+                </a>
+                {% elif test.certificate_number %}
+                <span class="ms-3 text-muted">
+                    Certificate: <strong>{{ test.certificate_number }}</strong>
+                </span>
+                {% endif %}
+            </div>
+            {% if current_user.role == 'admin' %}
+            <form method="POST" action="{{ url_for('tensile.delete', test_id=test.id) }}"
+                  onsubmit="return confirm('Delete this test? This cannot be undone.');">
+                <input type="hidden" name="reason" value="User requested deletion">
+                <button type="submit" class="btn btn-outline-danger">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}New Tensile Test{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('tensile.index') }}">Tensile Tests</a></li>
+        <li class="breadcrumb-item active">New Test</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-upload"></i> Upload Test Data</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    Upload the CSV file exported from MTS TestSuite containing the force-displacement data.
+                </p>
+
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-4">
+                        <label class="form-label">{{ form.csv_file.label.text }}</label>
+                        <div class="upload-area p-4 text-center">
+                            <i class="bi bi-file-earmark-spreadsheet display-4 text-muted mb-3"></i>
+                            <div class="mb-3">
+                                {{ form.csv_file(class="form-control", accept=".csv") }}
+                            </div>
+                            <small class="text-muted">
+                                Supported format: MTS TestSuite CSV export
+                            </small>
+                        </div>
+                        {% for error in form.csv_file.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-4">
+                        {{ form.certificate_id.label(class="form-label") }}
+                        {{ form.certificate_id(class="form-select") }}
+                        <small class="text-muted">
+                            Link this test to an existing certificate or leave blank.
+                        </small>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                        <a href="{{ url_for('tensile.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Help section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-question-circle"></i> CSV File Format</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-2">Expected CSV format from MTS TestSuite:</p>
+                <ul class="small text-muted">
+                    <li>Lines 1-4: Metadata (file path, test name, date)</li>
+                    <li>Line 7: Column headers (Time, Force, Displacement, Extension)</li>
+                    <li>Line 8+: Numerical data</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

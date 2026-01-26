@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Certificate Register{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-journal-text"></i> Certificate Register</h2>
+        <p class="text-muted">Manage test certificates (DUR-YYYY-NNNN)</p>
+    </div>
+    <a href="{{ url_for('certificates.new') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-plus-circle"></i> New Certificate
+    </a>
+</div>
+
+<!-- Filter Bar -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">Year</label>
+                <select name="year" class="form-select">
+                    <option value="All" {{ 'selected' if year_filter == 'All' or not year_filter else '' }}>All Years</option>
+                    {% for y in years %}
+                    <option value="{{ y }}" {{ 'selected' if year_filter|string == y|string else '' }}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Search</label>
+                <input type="text" name="search" class="form-control"
+                       value="{{ search_term }}" placeholder="Project, customer, material...">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Search
+                </button>
+                {% if search_term or (year_filter and year_filter != 'All') %}
+                <a href="{{ url_for('certificates.index') }}" class="btn btn-outline-secondary">Clear</a>
+                {% endif %}
+            </div>
+            <div class="col-md-4 text-end">
+                <span class="text-muted">{{ certificates|length }} certificates</span>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Certificates Table -->
+{% if certificates %}
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Certificate No.</th>
+                        <th>Date</th>
+                        <th>Project</th>
+                        <th>Customer</th>
+                        <th>Standard</th>
+                        <th>Material</th>
+                        <th class="text-center">Reported</th>
+                        <th class="text-center">Invoiced</th>
+                        <th class="text-center">Tests</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cert in certificates %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('certificates.view', cert_id=cert.id) }}" class="fw-bold text-decoration-none">
+                                {{ cert.certificate_number_with_rev }}
+                            </a>
+                        </td>
+                        <td>{{ cert.cert_date.strftime('%Y-%m-%d') if cert.cert_date else '-' }}</td>
+                        <td>{{ cert.test_project or '-' }}</td>
+                        <td>{{ cert.customer or '-' }}</td>
+                        <td><small>{{ cert.test_standard or '-' }}</small></td>
+                        <td><small>{{ cert.material or '-' }}</small></td>
+                        <td class="text-center">
+                            {% if cert.reported %}
+                            <span class="badge bg-success"><i class="bi bi-check"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if cert.invoiced %}
+                            <span class="badge bg-success"><i class="bi bi-check"></i></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% set test_count = cert.test_records.count() %}
+                            {% if test_count > 0 %}
+                            <span class="badge bg-info">{{ test_count }}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('certificates.view', cert_id=cert.id) }}"
+                               class="btn btn-sm btn-outline-primary" title="View">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{{ url_for('certificates.edit', cert_id=cert.id) }}"
+                               class="btn btn-sm btn-outline-secondary" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-journal display-1 text-muted mb-3"></i>
+        <h4>No Certificates Found</h4>
+        {% if search_term %}
+        <p class="text-muted">No certificates match your search criteria.</p>
+        <a href="{{ url_for('certificates.index') }}" class="btn btn-outline-primary">Clear Search</a>
+        {% else %}
+        <p class="text-muted">Create your first certificate to get started.</p>
+        <a href="{{ url_for('certificates.new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> New Certificate
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Report - {{ test.test_id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('tensile.index') }}">Tensile Tests</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('tensile.view', test_id=test.id) }}">{{ test.test_id }}</a></li>
+        <li class="breadcrumb-item active">Generate Report</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-file-pdf"></i> Generate Report</h4>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h6>Test Information</h6>
+                    <dl class="row mb-0">
+                        <dt class="col-4">Test ID:</dt>
+                        <dd class="col-8">{{ test.test_id }}</dd>
+                        <dt class="col-4">Specimen:</dt>
+                        <dd class="col-8">{{ test.specimen_id }}</dd>
+                        <dt class="col-4">Material:</dt>
+                        <dd class="col-8">{{ test.material or '-' }}</dd>
+                    </dl>
+                </div>
+
+                <hr>
+
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.certificate_number.label(class="form-label") }}
+                        {{ form.certificate_number(class="form-control", placeholder="e.g., DUR-2026-0001") }}
+                        <small class="text-muted">Leave blank to auto-generate</small>
+                    </div>
+
+                    <div class="mb-4">
+                        {{ form.include_raw_data.label(class="form-label") }}
+                        {{ form.include_raw_data(class="form-select") }}
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                        <a href="{{ url_for('tensile.view', test_id=test.id) }}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Report Contents</h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-2">The generated report will include:</p>
+                <ul class="small text-muted mb-0">
+                    <li>Laboratory header with accreditation number</li>
+                    <li>Specimen identification and geometry</li>
+                    <li>Test conditions and equipment</li>
+                    <li>All results with expanded uncertainties</li>
+                    <li>Stress-strain curve plot</li>
+                    <li>Validity statement per {{ test.test_standard }}</li>
+                    <li>Signature blocks for approval</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

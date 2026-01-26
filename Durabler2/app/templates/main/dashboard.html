@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
+        <p class="text-muted">Welcome, {{ current_user.username }}. Select a test method to begin.</p>
+    </div>
+</div>
+
+<!-- Test Method Cards -->
+<div class="row g-4 mb-5">
+    <!-- Tensile Testing -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 test-card">
+            <div class="card-body text-center">
+                <i class="bi bi-arrow-down-up display-4 text-primary mb-3"></i>
+                <h5 class="card-title">Tensile Testing</h5>
+                <p class="card-text text-muted small">ASTM E8/E8M, ISO 6892-1</p>
+                <a href="{{ url_for('tensile.index') }}" class="btn btn-primary stretched-link">Open</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sonic Resonance -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 test-card">
+            <div class="card-body text-center">
+                <i class="bi bi-soundwave display-4 text-success mb-3"></i>
+                <h5 class="card-title">Sonic Resonance</h5>
+                <p class="card-text text-muted small">Modified ASTM E1875</p>
+                <a href="#" class="btn btn-success stretched-link disabled">Coming Soon</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- FCGR -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 test-card">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up display-4 text-info mb-3"></i>
+                <h5 class="card-title">FCGR</h5>
+                <p class="card-text text-muted small">ASTM E647</p>
+                <a href="#" class="btn btn-info stretched-link disabled">Coming Soon</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTOD -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 test-card">
+            <div class="card-body text-center">
+                <i class="bi bi-arrows-angle-expand display-4 text-warning mb-3"></i>
+                <h5 class="card-title">CTOD</h5>
+                <p class="card-text text-muted small">ASTM E1820/E1290</p>
+                <a href="#" class="btn btn-warning stretched-link disabled">Coming Soon</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KIC -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 test-card">
+            <div class="card-body text-center">
+                <i class="bi bi-lightning display-4 text-danger mb-3"></i>
+                <h5 class="card-title">KIC</h5>
+                <p class="card-text text-muted small">ASTM E399</p>
+                <a href="#" class="btn btn-danger stretched-link disabled">Coming Soon</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vickers -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 test-card">
+            <div class="card-body text-center">
+                <i class="bi bi-diamond display-4 text-secondary mb-3"></i>
+                <h5 class="card-title">Vickers Hardness</h5>
+                <p class="card-text text-muted small">ISO 6507-1, ASTM E92</p>
+                <a href="#" class="btn btn-secondary stretched-link disabled">Coming Soon</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Certificate Register -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 test-card">
+            <div class="card-body text-center">
+                <i class="bi bi-journal-text display-4 text-dark mb-3"></i>
+                <h5 class="card-title">Certificate Register</h5>
+                <p class="card-text text-muted small">Search & Manage</p>
+                <a href="#" class="btn btn-dark stretched-link disabled">Coming Soon</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Summary -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card bg-warning bg-opacity-10 border-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-warning">Draft Tests</h6>
+                        <h2>{{ draft_count }}</h2>
+                    </div>
+                    <i class="bi bi-file-earmark-text display-4 text-warning opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info bg-opacity-10 border-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-info">Analyzed</h6>
+                        <h2>{{ analyzed_count }}</h2>
+                    </div>
+                    <i class="bi bi-check-circle display-4 text-info opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success bg-opacity-10 border-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-success">User Role</h6>
+                        <h4 class="text-capitalize">{{ current_user.role }}</h4>
+                    </div>
+                    <i class="bi bi-person-badge display-4 text-success opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Tests -->
+{% if recent_tests %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-clock-history"></i> Recent Tests</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Test ID</th>
+                                <th>Method</th>
+                                <th>Specimen</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for test in recent_tests %}
+                            <tr>
+                                <td>{{ test.test_id }}</td>
+                                <td>{{ test.test_method }}</td>
+                                <td>{{ test.specimen_id or '-' }}</td>
+                                <td>{{ test.test_date.strftime('%Y-%m-%d') if test.test_date else '-' }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'warning' if test.status == 'DRAFT' else 'success' }}">
+                                        {{ test.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="#" class="btn btn-sm btn-outline-primary">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

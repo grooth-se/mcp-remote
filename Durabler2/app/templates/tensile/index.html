@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Tensile Tests{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-arrow-down-up"></i> Tensile Testing</h2>
+        <p class="text-muted">ASTM E8/E8M, ISO 6892-1</p>
+    </div>
+    <a href="{{ url_for('tensile.new') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-plus-circle"></i> New Test
+    </a>
+</div>
+
+{% if tests %}
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Test ID</th>
+                        <th>Certificate</th>
+                        <th>Specimen ID</th>
+                        <th>Material</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Rp0.2 (MPa)</th>
+                        <th>Rm (MPa)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for test in tests %}
+                    <tr>
+                        <td><strong>{{ test.test_id }}</strong></td>
+                        <td>
+                            {% if test.certificate %}
+                            <a href="{{ url_for('certificates.view', cert_id=test.certificate.id) }}" class="text-decoration-none">
+                                {{ test.certificate.certificate_number }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ test.specimen_id or '-' }}</td>
+                        <td>{{ test.material or '-' }}</td>
+                        <td>{{ test.test_date.strftime('%Y-%m-%d %H:%M') if test.test_date else '-' }}</td>
+                        <td>
+                            {% if test.status == 'DRAFT' %}
+                            <span class="badge bg-warning">Draft</span>
+                            {% elif test.status == 'ANALYZED' %}
+                            <span class="badge bg-info">Analyzed</span>
+                            {% elif test.status == 'APPROVED' %}
+                            <span class="badge bg-success">Approved</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ test.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set rp02 = test.results.filter_by(parameter_name='Rp0.2').first() %}
+                            {{ "%.1f"|format(rp02.value) if rp02 else '-' }}
+                        </td>
+                        <td>
+                            {% set rm = test.results.filter_by(parameter_name='Rm').first() %}
+                            {{ "%.1f"|format(rm.value) if rm else '-' }}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('tensile.view', test_id=test.id) }}"
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                            <a href="{{ url_for('tensile.report', test_id=test.id) }}"
+                               class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-file-pdf"></i> Report
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+        <h4>No Tensile Tests Yet</h4>
+        <p class="text-muted">Upload an MTS CSV file to start your first test.</p>
+        <a href="{{ url_for('tensile.new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> New Test
+        </a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
