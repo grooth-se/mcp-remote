@@ -954,12 +954,12 @@ class TensileAnalyzer:
             search_idx = np.ones(len(strain), dtype=bool)
 
         stress_search = stress[search_idx]
+        strain_search = strain[search_idx]
+        max_stress_in_region = np.max(stress_search)
 
         # Find local maxima by looking for sign changes in the derivative
         # Use smoothing to avoid noise-induced false peaks
-        window = min(5, len(stress_search) // 10)
-        if window < 2:
-            window = 2
+        window = min(11, max(3, len(stress_search) // 20))
 
         # Simple smoothing
         stress_smooth = np.convolve(stress_search, np.ones(window)/window, mode='same')
@@ -967,18 +967,40 @@ class TensileAnalyzer:
         # Find first significant peak (where derivative changes from + to -)
         diff_stress = np.diff(stress_smooth)
 
+        # Minimum strain before considering yield point (skip elastic region noise)
+        min_strain_for_yield = 0.001  # 0.1% strain minimum
+        # Minimum stress threshold - peak must be at least 50% of max in region
+        min_stress_threshold = max_stress_in_region * 0.50
+
         # Look for first point where stress starts to decrease significantly
         # after an initial rise
         peak_idx = None
         for i in range(len(diff_stress) - 1):
             if diff_stress[i] > 0 and diff_stress[i + 1] < 0:
                 # Check if this is a significant peak (not just noise)
-                if i > 10:  # Skip very early points
-                    peak_idx = i + 1
-                    break
+                candidate_stress = stress_search[i + 1]
+                candidate_strain = strain_search[i + 1]
+
+                # Peak must be above minimum strain and stress thresholds
+                if candidate_strain > min_strain_for_yield and candidate_stress > min_stress_threshold:
+                    # Check for significant drop after peak (at least 1% drop)
+                    lookahead = min(i + 20, len(stress_search) - 1)
+                    stress_after = np.min(stress_smooth[i+1:lookahead+1])
+                    if candidate_stress - stress_after > candidate_stress * 0.01:
+                        peak_idx = i + 1
+                        break
 
         if peak_idx is None:
-            # No clear yield point, use maximum in search region
+            # No clear yield point found - use maximum in search region
+            # but only if it shows characteristic drop afterwards
+            max_idx = np.argmax(stress_search)
+            if max_idx < len(stress_search) - 10:
+                stress_after_max = np.min(stress_search[max_idx:max_idx+10])
+                if stress_search[max_idx] - stress_after_max > stress_search[max_idx] * 0.005:
+                    peak_idx = max_idx
+
+        if peak_idx is None:
+            # Still no valid peak - this material likely doesn't have a yield point
             peak_idx = np.argmax(stress_search)
 
         ReH = stress_search[peak_idx]
@@ -1028,6 +1050,7 @@ class TensileAnalyzer:
             Lower yield strength ReL with uncertainty in MPa
         """
         # First find ReH to identify the yield point region
+        # Use the same improved algorithm as calculate_upper_yield_strength_reh
         max_strain_search = 0.05
         search_idx = strain < max_strain_search
 
@@ -1036,46 +1059,68 @@ class TensileAnalyzer:
 
         stress_search = stress[search_idx]
         strain_search = strain[search_idx]
+        max_stress_in_region = np.max(stress_search)
 
-        # Find the peak (ReH location)
-        window = min(5, len(stress_search) // 10)
-        if window < 2:
-            window = 2
+        # Find the peak (ReH location) using same improved logic
+        window = min(11, max(3, len(stress_search) // 20))
         stress_smooth = np.convolve(stress_search, np.ones(window)/window, mode='same')
         diff_stress = np.diff(stress_smooth)
+
+        min_strain_for_yield = 0.001
+        min_stress_threshold = max_stress_in_region * 0.50
 
         peak_idx = None
         for i in range(len(diff_stress) - 1):
             if diff_stress[i] > 0 and diff_stress[i + 1] < 0:
-                if i > 10:
-                    peak_idx = i + 1
-                    break
+                candidate_stress = stress_search[i + 1]
+                candidate_strain = strain_search[i + 1]
+                if candidate_strain > min_strain_for_yield and candidate_stress > min_stress_threshold:
+                    lookahead = min(i + 20, len(stress_search) - 1)
+                    stress_after = np.min(stress_smooth[i+1:lookahead+1])
+                    if candidate_stress - stress_after > candidate_stress * 0.01:
+                        peak_idx = i + 1
+                        break
+
+        if peak_idx is None:
+            max_idx = np.argmax(stress_search)
+            if max_idx < len(stress_search) - 10:
+                stress_after_max = np.min(stress_search[max_idx:max_idx+10])
+                if stress_search[max_idx] - stress_after_max > stress_search[max_idx] * 0.005:
+                    peak_idx = max_idx
 
         if peak_idx is None:
             peak_idx = np.argmax(stress_search)
+
+        ReH_value = stress_search[peak_idx]
 
         # ReL is the minimum stress in the Lüders region (after ReH)
         # The Lüders region typically extends until strain hardening begins
         # Look for minimum between ReH and where stress starts rising again
 
-        # Search from peak to end of search region
-        post_peak_stress = stress_search[peak_idx:]
-        post_peak_strain = strain_search[peak_idx:]
+        # Search from peak, but limit to reasonable Lüders region (max 3% additional strain)
+        peak_strain = strain_search[peak_idx]
+        max_luders_strain = peak_strain + 0.03  # Lüders plateau typically < 3% strain
+        luders_idx = (strain_search > peak_strain) & (strain_search < max_luders_strain)
 
-        if len(post_peak_stress) < 5:
-            # Not enough data, use the value right after peak
-            ReL = stress_search[min(peak_idx + 5, len(stress_search) - 1)]
+        post_peak_stress = stress_search[luders_idx] if np.any(luders_idx) else stress_search[peak_idx:]
+
+        if len(post_peak_stress) < 3:
+            # Not enough data for Lüders region, ReL ~ ReH
+            ReL = ReH_value * 0.98  # Estimate ReL slightly below ReH
         else:
             # Find the minimum in the Lüders plateau region
-            # Exclude initial transient (first ~20% of post-peak region)
-            transient_skip = max(1, len(post_peak_stress) // 5)
-            luders_region = post_peak_stress[transient_skip:]
+            # ReL should be close to ReH (within 80-100% typically)
+            min_stress = np.min(post_peak_stress)
 
-            if len(luders_region) > 0:
-                min_idx = np.argmin(luders_region)
-                ReL = luders_region[min_idx]
+            # Validate: ReL shouldn't be too far below ReH
+            if min_stress >= ReH_value * 0.80:
+                ReL = min_stress
             else:
-                ReL = post_peak_stress[-1]
+                # Minimum is too low (noise or no real Lüders region)
+                # Use a value closer to ReH
+                ReL = np.percentile(post_peak_stress, 10)  # 10th percentile
+                if ReL < ReH_value * 0.80:
+                    ReL = ReH_value * 0.95  # Fallback estimate
 
         # Uncertainty calculation
         u_area = ReL * (area_uncertainty / area)

@@ -398,12 +398,17 @@ def specimen():
 
                 try:
                     ReL = analyzer.calculate_lower_yield_strength_rel(stress, strain, area, area_unc)
-                    # Validate: ReL should be at least 45% of Rm and <= ReH
-                    if ReL and ReL.value < Rm.value * 0.45:
+                    # Validate ReL based on ReH if available, otherwise based on Rm
+                    if ReH and ReL:
+                        # ReL should be between 80% and 100% of ReH for valid yield plateau
+                        if ReL.value < ReH.value * 0.80:
+                            print(f"ReL={ReL.value} MPa rejected (< 80% of ReH={ReH.value})")
+                            ReL = None
+                        elif ReL.value > ReH.value:
+                            print(f"ReL={ReL.value} MPa rejected (> ReH={ReH.value})")
+                            ReL = None
+                    elif ReL and ReL.value < Rm.value * 0.45:
                         print(f"ReL={ReL.value} MPa rejected (< 45% of Rm={Rm.value})")
-                        ReL = None
-                    elif ReL and ReH and ReL.value > ReH.value:
-                        print(f"ReL={ReL.value} MPa rejected (> ReH={ReH.value})")
                         ReL = None
                 except Exception as e:
                     print(f"ReL calculation failed: {e}")
@@ -419,9 +424,10 @@ def specimen():
 
                 try:
                     ReL_disp = analyzer.calculate_lower_yield_strength_rel(stress_disp, strain_disp, area, area_unc)
-                    if ReL_disp and ReL_disp.value < Rm.value * 0.45:
-                        ReL_disp = None
-                    elif ReL_disp and ReH_disp and ReL_disp.value > ReH_disp.value:
+                    if ReH_disp and ReL_disp:
+                        if ReL_disp.value < ReH_disp.value * 0.80 or ReL_disp.value > ReH_disp.value:
+                            ReL_disp = None
+                    elif ReL_disp and ReL_disp.value < Rm.value * 0.45:
                         ReL_disp = None
                 except Exception:
                     ReL_disp = None
