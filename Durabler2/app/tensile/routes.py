@@ -49,62 +49,111 @@ def calculate_area_uncertainty(diameter, d_unc=0.01):
 
 def create_stress_strain_plot(strain, stress, strain_disp=None, stress_disp=None,
                                rp02_strain=None, rp02_stress=None,
+                               rp05_strain=None, rp05_stress=None,
                                rm_strain=None, rm_stress=None,
+                               reh_strain=None, reh_stress=None,
+                               rel_strain=None, rel_stress=None,
                                E_modulus=None):
     """Create interactive Plotly stress-strain chart."""
     fig = go.Figure()
 
-    # Main stress-strain curve (extensometer)
+    # Main stress-strain curve (extensometer) - DARK RED
     fig.add_trace(go.Scatter(
         x=strain * 100,  # Convert to %
         y=stress,
         mode='lines',
         name='Extensometer',
-        line=dict(color='#0d6efd', width=2)
+        line=dict(color='#8B0000', width=2)  # Dark red
     ))
 
-    # Displacement curve if available
+    # Displacement curve - BLACK
     if strain_disp is not None and stress_disp is not None:
         fig.add_trace(go.Scatter(
             x=strain_disp * 100,
             y=stress_disp,
             mode='lines',
             name='Displacement',
-            line=dict(color='#6c757d', width=1, dash='dash')
+            line=dict(color='#000000', width=1.5)  # Black solid
         ))
 
-    # Mark Rp0.2 point
+    # Elastic slope line - GREY DOTTED
+    if E_modulus:
+        E_mpa = E_modulus * 1000
+        max_elastic_strain = 0.01  # Up to 1%
+        elastic_strain = np.linspace(0, max_elastic_strain, 50)
+        elastic_stress = E_mpa * elastic_strain
+        valid = elastic_stress <= np.max(stress) * 1.1
+        fig.add_trace(go.Scatter(
+            x=elastic_strain[valid] * 100,
+            y=elastic_stress[valid],
+            mode='lines',
+            name=f'E = {E_modulus:.0f} GPa',
+            line=dict(color='#808080', width=1, dash='dot')  # Grey dotted
+        ))
+
+    # Rp0.2 horizontal line - GREY DASHED
     if rp02_strain is not None and rp02_stress is not None:
         fig.add_trace(go.Scatter(
-            x=[rp02_strain * 100],
-            y=[rp02_stress],
-            mode='markers',
+            x=[0, rp02_strain * 100 * 1.5],
+            y=[rp02_stress, rp02_stress],
+            mode='lines',
             name=f'Rp0.2 = {rp02_stress:.1f} MPa',
-            marker=dict(color='#198754', size=12, symbol='circle')
+            line=dict(color='#808080', width=1, dash='dash')  # Grey dashed
         ))
 
-        # Draw 0.2% offset line
+        # Draw 0.2% offset line - GREY DOTTED
         if E_modulus:
             E_mpa = E_modulus * 1000
-            offset_strain = np.linspace(0.002, rp02_strain * 1.2, 50)
+            offset_strain = np.linspace(0.002, rp02_strain * 1.3, 50)
             offset_stress = E_mpa * (offset_strain - 0.002)
-            valid = offset_stress > 0
+            valid = (offset_stress > 0) & (offset_stress <= rp02_stress * 1.1)
             fig.add_trace(go.Scatter(
                 x=offset_strain[valid] * 100,
                 y=offset_stress[valid],
                 mode='lines',
                 name='0.2% offset',
-                line=dict(color='#198754', width=1, dash='dot')
+                line=dict(color='#808080', width=1, dash='dot'),  # Grey dotted
+                showlegend=False
             ))
 
-    # Mark Rm point
+    # Rp0.5 horizontal line - GREY DASHDOT
+    if rp05_strain is not None and rp05_stress is not None:
+        fig.add_trace(go.Scatter(
+            x=[0, rp05_strain * 100 * 1.5],
+            y=[rp05_stress, rp05_stress],
+            mode='lines',
+            name=f'Rp0.5 = {rp05_stress:.1f} MPa',
+            line=dict(color='#808080', width=1, dash='dashdot')  # Grey dashdot
+        ))
+
+    # Rm horizontal line - GREY LONGDASH
     if rm_strain is not None and rm_stress is not None:
         fig.add_trace(go.Scatter(
-            x=[rm_strain * 100],
-            y=[rm_stress],
-            mode='markers',
+            x=[0, rm_strain * 100 * 1.2],
+            y=[rm_stress, rm_stress],
+            mode='lines',
             name=f'Rm = {rm_stress:.1f} MPa',
-            marker=dict(color='#dc3545', size=12, symbol='diamond')
+            line=dict(color='#808080', width=1.5, dash='longdash')  # Grey longdash
+        ))
+
+    # ReH horizontal line - GREY SOLID (thicker)
+    if reh_strain is not None and reh_stress is not None:
+        fig.add_trace(go.Scatter(
+            x=[0, reh_strain * 100 * 1.5],
+            y=[reh_stress, reh_stress],
+            mode='lines',
+            name=f'ReH = {reh_stress:.1f} MPa',
+            line=dict(color='#606060', width=1.5, dash='solid')  # Dark grey solid
+        ))
+
+    # ReL horizontal line - GREY DASH with dots
+    if rel_strain is not None and rel_stress is not None:
+        fig.add_trace(go.Scatter(
+            x=[0, rel_strain * 100 * 1.5],
+            y=[rel_stress, rel_stress],
+            mode='lines',
+            name=f'ReL = {rel_stress:.1f} MPa',
+            line=dict(color='#606060', width=1.5, dash='dashdot')  # Dark grey dashdot
         ))
 
     fig.update_layout(
@@ -650,39 +699,41 @@ def view(test_id):
 
                 # Get result values for plot
                 rp02_val = results.get('Rp0.2')
+                rp05_val = results.get('Rp0.5')
                 rm_val = results.get('Rm')
                 e_val = results.get('E')
+                reh_val = results.get('ReH')
+                rel_val = results.get('ReL')
 
                 rm_idx = np.argmax(stress)
                 rm_strain = strain[rm_idx]
 
-                # Find Rp0.2 strain
-                if e_val:
-                    offset = 0.002
-                    E_mpa = e_val.value * 1000
-                    offset_line = E_mpa * (strain - offset)
-                    curve_minus_offset = stress - offset_line
-                    valid_idx = strain > offset * 1.5
-                    if np.any(valid_idx):
-                        curve_segment = curve_minus_offset[valid_idx]
-                        strain_segment = strain[valid_idx]
-                        sign_changes = np.where(np.diff(np.sign(curve_segment)))[0]
-                        if len(sign_changes) > 0:
-                            rp02_strain = strain_segment[sign_changes[0]]
-                        else:
-                            rp02_strain = strain_segment[np.argmin(np.abs(curve_segment))]
-                    else:
-                        rp02_strain = 0.004
-                else:
-                    rp02_strain = 0.004
+                # Helper to find strain at a given stress level
+                def find_strain_at_stress(target_stress):
+                    if target_stress is None:
+                        return None
+                    idx = np.argmin(np.abs(stress - target_stress))
+                    return strain[idx]
+
+                # Find strain values for each result
+                rp02_strain = find_strain_at_stress(rp02_val.value) if rp02_val else None
+                rp05_strain = find_strain_at_stress(rp05_val.value) if rp05_val else None
+                reh_strain = find_strain_at_stress(reh_val.value) if reh_val else None
+                rel_strain = find_strain_at_stress(rel_val.value) if rel_val else None
 
                 plot_html = create_stress_strain_plot(
                     strain, stress,
                     strain_disp=strain_disp, stress_disp=stress_disp,
                     rp02_strain=rp02_strain,
                     rp02_stress=rp02_val.value if rp02_val else None,
+                    rp05_strain=rp05_strain,
+                    rp05_stress=rp05_val.value if rp05_val else None,
                     rm_strain=rm_strain,
                     rm_stress=rm_val.value if rm_val else None,
+                    reh_strain=reh_strain,
+                    reh_stress=reh_val.value if reh_val else None,
+                    rel_strain=rel_strain,
+                    rel_stress=rel_val.value if rel_val else None,
                     E_modulus=e_val.value if e_val else None
                 )
         except Exception as e:
