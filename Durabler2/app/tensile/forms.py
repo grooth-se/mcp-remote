@@ -17,16 +17,31 @@ class CSVUploadForm(FlaskForm):
 
 
 class SpecimenForm(FlaskForm):
-    """Form for entering specimen geometry and test parameters."""
+    """
+    Form for entering specimen geometry and test parameters.
+
+    Round specimens: D0, L0, Lp, D1, L1, Lf
+    Rectangular specimens: a0, b0, L0, Lp, au, bu, L1, Lf
+
+    Yield evaluation:
+    - Offset method: Rp0.2, Rp0.5
+    - Yield point method: ReH, ReL
+    """
     # Specimen identification
     specimen_id = StringField('Specimen ID', validators=[DataRequired()])
     material = StringField('Material', validators=[Optional()])
     batch_number = StringField('Batch/Heat Number', validators=[Optional()])
 
-    # Specimen geometry type
+    # Specimen type
     specimen_type = SelectField('Specimen Type', choices=[
         ('round', 'Round (Cylindrical)'),
         ('rectangular', 'Rectangular (Flat)')
+    ], validators=[DataRequired()])
+
+    # Yield evaluation method
+    yield_method = SelectField('Yield Evaluation', choices=[
+        ('offset', 'Offset method (Rp0.2 / Rp0.5)'),
+        ('yield_point', 'Yield point (ReH / ReL)')
     ], validators=[DataRequired()])
 
     # Test standard
@@ -35,59 +50,57 @@ class SpecimenForm(FlaskForm):
         ('ISO 6892-1:2019', 'ISO 6892-1:2019')
     ])
 
-    # === INITIAL MEASUREMENTS (before test) ===
-    # Round specimen - initial
-    diameter = FloatField('Initial Diameter d₀ (mm)', validators=[
+    # Test conditions
+    test_temperature = FloatField('Test Temperature (°C)', validators=[Optional()])
+
+    # === ROUND SPECIMEN - BEFORE TEST ===
+    D0 = FloatField('D0 - Initial Diameter (mm)', validators=[
         Optional(),
         NumberRange(min=0.1, max=100, message='Diameter must be between 0.1 and 100 mm')
     ])
 
-    # Rectangular specimen - initial
-    width = FloatField('Initial Width a₀ (mm)', validators=[
+    # === RECTANGULAR SPECIMEN - BEFORE TEST ===
+    a0 = FloatField('a0 - Initial Width (mm)', validators=[
         Optional(),
         NumberRange(min=0.1, max=200, message='Width must be between 0.1 and 200 mm')
     ])
-    thickness = FloatField('Initial Thickness b₀ (mm)', validators=[
+    b0 = FloatField('b0 - Initial Thickness (mm)', validators=[
         Optional(),
         NumberRange(min=0.1, max=100, message='Thickness must be between 0.1 and 100 mm')
     ])
 
-    # Length measurements - initial
-    gauge_length = FloatField('Gauge Length L₀ (mm)', validators=[
+    # === COMMON - BEFORE TEST ===
+    L0 = FloatField('L0 - Extensometer Length (mm)', validators=[
         DataRequired(),
-        NumberRange(min=1, max=500, message='Gauge length must be between 1 and 500 mm')
+        NumberRange(min=1, max=200, message='Extensometer length must be between 1 and 200 mm')
     ])
-    extensometer_gauge_length = FloatField('Extensometer Gauge Length Le (mm)', validators=[
-        Optional(),
-        NumberRange(min=1, max=200, message='Extensometer gauge must be between 1 and 200 mm')
-    ])
-    parallel_length = FloatField('Parallel Length Lc (mm)', validators=[
-        Optional(),
-        NumberRange(min=1, max=500)
+    Lp = FloatField('Lp - Parallel Length (mm)', validators=[
+        DataRequired(),
+        NumberRange(min=1, max=500, message='Parallel length must be between 1 and 500 mm')
     ])
 
-    # Test conditions
-    test_temperature = FloatField('Test Temperature (°C)', validators=[Optional()])
-
-    # === FINAL MEASUREMENTS (after fracture) ===
-    # Round specimen - final
-    final_diameter = FloatField('Final Diameter du (mm)', validators=[
+    # === ROUND SPECIMEN - AFTER TEST ===
+    D1 = FloatField('D1 - Final Diameter (mm)', validators=[
         Optional(),
-        NumberRange(min=0.1, max=100)
+        NumberRange(min=0.1, max=100, message='Diameter must be between 0.1 and 100 mm')
     ])
 
-    # Rectangular specimen - final
-    final_width = FloatField('Final Width au (mm)', validators=[
+    # === RECTANGULAR SPECIMEN - AFTER TEST ===
+    au = FloatField('au - Final Width (mm)', validators=[
         Optional(),
         NumberRange(min=0.1, max=200)
     ])
-    final_thickness = FloatField('Final Thickness bu (mm)', validators=[
+    bu = FloatField('bu - Final Thickness (mm)', validators=[
         Optional(),
         NumberRange(min=0.1, max=100)
     ])
 
-    # Length - final
-    final_gauge_length = FloatField('Final Gauge Length Lu (mm)', validators=[
+    # === COMMON - AFTER TEST ===
+    L1 = FloatField('L1 - Final Extensometer Length (mm)', validators=[
+        Optional(),
+        NumberRange(min=1, max=1000, message='Length must be between 1 and 1000 mm')
+    ])
+    Lf = FloatField('Lf - Final Parallel Length (mm)', validators=[
         Optional(),
         NumberRange(min=1, max=1000)
     ])
@@ -104,17 +117,17 @@ class SpecimenForm(FlaskForm):
 
         # Require diameter for round specimens
         if self.specimen_type.data == 'round':
-            if not self.diameter.data:
-                self.diameter.errors.append('Diameter required for round specimens')
+            if not self.D0.data:
+                self.D0.errors.append('Diameter D0 required for round specimens')
                 return False
 
         # Require width and thickness for rectangular specimens
         if self.specimen_type.data == 'rectangular':
-            if not self.width.data:
-                self.width.errors.append('Width required for rectangular specimens')
+            if not self.a0.data:
+                self.a0.errors.append('Width a0 required for rectangular specimens')
                 return False
-            if not self.thickness.data:
-                self.thickness.errors.append('Thickness required for rectangular specimens')
+            if not self.b0.data:
+                self.b0.errors.append('Thickness b0 required for rectangular specimens')
                 return False
 
         return True

@@ -74,14 +74,14 @@
     <div class="col-md-9">
         <div class="card shadow">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-rulers"></i> Specimen Geometry & Measurements</h4>
+                <h4 class="mb-0"><i class="bi bi-rulers"></i> Specimen Geometry & Test Setup</h4>
             </div>
             <div class="card-body">
                 <form method="POST">
                     {{ form.hidden_tag() }}
 
-                    <!-- Row 1: Identification and Type -->
-                    <div class="row mb-4">
+                    <!-- Row 1: Identification -->
+                    <div class="row mb-3">
                         <div class="col-md-3">
                             {{ form.specimen_id.label(class="form-label") }}
                             {{ form.specimen_id(class="form-control") }}
@@ -93,171 +93,198 @@
                             {{ form.material.label(class="form-label") }}
                             {{ form.material(class="form-control", placeholder="e.g., S355J2") }}
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             {{ form.batch_number.label(class="form-label") }}
                             {{ form.batch_number(class="form-control") }}
                         </div>
-                        <div class="col-md-2">
-                            {{ form.specimen_type.label(class="form-label") }}
-                            {{ form.specimen_type(class="form-select", id="specimen_type") }}
-                        </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             {{ form.test_standard.label(class="form-label") }}
                             {{ form.test_standard(class="form-select") }}
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Specimen Type, Yield Method, Temperature -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            {{ form.specimen_type.label(class="form-label fw-bold") }}
+                            {{ form.specimen_type(class="form-select", id="specimen_type") }}
+                        </div>
+                        <div class="col-md-3">
+                            {{ form.yield_method.label(class="form-label fw-bold") }}
+                            {{ form.yield_method(class="form-select") }}
+                        </div>
+                        <div class="col-md-3">
+                            {{ form.test_temperature.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.test_temperature(class="form-control", value="23") }}
+                                <span class="input-group-text">°C</span>
+                            </div>
                         </div>
                     </div>
 
                     <hr>
 
                     <div class="row">
-                        <!-- INITIAL MEASUREMENTS Column -->
+                        <!-- BEFORE TEST Column -->
                         <div class="col-md-6">
-                            <h5 class="text-primary mb-3"><i class="bi bi-box-arrow-in-right"></i> Initial Measurements (Before Test)</h5>
+                            <h5 class="text-primary mb-3"><i class="bi bi-box-arrow-in-right"></i> Before Test (Initial)</h5>
 
-                            <!-- Round specimen initial -->
-                            <div id="round-initial" class="mb-3">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        {{ form.diameter.label(class="form-label") }}
+                            <!-- Round specimen fields -->
+                            <div id="round-initial">
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        {{ form.D0.label(class="form-label fw-bold") }}
                                         <div class="input-group">
-                                            {{ form.diameter(class="form-control", step="0.01", placeholder="d₀") }}
+                                            {{ form.D0(class="form-control", step="0.01", placeholder="d₀") }}
                                             <span class="input-group-text">mm</span>
                                         </div>
-                                        {% for error in form.diameter.errors %}
+                                        <small class="text-muted">For cross-section area and Z%</small>
+                                        {% for error in form.D0.errors %}
                                         <div class="text-danger small">{{ error }}</div>
                                         {% endfor %}
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Rectangular specimen initial -->
-                            <div id="rect-initial" class="mb-3" style="display: none;">
-                                <div class="row">
+                            <!-- Rectangular specimen fields -->
+                            <div id="rect-initial" style="display: none;">
+                                <div class="row mb-3">
                                     <div class="col-md-6">
-                                        {{ form.width.label(class="form-label") }}
+                                        {{ form.a0.label(class="form-label fw-bold") }}
                                         <div class="input-group">
-                                            {{ form.width(class="form-control", step="0.01", placeholder="a₀") }}
+                                            {{ form.a0(class="form-control", step="0.01", placeholder="a₀") }}
                                             <span class="input-group-text">mm</span>
                                         </div>
-                                        {% for error in form.width.errors %}
+                                        {% for error in form.a0.errors %}
                                         <div class="text-danger small">{{ error }}</div>
                                         {% endfor %}
                                     </div>
                                     <div class="col-md-6">
-                                        {{ form.thickness.label(class="form-label") }}
+                                        {{ form.b0.label(class="form-label fw-bold") }}
                                         <div class="input-group">
-                                            {{ form.thickness(class="form-control", step="0.01", placeholder="b₀") }}
+                                            {{ form.b0(class="form-control", step="0.01", placeholder="b₀") }}
                                             <span class="input-group-text">mm</span>
                                         </div>
-                                        {% for error in form.thickness.errors %}
+                                        {% for error in form.b0.errors %}
                                         <div class="text-danger small">{{ error }}</div>
                                         {% endfor %}
                                     </div>
                                 </div>
+                                <small class="text-muted">For cross-section area and Z%</small>
                             </div>
 
-                            <!-- Length measurements initial -->
+                            <!-- Common length fields -->
                             <div class="row mb-3">
                                 <div class="col-md-6">
-                                    {{ form.gauge_length.label(class="form-label") }}
+                                    {{ form.L0.label(class="form-label fw-bold") }}
                                     <div class="input-group">
-                                        {{ form.gauge_length(class="form-control", step="0.1", value="50", placeholder="L₀") }}
+                                        {{ form.L0(class="form-control", step="0.1", placeholder="Le") }}
                                         <span class="input-group-text">mm</span>
                                     </div>
-                                    <small class="text-muted">For A% calculation</small>
-                                    {% for error in form.gauge_length.errors %}
+                                    <small class="text-muted">For extensometer strain</small>
+                                    {% for error in form.L0.errors %}
                                     <div class="text-danger small">{{ error }}</div>
                                     {% endfor %}
                                 </div>
                                 <div class="col-md-6">
-                                    {{ form.extensometer_gauge_length.label(class="form-label") }}
+                                    {{ form.Lp.label(class="form-label fw-bold") }}
                                     <div class="input-group">
-                                        {{ form.extensometer_gauge_length(class="form-control", step="0.1", placeholder="Le") }}
-                                        <span class="input-group-text">mm</span>
-                                    </div>
-                                    <small class="text-muted">For strain calculation</small>
-                                </div>
-                            </div>
-
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    {{ form.parallel_length.label(class="form-label") }}
-                                    <div class="input-group">
-                                        {{ form.parallel_length(class="form-control", step="0.1", placeholder="Lc") }}
+                                        {{ form.Lp(class="form-control", step="0.1", placeholder="Lc") }}
                                         <span class="input-group-text">mm</span>
                                     </div>
                                     <small class="text-muted">For displacement strain</small>
-                                </div>
-                                <div class="col-md-6">
-                                    {{ form.test_temperature.label(class="form-label") }}
-                                    <div class="input-group">
-                                        {{ form.test_temperature(class="form-control", value="23") }}
-                                        <span class="input-group-text">°C</span>
-                                    </div>
+                                    {% for error in form.Lp.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
                                 </div>
                             </div>
                         </div>
 
-                        <!-- FINAL MEASUREMENTS Column -->
+                        <!-- AFTER TEST Column -->
                         <div class="col-md-6">
-                            <h5 class="text-success mb-3"><i class="bi bi-box-arrow-right"></i> Final Measurements (After Fracture)</h5>
+                            <h5 class="text-success mb-3"><i class="bi bi-box-arrow-right"></i> After Test (Final)</h5>
 
                             <!-- Round specimen final -->
-                            <div id="round-final" class="mb-3">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        {{ form.final_diameter.label(class="form-label") }}
+                            <div id="round-final">
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        {{ form.D1.label(class="form-label fw-bold") }}
                                         <div class="input-group">
-                                            {{ form.final_diameter(class="form-control", step="0.01", placeholder="du") }}
+                                            {{ form.D1(class="form-control", step="0.01", placeholder="df") }}
                                             <span class="input-group-text">mm</span>
                                         </div>
-                                        <small class="text-muted">For Z% calculation</small>
+                                        <small class="text-muted">For Z% and true stress at break</small>
+                                        {% for error in form.D1.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Rectangular specimen final -->
-                            <div id="rect-final" class="mb-3" style="display: none;">
-                                <div class="row">
+                            <div id="rect-final" style="display: none;">
+                                <div class="row mb-3">
                                     <div class="col-md-6">
-                                        {{ form.final_width.label(class="form-label") }}
+                                        {{ form.au.label(class="form-label fw-bold") }}
                                         <div class="input-group">
-                                            {{ form.final_width(class="form-control", step="0.01", placeholder="au") }}
+                                            {{ form.au(class="form-control", step="0.01", placeholder="au") }}
                                             <span class="input-group-text">mm</span>
                                         </div>
+                                        {% for error in form.au.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
                                     </div>
                                     <div class="col-md-6">
-                                        {{ form.final_thickness.label(class="form-label") }}
+                                        {{ form.bu.label(class="form-label fw-bold") }}
                                         <div class="input-group">
-                                            {{ form.final_thickness(class="form-control", step="0.01", placeholder="bu") }}
+                                            {{ form.bu(class="form-control", step="0.01", placeholder="bu") }}
                                             <span class="input-group-text">mm</span>
                                         </div>
+                                        {% for error in form.bu.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
                                     </div>
                                 </div>
                                 <small class="text-muted">For Z% calculation</small>
                             </div>
 
-                            <!-- Final gauge length -->
+                            <!-- Common final length fields -->
                             <div class="row mb-3">
                                 <div class="col-md-6">
-                                    {{ form.final_gauge_length.label(class="form-label") }}
+                                    {{ form.L1.label(class="form-label fw-bold") }}
                                     <div class="input-group">
-                                        {{ form.final_gauge_length(class="form-control", step="0.1", placeholder="Lu") }}
+                                        {{ form.L1(class="form-control", step="0.1", placeholder="Lu") }}
                                         <span class="input-group-text">mm</span>
                                     </div>
-                                    <small class="text-muted">Manual A% (overrides extensometer)</small>
+                                    <small class="text-muted">For A% calculation</small>
+                                    {% for error in form.L1.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
                                 </div>
-                            </div>
-
-                            <!-- Notes -->
-                            <div class="mb-3">
-                                {{ form.notes.label(class="form-label") }}
-                                {{ form.notes(class="form-control", rows="3", placeholder="Test notes, observations...") }}
+                                <div class="col-md-6">
+                                    {{ form.Lf.label(class="form-label fw-bold") }}
+                                    <div class="input-group">
+                                        {{ form.Lf(class="form-control", step="0.1", placeholder="Lcf") }}
+                                        <span class="input-group-text">mm</span>
+                                    </div>
+                                    <small class="text-muted">Optional</small>
+                                    {% for error in form.Lf.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <hr>
+
+                    <!-- Notes -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            {{ form.notes.label(class="form-label") }}
+                            {{ form.notes(class="form-control", rows="2", placeholder="Test notes, observations...") }}
+                        </div>
+                    </div>
 
                     <div class="d-flex justify-content-between">
                         <a href="{{ url_for('tensile.new') }}" class="btn btn-outline-secondary">

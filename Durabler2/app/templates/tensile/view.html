@@ -69,27 +69,36 @@
             </div>
             <div class="card-body">
                 {% if test.geometry %}
+                <div class="row">
+                    <div class="col-6">
+                        <h6 class="text-primary">Before Test</h6>
+                        <dl class="row mb-0 small">
+                            <dt class="col-5">D0:</dt>
+                            <dd class="col-7">{{ "%.2f"|format(test.geometry.D0 or test.geometry.diameter or 0) }} mm</dd>
+
+                            <dt class="col-5">L0:</dt>
+                            <dd class="col-7">{{ "%.1f"|format(test.geometry.L0 or test.geometry.extensometer_gauge_length or test.geometry.gauge_length or 0) }} mm</dd>
+
+                            <dt class="col-5">Lp:</dt>
+                            <dd class="col-7">{{ "%.1f"|format(test.geometry.Lp or test.geometry.parallel_length or 0) }} mm</dd>
+                        </dl>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-success">After Test</h6>
+                        <dl class="row mb-0 small">
+                            <dt class="col-5">D1:</dt>
+                            <dd class="col-7">{{ "%.2f"|format(test.geometry.D1 or test.geometry.final_diameter or 0) if (test.geometry.D1 or test.geometry.final_diameter) else '-' }} mm</dd>
+
+                            <dt class="col-5">L1:</dt>
+                            <dd class="col-7">{{ "%.1f"|format(test.geometry.L1 or test.geometry.final_gauge_length or 0) if (test.geometry.L1 or test.geometry.final_gauge_length) else '-' }} mm</dd>
+
+                            <dt class="col-5">Lf:</dt>
+                            <dd class="col-7">{{ "%.1f"|format(test.geometry.Lf or 0) if test.geometry.Lf else '-' }} mm</dd>
+                        </dl>
+                    </div>
+                </div>
+                <hr>
                 <dl class="row mb-0">
-                    <dt class="col-6">Type:</dt>
-                    <dd class="col-6 text-capitalize">{{ test.geometry.type }}</dd>
-
-                    {% if test.geometry.type == 'round' %}
-                    <dt class="col-6">Diameter d₀:</dt>
-                    <dd class="col-6">{{ "%.2f"|format(test.geometry.diameter) }} mm</dd>
-                    {% if test.geometry.final_diameter %}
-                    <dt class="col-6">Final df:</dt>
-                    <dd class="col-6">{{ "%.2f"|format(test.geometry.final_diameter) }} mm</dd>
-                    {% endif %}
-                    {% else %}
-                    <dt class="col-6">Width w₀:</dt>
-                    <dd class="col-6">{{ "%.2f"|format(test.geometry.width) }} mm</dd>
-                    <dt class="col-6">Thickness t₀:</dt>
-                    <dd class="col-6">{{ "%.2f"|format(test.geometry.thickness) }} mm</dd>
-                    {% endif %}
-
-                    <dt class="col-6">Gauge Length:</dt>
-                    <dd class="col-6">{{ "%.1f"|format(test.geometry.gauge_length) }} mm</dd>
-
                     <dt class="col-6">Area A₀:</dt>
                     <dd class="col-6">{{ "%.2f"|format(test.geometry.area) }} mm²</dd>
                 </dl>
@@ -100,11 +109,11 @@
         </div>
     </div>
 
-    <!-- Results Summary -->
+    <!-- Primary Results Summary -->
     <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Results</h5>
+                <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Primary Results</h5>
             </div>
             <div class="card-body">
                 <table class="table table-sm results-table mb-0">
@@ -115,6 +124,39 @@
                             <td class="text-end">
                                 <strong>{{ "%.1f"|format(results['Rp0.2'].value) }}</strong>
                                 <span class="text-muted">± {{ "%.1f"|format(results['Rp0.2'].uncertainty) }}</span>
+                                MPa
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {% if results.get('Rp0.5') %}
+                        <tr>
+                            <th>Rp0.5</th>
+                            <td class="text-end">
+                                <strong>{{ "%.1f"|format(results['Rp0.5'].value) }}</strong>
+                                <span class="text-muted">± {{ "%.1f"|format(results['Rp0.5'].uncertainty) }}</span>
+                                MPa
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {% if results.get('ReH') %}
+                        <tr>
+                            <th>ReH</th>
+                            <td class="text-end">
+                                <strong>{{ "%.1f"|format(results['ReH'].value) }}</strong>
+                                <span class="text-muted">± {{ "%.1f"|format(results['ReH'].uncertainty) }}</span>
+                                MPa
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {% if results.get('ReL') %}
+                        <tr>
+                            <th>ReL</th>
+                            <td class="text-end">
+                                <strong>{{ "%.1f"|format(results['ReL'].value) }}</strong>
+                                <span class="text-muted">± {{ "%.1f"|format(results['ReL'].uncertainty) }}</span>
                                 MPa
                             </td>
                         </tr>
@@ -200,19 +242,154 @@
     </div>
 </div>
 
-<!-- Results Table with Uncertainty Details -->
+<!-- Additional Results -->
+<div class="row">
+    <!-- Displacement-based Results -->
+    {% if results.get('E_disp') or results.get('Rp0.2_disp') or results.get('Rp0.5_disp') or results.get('ReH_disp') or results.get('ReL_disp') %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-secondary text-white">
+                <h6 class="mb-0"><i class="bi bi-arrows-vertical"></i> Displacement Results</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% if results.get('E_disp') %}
+                        <tr>
+                            <th>E (disp)</th>
+                            <td class="text-end">{{ "%.1f"|format(results['E_disp'].value) }} ± {{ "%.1f"|format(results['E_disp'].uncertainty) }} GPa</td>
+                        </tr>
+                        {% endif %}
+                        {% if results.get('Rp0.2_disp') %}
+                        <tr>
+                            <th>Rp0.2 (disp)</th>
+                            <td class="text-end">{{ "%.1f"|format(results['Rp0.2_disp'].value) }} ± {{ "%.1f"|format(results['Rp0.2_disp'].uncertainty) }} MPa</td>
+                        </tr>
+                        {% endif %}
+                        {% if results.get('Rp0.5_disp') %}
+                        <tr>
+                            <th>Rp0.5 (disp)</th>
+                            <td class="text-end">{{ "%.1f"|format(results['Rp0.5_disp'].value) }} ± {{ "%.1f"|format(results['Rp0.5_disp'].uncertainty) }} MPa</td>
+                        </tr>
+                        {% endif %}
+                        {% if results.get('ReH_disp') %}
+                        <tr>
+                            <th>ReH (disp)</th>
+                            <td class="text-end">{{ "%.1f"|format(results['ReH_disp'].value) }} ± {{ "%.1f"|format(results['ReH_disp'].uncertainty) }} MPa</td>
+                        </tr>
+                        {% endif %}
+                        {% if results.get('ReL_disp') %}
+                        <tr>
+                            <th>ReL (disp)</th>
+                            <td class="text-end">{{ "%.1f"|format(results['ReL_disp'].value) }} ± {{ "%.1f"|format(results['ReL_disp'].uncertainty) }} MPa</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                <small class="text-muted">Based on crosshead displacement</small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- True Stress & Ludwik -->
+    {% if results.get('True_stress_Rm') or results.get('True_stress_break') or results.get('K') %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-lightning"></i> True Stress & Hardening</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% if results.get('True_stress_Rm') %}
+                        <tr>
+                            <th>True stress at Rm</th>
+                            <td class="text-end">{{ "%.1f"|format(results['True_stress_Rm'].value) }} MPa</td>
+                        </tr>
+                        {% endif %}
+                        {% if results.get('True_stress_break') %}
+                        <tr>
+                            <th>True stress at break</th>
+                            <td class="text-end">{{ "%.1f"|format(results['True_stress_break'].value) }} MPa</td>
+                        </tr>
+                        {% endif %}
+                        {% if results.get('K') %}
+                        <tr>
+                            <th>K (Ludwik)</th>
+                            <td class="text-end">{{ "%.1f"|format(results['K'].value) }} MPa</td>
+                        </tr>
+                        {% endif %}
+                        {% if results.get('n') %}
+                        <tr>
+                            <th>n (Ludwik)</th>
+                            <td class="text-end">{{ "%.3f"|format(results['n'].value) }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                <small class="text-muted">Ludwik: σ = K·ε<sub>p</sub><sup>n</sup></small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Rates -->
+    {% if results.get('Stress_rate_Rp02') or results.get('Stress_rate_Rm') %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="bi bi-speedometer2"></i> Test Rates</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>At</th>
+                            <th>Stress</th>
+                            <th>Strain</th>
+                            <th>Disp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if results.get('Stress_rate_Rp02') %}
+                        <tr>
+                            <td>Rp0.2</td>
+                            <td>{{ "%.1f"|format(results['Stress_rate_Rp02'].value) }}</td>
+                            <td>{{ "%.1e"|format(results['Strain_rate_Rp02'].value) }}</td>
+                            <td>{{ "%.3f"|format(results['Disp_rate_Rp02'].value) }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if results.get('Stress_rate_Rm') %}
+                        <tr>
+                            <td>Rm</td>
+                            <td>{{ "%.1f"|format(results['Stress_rate_Rm'].value) }}</td>
+                            <td>{{ "%.1e"|format(results['Strain_rate_Rm'].value) }}</td>
+                            <td>{{ "%.3f"|format(results['Disp_rate_Rm'].value) }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                <small class="text-muted">Units: MPa/s, 1/s, mm/s</small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- All Results Table with Uncertainty Details -->
 <div class="card mb-4">
     <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-table"></i> Detailed Results</h5>
+        <h5 class="mb-0"><i class="bi bi-table"></i> All Calculated Results</h5>
     </div>
     <div class="card-body">
-        <table class="table">
+        <table class="table table-striped">
             <thead>
                 <tr>
                     <th>Parameter</th>
                     <th class="text-end">Value</th>
                     <th class="text-end">Uncertainty (k=2)</th>
-                    <th class="text-end">Relative Uncertainty</th>
+                    <th class="text-end">Relative Unc.</th>
                     <th>Unit</th>
                 </tr>
             </thead>
