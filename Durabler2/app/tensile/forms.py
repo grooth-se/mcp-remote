@@ -23,32 +23,43 @@ class SpecimenForm(FlaskForm):
     material = StringField('Material', validators=[Optional()])
     batch_number = StringField('Batch/Heat Number', validators=[Optional()])
 
-    # Specimen geometry
+    # Specimen geometry type
     specimen_type = SelectField('Specimen Type', choices=[
         ('round', 'Round (Cylindrical)'),
         ('rectangular', 'Rectangular (Flat)')
     ], validators=[DataRequired()])
 
-    # Round specimen
-    diameter = FloatField('Diameter d₀ (mm)', validators=[
+    # Test standard
+    test_standard = SelectField('Test Standard', choices=[
+        ('ASTM E8/E8M-22', 'ASTM E8/E8M-22'),
+        ('ISO 6892-1:2019', 'ISO 6892-1:2019')
+    ])
+
+    # === INITIAL MEASUREMENTS (before test) ===
+    # Round specimen - initial
+    diameter = FloatField('Initial Diameter d₀ (mm)', validators=[
         Optional(),
         NumberRange(min=0.1, max=100, message='Diameter must be between 0.1 and 100 mm')
     ])
 
-    # Rectangular specimen
-    width = FloatField('Width w₀ (mm)', validators=[
+    # Rectangular specimen - initial
+    width = FloatField('Initial Width a₀ (mm)', validators=[
         Optional(),
         NumberRange(min=0.1, max=200, message='Width must be between 0.1 and 200 mm')
     ])
-    thickness = FloatField('Thickness t₀ (mm)', validators=[
+    thickness = FloatField('Initial Thickness b₀ (mm)', validators=[
         Optional(),
         NumberRange(min=0.1, max=100, message='Thickness must be between 0.1 and 100 mm')
     ])
 
-    # Common geometry
+    # Length measurements - initial
     gauge_length = FloatField('Gauge Length L₀ (mm)', validators=[
         DataRequired(),
         NumberRange(min=1, max=500, message='Gauge length must be between 1 and 500 mm')
+    ])
+    extensometer_gauge_length = FloatField('Extensometer Gauge Length Le (mm)', validators=[
+        Optional(),
+        NumberRange(min=1, max=200, message='Extensometer gauge must be between 1 and 200 mm')
     ])
     parallel_length = FloatField('Parallel Length Lc (mm)', validators=[
         Optional(),
@@ -57,14 +68,29 @@ class SpecimenForm(FlaskForm):
 
     # Test conditions
     test_temperature = FloatField('Test Temperature (°C)', validators=[Optional()])
-    test_standard = SelectField('Test Standard', choices=[
-        ('ASTM E8/E8M-22', 'ASTM E8/E8M-22'),
-        ('ISO 6892-1:2019', 'ISO 6892-1:2019')
+
+    # === FINAL MEASUREMENTS (after fracture) ===
+    # Round specimen - final
+    final_diameter = FloatField('Final Diameter du (mm)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=100)
     ])
 
-    # Post-fracture measurements (optional)
-    final_diameter = FloatField('Final Diameter df (mm)', validators=[Optional()])
-    final_gauge_length = FloatField('Final Gauge Length Lf (mm)', validators=[Optional()])
+    # Rectangular specimen - final
+    final_width = FloatField('Final Width au (mm)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=200)
+    ])
+    final_thickness = FloatField('Final Thickness bu (mm)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=100)
+    ])
+
+    # Length - final
+    final_gauge_length = FloatField('Final Gauge Length Lu (mm)', validators=[
+        Optional(),
+        NumberRange(min=1, max=1000)
+    ])
 
     # Notes
     notes = TextAreaField('Notes', validators=[Optional()])

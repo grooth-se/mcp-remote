@@ -22,6 +22,7 @@ from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
 # Import analysis utilities
 from utils.data_acquisition.mts_csv_parser import parse_mts_csv, MTSTestData
 from utils.analysis.tensile_calculations import TensileAnalyzer, TensileAnalysisConfig
+from utils.models.test_result import MeasuredValue
 
 
 def generate_test_id():
@@ -241,7 +242,7 @@ def specimen():
             csv_path = session['tensile_csv_path']
             data = parse_mts_csv(Path(csv_path))
 
-            # Calculate area
+            # Calculate initial area
             area = calculate_area(
                 form.specimen_type.data,
                 diameter=form.diameter.data,
@@ -257,40 +258,75 @@ def specimen():
 
             # Create analyzer and run calculations
             analyzer = TensileAnalyzer()
-            gauge_length = form.gauge_length.data
 
-            # Calculate stress-strain
+            # Get gauge lengths
+            gauge_length = form.gauge_length.data  # L0 for A% calculation
+            extensometer_gl = form.extensometer_gauge_length.data or gauge_length  # Le for strain
+            parallel_length = form.parallel_length.data  # Lc
+
+            # Calculate stress-strain from EXTENSOMETER (primary)
             stress, strain = analyzer.calculate_stress_strain(
-                data.force, data.extension, area, gauge_length
+                data.force, data.extension, area, extensometer_gl
+            )
+
+            # Calculate stress-strain from DISPLACEMENT/crosshead (secondary)
+            # Use parallel length if provided, otherwise gauge length
+            disp_ref_length = parallel_length or gauge_length
+            stress_disp, strain_disp = analyzer.calculate_stress_strain(
+                data.force, data.displacement, area, disp_ref_length
             )
 
             # Calculate Rm first (needed for other calculations)
             Rm = analyzer.calculate_ultimate_tensile_strength(data.force, area, area_unc)
 
-            # Calculate E (Young's modulus)
-            E = analyzer.calculate_youngs_modulus(stress, strain, area_unc, gauge_length)
+            # Calculate E (Young's modulus) from extensometer data
+            E = analyzer.calculate_youngs_modulus(stress, strain, area_unc, extensometer_gl)
 
-            # Calculate Rp0.2
+            # Calculate Rp0.2 from extensometer data
             Rp02 = analyzer.calculate_yield_strength_rp02(
                 stress, strain, E.value, area, area_unc
             )
 
-            # Calculate elongation
-            A_percent = analyzer.calculate_elongation_at_fracture(
-                data.extension, data.force, gauge_length
-            )
-
-            # Calculate uniform elongation
-            Ag = analyzer.calculate_uniform_elongation(
-                data.extension, data.force, gauge_length
-            )
-
-            # Calculate reduction of area if final diameter provided
-            Z_percent = None
-            if form.specimen_type.data == 'round' and form.final_diameter.data:
-                Z_percent = analyzer.calculate_reduction_of_area(
-                    form.diameter.data, form.final_diameter.data
+            # Calculate elongation A%
+            # Use manual measurement (Lu) if provided, otherwise from extensometer
+            if form.final_gauge_length.data and form.gauge_length.data:
+                # Manual measurement: A% = (Lu - L0) / L0 * 100
+                L0 = form.gauge_length.data
+                Lu = form.final_gauge_length.data
+                A_value = (Lu - L0) / L0 * 100
+                # Uncertainty from measurement (assume 0.5mm for manual)
+                A_unc = np.sqrt(2) * 0.5 / L0 * 100
+                A_percent = MeasuredValue(A_value, A_unc, '%')
+            else:
+                # From extensometer data
+                A_percent = analyzer.calculate_elongation_at_fracture(
+                    data.extension, data.force, gauge_length
                 )
+
+            # Calculate uniform elongation Ag from extensometer
+            Ag = analyzer.calculate_uniform_elongation(
+                data.extension, data.force, extensometer_gl
+            )
+
+            # Calculate reduction of area Z%
+            Z_percent = None
+            if form.specimen_type.data == 'round':
+                if form.final_diameter.data and form.diameter.data:
+                    Z_percent = analyzer.calculate_reduction_of_area(
+                        form.diameter.data, form.final_diameter.data
+                    )
+            elif form.specimen_type.data == 'rectangular':
+                if (form.final_width.data and form.final_thickness.data and
+                    form.width.data and form.thickness.data):
+                    # Z% = (A0 - Au) / A0 * 100
+                    A0 = form.width.data * form.thickness.data
+                    Au = form.final_width.data * form.final_thickness.data
+                    Z_value = (A0 - Au) / A0 * 100
+                    # Uncertainty propagation
+                    u_A0 = np.sqrt((form.thickness.data * 0.01)**2 + (form.width.data * 0.01)**2)
+                    u_Au = np.sqrt((form.final_thickness.data * 0.01)**2 + (form.final_width.data * 0.01)**2)
+                    Z_unc = np.sqrt((u_A0/A0)**2 + (u_Au/Au)**2) * Z_value
+                    Z_percent = MeasuredValue(Z_value, Z_unc, '%')
 
             # Find Rp0.2 and Rm positions for plotting
             rm_idx = np.argmax(stress)
@@ -314,9 +350,10 @@ def specimen():
             else:
                 rp02_strain = offset * 2
 
-            # Create plot
+            # Create plot with BOTH extensometer and displacement curves
             plot_html = create_stress_strain_plot(
                 strain, stress,
+                strain_disp=strain_disp, stress_disp=stress_disp,
                 rp02_strain=rp02_strain, rp02_stress=Rp02.value,
                 rm_strain=rm_strain, rm_stress=Rm.value,
                 E_modulus=E.value
@@ -327,6 +364,8 @@ def specimen():
             geometry = {
                 'type': form.specimen_type.data,
                 'gauge_length': gauge_length,
+                'extensometer_gauge_length': extensometer_gl,
+                'parallel_length': parallel_length,
                 'area': area
             }
             if form.specimen_type.data == 'round':
@@ -336,6 +375,12 @@ def specimen():
             else:
                 geometry['width'] = form.width.data
                 geometry['thickness'] = form.thickness.data
+                if form.final_width.data:
+                    geometry['final_width'] = form.final_width.data
+                if form.final_thickness.data:
+                    geometry['final_thickness'] = form.final_thickness.data
+            if form.final_gauge_length.data:
+                geometry['final_gauge_length'] = form.final_gauge_length.data
 
             # Get certificate if linked
             certificate_id = session.get('tensile_certificate_id')
@@ -450,11 +495,20 @@ def view(test_id):
                 data = parse_mts_csv(Path(csv_path))
                 geometry = test.geometry or {}
                 area = geometry.get('area', 100)
-                gauge_length = geometry.get('gauge_length', 50)
+                extensometer_gl = geometry.get('extensometer_gauge_length') or geometry.get('gauge_length', 50)
+                parallel_length = geometry.get('parallel_length')
+                disp_ref_length = parallel_length or geometry.get('gauge_length', 50)
 
                 analyzer = TensileAnalyzer()
+
+                # Calculate extensometer strain
                 stress, strain = analyzer.calculate_stress_strain(
-                    data.force, data.extension, area, gauge_length
+                    data.force, data.extension, area, extensometer_gl
+                )
+
+                # Calculate displacement strain
+                stress_disp, strain_disp = analyzer.calculate_stress_strain(
+                    data.force, data.displacement, area, disp_ref_length
                 )
 
                 # Get result values for plot
@@ -487,6 +541,7 @@ def view(test_id):
 
                 plot_html = create_stress_strain_plot(
                     strain, stress,
+                    strain_disp=strain_disp, stress_disp=stress_disp,
                     rp02_strain=rp02_strain,
                     rp02_stress=rp02_val.value if rp02_val else None,
                     rm_strain=rm_strain,
