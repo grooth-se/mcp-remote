@@ -326,8 +326,11 @@ class TensileReportGenerator:
         data['A'] = A_val
         data['A_uncertainty'] = A_unc
 
-        # A5 from L1-L0 (manual measurement)
+        # A5 from L1-L0 (manual measurement), fallback to A_percent if not available
         A5_val, A5_unc = get_result('A_manual')
+        if A5_val == '-' or A5_val is None:
+            # Fallback to extensometer A% if manual measurement not available
+            A5_val, A5_unc = A_val, A_unc
         data['A5_value'] = A5_val if A5_val != '-' else '-'
         data['A5_uncertainty'] = A5_unc if A5_unc != '-' else '-'
         data['A5_req'] = requirements.get('A5', '-')
