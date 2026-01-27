@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}New Sonic Resonance Test{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('sonic.index') }}">Sonic Tests</a></li>
+        <li class="breadcrumb-item active">New Test</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-lg-10">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-soundwave"></i> New Sonic Resonance Test
+                </h4>
+            </div>
+            <div class="card-body">
+                {% if certificate %}
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-link-45deg"></i>
+                    Linked to Certificate: <strong>{{ certificate.certificate_number_with_rev }}</strong>
+                    - {{ certificate.customer or 'No customer' }}
+                </div>
+                {% endif %}
+
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <div class="row">
+                        <!-- Column 1: Specimen Info -->
+                        <div class="col-md-4">
+                            <div class="card mb-3">
+                                <div class="card-header"><h6 class="mb-0">Specimen Information</h6></div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        {{ form.specimen_id.label(class="form-label") }}
+                                        {{ form.specimen_id(class="form-control") }}
+                                        {% for error in form.specimen_id.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.material.label(class="form-label") }}
+                                        {{ form.material(class="form-control") }}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.batch_number.label(class="form-label") }}
+                                        {{ form.batch_number(class="form-control") }}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.test_standard.label(class="form-label") }}
+                                        {{ form.test_standard(class="form-select") }}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.test_temperature.label(class="form-label") }}
+                                        {{ form.test_temperature(class="form-control") }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Column 2: Geometry -->
+                        <div class="col-md-4">
+                            <div class="card mb-3">
+                                <div class="card-header"><h6 class="mb-0">Specimen Geometry</h6></div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Specimen Type</label>
+                                        <div>
+                                            {% for subfield in form.specimen_type %}
+                                            <div class="form-check form-check-inline">
+                                                {{ subfield(class="form-check-input", id="type_" + subfield.data) }}
+                                                {{ subfield.label(class="form-check-label", for="type_" + subfield.data) }}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3" id="diameter-group">
+                                        {{ form.diameter.label(class="form-label") }}
+                                        {{ form.diameter(class="form-control", placeholder="e.g., 10.00") }}
+                                        {% for error in form.diameter.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="mb-3" id="side-length-group" style="display: none;">
+                                        {{ form.side_length.label(class="form-label") }}
+                                        {{ form.side_length(class="form-control", placeholder="e.g., 10.00") }}
+                                        {% for error in form.side_length.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="mb-3">
+                                        {{ form.length.label(class="form-label") }}
+                                        {{ form.length(class="form-control", placeholder="e.g., 100.00") }}
+                                        {% for error in form.length.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="mb-3">
+                                        {{ form.mass.label(class="form-label") }}
+                                        {{ form.mass(class="form-control", placeholder="e.g., 61.54") }}
+                                        {% for error in form.mass.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div id="calculated-values" class="alert alert-secondary small">
+                                        <strong>Calculated:</strong><br>
+                                        Volume: <span id="calc-volume">-</span> mm³<br>
+                                        Density: <span id="calc-density">-</span> kg/m³
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Column 3: Velocity Measurements -->
+                        <div class="col-md-4">
+                            <div class="card mb-3">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0">Velocity Measurements</h6>
+                                </div>
+                                <div class="card-body">
+                                    <h6 class="text-primary">Longitudinal (Vl)</h6>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-4">
+                                            {{ form.vl1(class="form-control form-control-sm", placeholder="Vl₁") }}
+                                        </div>
+                                        <div class="col-4">
+                                            {{ form.vl2(class="form-control form-control-sm", placeholder="Vl₂") }}
+                                        </div>
+                                        <div class="col-4">
+                                            {{ form.vl3(class="form-control form-control-sm", placeholder="Vl₃") }}
+                                        </div>
+                                    </div>
+                                    <div class="text-muted small mb-3">
+                                        Avg: <span id="vl-avg">-</span> m/s
+                                    </div>
+                                    {% for error in form.vl1.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+
+                                    <h6 class="text-success">Shear (Vs)</h6>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-4">
+                                            {{ form.vs1(class="form-control form-control-sm", placeholder="Vs₁") }}
+                                        </div>
+                                        <div class="col-4">
+                                            {{ form.vs2(class="form-control form-control-sm", placeholder="Vs₂") }}
+                                        </div>
+                                        <div class="col-4">
+                                            {{ form.vs3(class="form-control form-control-sm", placeholder="Vs₃") }}
+                                        </div>
+                                    </div>
+                                    <div class="text-muted small mb-3">
+                                        Avg: <span id="vs-avg">-</span> m/s
+                                    </div>
+                                    {% for error in form.vs1.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+
+                                    <div class="alert alert-info small">
+                                        <strong>Typical ranges:</strong><br>
+                                        Steel: Vl ≈ 5900 m/s, Vs ≈ 3200 m/s<br>
+                                        Aluminum: Vl ≈ 6400 m/s, Vs ≈ 3100 m/s
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="card mb-4">
+                        <div class="card-header"><h6 class="mb-0">Notes</h6></div>
+                        <div class="card-body">
+                            {{ form.notes(class="form-control", rows="2", placeholder="Optional notes...") }}
+                        </div>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('sonic.index') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-calculator"></i> Calculate Results
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Panel -->
+    <div class="col-lg-2">
+        <div class="card">
+            <div class="card-header"><h6 class="mb-0">Help</h6></div>
+            <div class="card-body small">
+                <p><strong>Modified ASTM E1875</strong></p>
+                <p>Calculates elastic properties from ultrasonic wave velocities:</p>
+                <ul class="small">
+                    <li>Young's modulus (E)</li>
+                    <li>Shear modulus (G)</li>
+                    <li>Poisson's ratio (ν)</li>
+                    <li>Resonant frequencies</li>
+                </ul>
+                <hr>
+                <p class="mb-0"><strong>Requirements:</strong></p>
+                <ul class="small mb-0">
+                    <li>3 Vl measurements</li>
+                    <li>3 Vs measurements</li>
+                    <li>Vl > Vs always</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle diameter/side_length based on specimen type
+    const typeRadios = document.querySelectorAll('input[name="specimen_type"]');
+    const diameterGroup = document.getElementById('diameter-group');
+    const sideLengthGroup = document.getElementById('side-length-group');
+
+    function updateGeometryFields() {
+        const selectedType = document.querySelector('input[name="specimen_type"]:checked').value;
+        if (selectedType === 'round') {
+            diameterGroup.style.display = 'block';
+            sideLengthGroup.style.display = 'none';
+        } else {
+            diameterGroup.style.display = 'none';
+            sideLengthGroup.style.display = 'block';
+        }
+        calculateDensity();
+    }
+
+    typeRadios.forEach(radio => {
+        radio.addEventListener('change', updateGeometryFields);
+    });
+    updateGeometryFields();
+
+    // Calculate density on geometry change
+    const diameterInput = document.querySelector('input[name="diameter"]');
+    const sideLengthInput = document.querySelector('input[name="side_length"]');
+    const lengthInput = document.querySelector('input[name="length"]');
+    const massInput = document.querySelector('input[name="mass"]');
+
+    function calculateDensity() {
+        const selectedType = document.querySelector('input[name="specimen_type"]:checked').value;
+        const length = parseFloat(lengthInput.value) || 0;
+        const mass = parseFloat(massInput.value) || 0;
+
+        let area = 0;
+        if (selectedType === 'round') {
+            const d = parseFloat(diameterInput.value) || 0;
+            area = Math.PI * (d / 2) ** 2;
+        } else {
+            const s = parseFloat(sideLengthInput.value) || 0;
+            area = s * s;
+        }
+
+        const volume = area * length;
+        const volumeM3 = volume * 1e-9;
+        const massKg = mass / 1000;
+        const density = volumeM3 > 0 ? massKg / volumeM3 : 0;
+
+        document.getElementById('calc-volume').textContent = volume > 0 ? volume.toFixed(2) : '-';
+        document.getElementById('calc-density').textContent = density > 0 ? density.toFixed(1) : '-';
+    }
+
+    [diameterInput, sideLengthInput, lengthInput, massInput].forEach(input => {
+        input.addEventListener('input', calculateDensity);
+    });
+
+    // Calculate velocity averages
+    const vl1 = document.querySelector('input[name="vl1"]');
+    const vl2 = document.querySelector('input[name="vl2"]');
+    const vl3 = document.querySelector('input[name="vl3"]');
+    const vs1 = document.querySelector('input[name="vs1"]');
+    const vs2 = document.querySelector('input[name="vs2"]');
+    const vs3 = document.querySelector('input[name="vs3"]');
+
+    function updateVelocityAverages() {
+        const vlVals = [parseFloat(vl1.value), parseFloat(vl2.value), parseFloat(vl3.value)].filter(v => !isNaN(v));
+        const vsVals = [parseFloat(vs1.value), parseFloat(vs2.value), parseFloat(vs3.value)].filter(v => !isNaN(v));
+
+        const vlAvg = vlVals.length > 0 ? vlVals.reduce((a, b) => a + b, 0) / vlVals.length : 0;
+        const vsAvg = vsVals.length > 0 ? vsVals.reduce((a, b) => a + b, 0) / vsVals.length : 0;
+
+        document.getElementById('vl-avg').textContent = vlAvg > 0 ? vlAvg.toFixed(1) : '-';
+        document.getElementById('vs-avg').textContent = vsAvg > 0 ? vsAvg.toFixed(1) : '-';
+    }
+
+    [vl1, vl2, vl3, vs1, vs2, vs3].forEach(input => {
+        input.addEventListener('input', updateVelocityAverages);
+    });
+});
+</script>
+{% endblock %}

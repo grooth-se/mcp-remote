@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block title %}{{ test.test_id }} - Sonic Resonance{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('sonic.index') }}">Sonic Tests</a></li>
+        <li class="breadcrumb-item active">{{ test.test_id }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-soundwave"></i> {{ test.test_id }}</h2>
+        <span class="badge bg-{{ 'success' if test.status == 'ANALYZED' else 'warning' }} me-2">
+            {{ test.status }}
+        </span>
+        {% if test.certificate %}
+        <span class="badge bg-info">
+            <i class="bi bi-link-45deg"></i> {{ test.certificate.certificate_number_with_rev }}
+        </span>
+        {% endif %}
+    </div>
+    <div>
+        <a href="{{ url_for('sonic.report', test_id=test.id) }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-pdf"></i> Generate Report
+        </a>
+        <a href="{{ url_for('sonic.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Results Card -->
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Results</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th class="text-end">Value</th>
+                                <th class="text-end">U (k=2)</th>
+                                <th>Unit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Young's Modulus (E)</strong></td>
+                                <td class="text-end fs-5 text-primary">{{ "%.2f"|format(results['E'].value) if results.get('E') else '-' }}</td>
+                                <td class="text-end text-muted">{{ "±%.2f"|format(results['E'].uncertainty) if results.get('E') else '-' }}</td>
+                                <td>GPa</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Shear Modulus (G)</strong></td>
+                                <td class="text-end fs-5 text-success">{{ "%.2f"|format(results['G'].value) if results.get('G') else '-' }}</td>
+                                <td class="text-end text-muted">{{ "±%.2f"|format(results['G'].uncertainty) if results.get('G') else '-' }}</td>
+                                <td>GPa</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Poisson's Ratio (ν)</strong></td>
+                                <td class="text-end fs-5">{{ "%.4f"|format(results['Poisson'].value) if results.get('Poisson') else '-' }}</td>
+                                <td class="text-end text-muted">{{ "±%.4f"|format(results['Poisson'].uncertainty) if results.get('Poisson') else '-' }}</td>
+                                <td>-</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td>Density</td>
+                                <td class="text-end">{{ "%.1f"|format(results['Density'].value) if results.get('Density') else '-' }}</td>
+                                <td class="text-end text-muted">{{ "±%.1f"|format(results['Density'].uncertainty) if results.get('Density') else '-' }}</td>
+                                <td>kg/m³</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td>Flexural Frequency (ff)</td>
+                                <td class="text-end">{{ "%.1f"|format(results['ff'].value) if results.get('ff') else '-' }}</td>
+                                <td class="text-end text-muted">{{ "±%.1f"|format(results['ff'].uncertainty) if results.get('ff') else '-' }}</td>
+                                <td>Hz</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td>Torsional Frequency (ft)</td>
+                                <td class="text-end">{{ "%.1f"|format(results['ft'].value) if results.get('ft') else '-' }}</td>
+                                <td class="text-end text-muted">{{ "±%.1f"|format(results['ft'].uncertainty) if results.get('ft') else '-' }}</td>
+                                <td>Hz</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Velocity Measurements -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-speedometer2"></i> Velocity Measurements</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="text-primary">Longitudinal (Vl)</h6>
+                        <table class="table table-sm">
+                            <tr><td>Vl₁</td><td class="text-end">{{ geometry.get('vl1', '-') }} m/s</td></tr>
+                            <tr><td>Vl₂</td><td class="text-end">{{ geometry.get('vl2', '-') }} m/s</td></tr>
+                            <tr><td>Vl₃</td><td class="text-end">{{ geometry.get('vl3', '-') }} m/s</td></tr>
+                            <tr class="table-primary"><td><strong>Average</strong></td><td class="text-end"><strong>{{ "%.1f"|format(vl_avg) }} m/s</strong></td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-success">Shear (Vs)</h6>
+                        <table class="table table-sm">
+                            <tr><td>Vs₁</td><td class="text-end">{{ geometry.get('vs1', '-') }} m/s</td></tr>
+                            <tr><td>Vs₂</td><td class="text-end">{{ geometry.get('vs2', '-') }} m/s</td></tr>
+                            <tr><td>Vs₃</td><td class="text-end">{{ geometry.get('vs3', '-') }} m/s</td></tr>
+                            <tr class="table-success"><td><strong>Average</strong></td><td class="text-end"><strong>{{ "%.1f"|format(vs_avg) }} m/s</strong></td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Info & Specimen -->
+    <div class="col-lg-6">
+        <!-- Test Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Test Information</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Test ID:</dt>
+                    <dd class="col-7">{{ test.test_id }}</dd>
+
+                    <dt class="col-5">Specimen ID:</dt>
+                    <dd class="col-7">{{ test.specimen_id or '-' }}</dd>
+
+                    <dt class="col-5">Material:</dt>
+                    <dd class="col-7">{{ test.material or '-' }}</dd>
+
+                    <dt class="col-5">Batch Number:</dt>
+                    <dd class="col-7">{{ test.batch_number or '-' }}</dd>
+
+                    <dt class="col-5">Test Standard:</dt>
+                    <dd class="col-7">{{ test.test_standard or 'Modified ASTM E1875' }}</dd>
+
+                    <dt class="col-5">Test Date:</dt>
+                    <dd class="col-7">{{ test.test_date.strftime('%Y-%m-%d %H:%M') if test.test_date else '-' }}</dd>
+
+                    <dt class="col-5">Temperature:</dt>
+                    <dd class="col-7">{{ test.temperature or '23' }} °C</dd>
+
+                    {% if test.certificate %}
+                    <dt class="col-5">Certificate:</dt>
+                    <dd class="col-7">
+                        <a href="{{ url_for('certificates.view', cert_id=test.certificate.id) }}">
+                            {{ test.certificate.certificate_number_with_rev }}
+                        </a>
+                    </dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- Specimen Geometry -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-rulers"></i> Specimen Geometry</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Type:</dt>
+                    <dd class="col-7">{{ 'Round Bar' if geometry.get('type') == 'round' else 'Square Bar' }}</dd>
+
+                    {% if geometry.get('type') == 'round' %}
+                    <dt class="col-5">Diameter:</dt>
+                    <dd class="col-7">{{ geometry.get('diameter', '-') }} mm</dd>
+                    {% else %}
+                    <dt class="col-5">Side Length:</dt>
+                    <dd class="col-7">{{ geometry.get('side_length', '-') }} mm</dd>
+                    {% endif %}
+
+                    <dt class="col-5">Length:</dt>
+                    <dd class="col-7">{{ geometry.get('length', '-') }} mm</dd>
+
+                    <dt class="col-5">Mass:</dt>
+                    <dd class="col-7">{{ geometry.get('mass', '-') }} g</dd>
+
+                    <dt class="col-5">Volume:</dt>
+                    <dd class="col-7">{{ "%.2f"|format(geometry.get('volume', 0)) }} mm³</dd>
+
+                    <dt class="col-5">Density:</dt>
+                    <dd class="col-7">{{ "%.1f"|format(geometry.get('density', 0)) }} kg/m³</dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Validity -->
+        {% if test.notes %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Validity Check</h5>
+            </div>
+            <div class="card-body">
+                {% if 'Valid: True' in test.notes %}
+                <div class="alert alert-success mb-0">
+                    <i class="bi bi-check-circle-fill"></i> {{ test.notes }}
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle-fill"></i> {{ test.notes }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Audit Info -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Audit Info</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Created:</dt>
+                    <dd class="col-7">{{ test.created_at.strftime('%Y-%m-%d %H:%M') if test.created_at else '-' }}</dd>
+
+                    <dt class="col-5">Operator:</dt>
+                    <dd class="col-7">{{ test.operator.username if test.operator else '-' }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions -->
+<div class="card mt-4">
+    <div class="card-body d-flex justify-content-between">
+        <div>
+            <a href="{{ url_for('sonic.report', test_id=test.id) }}" class="btn btn-success">
+                <i class="bi bi-file-earmark-pdf"></i> Generate Report
+            </a>
+        </div>
+        {% if current_user.role == 'admin' %}
+        <form method="POST" action="{{ url_for('sonic.delete', test_id=test.id) }}"
+              onsubmit="return confirm('Delete this test? This cannot be undone.');">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

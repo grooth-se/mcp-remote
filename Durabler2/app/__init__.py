@@ -41,11 +41,13 @@ def create_app(config_name='default'):
     from .main import main_bp
     from .auth import auth_bp
     from .tensile import tensile_bp
+    from .sonic import sonic_bp
     from .certificates import certificates_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(tensile_bp, url_prefix='/tensile')
+    app.register_blueprint(sonic_bp, url_prefix='/sonic')
     app.register_blueprint(certificates_bp, url_prefix='/certificates')
 
     # Create database tables (development only)
