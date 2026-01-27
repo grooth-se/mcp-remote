@@ -73,11 +73,14 @@
     <!-- Specimen Form -->
     <div class="col-md-9">
         <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-rulers"></i> Specimen Geometry & Test Setup</h4>
+            <div class="card-header {{ 'bg-warning text-dark' if reanalyze else 'bg-primary text-white' }}">
+                <h4 class="mb-0">
+                    <i class="bi bi-{{ 'arrow-repeat' if reanalyze else 'rulers' }}"></i>
+                    {{ 'Re-analyze Test' if reanalyze else 'Specimen Geometry & Test Setup' }}
+                </h4>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" action="{{ url_for('tensile.specimen') }}">
                     {{ form.hidden_tag() }}
 
                     <!-- Row 1: Identification -->
@@ -118,6 +121,13 @@
                             <div class="input-group">
                                 {{ form.test_temperature(class="form-control", value="23") }}
                                 <span class="input-group-text">°C</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="form-check">
+                                {{ form.use_displacement_only(class="form-check-input", id="use_displacement_only") }}
+                                {{ form.use_displacement_only.label(class="form-check-label fw-bold text-warning") }}
+                                <div class="form-text small">E from 10-30% Rm, strain zeroed at 10% Rm</div>
                             </div>
                         </div>
                     </div>
@@ -287,10 +297,19 @@
                     </div>
 
                     <div class="d-flex justify-content-between">
+                        {% if reanalyze %}
+                        <a href="{{ url_for('tensile.view', test_id=test_id) }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-warning btn-lg">
+                            <i class="bi bi-arrow-repeat"></i> Re-run Analysis
+                        </button>
+                        {% else %}
                         <a href="{{ url_for('tensile.new') }}" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-left"></i> Back to Upload
                         </a>
                         {{ form.submit(class="btn btn-success btn-lg") }}
+                        {% endif %}
                     </div>
                 </form>
             </div>

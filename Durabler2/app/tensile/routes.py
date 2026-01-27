@@ -23,6 +23,12 @@ from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
 from utils.data_acquisition.mts_csv_parser import parse_mts_csv, MTSTestData
 from utils.analysis.tensile_calculations import TensileAnalyzer, TensileAnalysisConfig
 from utils.models.test_result import MeasuredValue
+from utils.reporting.word_report import TensileReportGenerator
+
+# For chart image generation
+import matplotlib
+matplotlib.use('Agg')  # Non-GUI backend
+import matplotlib.pyplot as plt
 
 
 def generate_test_id():
@@ -49,7 +55,6 @@ def calculate_area_uncertainty(diameter, d_unc=0.01):
 
 def create_stress_strain_plot(strain, stress, strain_disp=None, stress_disp=None,
                                rp02_strain=None, rp02_stress=None,
-                               rp05_strain=None, rp05_stress=None,
                                rm_strain=None, rm_stress=None,
                                reh_strain=None, reh_stress=None,
                                rel_strain=None, rel_stress=None,
@@ -115,16 +120,6 @@ def create_stress_strain_plot(strain, stress, strain_disp=None, stress_disp=None
                 line=dict(color='#808080', width=1, dash='dot'),  # Grey dotted
                 showlegend=False
             ))
-
-    # Rp0.5 horizontal line - GREY DASHDOT
-    if rp05_strain is not None and rp05_stress is not None:
-        fig.add_trace(go.Scatter(
-            x=[0, rp05_strain * 100 * 1.5],
-            y=[rp05_stress, rp05_stress],
-            mode='lines',
-            name=f'Rp0.5 = {rp05_stress:.1f} MPa',
-            line=dict(color='#808080', width=1, dash='dashdot')  # Grey dashdot
-        ))
 
     # Rm horizontal line - GREY LONGDASH
     if rm_strain is not None and rm_stress is not None:
@@ -281,9 +276,13 @@ def specimen():
             csv_path = session['tensile_csv_path']
             data = parse_mts_csv(Path(csv_path))
 
-            # Get specimen type and yield method
+            # Check if this is a re-analysis
+            reanalyze_id = session.pop('tensile_reanalyze_id', None)
+
+            # Get specimen type, yield method, and data source option
             specimen_type = form.specimen_type.data
             yield_method = form.yield_method.data
+            use_displacement_only = form.use_displacement_only.data
 
             # Get common dimensions
             L0 = form.L0.data  # Extensometer length
@@ -337,57 +336,93 @@ def specimen():
             # Rm - Ultimate tensile strength
             Rm = analyzer.calculate_ultimate_tensile_strength(data.force, area, area_unc)
 
-            # E - Young's modulus from extensometer
-            E = analyzer.calculate_youngs_modulus(stress, strain, area_unc, L0)
-
-            # E_disp - Young's modulus from displacement (using 15-40% Rm range)
-            try:
-                E_disp = analyzer.calculate_youngs_modulus_displacement(
-                    stress_disp, strain_disp, area_unc, Lp, Rm.value
+            if use_displacement_only:
+                # DISPLACEMENT-ONLY MODE
+                # E calculated from displacement data using 10-30% Rm range
+                E = analyzer.calculate_youngs_modulus_displacement(
+                    stress_disp, strain_disp, area_unc, Lp, Rm.value,
+                    min_stress_fraction=0.10, max_stress_fraction=0.30
                 )
-            except Exception:
-                E_disp = None
+                E_disp = E  # Same value for display
+            else:
+                # NORMAL MODE: E from extensometer
+                E = analyzer.calculate_youngs_modulus(stress, strain, area_unc, L0)
+
+                # E_disp - Young's modulus from displacement (using 15-40% Rm range)
+                try:
+                    E_disp = analyzer.calculate_youngs_modulus_displacement(
+                        stress_disp, strain_disp, area_unc, Lp, Rm.value
+                    )
+                except Exception:
+                    E_disp = None
 
             # ===== YIELD STRENGTH CALCULATIONS =====
             Rp02 = Rp05 = Rp02_disp = Rp05_disp = None
             ReH = ReL = ReH_disp = ReL_disp = None
 
             if yield_method == 'offset':
-                # Offset method: Rp0.2, Rp0.5
-                Rp02 = analyzer.calculate_yield_strength_rp02(
-                    stress, strain, E.value, area, area_unc
-                )
-                try:
-                    Rp05 = analyzer.calculate_yield_strength_rp05(
+                if use_displacement_only:
+                    # DISPLACEMENT-ONLY MODE: Zero strain at 10% Rm to eliminate mechanical slack
+                    # Rp0.2 from displacement with strain zeroed at 10% Rm
+                    Rp02 = analyzer.calculate_yield_strength_rp02_displacement(
+                        stress_disp, strain_disp, E.value, Rm.value, area, area_unc,
+                        strain_zero_stress_fraction=0.10
+                    )
+                    # Rp0.5 from displacement with strain zeroed at 10% Rm
+                    try:
+                        Rp05 = analyzer.calculate_yield_strength_rp05_displacement(
+                            stress_disp, strain_disp, E.value, Rm.value, area, area_unc,
+                            strain_zero_stress_fraction=0.10
+                        )
+                    except Exception:
+                        Rp05 = None
+                    # No separate displacement values - they are the primary values
+                    Rp02_disp = None
+                    Rp05_disp = None
+                else:
+                    # NORMAL MODE: Extensometer for primary, displacement for secondary
+                    # Rp0.2, Rp0.5 from extensometer
+                    Rp02 = analyzer.calculate_yield_strength_rp02(
                         stress, strain, E.value, area, area_unc
                     )
-                except Exception:
-                    Rp05 = None
+                    try:
+                        Rp05 = analyzer.calculate_yield_strength_rp05(
+                            stress, strain, E.value, area, area_unc
+                        )
+                    except Exception:
+                        Rp05 = None
 
-                # Rp0.2 from displacement
-                try:
-                    Rp02_disp = analyzer.calculate_yield_strength_rp02_displacement(
-                        stress_disp, strain_disp, E_disp.value if E_disp else E.value,
-                        Rm.value, area, area_unc
-                    )
-                except Exception:
-                    Rp02_disp = None
+                    # Rp0.2 from displacement (30% Rm reference - default)
+                    try:
+                        Rp02_disp = analyzer.calculate_yield_strength_rp02_displacement(
+                            stress_disp, strain_disp, E_disp.value if E_disp else E.value,
+                            Rm.value, area, area_unc
+                        )
+                    except Exception:
+                        Rp02_disp = None
 
-                # Rp0.5 from displacement
-                try:
-                    Rp05_disp = analyzer.calculate_yield_strength_rp05_displacement(
-                        stress_disp, strain_disp, E_disp.value if E_disp else E.value,
-                        Rm.value, area, area_unc
-                    )
-                except Exception:
-                    Rp05_disp = None
+                    # Rp0.5 from displacement
+                    try:
+                        Rp05_disp = analyzer.calculate_yield_strength_rp05_displacement(
+                            stress_disp, strain_disp, E_disp.value if E_disp else E.value,
+                            Rm.value, area, area_unc
+                        )
+                    except Exception:
+                        Rp05_disp = None
 
             else:
                 # Yield point method: ReH, ReL
                 # Note: These values are only valid for materials with a clear yield point
                 # (Lüders band/yield plateau), typically mild steel.
+
+                # Choose data source based on mode
+                if use_displacement_only:
+                    primary_stress, primary_strain = stress_disp, strain_disp
+                else:
+                    primary_stress, primary_strain = stress, strain
+
                 try:
-                    ReH = analyzer.calculate_upper_yield_strength_reh(stress, strain, area, area_unc)
+                    ReH = analyzer.calculate_upper_yield_strength_reh(primary_stress, primary_strain, area, area_unc)
                     # Validate: ReH should be at least 50% of Rm for typical steel
                     if ReH and ReH.value < Rm.value * 0.5:
                         print(f"ReH={ReH.value} MPa rejected (< 50% of Rm={Rm.value})")
@@ -397,7 +432,7 @@ def specimen():
                     ReH = None
 
                 try:
-                    ReL = analyzer.calculate_lower_yield_strength_rel(stress, strain, area, area_unc)
+                    ReL = analyzer.calculate_lower_yield_strength_rel(primary_stress, primary_strain, area, area_unc)
                     # Validate ReL based on ReH if available, otherwise based on Rm
                     if ReH and ReL:
                         # ReL should be between 80% and 100% of ReH for valid yield plateau
@@ -414,23 +449,24 @@ def specimen():
                     print(f"ReL calculation failed: {e}")
                     ReL = None
 
-                # ReH/ReL from displacement
-                try:
-                    ReH_disp = analyzer.calculate_upper_yield_strength_reh(stress_disp, strain_disp, area, area_unc)
-                    if ReH_disp and ReH_disp.value < Rm.value * 0.5:
+                # ReH/ReL from displacement (only in normal mode)
+                if not use_displacement_only:
+                    try:
+                        ReH_disp = analyzer.calculate_upper_yield_strength_reh(stress_disp, strain_disp, area, area_unc)
+                        if ReH_disp and ReH_disp.value < Rm.value * 0.5:
+                            ReH_disp = None
+                    except Exception:
                         ReH_disp = None
-                except Exception:
-                    ReH_disp = None
 
-                try:
-                    ReL_disp = analyzer.calculate_lower_yield_strength_rel(stress_disp, strain_disp, area, area_unc)
-                    if ReH_disp and ReL_disp:
-                        if ReL_disp.value < ReH_disp.value * 0.80 or ReL_disp.value > ReH_disp.value:
+                    try:
+                        ReL_disp = analyzer.calculate_lower_yield_strength_rel(stress_disp, strain_disp, area, area_unc)
+                        if ReH_disp and ReL_disp:
+                            if ReL_disp.value < ReH_disp.value * 0.80 or ReL_disp.value > ReH_disp.value:
+                                ReL_disp = None
+                        elif ReL_disp and ReL_disp.value < Rm.value * 0.45:
                             ReL_disp = None
-                    elif ReL_disp and ReL_disp.value < Rm.value * 0.45:
+                    except Exception:
                         ReL_disp = None
-                except Exception:
-                    ReL_disp = None
 
                 # If no valid ReH/ReL found, this material likely doesn't have a yield plateau
                 # User should use offset method (Rp0.2) instead
@@ -536,9 +572,6 @@ def specimen():
 
             # ===== SAVE TO DATABASE =====
 
-            # Create test record
-            test_id = generate_test_id()
-
             # Build geometry dict based on specimen type
             if specimen_type == 'round':
                 geometry = {
@@ -567,8 +600,9 @@ def specimen():
                     'area_final': area_final
                 }
 
-            # Store yield method
+            # Store yield method and data source option
             geometry['yield_method'] = yield_method
+            geometry['use_displacement_only'] = use_displacement_only
 
             # Get certificate if linked
             certificate_id = session.get('tensile_certificate_id')
@@ -578,23 +612,60 @@ def specimen():
                 if cert:
                     cert_number = cert.certificate_number_with_rev
 
-            test_record = TestRecord(
-                test_id=test_id,
-                test_method='TENSILE',
-                test_standard=form.test_standard.data,
-                specimen_id=form.specimen_id.data,
-                material=form.material.data,
-                batch_number=form.batch_number.data,
-                geometry=geometry,
-                test_date=datetime.now(),
-                temperature=form.test_temperature.data,
-                raw_data_filename=os.path.basename(csv_path),
-                status='ANALYZED',
-                certificate_id=certificate_id if certificate_id else None,
-                certificate_number=cert_number,
-                operator_id=current_user.id
-            )
-            db.session.add(test_record)
+            # Handle re-analysis vs new test
+            if reanalyze_id:
+                # Re-analysis: update existing record
+                test_record = TestRecord.query.get(reanalyze_id)
+                if not test_record:
+                    flash('Original test record not found.', 'danger')
+                    return redirect(url_for('tensile.index'))
+
+                # Delete old results
+                AnalysisResult.query.filter_by(test_record_id=test_record.id).delete()
+
+                # Update record fields
+                test_record.test_standard = form.test_standard.data
+                test_record.specimen_id = form.specimen_id.data
+                test_record.material = form.material.data
+                test_record.batch_number = form.batch_number.data
+                test_record.geometry = geometry
+                test_record.temperature = form.test_temperature.data
+                test_record.status = 'ANALYZED'
+
+                # Audit log for re-analysis
+                audit = AuditLog(
+                    user_id=current_user.id,
+                    action='REANALYZE',
+                    table_name='test_records',
+                    record_id=test_record.id,
+                    new_values={'specimen_id': form.specimen_id.data, 'reanalyzed': True},
+                    ip_address=request.remote_addr
+                )
+                db.session.add(audit)
+
+                flash('Test re-analyzed successfully.', 'success')
+            else:
+                # New test: create new record
+                test_id = generate_test_id()
+
+                test_record = TestRecord(
+                    test_id=test_id,
+                    test_method='TENSILE',
+                    test_standard=form.test_standard.data,
+                    specimen_id=form.specimen_id.data,
+                    material=form.material.data,
+                    batch_number=form.batch_number.data,
+                    geometry=geometry,
+                    test_date=datetime.now(),
+                    temperature=form.test_temperature.data,
+                    raw_data_filename=os.path.basename(csv_path),
+                    status='ANALYZED',
+                    certificate_id=certificate_id if certificate_id else None,
+                    certificate_number=cert_number,
+                    operator_id=current_user.id
+                )
+                db.session.add(test_record)
+
             db.session.flush()  # Get ID
 
             # Store ALL results
@@ -667,16 +738,17 @@ def specimen():
                 )
                 db.session.add(result)
 
-            # Audit log
-            audit = AuditLog(
-                user_id=current_user.id,
-                action='CREATE',
-                table_name='test_records',
-                record_id=test_record.id,
-                new_values={'test_id': test_id, 'specimen_id': form.specimen_id.data},
-                ip_address=request.remote_addr
-            )
-            db.session.add(audit)
+            # Audit log (only for new tests, re-analysis already logged above)
+            if not reanalyze_id:
+                audit = AuditLog(
+                    user_id=current_user.id,
+                    action='CREATE',
+                    table_name='test_records',
+                    record_id=test_record.id,
+                    new_values={'test_id': test_record.test_id, 'specimen_id': form.specimen_id.data},
+                    ip_address=request.remote_addr
+                )
+                db.session.add(audit)
 
             db.session.commit()
 
@@ -686,7 +758,10 @@ def specimen():
             session.pop('tensile_certificate_id', None)
             session.pop('tensile_results', None)
 
-            flash(f'Analysis complete! Test ID: {test_id}', 'success')
+            if reanalyze_id:
+                flash(f'Test re-analyzed successfully! Test ID: {test_record.test_id}', 'success')
+            else:
+                flash(f'Analysis complete! Test ID: {test_record.test_id}', 'success')
             return redirect(url_for('tensile.view', test_id=test_record.id))
 
         except Exception as e:
@@ -731,7 +806,6 @@ def view(test_id):
 
                 # Get result values for plot
                 rp02_val = results.get('Rp0.2')
-                rp05_val = results.get('Rp0.5')
                 rm_val = results.get('Rm')
                 e_val = results.get('E')
                 reh_val = results.get('ReH')
@@ -749,7 +823,6 @@ def view(test_id):
 
                 # Find strain values for each result
                 rp02_strain = find_strain_at_stress(rp02_val.value) if rp02_val else None
-                rp05_strain = find_strain_at_stress(rp05_val.value) if rp05_val else None
                 reh_strain = find_strain_at_stress(reh_val.value) if reh_val else None
                 rel_strain = find_strain_at_stress(rel_val.value) if rel_val else None
 
@@ -758,8 +831,6 @@ def view(test_id):
                     strain_disp=strain_disp, stress_disp=stress_disp,
                     rp02_strain=rp02_strain,
                     rp02_stress=rp02_val.value if rp02_val else None,
-                    rp05_strain=rp05_strain,
-                    rp05_stress=rp05_val.value if rp05_val else None,
                     rm_strain=rm_strain,
                     rm_stress=rm_val.value if rm_val else None,
                     reh_strain=reh_strain,
@@ -774,6 +845,68 @@ def view(test_id):
     return render_template('tensile/view.html', test=test, results=results, plot_html=plot_html)
 
 
+@tensile_bp.route('/<int:test_id>/reanalyze', methods=['GET', 'POST'])
+@login_required
+def reanalyze(test_id):
+    """Re-analyze test with modified specimen data."""
+    test = TestRecord.query.get_or_404(test_id)
+    form = SpecimenForm()
+    geometry = test.geometry or {}
+
+    # Load CSV info
+    csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], test.raw_data_filename)
+    if not os.path.exists(csv_path):
+        flash('Original CSV file not found. Cannot re-analyze.', 'danger')
+        return redirect(url_for('tensile.view', test_id=test_id))
+
+    data = parse_mts_csv(Path(csv_path))
+    csv_info = {
+        'filename': test.raw_data_filename,
+        'test_run_name': data.test_run_name,
+        'test_date': data.test_date.strftime('%Y-%m-%d %H:%M') if hasattr(data.test_date, 'strftime') else str(data.test_date) if data.test_date else 'Unknown',
+        'num_points': len(data.time),
+        'max_force': float(np.max(data.force)),
+        'max_extension': float(np.max(data.extension))
+    }
+
+    # Store CSV path and info in session for analysis
+    session['tensile_csv_path'] = csv_path
+    session['tensile_csv_info'] = csv_info
+    session['tensile_reanalyze_id'] = test_id
+
+    # Pre-fill form with existing data on GET
+    if request.method == 'GET':
+        form.specimen_id.data = test.specimen_id
+        form.material.data = test.material
+        form.batch_number.data = test.batch_number
+        form.test_standard.data = test.test_standard
+        form.test_temperature.data = test.temperature
+        form.notes.data = getattr(test, 'notes', '')
+
+        # Specimen type and yield method
+        form.specimen_type.data = geometry.get('type', 'round')
+        form.yield_method.data = geometry.get('yield_method', 'offset')
+        form.use_displacement_only.data = geometry.get('use_displacement_only', False)
+
+        # Dimensions
+        form.L0.data = geometry.get('L0')
+        form.Lp.data = geometry.get('Lp')
+        form.L1.data = geometry.get('L1')
+        form.Lf.data = geometry.get('Lf')
+
+        if geometry.get('type') == 'round':
+            form.D0.data = geometry.get('D0')
+            form.D1.data = geometry.get('D1')
+        else:
+            form.a0.data = geometry.get('a0')
+            form.b0.data = geometry.get('b0')
+            form.au.data = geometry.get('au')
+            form.bu.data = geometry.get('bu')
+
+    return render_template('tensile/specimen.html', form=form, csv_info=csv_info,
+                          certificate=test.certificate, reanalyze=True, test_id=test_id)
+
+
 @tensile_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])
 @login_required
 def report(test_id):
@@ -781,10 +914,184 @@ def report(test_id):
     test = TestRecord.query.get_or_404(test_id)
     form = ReportForm()
 
+    # Pre-fill certificate number if linked
+    if request.method == 'GET' and test.certificate:
+        form.certificate_number.data = test.certificate.certificate_number_with_rev
+
     if form.validate_on_submit():
-        # TODO: Implement report generation using utils/reporting/tensile_word_report.py
-        flash('Report generation coming soon!', 'info')
-        return redirect(url_for('tensile.view', test_id=test_id))
+        try:
+            # Get results as dictionary
+            results = {r.parameter_name: r for r in test.results.all()}
+            geometry = test.geometry or {}
+
+            # Prepare test info
+            test_info = {
+                'test_project': test.certificate.test_project if test.certificate else '',
+                'customer': test.certificate.customer if test.certificate else '',
+                'customer_order': test.certificate.customer_order if test.certificate else '',
+                'product_sn': test.certificate.product_sn if test.certificate else '',
+                'specimen_id': test.specimen_id or '',
+                'location_orientation': test.certificate.location_orientation if test.certificate else '',
+                'material': test.material or '',
+                'certificate_number': form.certificate_number.data or '',
+                'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
+                'test_engineer': current_user.username,
+                'temperature': str(test.temperature) if test.temperature else '23',
+                'strain_source': 'Displacement Only' if geometry.get('use_displacement_only') else 'Extensometer',
+                'comments': ''
+            }
+
+            # Prepare dimensions
+            specimen_type = geometry.get('type', 'round')
+            if specimen_type == 'round':
+                dimensions = {
+                    'diameter': geometry.get('D0'),
+                    'final_diameter': geometry.get('D1'),
+                    'gauge_length': geometry.get('L0'),
+                    'final_gauge_length': geometry.get('L1'),
+                    'parallel_length': geometry.get('Lp')
+                }
+            else:
+                dimensions = {
+                    'width': geometry.get('a0'),
+                    'thickness': geometry.get('b0'),
+                    'gauge_length': geometry.get('L0'),
+                    'final_gauge_length': geometry.get('L1'),
+                    'parallel_length': geometry.get('Lp')
+                }
+
+            # Convert AnalysisResult objects to MeasuredValue-like objects for report
+            results_for_report = {}
+            for name, result in results.items():
+                # Create a simple object with value and uncertainty attributes
+                class ResultValue:
+                    def __init__(self, v, u):
+                        self.value = v
+                        self.uncertainty = u
+                results_for_report[name] = ResultValue(result.value, result.uncertainty)
+
+            # Map database result names to report template names
+            result_mapping = {
+                'Rp0.2': 'Rp02',
+                'Rp0.5': 'Rp05',
+                'A%': 'A_percent',
+                'Z%': 'Z',
+                'Stress_rate_Rp02': 'stress_rate_rp02',
+                'Strain_rate_Rp02': 'strain_rate_rp02',
+                'Stress_rate_Rm': 'stress_rate_rm',
+                'Strain_rate_Rm': 'strain_rate_rm'
+            }
+            for db_name, report_name in result_mapping.items():
+                if db_name in results_for_report:
+                    results_for_report[report_name] = results_for_report[db_name]
+
+            yield_type = geometry.get('yield_method', 'offset')
+
+            # Prepare report data
+            report_data = TensileReportGenerator.prepare_report_data(
+                test_info=test_info,
+                dimensions=dimensions,
+                results=results_for_report,
+                specimen_type=specimen_type,
+                yield_type=yield_type
+            )
+
+            # Generate stress-strain chart image
+            chart_path = None
+            if test.raw_data_filename:
+                csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], test.raw_data_filename)
+                if os.path.exists(csv_path):
+                    data = parse_mts_csv(Path(csv_path))
+                    area = geometry.get('area', 100)
+                    L0 = geometry.get('L0', 50)
+                    Lp = geometry.get('Lp', 50)
+
+                    analyzer = TensileAnalyzer()
+                    stress, strain = analyzer.calculate_stress_strain(data.force, data.extension, area, L0)
+                    stress_disp, strain_disp = analyzer.calculate_stress_strain(data.force, data.displacement, area, Lp)
+
+                    # Create matplotlib figure for report
+                    fig, ax = plt.subplots(figsize=(8, 5))
+                    ax.plot(strain * 100, stress, 'darkred', linewidth=1.5, label='Extensometer')
+                    ax.plot(strain_disp * 100, stress_disp, 'black', linewidth=1, label='Displacement')
+
+                    # Add result markers
+                    rm_val = results.get('Rm')
+                    rp02_val = results.get('Rp0.2')
+                    e_val = results.get('E')
+
+                    if rm_val:
+                        ax.axhline(y=rm_val.value, color='gray', linestyle='--', linewidth=1,
+                                   label=f'Rm = {rm_val.value:.1f} MPa')
+                    if rp02_val:
+                        ax.axhline(y=rp02_val.value, color='gray', linestyle=':', linewidth=1,
+                                   label=f'Rp0.2 = {rp02_val.value:.1f} MPa')
+
+                    ax.set_xlabel('Strain (%)')
+                    ax.set_ylabel('Stress (MPa)')
+                    ax.set_title(f'Stress-Strain Curve - {test.specimen_id}')
+                    ax.legend(loc='lower right', fontsize=8)
+                    ax.grid(True, alpha=0.3)
+
+                    # Save chart to temp file
+                    chart_path = Path(current_app.config['UPLOAD_FOLDER']) / f'chart_{test_id}.png'
+                    fig.savefig(chart_path, dpi=150, bbox_inches='tight')
+                    plt.close(fig)
+
+            # Get template and logo paths
+            template_path = Path(current_app.root_path).parent / 'templates' / 'tensile_report_template.docx'
+            logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
+
+            if not template_path.exists():
+                flash(f'Template not found: {template_path}', 'danger')
+                return redirect(url_for('tensile.view', test_id=test_id))
+
+            # Generate report
+            reports_folder = Path(current_app.root_path).parent / 'reports'
+            reports_folder.mkdir(exist_ok=True)
+
+            report_filename = f"Tensile_Report_{test.specimen_id or test.test_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+            output_path = reports_folder / report_filename
+
+            generator = TensileReportGenerator(template_path)
+            generator.generate_report(
+                output_path=output_path,
+                data=report_data,
+                chart_path=chart_path,
+                logo_path=logo_path if logo_path.exists() else None
+            )
+
+            # Clean up chart temp file
+            if chart_path and chart_path.exists():
+                os.remove(chart_path)
+
+            # Audit log
+            audit = AuditLog(
+                user_id=current_user.id,
+                action='GENERATE_REPORT',
+                table_name='test_records',
+                record_id=test_id,
+                new_values={'report_filename': report_filename},
+                ip_address=request.remote_addr
+            )
+            db.session.add(audit)
+            db.session.commit()
+
+            flash(f'Report generated: {report_filename}', 'success')
+
+            # Return file for download
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=report_filename,
+                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            flash(f'Report generation error: {str(e)}', 'danger')
+            return redirect(url_for('tensile.view', test_id=test_id))
 
     return render_template('tensile/report.html', test=test, form=form)
 

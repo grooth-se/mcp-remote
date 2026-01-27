@@ -1,12 +1,15 @@
 """Certificate register routes."""
+import os
 from datetime import datetime, date
+from pathlib import Path
 
 from flask import (render_template, redirect, url_for, flash, request,
-                   jsonify)
+                   jsonify, current_app)
 from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
 
 from . import certificates_bp
-from .forms import CertificateForm, CertificateSearchForm
+from .forms import CertificateForm, CertificateSearchForm, CertificateImportForm
 from app.extensions import db
 from app.models import AuditLog
 from app.models.certificate import Certificate
@@ -332,3 +335,165 @@ def next_id():
     year = request.args.get('year', datetime.now().year, type=int)
     next_cert_id = Certificate.get_next_cert_id(year)
     return jsonify({'year': year, 'next_id': next_cert_id})
+
+
+@certificates_bp.route('/import', methods=['GET', 'POST'])
+@login_required
+def import_excel():
+    """Import certificates from Excel file."""
+    if current_user.role != 'admin':
+        flash('Only administrators can import certificates.', 'danger')
+        return redirect(url_for('certificates.index'))
+
+    form = CertificateImportForm()
+
+    if form.validate_on_submit():
+        try:
+            from openpyxl import load_workbook
+
+            file = form.excel_file.data
+            filename = secure_filename(file.filename)
+            filepath = Path(current_app.config['UPLOAD_FOLDER']) / filename
+            file.save(filepath)
+
+            # Load workbook
+            wb = load_workbook(filepath)
+            ws = wb.active
+
+            # Get headers from first row
+            headers = [cell.value for cell in ws[1]]
+
+            # Map column names to indices
+            col_map = {}
+            header_mapping = {
+                'Year': 'year',
+                'ID': 'cert_id',
+                'Revision No': 'revision',
+                'Date': 'cert_date',
+                'Product': 'product',
+                'Product S/N': 'product_sn',
+                'Test Project': 'test_project',
+                'Project name': 'project_name',
+                'Test standard': 'test_standard',
+                'Material/ HT': 'material',
+                'Specimen ID': 'specimen_id',
+                'Location/orient.:': 'location_orientation',
+                'Temperature': 'temperature',
+                'Customer': 'customer',
+                'Customer order': 'customer_order',
+                'Comment': 'comment',
+                'Reported': 'reported',
+                'Invoiced': 'invoiced'
+            }
+
+            for idx, header in enumerate(headers):
+                if header in header_mapping:
+                    col_map[header_mapping[header]] = idx
+
+            # Process rows
+            imported = 0
+            skipped = 0
+            errors = []
+
+            for row_num in range(2, ws.max_row + 1):
+                row_data = [cell.value for cell in ws[row_num]]
+
+                # Skip empty rows
+                if not row_data[col_map.get('year', 0)]:
+                    continue
+
+                try:
+                    year = int(row_data[col_map.get('year', 0)])
+                    cert_id = int(row_data[col_map.get('cert_id', 1)])
+                    revision = int(row_data[col_map.get('revision', 3)] or 1)
+
+                    # Check if exists
+                    existing = Certificate.query.filter_by(
+                        year=year, cert_id=cert_id, revision=revision
+                    ).first()
+
+                    if existing:
+                        if form.skip_existing.data:
+                            skipped += 1
+                            continue
+                        else:
+                            # Update existing
+                            cert = existing
+                    else:
+                        cert = Certificate(
+                            year=year,
+                            cert_id=cert_id,
+                            revision=revision,
+                            created_by_id=current_user.id
+                        )
+                        db.session.add(cert)
+
+                    # Set other fields
+                    cert_date = row_data[col_map.get('cert_date', 4)]
+                    if cert_date:
+                        if isinstance(cert_date, datetime):
+                            cert.cert_date = cert_date.date()
+                        elif isinstance(cert_date, date):
+                            cert.cert_date = cert_date
+
+                    cert.product = str(row_data[col_map.get('product', 5)] or '') if col_map.get('product') else ''
+                    cert.product_sn = str(row_data[col_map.get('product_sn', 6)] or '') if col_map.get('product_sn') else ''
+                    cert.test_project = str(row_data[col_map.get('test_project', 7)] or '') if col_map.get('test_project') else ''
+                    cert.project_name = str(row_data[col_map.get('project_name', 8)] or '') if col_map.get('project_name') else ''
+                    cert.test_standard = str(row_data[col_map.get('test_standard', 9)] or '') if col_map.get('test_standard') else ''
+                    cert.material = str(row_data[col_map.get('material', 10)] or '') if col_map.get('material') else ''
+                    cert.specimen_id = str(row_data[col_map.get('specimen_id', 11)] or '') if col_map.get('specimen_id') else ''
+                    cert.location_orientation = str(row_data[col_map.get('location_orientation', 12)] or '') if col_map.get('location_orientation') else ''
+                    cert.temperature = str(row_data[col_map.get('temperature', 13)] or '') if col_map.get('temperature') else ''
+                    cert.customer = str(row_data[col_map.get('customer', 14)] or '') if col_map.get('customer') else ''
+                    cert.customer_order = str(row_data[col_map.get('customer_order', 15)] or '') if col_map.get('customer_order') else ''
+                    cert.comment = str(row_data[col_map.get('comment', 16)] or '') if col_map.get('comment') else ''
+
+                    # Boolean fields
+                    reported = row_data[col_map.get('reported', 17)] if col_map.get('reported') else None
+                    invoiced = row_data[col_map.get('invoiced', 18)] if col_map.get('invoiced') else None
+                    cert.reported = bool(reported) if reported else False
+                    cert.invoiced = bool(invoiced) if invoiced else False
+
+                    imported += 1
+
+                except Exception as e:
+                    errors.append(f"Row {row_num}: {str(e)}")
+
+            db.session.commit()
+
+            # Audit log
+            audit = AuditLog(
+                user_id=current_user.id,
+                action='IMPORT',
+                table_name='certificates',
+                new_values={
+                    'filename': filename,
+                    'imported': imported,
+                    'skipped': skipped,
+                    'errors': len(errors)
+                },
+                ip_address=request.remote_addr
+            )
+            db.session.add(audit)
+            db.session.commit()
+
+            # Clean up uploaded file
+            os.remove(filepath)
+
+            flash(f'Import complete: {imported} imported, {skipped} skipped, {len(errors)} errors', 'success')
+
+            if errors:
+                for err in errors[:5]:  # Show first 5 errors
+                    flash(err, 'warning')
+                if len(errors) > 5:
+                    flash(f'...and {len(errors) - 5} more errors', 'warning')
+
+            return redirect(url_for('certificates.index'))
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            flash(f'Import error: {str(e)}', 'danger')
+
+    return render_template('certificates/import.html', form=form)

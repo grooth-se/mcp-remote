@@ -6,11 +6,48 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2><i class="bi bi-journal-text"></i> Certificate Register</h2>
-        <p class="text-muted">Manage test certificates (DUR-YYYY-NNNN)</p>
+        <p class="text-muted">Central hub for all test reports (DUR-YYYY-NNNN)</p>
     </div>
-    <a href="{{ url_for('certificates.new') }}" class="btn btn-primary btn-lg">
-        <i class="bi bi-plus-circle"></i> New Certificate
-    </a>
+    <div>
+        {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('certificates.import_excel') }}" class="btn btn-outline-info me-2">
+            <i class="bi bi-file-earmark-excel"></i> Import
+        </a>
+        {% endif %}
+        <a href="{{ url_for('certificates.new') }}" class="btn btn-success btn-lg">
+            <i class="bi bi-plus-circle"></i> New Test Entry
+        </a>
+    </div>
+</div>
+
+<!-- Quick Lookup -->
+<div class="card mb-4 border-primary">
+    <div class="card-body">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Quick Lookup - Open Certificate</label>
+                <div class="input-group">
+                    <span class="input-group-text">DUR-</span>
+                    <input type="text" name="lookup" class="form-control"
+                           placeholder="2026-1001" id="cert-lookup-input">
+                    <button type="button" class="btn btn-primary" id="lookup-btn">
+                        <i class="bi bi-search"></i> Open
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="d-flex gap-2 justify-content-end">
+                    <small class="text-muted align-self-center">Recent:</small>
+                    {% for cert in certificates[:5] %}
+                    <a href="{{ url_for('certificates.view', cert_id=cert.id) }}"
+                       class="btn btn-sm btn-outline-secondary">
+                        {{ cert.certificate_number }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Filter Bar -->
@@ -60,17 +97,16 @@
                         <th>Customer</th>
                         <th>Standard</th>
                         <th>Material</th>
-                        <th class="text-center">Reported</th>
-                        <th class="text-center">Invoiced</th>
                         <th class="text-center">Tests</th>
-                        <th>Actions</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for cert in certificates %}
-                    <tr>
+                    <tr class="align-middle">
                         <td>
-                            <a href="{{ url_for('certificates.view', cert_id=cert.id) }}" class="fw-bold text-decoration-none">
+                            <a href="{{ url_for('certificates.view', cert_id=cert.id) }}" class="fw-bold text-decoration-none text-primary">
                                 {{ cert.certificate_number_with_rev }}
                             </a>
                         </td>
@@ -80,36 +116,33 @@
                         <td><small>{{ cert.test_standard or '-' }}</small></td>
                         <td><small>{{ cert.material or '-' }}</small></td>
                         <td class="text-center">
-                            {% if cert.reported %}
-                            <span class="badge bg-success"><i class="bi bi-check"></i></span>
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            {% if cert.invoiced %}
-                            <span class="badge bg-success"><i class="bi bi-check"></i></span>
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
                             {% set test_count = cert.test_records.count() %}
                             {% if test_count > 0 %}
-                            <span class="badge bg-info">{{ test_count }}</span>
+                            <span class="badge bg-primary">{{ test_count }}</span>
                             {% else %}
-                            <span class="text-muted">-</span>
+                            <span class="badge bg-light text-muted">0</span>
                             {% endif %}
                         </td>
-                        <td>
-                            <a href="{{ url_for('certificates.view', cert_id=cert.id) }}"
-                               class="btn btn-sm btn-outline-primary" title="View">
-                                <i class="bi bi-eye"></i>
-                            </a>
-                            <a href="{{ url_for('certificates.edit', cert_id=cert.id) }}"
-                               class="btn btn-sm btn-outline-secondary" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </a>
+                        <td class="text-center">
+                            {% if cert.reported and cert.invoiced %}
+                            <span class="badge bg-success"><i class="bi bi-check-all"></i> Complete</span>
+                            {% elif cert.reported %}
+                            <span class="badge bg-warning text-dark"><i class="bi bi-check"></i> Reported</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Open</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('certificates.view', cert_id=cert.id) }}"
+                                   class="btn btn-primary" title="Open Test Entry">
+                                    <i class="bi bi-folder2-open"></i> Open
+                                </a>
+                                <a href="{{ url_for('certificates.edit', cert_id=cert.id) }}"
+                                   class="btn btn-outline-secondary" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -135,4 +168,46 @@
     </div>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lookupInput = document.getElementById('cert-lookup-input');
+    const lookupBtn = document.getElementById('lookup-btn');
+
+    function openCertificate() {
+        let value = lookupInput.value.trim();
+        if (!value) return;
+
+        // Add DUR- prefix if not present
+        if (!value.toUpperCase().startsWith('DUR-')) {
+            value = 'DUR-' + value;
+        }
+
+        // Search for certificate
+        fetch(`{{ url_for('certificates.search') }}?q=${encodeURIComponent(value)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.length > 0) {
+                    // Redirect to view page
+                    window.location.href = `/certificates/${data[0].id}`;
+                } else {
+                    alert('Certificate not found: ' + value);
+                }
+            })
+            .catch(err => {
+                alert('Error searching: ' + err);
+            });
+    }
+
+    lookupBtn.addEventListener('click', openCertificate);
+    lookupInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            openCertificate();
+        }
+    });
+});
+</script>
 {% endblock %}

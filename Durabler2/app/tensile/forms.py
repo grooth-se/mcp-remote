@@ -2,7 +2,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired, FileAllowed
 from wtforms import (StringField, FloatField, SelectField, TextAreaField,
-                     SubmitField, HiddenField, IntegerField)
+                     SubmitField, HiddenField, IntegerField, BooleanField)
 from wtforms.validators import DataRequired, Optional, NumberRange
 
 
@@ -43,6 +43,10 @@ class SpecimenForm(FlaskForm):
         ('offset', 'Offset method (Rp0.2 / Rp0.5)'),
         ('yield_point', 'Yield point (ReH / ReL)')
     ], validators=[DataRequired()])
+
+    # Data source option
+    use_displacement_only = BooleanField('Use Displacement Data Only',
+        description='Use when extensometer data is unreliable. E modulus calculated from 10-30% Rm range.')
 
     # Test standard
     test_standard = SelectField('Test Standard', choices=[

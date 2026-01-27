@@ -184,12 +184,14 @@ class TensileAnalyzer:
         strain: np.ndarray,
         area_uncertainty: float,
         reference_length: float,
-        Rm: float
+        Rm: float,
+        min_stress_fraction: float = 0.15,
+        max_stress_fraction: float = 0.40
     ) -> MeasuredValue:
         """
         Calculate Young's modulus E from displacement/crosshead data.
 
-        Uses stress range 15%-40% of Rm to select the elastic region,
+        Uses stress range (default 15%-40%) of Rm to select the elastic region,
         removing data affected by machine setup mismatch at low loads.
 
         Parameters
@@ -204,15 +206,19 @@ class TensileAnalyzer:
             Reference length (parallel length Lc) in mm
         Rm : float
             Ultimate tensile strength in MPa
+        min_stress_fraction : float
+            Minimum stress as fraction of Rm (default 0.15 = 15%)
+        max_stress_fraction : float
+            Maximum stress as fraction of Rm (default 0.40 = 40%)
 
         Returns
         -------
         MeasuredValue
             Young's modulus with uncertainty in GPa
         """
-        # Use stress range 15%-40% of Rm to avoid machine setup mismatch
-        min_stress = 0.15 * Rm
-        max_stress = 0.40 * Rm
+        # Use stress range based on Rm to avoid machine setup mismatch
+        min_stress = min_stress_fraction * Rm
+        max_stress = max_stress_fraction * Rm
 
         # Select elastic region based on stress range
         mask = (stress >= min_stress) & (stress <= max_stress)
@@ -682,16 +688,18 @@ class TensileAnalyzer:
         E_modulus: float,
         Rm: float,
         area: float,
-        area_uncertainty: float
+        area_uncertainty: float,
+        strain_zero_stress_fraction: float = 0.30
     ) -> MeasuredValue:
         """
         Calculate 0.2% offset yield strength (Rp0.2) for displacement/crosshead data.
 
-        This method uses the point at 30% of Rm as a reference to establish the
-        elastic line baseline, compensating for initial misalignment in the test
-        equipment. The elastic line is drawn through the 30% Rm point with slope E,
-        and its x-intercept (strain at zero stress) is used as the origin for the
-        0.2% offset calculation.
+        This method zeros the strain at the point where stress equals a fraction
+        of Rm (default 30%, use 10% for displacement-only mode). This compensates
+        for mechanical slack in the displacement data early in the test.
+
+        The strain zero point is set where stress = strain_zero_stress_fraction * Rm,
+        then the standard 0.2% offset method is applied.
 
         NOTE: This method should ONLY be used for displacement/crosshead data,
         NOT for extensometer data.
@@ -710,6 +718,9 @@ class TensileAnalyzer:
             Cross-sectional area in mm^2
         area_uncertainty : float
             Uncertainty in area in mm^2
+        strain_zero_stress_fraction : float
+            Fraction of Rm at which to zero the strain (default 0.30 = 30%).
+            Use 0.10 (10%) for displacement-only mode to eliminate mechanical slack.
 
         Returns
         -------
@@ -719,29 +730,21 @@ class TensileAnalyzer:
         offset = self.config.offset_strain  # 0.002 (0.2%)
         E_mpa = E_modulus * 1000  # Convert GPa to MPa
 
-        # Find the point at 30% of Rm as reference for the elastic line
-        target_stress = 0.30 * Rm
+        # Find the stress level at which to zero the strain
+        target_stress = strain_zero_stress_fraction * Rm
 
-        # Find the index closest to 30% Rm on the ascending part of the curve
+        # Find the index closest to target stress on the ascending part of the curve
         # Use only the portion before max stress to avoid post-necking data
         max_idx = np.argmax(stress)
         ascending_stress = stress[:max_idx + 1]
         ascending_strain = strain[:max_idx + 1]
 
-        # Find index where stress is closest to 30% Rm
+        # Find index where stress is closest to target
         ref_idx = np.argmin(np.abs(ascending_stress - target_stress))
-        strain_ref = ascending_strain[ref_idx]
-        stress_ref = ascending_stress[ref_idx]
+        strain_at_zero_point = ascending_strain[ref_idx]
 
-        # Calculate the x-intercept (strain at zero stress) of the elastic line
-        # passing through the reference point with slope E
-        # Elastic line: sigma = E * (epsilon - epsilon_0)
-        # At reference point: stress_ref = E * (strain_ref - epsilon_0)
-        # So: epsilon_0 = strain_ref - stress_ref / E
-        strain_zero = strain_ref - stress_ref / E_mpa
-
-        # Shift strain so that the elastic line x-intercept becomes the origin
-        strain_corrected = strain - strain_zero
+        # Zero the strain at this point (eliminate mechanical slack)
+        strain_corrected = strain - strain_at_zero_point
 
         # Apply standard offset method with corrected strain
         # Offset line: sigma = E * (epsilon_corrected - offset)
@@ -780,15 +783,15 @@ class TensileAnalyzer:
         # Uncertainty calculation
         u_area = yield_stress * (area_uncertainty / area)
         u_force = yield_stress * self.config.force_calibration_uncertainty
-        # Additional uncertainty from baseline determination
-        u_baseline = yield_stress * 0.01  # ~1% from baseline selection
+        # Additional uncertainty from zero point determination
+        u_zero_point = yield_stress * 0.01  # ~1% from zero point selection
 
         if len(sign_changes) > 0 and idx + 1 < len(stress_segment):
             u_interpolation = abs(stress_segment[idx + 1] - stress_segment[idx]) / 4
         else:
             u_interpolation = yield_stress * 0.01
 
-        u_combined = np.sqrt(u_area**2 + u_force**2 + u_interpolation**2 + u_baseline**2)
+        u_combined = np.sqrt(u_area**2 + u_force**2 + u_interpolation**2 + u_zero_point**2)
         U = 2 * u_combined
 
         return MeasuredValue(
@@ -805,16 +808,18 @@ class TensileAnalyzer:
         E_modulus: float,
         Rm: float,
         area: float,
-        area_uncertainty: float
+        area_uncertainty: float,
+        strain_zero_stress_fraction: float = 0.30
     ) -> MeasuredValue:
         """
         Calculate 0.5% offset yield strength (Rp0.5) for displacement/crosshead data.
 
-        This method uses the point at 30% of Rm as a reference to establish the
-        elastic line baseline, compensating for initial misalignment in the test
-        equipment. The elastic line is drawn through the 30% Rm point with slope E,
-        and its x-intercept (strain at zero stress) is used as the origin for the
-        0.5% offset calculation.
+        This method zeros the strain at the point where stress equals a fraction
+        of Rm (default 30%, use 10% for displacement-only mode). This compensates
+        for mechanical slack in the displacement data early in the test.
+
+        The strain zero point is set where stress = strain_zero_stress_fraction * Rm,
+        then the standard 0.5% offset method is applied.
 
         NOTE: This method should ONLY be used for displacement/crosshead data,
         NOT for extensometer data.
@@ -833,6 +838,9 @@ class TensileAnalyzer:
             Cross-sectional area in mm^2
         area_uncertainty : float
             Uncertainty in area in mm^2
+        strain_zero_stress_fraction : float
+            Fraction of Rm at which to zero the strain (default 0.30 = 30%).
+            Use 0.10 (10%) for displacement-only mode to eliminate mechanical slack.
 
         Returns
         -------
@@ -842,28 +850,20 @@ class TensileAnalyzer:
         offset = 0.005  # 0.5%
         E_mpa = E_modulus * 1000  # Convert GPa to MPa
 
-        # Find the point at 30% of Rm as reference for the elastic line
-        target_stress = 0.30 * Rm
+        # Find the stress level at which to zero the strain
+        target_stress = strain_zero_stress_fraction * Rm
 
-        # Find the index closest to 30% Rm on the ascending part of the curve
+        # Find the index closest to target stress on the ascending part of the curve
         max_idx = np.argmax(stress)
         ascending_stress = stress[:max_idx + 1]
         ascending_strain = strain[:max_idx + 1]
 
-        # Find index where stress is closest to 30% Rm
+        # Find index where stress is closest to target
         ref_idx = np.argmin(np.abs(ascending_stress - target_stress))
-        strain_ref = ascending_strain[ref_idx]
-        stress_ref = ascending_stress[ref_idx]
+        strain_at_zero_point = ascending_strain[ref_idx]
 
-        # Calculate the x-intercept (strain at zero stress) of the elastic line
-        # passing through the reference point with slope E
-        # Elastic line: sigma = E * (epsilon - epsilon_0)
-        # At reference point: stress_ref = E * (strain_ref - epsilon_0)
-        # So: epsilon_0 = strain_ref - stress_ref / E
-        strain_zero = strain_ref - stress_ref / E_mpa
-
-        # Shift strain so that the elastic line x-intercept becomes the origin
-        strain_corrected = strain - strain_zero
+        # Zero the strain at this point (eliminate mechanical slack)
+        strain_corrected = strain - strain_at_zero_point
 
         # Apply standard offset method with corrected strain
         offset_line = E_mpa * (strain_corrected - offset)
@@ -899,14 +899,14 @@ class TensileAnalyzer:
         # Uncertainty calculation
         u_area = yield_stress * (area_uncertainty / area)
         u_force = yield_stress * self.config.force_calibration_uncertainty
-        u_baseline = yield_stress * 0.01  # Baseline determination uncertainty
+        u_zero_point = yield_stress * 0.01  # Zero point determination uncertainty
 
         if len(sign_changes) > 0 and idx + 1 < len(stress_segment):
             u_interpolation = abs(stress_segment[idx + 1] - stress_segment[idx]) / 4
         else:
             u_interpolation = yield_stress * 0.01
 
-        u_combined = np.sqrt(u_area**2 + u_force**2 + u_interpolation**2 + u_baseline**2)
+        u_combined = np.sqrt(u_area**2 + u_force**2 + u_interpolation**2 + u_zero_point**2)
         U = 2 * u_combined
 
         return MeasuredValue(

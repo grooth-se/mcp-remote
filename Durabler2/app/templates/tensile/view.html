@@ -18,6 +18,9 @@
         </span>
     </div>
     <div>
+        <a href="{{ url_for('tensile.reanalyze', test_id=test.id) }}" class="btn btn-warning">
+            <i class="bi bi-arrow-repeat"></i> Re-analyze
+        </a>
         <a href="{{ url_for('tensile.report', test_id=test.id) }}" class="btn btn-primary">
             <i class="bi bi-file-pdf"></i> Generate Report
         </a>
@@ -101,6 +104,14 @@
                 <dl class="row mb-0">
                     <dt class="col-6">Area A₀:</dt>
                     <dd class="col-6">{{ "%.2f"|format(test.geometry.area) }} mm²</dd>
+
+                    <dt class="col-6">Yield Method:</dt>
+                    <dd class="col-6">{{ 'ReH/ReL' if test.geometry.yield_method == 'yield_point' else 'Rp0.2/Rp0.5' }}</dd>
+
+                    {% if test.geometry.use_displacement_only %}
+                    <dt class="col-6">Data Source:</dt>
+                    <dd class="col-6"><span class="badge bg-warning text-dark">Displacement Only</span></dd>
+                    {% endif %}
                 </dl>
                 {% else %}
                 <p class="text-muted">No geometry data</p>

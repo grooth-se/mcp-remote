@@ -1,5 +1,6 @@
 """Certificate register forms."""
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed, FileRequired
 from wtforms import (StringField, IntegerField, DateField, TextAreaField,
                      BooleanField, SelectField, SubmitField)
 from wtforms.validators import DataRequired, Optional, NumberRange
@@ -74,3 +75,13 @@ class CertificateLookupForm(FlaskForm):
                                      validators=[DataRequired()],
                                      render_kw={'placeholder': 'DUR-2026-1001'})
     submit = SubmitField('Lookup')
+
+
+class CertificateImportForm(FlaskForm):
+    """Form for importing certificates from Excel."""
+    excel_file = FileField('Excel File', validators=[
+        FileRequired(),
+        FileAllowed(['xlsx', 'xls'], 'Only Excel files allowed!')
+    ])
+    skip_existing = BooleanField('Skip existing certificates', default=True)
+    submit = SubmitField('Import Certificates')
