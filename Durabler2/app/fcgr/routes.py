@@ -188,7 +188,9 @@ def new():
 
     if form.validate_on_submit():
         try:
-            # Check if Excel file uploaded - parse for specimen data
+            # ============================================================
+            # STEP 1: Parse Excel file first (primary data source)
+            # ============================================================
             excel_data = None
             if form.excel_file.data:
                 excel_file = form.excel_file.data
@@ -196,8 +198,11 @@ def new():
                 filepath = Path(current_app.config['UPLOAD_FOLDER']) / filename
                 excel_file.save(filepath)
                 excel_data = parse_fcgr_excel(filepath)
+                flash(f'Excel data imported: Specimen {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm', 'info')
 
-            # Check if CSV file uploaded - parse for raw data
+            # ============================================================
+            # STEP 2: Parse CSV file for raw test data
+            # ============================================================
             csv_data = None
             cycles = None
             crack_lengths = None
@@ -221,27 +226,110 @@ def new():
                 P_max = P_max_arr
                 P_min = P_min_arr
 
-            # Get specimen dimensions (prefer form, fallback to Excel)
-            specimen_id = form.specimen_id.data or (excel_data.specimen_id if excel_data else '')
-            specimen_type = form.specimen_type.data or (excel_data.specimen_type if excel_data else 'C(T)')
-            W = form.W.data or (excel_data.W if excel_data else 50.0)
-            B = form.B.data or (excel_data.B if excel_data else 12.5)
-            B_n = form.B_n.data or (excel_data.B_n if excel_data else B)
-            a_0 = form.a_0.data or (excel_data.a_0 if excel_data else 10.0)
-            notch_height = form.notch_height.data or (excel_data.notch_height if excel_data else 0.0)
+            # ============================================================
+            # STEP 3: Extract values - Excel takes precedence over form
+            # ============================================================
 
-            # Get material properties (prefer form, fallback to Excel)
-            yield_strength = form.yield_strength.data or (excel_data.yield_strength if excel_data else 0.0)
-            ultimate_strength = form.ultimate_strength.data or (excel_data.ultimate_strength if excel_data else 0.0)
-            youngs_modulus = form.youngs_modulus.data or (excel_data.youngs_modulus if excel_data else 210.0)
-            poissons_ratio = form.poissons_ratio.data or (excel_data.poissons_ratio if excel_data else 0.3)
+            # Specimen identification - Excel first, then form
+            if excel_data and excel_data.specimen_id:
+                specimen_id = excel_data.specimen_id
+            else:
+                specimen_id = form.specimen_id.data or ''
 
-            # Get test parameters (prefer form, fallback to Excel)
-            control_mode = form.control_mode.data or (excel_data.control_mode if excel_data else 'Load Control')
-            load_ratio = form.load_ratio.data if form.load_ratio.data is not None else (excel_data.load_ratio if excel_data else 0.1)
-            frequency = form.frequency.data or (excel_data.frequency if excel_data else 10.0)
-            wave_shape = form.wave_shape.data or (excel_data.wave_shape if excel_data else 'Sine')
-            test_temperature = form.test_temperature.data if form.test_temperature.data is not None else (excel_data.test_temperature if excel_data else 23.0)
+            # Specimen type - Excel first, then form
+            if excel_data and excel_data.specimen_type:
+                specimen_type = excel_data.specimen_type
+            else:
+                specimen_type = form.specimen_type.data or 'C(T)'
+
+            # Specimen dimensions - Excel takes precedence
+            if excel_data and excel_data.W > 0:
+                W = excel_data.W
+            else:
+                W = form.W.data or 50.0
+
+            if excel_data and excel_data.B > 0:
+                B = excel_data.B
+            else:
+                B = form.B.data or 12.5
+
+            if excel_data and excel_data.B_n > 0:
+                B_n = excel_data.B_n
+            else:
+                B_n = form.B_n.data or B
+
+            if excel_data and excel_data.a_0 > 0:
+                a_0 = excel_data.a_0
+            else:
+                a_0 = form.a_0.data or 10.0
+
+            if excel_data and excel_data.notch_height > 0:
+                notch_height = excel_data.notch_height
+            else:
+                notch_height = form.notch_height.data or 0.0
+
+            # Material properties - Excel takes precedence
+            if excel_data and excel_data.yield_strength > 0:
+                yield_strength = excel_data.yield_strength
+            else:
+                yield_strength = form.yield_strength.data or 0.0
+
+            if excel_data and excel_data.ultimate_strength > 0:
+                ultimate_strength = excel_data.ultimate_strength
+            else:
+                ultimate_strength = form.ultimate_strength.data or 0.0
+
+            if excel_data and excel_data.youngs_modulus > 0:
+                youngs_modulus = excel_data.youngs_modulus
+            else:
+                youngs_modulus = form.youngs_modulus.data or 210.0
+
+            if excel_data and excel_data.poissons_ratio > 0:
+                poissons_ratio = excel_data.poissons_ratio
+            else:
+                poissons_ratio = form.poissons_ratio.data or 0.3
+
+            # Test parameters - Excel takes precedence
+            if excel_data and excel_data.control_mode:
+                control_mode = excel_data.control_mode
+            else:
+                control_mode = form.control_mode.data or 'Load Control'
+
+            if excel_data and excel_data.load_ratio is not None:
+                load_ratio = excel_data.load_ratio
+            elif form.load_ratio.data is not None:
+                load_ratio = form.load_ratio.data
+            else:
+                load_ratio = 0.1
+
+            if excel_data and excel_data.frequency > 0:
+                frequency = excel_data.frequency
+            else:
+                frequency = form.frequency.data or 10.0
+
+            if excel_data and excel_data.wave_shape:
+                wave_shape = excel_data.wave_shape
+            else:
+                wave_shape = form.wave_shape.data or 'Sine'
+
+            if excel_data and excel_data.test_temperature != 23.0:
+                test_temperature = excel_data.test_temperature
+            elif form.test_temperature.data is not None:
+                test_temperature = form.test_temperature.data
+            else:
+                test_temperature = 23.0
+
+            # Material name - form takes precedence (user may want to specify)
+            material_name = form.material.data or ''
+
+            # Log extracted values
+            current_app.logger.info(f'FCGR Analysis - Specimen: {specimen_id}, W={W}, B={B}, a_0={a_0}')
+            current_app.logger.info(f'FCGR Analysis - Material: yield={yield_strength} MPa, E={youngs_modulus} GPa')
+            current_app.logger.info(f'FCGR Analysis - Test params: R={load_ratio}, f={frequency} Hz')
+
+            # ============================================================
+            # STEP 4: Create analysis objects and run analysis
+            # ============================================================
 
             # Create specimen object
             specimen = FCGRSpecimen(
@@ -252,7 +340,7 @@ def new():
                 B_n=B_n,
                 a_0=a_0,
                 notch_height=notch_height,
-                material=form.material.data or ''
+                material=material_name
             )
 
             # Create material object
