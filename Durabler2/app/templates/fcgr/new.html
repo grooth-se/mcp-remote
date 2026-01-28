@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}New FCGR Test{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('fcgr.index') }}">FCGR Tests</a></li>
+        <li class="breadcrumb-item active">New Test</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-graph-up"></i> New FCGR Test (E647)</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <!-- Certificate Selection -->
+                    <div class="card mb-4 border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="bi bi-link-45deg"></i> Link to Certificate</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-0">
+                                {{ form.certificate_id.label(class="form-label") }}
+                                {{ form.certificate_id(class="form-select", id="certificate_select") }}
+                                <small class="text-muted">Select a certificate to auto-fill test information</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Upload -->
+                    <div class="card mb-4">
+                        <div class="card-header"><h6 class="mb-0"><i class="bi bi-upload"></i> Data Files</h6></div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.excel_file.label(class="form-label") }}
+                                        {{ form.excel_file(class="form-control", accept=".xlsx,.xls") }}
+                                        <small class="text-muted">MTS TestSuite Analysis Report (optional)</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.csv_file.label(class="form-label") }}
+                                        {{ form.csv_file(class="form-control", accept=".csv") }}
+                                        <small class="text-muted">Raw test data with cycles, loads, crack lengths</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Specimen Information -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header"><h6 class="mb-0">Specimen Information</h6></div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        {{ form.specimen_id.label(class="form-label") }}
+                                        {{ form.specimen_id(class="form-control") }}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.material.label(class="form-label") }}
+                                        {{ form.material(class="form-control") }}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.batch_number.label(class="form-label") }}
+                                        {{ form.batch_number(class="form-control") }}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.specimen_type.label(class="form-label") }}
+                                        {{ form.specimen_type(class="form-select") }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Specimen Geometry -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header"><h6 class="mb-0">Specimen Geometry</h6></div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            {{ form.W.label(class="form-label") }}
+                                            {{ form.W(class="form-control", placeholder="50.0") }}
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            {{ form.B.label(class="form-label") }}
+                                            {{ form.B(class="form-control", placeholder="12.5") }}
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            {{ form.B_n.label(class="form-label") }}
+                                            {{ form.B_n(class="form-control", placeholder="(same as B)") }}
+                                            <small class="text-muted">Net thickness if side-grooved</small>
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            {{ form.a_0.label(class="form-label") }}
+                                            {{ form.a_0(class="form-control", placeholder="10.0") }}
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.notch_height.label(class="form-label") }}
+                                        {{ form.notch_height(class="form-control", placeholder="0") }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Material Properties -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header"><h6 class="mb-0">Material Properties</h6></div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            {{ form.yield_strength.label(class="form-label") }}
+                                            {{ form.yield_strength(class="form-control", placeholder="500") }}
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            {{ form.ultimate_strength.label(class="form-label") }}
+                                            {{ form.ultimate_strength(class="form-control", placeholder="600") }}
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            {{ form.youngs_modulus.label(class="form-label") }}
+                                            {{ form.youngs_modulus(class="form-control") }}
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            {{ form.poissons_ratio.label(class="form-label") }}
+                                            {{ form.poissons_ratio(class="form-control") }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Test Parameters -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header"><h6 class="mb-0">Test Parameters</h6></div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            {{ form.control_mode.label(class="form-label") }}
+                                            {{ form.control_mode(class="form-select") }}
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            {{ form.load_ratio.label(class="form-label") }}
+                                            {{ form.load_ratio(class="form-control") }}
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            {{ form.frequency.label(class="form-label") }}
+                                            {{ form.frequency(class="form-control") }}
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            {{ form.wave_shape.label(class="form-label") }}
+                                            {{ form.wave_shape(class="form-select") }}
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-6 mb-3">
+                                            {{ form.test_temperature.label(class="form-label") }}
+                                            {{ form.test_temperature(class="form-control") }}
+                                        </div>
+                                        <div class="col-6 mb-3">
+                                            {{ form.environment.label(class="form-label") }}
+                                            {{ form.environment(class="form-control") }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Parameters -->
+                    <div class="card mb-4">
+                        <div class="card-header"><h6 class="mb-0">Analysis Parameters</h6></div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    {{ form.dadn_method.label(class="form-label") }}
+                                    {{ form.dadn_method(class="form-select") }}
+                                </div>
+                                <div class="col-md-4">
+                                    {{ form.outlier_threshold.label(class="form-label") }}
+                                    {{ form.outlier_threshold(class="form-control") }}
+                                    <small class="text-muted">Points deviating more than this % are marked as outliers</small>
+                                </div>
+                                <div class="col-md-4">
+                                    {{ form.test_standard.label(class="form-label") }}
+                                    {{ form.test_standard(class="form-select") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-4">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control", rows=2) }}
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                        <a href="{{ url_for('fcgr.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Certificate selection - reload page to pre-fill data
+    const certSelect = document.getElementById('certificate_select');
+    if (certSelect) {
+        certSelect.addEventListener('change', function() {
+            const certId = this.value;
+            if (certId && certId !== '0') {
+                window.location.href = "{{ url_for('fcgr.new') }}?certificate=" + certId;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

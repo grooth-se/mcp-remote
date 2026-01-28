@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}FCGR Test - {{ test.test_id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('fcgr.index') }}">FCGR Tests</a></li>
+        <li class="breadcrumb-item active">{{ test.test_id }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-graph-up"></i> {{ test.test_id }}</h2>
+        <p class="text-muted mb-0">
+            {{ test.specimen_id or 'No specimen ID' }} |
+            {{ test.material or 'No material' }} |
+            {{ test.test_date.strftime('%Y-%m-%d') if test.test_date else 'No date' }}
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('fcgr.report', test_id=test.id) }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-pdf"></i> Generate Report
+        </a>
+        <a href="{{ url_for('fcgr.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left column: Results -->
+    <div class="col-lg-4">
+        <!-- Paris Law Results -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Paris Law Results</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <small class="text-muted">da/dN = C × (ΔK)<sup>m</sup></small>
+                </div>
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td><strong>C</strong></td>
+                        <td class="text-end">
+                            {% set paris_C = results.get('paris_C') %}
+                            {{ "%.4e"|format(paris_C.value) if paris_C else '-' }}
+                            {% if paris_C and paris_C.uncertainty > 0 %}
+                            <small class="text-muted">± {{ "%.2e"|format(paris_C.uncertainty) }}</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>m</strong></td>
+                        <td class="text-end">
+                            {% set paris_m = results.get('paris_m') %}
+                            {{ "%.3f"|format(paris_m.value) if paris_m else '-' }}
+                            {% if paris_m and paris_m.uncertainty > 0 %}
+                            <small class="text-muted">± {{ "%.3f"|format(paris_m.uncertainty) }}</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="table-light">
+                        <td><strong>R²</strong></td>
+                        <td class="text-end">
+                            {% set r_sq = results.get('r_squared') %}
+                            {{ "%.4f"|format(r_sq.value) if r_sq else '-' }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Data Points</td>
+                        <td class="text-end">
+                            {% set n_pts = results.get('n_points') %}
+                            {{ n_pts.value|int if n_pts else '-' }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Outliers</td>
+                        <td class="text-end">{{ geometry.get('outlier_mask', [])|sum }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- ΔK Range -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-arrows-expand"></i> ΔK Range</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>ΔK min</td>
+                        <td class="text-end">
+                            {% set dK_min = results.get('delta_K_min') %}
+                            {{ "%.2f"|format(dK_min.value) if dK_min else '-' }} MPa√m
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>ΔK max</td>
+                        <td class="text-end">
+                            {% set dK_max = results.get('delta_K_max') %}
+                            {{ "%.2f"|format(dK_max.value) if dK_max else '-' }} MPa√m
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Test Summary -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Test Summary</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>Total Cycles</td>
+                        <td class="text-end">
+                            {% set cycles = results.get('total_cycles') %}
+                            {{ "{:,}".format(cycles.value|int) if cycles else '-' }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Final Crack</td>
+                        <td class="text-end">
+                            {% set final = results.get('final_crack') %}
+                            {{ "%.2f"|format(final.value) if final else '-' }} mm
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Initial a₀</td>
+                        <td class="text-end">{{ "%.2f"|format(geometry.get('a_0', 0)) }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>a₀/W</td>
+                        <td class="text-end">
+                            {% set a0 = geometry.get('a_0', 0) %}
+                            {% set W = geometry.get('W', 1) %}
+                            {{ "%.3f"|format(a0/W) if W > 0 else '-' }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Specimen Geometry -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-rulers"></i> Specimen</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>Type</td>
+                        <td class="text-end">{{ geometry.get('type', '-') }}</td>
+                    </tr>
+                    <tr>
+                        <td>W</td>
+                        <td class="text-end">{{ geometry.get('W', '-') }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>B</td>
+                        <td class="text-end">{{ geometry.get('B', '-') }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>Bn</td>
+                        <td class="text-end">{{ geometry.get('B_n', '-') }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>R ratio</td>
+                        <td class="text-end">{{ geometry.get('load_ratio', '-') }}</td>
+                    </tr>
+                    <tr>
+                        <td>Frequency</td>
+                        <td class="text-end">{{ geometry.get('frequency', '-') }} Hz</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Certificate Link -->
+        {% if test.certificate %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Certificate</h5>
+            </div>
+            <div class="card-body text-center">
+                <a href="{{ url_for('certificates.view', cert_id=test.certificate.id) }}" class="btn btn-outline-info">
+                    <i class="bi bi-journal-text"></i> {{ test.certificate_number }}
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right column: Plots -->
+    <div class="col-lg-8">
+        <!-- Crack Length Plot -->
+        {% if crack_plot %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Crack Length vs Cycles</h5>
+            </div>
+            <div class="card-body">
+                {{ crack_plot | safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Paris Law Plot -->
+        {% if paris_plot %}
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Paris Law (da/dN vs ΔK)</h5>
+            </div>
+            <div class="card-body">
+                {{ paris_plot | safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Validity Notes -->
+        {% if test.notes %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Validity</h5>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0" style="white-space: pre-wrap;">{{ test.notes }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
