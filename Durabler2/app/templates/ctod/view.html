@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}CTOD Test - {{ test.test_id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('ctod.index') }}">CTOD Tests</a></li>
+        <li class="breadcrumb-item active">{{ test.test_id }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-bullseye"></i> {{ test.test_id }}</h2>
+        <p class="text-muted mb-0">
+            {{ test.specimen_id or 'No specimen ID' }} |
+            {{ test.material or 'No material' }} |
+            {{ test.temperature or 23 }} °C |
+            {{ test.test_date.strftime('%Y-%m-%d') if test.test_date else 'No date' }}
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('ctod.report', test_id=test.id) }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-pdf"></i> Generate Report
+        </a>
+        <a href="{{ url_for('ctod.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left column: Results -->
+    <div class="col-lg-4">
+        <!-- CTOD Results -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-bullseye"></i> CTOD Results</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    {% set dc = results.get('delta_c') %}
+                    {% set du = results.get('delta_u') %}
+                    {% set dm = results.get('delta_m') %}
+                    {% if dc %}
+                    <tr class="table-danger">
+                        <td><strong>δc (Cleavage)</strong></td>
+                        <td class="text-end">
+                            <strong>{{ "%.4f"|format(dc.value) }}</strong> ± {{ "%.4f"|format(dc.uncertainty) }} mm
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% if du %}
+                    <tr class="table-warning">
+                        <td><strong>δu (Instability)</strong></td>
+                        <td class="text-end">
+                            <strong>{{ "%.4f"|format(du.value) }}</strong> ± {{ "%.4f"|format(du.uncertainty) }} mm
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% if dm %}
+                    <tr class="table-success">
+                        <td><strong>δm (Max Force)</strong></td>
+                        <td class="text-end">
+                            <strong>{{ "%.4f"|format(dm.value) }}</strong> ± {{ "%.4f"|format(dm.uncertainty) }} mm
+                        </td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Test Summary -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Test Summary</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>P<sub>max</sub></td>
+                        <td class="text-end">
+                            {% set P_max = results.get('P_max') %}
+                            {{ "%.2f"|format(P_max.value) if P_max else '-' }} kN
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>CMOD<sub>max</sub></td>
+                        <td class="text-end">
+                            {% set CMOD_max = results.get('CMOD_max') %}
+                            {{ "%.3f"|format(CMOD_max.value) if CMOD_max else '-' }} mm
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>K<sub>max</sub></td>
+                        <td class="text-end">
+                            {% set K_max = results.get('K_max') %}
+                            {{ "%.1f"|format(K_max.value) if K_max else '-' }} MPa√m
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>a₀/W</td>
+                        <td class="text-end">
+                            {% set a_W = results.get('a_W_ratio') %}
+                            {{ "%.3f"|format(a_W.value) if a_W else '-' }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Compliance</td>
+                        <td class="text-end">
+                            {% set comp = results.get('compliance') %}
+                            {{ "%.4f"|format(comp.value) if comp else '-' }} mm/kN
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Specimen Geometry -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-rulers"></i> Specimen</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>Type</td>
+                        <td class="text-end">{{ geometry.get('type', '-') }}</td>
+                    </tr>
+                    <tr>
+                        <td>W</td>
+                        <td class="text-end">{{ "%.2f"|format(geometry.get('W', 0)) }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>B</td>
+                        <td class="text-end">{{ "%.2f"|format(geometry.get('B', 0)) }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>Bn</td>
+                        <td class="text-end">{{ "%.2f"|format(geometry.get('B_n', 0)) }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>a₀</td>
+                        <td class="text-end">{{ "%.2f"|format(geometry.get('a_0', 0)) }} mm</td>
+                    </tr>
+                    {% if geometry.get('type') == 'SE(B)' %}
+                    <tr>
+                        <td>S</td>
+                        <td class="text-end">{{ "%.1f"|format(geometry.get('S', 0)) }} mm</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Certificate Link -->
+        {% if test.certificate %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Certificate</h5>
+            </div>
+            <div class="card-body text-center">
+                <a href="{{ url_for('certificates.view', cert_id=test.certificate.id) }}" class="btn btn-outline-info">
+                    <i class="bi bi-journal-text"></i> {{ test.certificate_number }}
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right column: Plot -->
+    <div class="col-lg-8">
+        <!-- Force-CMOD Plot -->
+        {% if force_cmod_plot %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Force vs CMOD</h5>
+            </div>
+            <div class="card-body">
+                {{ force_cmod_plot | safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 9-Point Crack Measurements -->
+        {% if geometry.get('crack_measurements') and geometry.get('crack_measurements')|length == 9 %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-rulers"></i> 9-Point Crack Measurements</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm text-center mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>a₁</th><th>a₂</th><th>a₃</th><th>a₄</th>
+                                <th class="table-primary">a₅</th>
+                                <th>a₆</th><th>a₇</th><th>a₈</th><th>a₉</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                {% for val in geometry.get('crack_measurements', []) %}
+                                <td{% if loop.index == 5 %} class="table-primary"{% endif %}>{{ "%.2f"|format(val) }}</td>
+                                {% endfor %}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted small mt-2 mb-0">
+                    Average: {{ "%.3f"|format(geometry.get('a_0', 0)) }} mm (using weighted formula per E1290)
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Validity Notes -->
+        {% if test.notes %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Validity</h5>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0" style="white-space: pre-wrap;">{{ test.notes }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
