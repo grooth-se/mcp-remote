@@ -327,11 +327,6 @@ class KICReportGenerator:
             sig_table.rows[0].cells[i].text = header
             sig_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
-        sig_roles = ['Tested by:', 'Reviewed by:', 'Approved by:']
-        for i, role in enumerate(sig_roles):
-            sig_table.rows[i+1].cells[0].text = role if i < 2 else ''
-
-        # Can only have 3 rows, adjust
         sig_table.rows[1].cells[0].text = 'Tested by:'
         sig_table.rows[2].cells[0].text = 'Reviewed by:'
 
