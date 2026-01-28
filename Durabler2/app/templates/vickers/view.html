@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Vickers Test - {{ test.test_id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('vickers.index') }}">Vickers Tests</a></li>
+        <li class="breadcrumb-item active">{{ test.test_id }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-diamond"></i> {{ test.test_id }}</h2>
+        <p class="text-muted mb-0">
+            {{ test.specimen_id or 'No specimen ID' }} |
+            {{ test.material or 'No material' }} |
+            {{ test_params.get('load_level', 'HV') }} |
+            {{ test.test_date.strftime('%Y-%m-%d') if test.test_date else 'No date' }}
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('vickers.report', test_id=test.id) }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-pdf"></i> Generate Report
+        </a>
+        <a href="{{ url_for('vickers.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left column: Results -->
+    <div class="col-lg-4">
+        <!-- Results Summary -->
+        <div class="card mb-4">
+            <div class="card-header text-white" style="background-color: #6f42c1;">
+                <h5 class="mb-0"><i class="bi bi-diamond"></i> Results Summary</h5>
+            </div>
+            <div class="card-body">
+                {% set mean = results.get('mean_hardness', {}) %}
+                <div class="text-center mb-3">
+                    <h2 class="mb-0">{{ "%.1f"|format(mean.get('value', 0)) }}</h2>
+                    <p class="text-muted mb-0">+/- {{ "%.1f"|format(mean.get('uncertainty', 0)) }} {{ results.get('load_level', 'HV') }}</p>
+                </div>
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>Standard Deviation</td>
+                        <td class="text-end">{{ "%.1f"|format(results.get('std_dev', 0)) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Range</td>
+                        <td class="text-end">{{ "%.1f"|format(results.get('range_value', 0)) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Minimum</td>
+                        <td class="text-end">{{ "%.1f"|format(results.get('min_value', 0)) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Maximum</td>
+                        <td class="text-end">{{ "%.1f"|format(results.get('max_value', 0)) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Number of Readings</td>
+                        <td class="text-end">{{ results.get('n_readings', 0) }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Test Parameters -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Test Parameters</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>Load Level</td>
+                        <td class="text-end">{{ test_params.get('load_level', '-') }}</td>
+                    </tr>
+                    <tr>
+                        <td>Dwell Time</td>
+                        <td class="text-end">{{ test_params.get('dwell_time', '15') }} s</td>
+                    </tr>
+                    <tr>
+                        <td>Temperature</td>
+                        <td class="text-end">{{ test.temperature or '23' }} C</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Uncertainty Budget -->
+        {% set unc_budget = results.get('uncertainty_budget', {}) %}
+        {% if unc_budget %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Uncertainty (k=2)</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>Type A (Repeat.)</td>
+                        <td class="text-end">{{ "%.2f"|format(unc_budget.get('u_A', 0)) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Machine</td>
+                        <td class="text-end">{{ "%.2f"|format(unc_budget.get('u_machine', 0)) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Diagonal</td>
+                        <td class="text-end">{{ "%.2f"|format(unc_budget.get('u_diagonal', 0)) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Force</td>
+                        <td class="text-end">{{ "%.2f"|format(unc_budget.get('u_force', 0)) }}</td>
+                    </tr>
+                    <tr class="table-warning">
+                        <td><strong>Combined (u<sub>c</sub>)</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(unc_budget.get('u_combined', 0)) }}</strong></td>
+                    </tr>
+                    <tr class="table-success">
+                        <td><strong>Expanded (U)</strong></td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(unc_budget.get('U_expanded', 0)) }}</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Certificate Link -->
+        {% if test.certificate %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Certificate</h5>
+            </div>
+            <div class="card-body text-center">
+                <a href="{{ url_for('certificates.view', cert_id=test.certificate.id) }}" class="btn btn-outline-info">
+                    <i class="bi bi-journal-text"></i> {{ test.certificate_number }}
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right column: Plot and Readings -->
+    <div class="col-lg-8">
+        <!-- Hardness Profile Plot -->
+        {% if hardness_plot %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Hardness Profile</h5>
+            </div>
+            <div class="card-body">
+                {{ hardness_plot | safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Individual Readings Table -->
+        {% if readings %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-list-ol"></i> Individual Readings</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm text-center mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Location</th>
+                                <th>Hardness ({{ test_params.get('load_level', 'HV') }})</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in readings %}
+                            <tr>
+                                <td>{{ r.reading_number }}</td>
+                                <td>{{ r.location }}</td>
+                                <td>
+                                    <strong>{{ "%.1f"|format(r.hardness_value) }}</strong>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Indent Photo -->
+        {% if photo_url %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-camera"></i> Indent Photo</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ photo_url }}" class="img-fluid rounded" alt="Indent photo" style="max-height: 400px;">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Notes -->
+        {% if test.notes %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-chat-left-text"></i> Notes</h5>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0" style="white-space: pre-wrap;">{{ test.notes }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
