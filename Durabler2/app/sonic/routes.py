@@ -25,22 +25,22 @@ def create_velocity_chart(vl1, vl2, vl3, vs1, vs2, vs3):
     """Create Plotly bar chart showing velocity measurements."""
     fig = go.Figure()
 
-    # Longitudinal velocities
+    # Longitudinal velocities - darkred
     fig.add_trace(go.Bar(
         name='Longitudinal (Vl)',
         x=['Vl₁', 'Vl₂', 'Vl₃'],
         y=[vl1, vl2, vl3],
-        marker_color='#0d6efd',  # Bootstrap primary blue
+        marker_color='darkred',
         text=[f'{v:.0f}' for v in [vl1, vl2, vl3]],
         textposition='outside'
     ))
 
-    # Shear velocities
+    # Shear velocities - black
     fig.add_trace(go.Bar(
         name='Shear (Vs)',
         x=['Vs₁', 'Vs₂', 'Vs₃'],
         y=[vs1, vs2, vs3],
-        marker_color='#198754',  # Bootstrap success green
+        marker_color='black',
         text=[f'{v:.0f}' for v in [vs1, vs2, vs3]],
         textposition='outside'
     ))
@@ -49,11 +49,11 @@ def create_velocity_chart(vl1, vl2, vl3, vs1, vs2, vs3):
     vl_avg = (vl1 + vl2 + vl3) / 3
     vs_avg = (vs1 + vs2 + vs3) / 3
 
-    # Add average lines
-    fig.add_hline(y=vl_avg, line_dash="dash", line_color="#0d6efd",
+    # Add average lines - thin grey with different dash styles
+    fig.add_hline(y=vl_avg, line_dash="dash", line_color="grey", line_width=1,
                   annotation_text=f"Vl avg: {vl_avg:.0f} m/s",
                   annotation_position="top right")
-    fig.add_hline(y=vs_avg, line_dash="dash", line_color="#198754",
+    fig.add_hline(y=vs_avg, line_dash="dot", line_color="grey", line_width=1,
                   annotation_text=f"Vs avg: {vs_avg:.0f} m/s",
                   annotation_position="bottom right")
 
@@ -406,11 +406,11 @@ def report(test_id):
                     x_vl = [0.8, 1.0, 1.2]
                     x_vs = [1.8, 2.0, 2.2]
 
-                    # Plot bars
+                    # Plot bars - darkred for longitudinal, black for shear
                     bars_vl = ax.bar(x_vl, [vl1, vl2, vl3], width=0.15, label='Longitudinal (Vl)',
-                                    color='#0d6efd', edgecolor='black')
+                                    color='darkred', edgecolor='black')
                     bars_vs = ax.bar(x_vs, [vs1, vs2, vs3], width=0.15, label='Shear (Vs)',
-                                    color='#198754', edgecolor='black')
+                                    color='black', edgecolor='black')
 
                     # Add value labels
                     for bar, val in zip(bars_vl, [vl1, vl2, vl3]):
@@ -418,15 +418,15 @@ def report(test_id):
                                f'{val:.0f}', ha='center', va='bottom', fontsize=8)
                     for bar, val in zip(bars_vs, [vs1, vs2, vs3]):
                         ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 50,
-                               f'{val:.0f}', ha='center', va='bottom', fontsize=8)
+                               f'{val:.0f}', ha='center', va='bottom', fontsize=8, color='white')
 
-                    # Add average lines
+                    # Add average lines - thin grey with different linestyles
                     vl_avg = (vl1 + vl2 + vl3) / 3
                     vs_avg = (vs1 + vs2 + vs3) / 3
-                    ax.axhline(y=vl_avg, xmin=0.1, xmax=0.45, color='#0d6efd',
-                              linestyle='--', linewidth=1.5)
-                    ax.axhline(y=vs_avg, xmin=0.55, xmax=0.9, color='#198754',
-                              linestyle='--', linewidth=1.5)
+                    ax.axhline(y=vl_avg, xmin=0.1, xmax=0.45, color='grey',
+                              linestyle='--', linewidth=1)
+                    ax.axhline(y=vs_avg, xmin=0.55, xmax=0.9, color='grey',
+                              linestyle=':', linewidth=1)
 
                     ax.set_ylabel('Velocity (m/s)')
                     ax.set_title(f'Sound Velocity Measurements - {test.specimen_id}')

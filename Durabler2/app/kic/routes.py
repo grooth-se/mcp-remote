@@ -49,26 +49,26 @@ def create_force_displacement_plot(force, displacement, P_Q=None, P_max=None, se
 
     fig = go.Figure()
 
-    # Main force-displacement curve
+    # Main force-displacement curve - darkred
     fig.add_trace(go.Scatter(
         x=list(displacement),
         y=list(force),
         mode='lines',
         name='Force vs Displacement',
-        line=dict(color='blue', width=2)
+        line=dict(color='darkred', width=2)
     ))
 
-    # Add 5% secant offset line if available
+    # Add 5% secant offset line - black
     if secant_line:
         fig.add_trace(go.Scatter(
             x=secant_line['x'],
             y=secant_line['y'],
             mode='lines',
             name='5% Secant Offset',
-            line=dict(color='red', width=1.5, dash='dash')
+            line=dict(color='black', width=1.5, dash='dash')
         ))
 
-    # Mark PQ point
+    # Mark PQ point - grey diamond
     if P_Q is not None:
         # Find displacement at PQ
         import numpy as np
@@ -82,10 +82,10 @@ def create_force_displacement_plot(force, displacement, P_Q=None, P_max=None, se
             y=[P_Q],
             mode='markers',
             name=f'PQ = {P_Q:.2f} kN',
-            marker=dict(color='red', size=12, symbol='diamond')
+            marker=dict(color='grey', size=12, symbol='diamond-open', line=dict(width=2, color='grey'))
         ))
 
-    # Mark Pmax point
+    # Mark Pmax point - grey square
     if P_max is not None:
         import numpy as np
         force_arr = np.array(force)
@@ -98,7 +98,7 @@ def create_force_displacement_plot(force, displacement, P_Q=None, P_max=None, se
             y=[P_max],
             mode='markers',
             name=f'Pmax = {P_max:.2f} kN',
-            marker=dict(color='green', size=12, symbol='star')
+            marker=dict(color='grey', size=12, symbol='square-open', line=dict(width=2, color='grey'))
         ))
 
     fig.update_layout(
@@ -553,23 +553,25 @@ def report(test_id):
                 force = np.array(raw_data['force'])
                 displacement = np.array(raw_data['displacement'])
 
-                ax.plot(displacement, force, 'b-', linewidth=1.5, label='Force vs Displacement')
+                ax.plot(displacement, force, color='darkred', linewidth=1.5, label='Force vs Displacement')
 
-                # Mark PQ
+                # Mark PQ - grey diamond
                 P_Q_data = results.get('P_Q')
                 if P_Q_data and isinstance(P_Q_data, dict):
                     P_Q = P_Q_data.get('value')
                     if P_Q:
                         idx = np.argmin(np.abs(force - P_Q))
-                        ax.plot(displacement[idx], P_Q, 'rd', markersize=10, label=f'PQ = {P_Q:.2f} kN')
+                        ax.plot(displacement[idx], P_Q, 'D', color='grey', markersize=10,
+                               markerfacecolor='none', markeredgewidth=2, label=f'PQ = {P_Q:.2f} kN')
 
-                # Mark Pmax
+                # Mark Pmax - grey square
                 P_max_data = results.get('P_max')
                 if P_max_data and isinstance(P_max_data, dict):
                     P_max = P_max_data.get('value')
                     if P_max:
                         idx = np.argmax(force)
-                        ax.plot(displacement[idx], P_max, 'g*', markersize=12, label=f'Pmax = {P_max:.2f} kN')
+                        ax.plot(displacement[idx], P_max, 's', color='grey', markersize=12,
+                               markerfacecolor='none', markeredgewidth=2, label=f'Pmax = {P_max:.2f} kN')
 
                 ax.set_xlabel('Displacement (mm)')
                 ax.set_ylabel('Force (kN)')

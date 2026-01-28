@@ -39,16 +39,16 @@ def create_force_cmod_plot(force, cmod, specimen_id, elastic_coeffs=None, ctod_p
     """Create Force vs CMOD plot with elastic line and CTOD points."""
     fig = go.Figure()
 
-    # Main test data
+    # Main test data - darkred
     fig.add_trace(go.Scatter(
         x=cmod,
         y=force,
         mode='lines',
         name='Test Data',
-        line=dict(width=2, color='#0d6efd')
+        line=dict(width=2, color='darkred')
     ))
 
-    # Elastic loading line
+    # Elastic loading line - thin grey dashed
     if elastic_coeffs is not None:
         slope, intercept = elastic_coeffs
         cmod_elastic = np.linspace(0, max(cmod) * 0.6, 100)
@@ -60,16 +60,16 @@ def create_force_cmod_plot(force, cmod, specimen_id, elastic_coeffs=None, ctod_p
             y=force_elastic,
             mode='lines',
             name='Elastic Line',
-            line=dict(width=1.5, color='#6c757d', dash='dash')
+            line=dict(width=1, color='grey', dash='dash')
         ))
 
-    # Mark CTOD points
+    # Mark CTOD points - grey with different shapes
     if ctod_points:
-        markers = {'delta_m': ('Max Force (δm)', '#198754', 'circle'),
-                   'delta_c': ('Cleavage (δc)', '#dc3545', 'diamond'),
-                   'delta_u': ('Instability (δu)', '#fd7e14', 'square')}
+        markers = {'delta_m': ('Max Force (δm)', 'circle-open'),
+                   'delta_c': ('Cleavage (δc)', 'diamond-open'),
+                   'delta_u': ('Instability (δu)', 'square-open')}
 
-        for key, (label, color, symbol) in markers.items():
+        for key, (label, symbol) in markers.items():
             point = ctod_points.get(key)
             if point:
                 idx, P, V, delta = point
@@ -78,7 +78,7 @@ def create_force_cmod_plot(force, cmod, specimen_id, elastic_coeffs=None, ctod_p
                     y=[P],
                     mode='markers',
                     name=f'{label}: δ={delta:.4f} mm',
-                    marker=dict(size=12, color=color, symbol=symbol)
+                    marker=dict(size=12, color='grey', symbol=symbol, line=dict(width=2, color='grey'))
                 ))
 
     fig.update_layout(
@@ -630,13 +630,14 @@ def report(test_id):
 
             if len(force) > 0 and len(cmod) > 0:
                 fig, ax = plt.subplots(figsize=(6, 4))
-                ax.plot(cmod, force, 'b-', linewidth=1.5)
+                ax.plot(cmod, force, color='darkred', linewidth=1.5)
 
-                # Mark CTOD points
-                for ctod_type, color, marker in [('delta_m', 'g', 'o'), ('delta_c', 'r', 'd'), ('delta_u', 'orange', 's')]:
+                # Mark CTOD points - grey with different markers
+                for ctod_type, marker in [('delta_m', 'o'), ('delta_c', 'D'), ('delta_u', 's')]:
                     pt = ctod_points.get(ctod_type)
                     if pt:
-                        ax.plot(pt['cmod'], pt['force'], marker, color=color, markersize=10,
+                        ax.plot(pt['cmod'], pt['force'], marker, color='grey', markersize=10,
+                               markerfacecolor='none', markeredgewidth=2,
                                label=f'{ctod_type}: δ={pt["ctod"]:.4f} mm')
 
                 ax.set_xlabel('CMOD (mm)')
