@@ -134,8 +134,8 @@ def new():
             form.material.data = certificate.material
         if certificate.specimen_id:
             form.specimen_id.data = certificate.specimen_id
-        if certificate.batch_number:
-            form.batch_number.data = certificate.batch_number
+        if certificate.product_sn:
+            form.batch_number.data = certificate.product_sn
 
     if form.validate_on_submit():
         try:
