@@ -32,13 +32,13 @@ class SpecimenForm(FlaskForm):
         ('C(T)', 'C(T) - Compact Tension')
     ], validators=[DataRequired()])
 
-    # Specimen geometry
+    # Specimen geometry (Optional - can be populated from Excel file)
     W = FloatField('W - Width/Depth (mm)', validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=5, max=200, message='Width must be 5-200 mm')
     ])
     B = FloatField('B - Thickness (mm)', validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=1, max=100, message='Thickness must be 1-100 mm')
     ])
     B_n = FloatField('Bn - Net Thickness (mm)', validators=[
@@ -46,7 +46,7 @@ class SpecimenForm(FlaskForm):
         NumberRange(min=1, max=100)
     ])
     a_0 = FloatField('a₀ - Initial Crack Length (mm)', validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=1, max=150)
     ])
     S = FloatField('S - Span (mm)', validators=[
@@ -65,9 +65,9 @@ class SpecimenForm(FlaskForm):
     a8 = FloatField('a₈', validators=[Optional()])
     a9 = FloatField('a₉ (Surface)', validators=[Optional()])
 
-    # Material properties
+    # Material properties (Optional - can be populated from Excel file)
     yield_strength = FloatField('Yield Strength (MPa)', validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=50, max=3000)
     ])
     ultimate_strength = FloatField('Ultimate Strength (MPa)', validators=[
@@ -75,7 +75,7 @@ class SpecimenForm(FlaskForm):
         NumberRange(min=100, max=3000)
     ])
     youngs_modulus = FloatField("Young's Modulus (GPa)", validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=50, max=500, message='E must be 50-500 GPa')
     ], default=210.0)
     poissons_ratio = FloatField("Poisson's Ratio", validators=[

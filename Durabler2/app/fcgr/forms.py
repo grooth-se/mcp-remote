@@ -32,13 +32,13 @@ class SpecimenForm(FlaskForm):
         ('M(T)', 'M(T) - Middle Tension')
     ], validators=[DataRequired()])
 
-    # Specimen geometry
+    # Specimen geometry (Optional - can be populated from Excel file)
     W = FloatField('W - Width (mm)', validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=10, max=500, message='Width must be 10-500 mm')
     ])
     B = FloatField('B - Thickness (mm)', validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=1, max=100, message='Thickness must be 1-100 mm')
     ])
     B_n = FloatField('Bn - Net Thickness (mm)', validators=[
@@ -46,7 +46,7 @@ class SpecimenForm(FlaskForm):
         NumberRange(min=1, max=100)
     ])
     a_0 = FloatField('a₀ - Initial Notch Length (mm)', validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=1, max=200)
     ])
     notch_height = FloatField('h - Notch Height (mm)', validators=[
@@ -64,7 +64,7 @@ class SpecimenForm(FlaskForm):
         NumberRange(min=100, max=3000)
     ])
     youngs_modulus = FloatField("Young's Modulus (GPa)", validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=50, max=500, message='E must be 50-500 GPa')
     ], default=210.0)
     poissons_ratio = FloatField("Poisson's Ratio", validators=[
@@ -78,7 +78,7 @@ class SpecimenForm(FlaskForm):
         ('Delta-K Control', 'Delta-K Control (K-decreasing)')
     ])
     load_ratio = FloatField('R - Load Ratio (Pmin/Pmax)', validators=[
-        DataRequired(),
+        Optional(),
         NumberRange(min=-1, max=0.99)
     ], default=0.1)
     frequency = FloatField('Frequency (Hz)', validators=[

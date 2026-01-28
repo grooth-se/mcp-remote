@@ -288,6 +288,27 @@ def new():
                 current_app.logger.info(f'KIC Analysis - Crack measurements: {crack_measurements}')
 
             # ============================================================
+            # STEP 3b: Validate required values after Excel/form merge
+            # ============================================================
+            validation_errors = []
+            if not W or W <= 0:
+                validation_errors.append('Width (W) is required')
+            if not B or B <= 0:
+                validation_errors.append('Thickness (B) is required')
+            if not a_0 or a_0 <= 0:
+                validation_errors.append('Initial crack length (a₀) is required')
+            if not yield_strength or yield_strength <= 0:
+                validation_errors.append('Yield strength is required')
+
+            if validation_errors:
+                for error in validation_errors:
+                    flash(f'{error}. Please provide in form or upload Excel file with this data.', 'danger')
+                # Get certificate for re-rendering the form
+                cert_id = request.args.get('certificate', type=int)
+                cert = Certificate.query.get(cert_id) if cert_id else None
+                return render_template('kic/new.html', form=form, certificate=cert)
+
+            # ============================================================
             # STEP 4: Build data structures and create test record
             # ============================================================
 

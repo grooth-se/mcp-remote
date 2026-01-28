@@ -23,11 +23,11 @@ class SpecimenForm(FlaskForm):
         validators=[DataRequired()]
     )
 
-    # Specimen geometry
-    W = FloatField('W - Width (mm)', validators=[DataRequired(), NumberRange(min=0.1)])
-    B = FloatField('B - Thickness (mm)', validators=[DataRequired(), NumberRange(min=0.1)])
+    # Specimen geometry (Optional - can be populated from Excel file)
+    W = FloatField('W - Width (mm)', validators=[Optional(), NumberRange(min=0.1)])
+    B = FloatField('B - Thickness (mm)', validators=[Optional(), NumberRange(min=0.1)])
     B_n = FloatField('Bn - Net Thickness (mm)', validators=[Optional(), NumberRange(min=0.1)])
-    a_0 = FloatField('a0 - Initial Crack Length (mm)', validators=[DataRequired(), NumberRange(min=0.1)])
+    a_0 = FloatField('a0 - Initial Crack Length (mm)', validators=[Optional(), NumberRange(min=0.1)])
     S = FloatField('S - Span (mm, SE(B) only)', validators=[Optional(), NumberRange(min=0.1)])
 
     # 5-point crack measurements (ASTM E399)
@@ -37,11 +37,11 @@ class SpecimenForm(FlaskForm):
     crack_4 = FloatField('a4 (mm)', validators=[Optional(), NumberRange(min=0)])
     crack_5 = FloatField('a5 (mm)', validators=[Optional(), NumberRange(min=0)])
 
-    # Material properties
+    # Material properties (Optional - can be populated from Excel file)
     material = StringField('Material', validators=[Optional()])
-    yield_strength = FloatField('Yield Strength (MPa)', validators=[DataRequired(), NumberRange(min=1)])
+    yield_strength = FloatField('Yield Strength (MPa)', validators=[Optional(), NumberRange(min=1)])
     ultimate_strength = FloatField('Ultimate Tensile Strength (MPa)', validators=[Optional(), NumberRange(min=1)])
-    youngs_modulus = FloatField("Young's Modulus (GPa)", validators=[DataRequired(), NumberRange(min=1)],
+    youngs_modulus = FloatField("Young's Modulus (GPa)", validators=[Optional(), NumberRange(min=1)],
                                 default=210.0)
     poissons_ratio = FloatField("Poisson's Ratio", validators=[Optional(), NumberRange(min=0.1, max=0.5)],
                                 default=0.3)
