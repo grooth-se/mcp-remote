@@ -378,8 +378,9 @@ def report(test_id):
             mock_results.flexural_frequency = MockValue(v, u)
             v, u = get_result('ft')
             mock_results.torsional_frequency = MockValue(v, u)
-            mock_results.is_valid = 'Valid: True' in (test.notes or '')
-            mock_results.validity_notes = test.notes or ''
+            notes = geometry.get('notes', '')
+            mock_results.is_valid = 'Valid: True' in (notes or '')
+            mock_results.validity_notes = notes or ''
 
             # Prepare report data
             report_data = SonicReportGenerator.prepare_report_data(
