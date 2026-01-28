@@ -354,13 +354,13 @@ def new():
             if 'force' in raw_data and 'displacement' in raw_data:
                 # Create specimen and material objects
                 specimen = KICSpecimen(
+                    specimen_id=specimen_id,
                     specimen_type=specimen_geometry['type'],
                     W=specimen_geometry['W'],
                     B=specimen_geometry['B'],
                     B_n=specimen_geometry.get('B_n', specimen_geometry['B']),
                     a_0=specimen_geometry['a_0'],
-                    S=specimen_geometry.get('S'),
-                    crack_measurements=specimen_geometry.get('crack_measurements', [])
+                    S=specimen_geometry.get('S') or 0.0
                 )
 
                 material = KICMaterial(
@@ -374,8 +374,8 @@ def new():
                 displacement = np.array(raw_data['displacement'])
 
                 # Run KIC analysis
-                analyzer = KICAnalyzer(specimen, material, force, displacement)
-                result = analyzer.run_analysis()
+                analyzer = KICAnalyzer()
+                result = analyzer.run_analysis(force, displacement, specimen, material)
 
                 # Store results as individual AnalysisResult records
                 results_to_store = [
