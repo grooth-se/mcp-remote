@@ -7,6 +7,9 @@ from flask import (render_template, redirect, url_for, flash, request,
                    current_app, send_file)
 from flask_login import login_required, current_user
 
+import plotly.graph_objects as go
+import plotly.io as pio
+
 from . import sonic_bp
 from .forms import SpecimenForm, ReportForm
 from app.extensions import db
@@ -16,6 +19,55 @@ from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
 from utils.analysis.sonic_calculations import SonicAnalyzer, SonicResults
 from utils.models.sonic_specimen import SonicSpecimen, UltrasonicMeasurements
 from utils.reporting.sonic_word_report import SonicReportGenerator
+
+
+def create_velocity_chart(vl1, vl2, vl3, vs1, vs2, vs3):
+    """Create Plotly bar chart showing velocity measurements."""
+    fig = go.Figure()
+
+    # Longitudinal velocities
+    fig.add_trace(go.Bar(
+        name='Longitudinal (Vl)',
+        x=['Vl₁', 'Vl₂', 'Vl₃'],
+        y=[vl1, vl2, vl3],
+        marker_color='#0d6efd',  # Bootstrap primary blue
+        text=[f'{v:.0f}' for v in [vl1, vl2, vl3]],
+        textposition='outside'
+    ))
+
+    # Shear velocities
+    fig.add_trace(go.Bar(
+        name='Shear (Vs)',
+        x=['Vs₁', 'Vs₂', 'Vs₃'],
+        y=[vs1, vs2, vs3],
+        marker_color='#198754',  # Bootstrap success green
+        text=[f'{v:.0f}' for v in [vs1, vs2, vs3]],
+        textposition='outside'
+    ))
+
+    # Calculate averages for reference lines
+    vl_avg = (vl1 + vl2 + vl3) / 3
+    vs_avg = (vs1 + vs2 + vs3) / 3
+
+    # Add average lines
+    fig.add_hline(y=vl_avg, line_dash="dash", line_color="#0d6efd",
+                  annotation_text=f"Vl avg: {vl_avg:.0f} m/s",
+                  annotation_position="top right")
+    fig.add_hline(y=vs_avg, line_dash="dash", line_color="#198754",
+                  annotation_text=f"Vs avg: {vs_avg:.0f} m/s",
+                  annotation_position="bottom right")
+
+    fig.update_layout(
+        title='Sound Velocity Measurements',
+        yaxis_title='Velocity (m/s)',
+        xaxis_title='Measurement',
+        template='plotly_white',
+        barmode='group',
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        height=400
+    )
+
+    return pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
 
 
 def generate_test_id():
@@ -43,9 +95,24 @@ def new():
     """Create new sonic resonance test."""
     form = SpecimenForm()
 
-    # Get certificate from URL parameter if provided
+    # Populate certificate dropdown
+    certificates = Certificate.query.order_by(
+        Certificate.year.desc(),
+        Certificate.cert_id.desc()
+    ).limit(100).all()
+    form.certificate_id.choices = [(0, '-- Select Certificate --')] + [
+        (c.id, f"{c.certificate_number_with_rev} - {c.customer or 'No customer'}")
+        for c in certificates
+    ]
+
+    # Get certificate from URL parameter or form selection
     cert_id = request.args.get('certificate', type=int)
-    certificate = Certificate.query.get(cert_id) if cert_id else None
+    if request.method == 'GET' and cert_id:
+        form.certificate_id.data = cert_id
+
+    # Get selected certificate
+    selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else cert_id
+    certificate = Certificate.query.get(selected_cert_id) if selected_cert_id else None
 
     # Pre-fill from certificate
     if request.method == 'GET' and certificate:
@@ -53,6 +120,8 @@ def new():
             form.material.data = certificate.material
         if certificate.specimen_id:
             form.specimen_id.data = certificate.specimen_id
+        if certificate.batch_number:
+            form.batch_number.data = certificate.batch_number
 
     if form.validate_on_submit():
         try:
@@ -105,7 +174,11 @@ def new():
 
             # Create test record
             test_id = generate_test_id()
-            cert_number = certificate.certificate_number_with_rev if certificate else None
+
+            # Get certificate from form selection
+            selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else None
+            selected_cert = Certificate.query.get(selected_cert_id) if selected_cert_id else None
+            cert_number = selected_cert.certificate_number_with_rev if selected_cert else None
 
             test_record = TestRecord(
                 test_id=test_id,
@@ -118,7 +191,7 @@ def new():
                 test_date=datetime.now(),
                 temperature=form.test_temperature.data,
                 status='ANALYZED',
-                certificate_id=cert_id,
+                certificate_id=selected_cert_id,
                 certificate_number=cert_number,
                 operator_id=current_user.id
             )
@@ -186,18 +259,40 @@ def view(test_id):
     results = {r.parameter_name: r for r in test.results.all()}
     geometry = test.geometry or {}
 
+    # Get velocity measurements
+    vl1 = geometry.get('vl1', 0)
+    vl2 = geometry.get('vl2', 0)
+    vl3 = geometry.get('vl3', 0)
+    vs1 = geometry.get('vs1', 0)
+    vs2 = geometry.get('vs2', 0)
+    vs3 = geometry.get('vs3', 0)
+
     # Calculate averages for display
-    vl_avg = (geometry.get('vl1', 0) + geometry.get('vl2', 0) + geometry.get('vl3', 0)) / 3
-    vs_avg = (geometry.get('vs1', 0) + geometry.get('vs2', 0) + geometry.get('vs3', 0)) / 3
+    vl_avg = (vl1 + vl2 + vl3) / 3
+    vs_avg = (vs1 + vs2 + vs3) / 3
+
+    # Generate velocity chart
+    velocity_chart = None
+    if vl1 > 0 and vs1 > 0:
+        try:
+            velocity_chart = create_velocity_chart(vl1, vl2, vl3, vs1, vs2, vs3)
+        except Exception as e:
+            print(f"Error creating velocity chart: {e}")
 
     return render_template('sonic/view.html', test=test, results=results,
-                          geometry=geometry, vl_avg=vl_avg, vs_avg=vs_avg)
+                          geometry=geometry, vl_avg=vl_avg, vs_avg=vs_avg,
+                          velocity_chart=velocity_chart)
 
 
 @sonic_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])
 @login_required
 def report(test_id):
     """Generate test report."""
+    # Import matplotlib for chart generation
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
     test = TestRecord.query.get_or_404(test_id)
     form = ReportForm()
 
@@ -234,52 +329,55 @@ def report(test_id):
             }
 
             # Prepare velocity data
+            vl1 = geometry.get('vl1', 0)
+            vl2 = geometry.get('vl2', 0)
+            vl3 = geometry.get('vl3', 0)
+            vs1 = geometry.get('vs1', 0)
+            vs2 = geometry.get('vs2', 0)
+            vs3 = geometry.get('vs3', 0)
+
             velocity_data = {
-                'vl1': geometry.get('vl1', '-'),
-                'vl2': geometry.get('vl2', '-'),
-                'vl3': geometry.get('vl3', '-'),
-                'vs1': geometry.get('vs1', '-'),
-                'vs2': geometry.get('vs2', '-'),
-                'vs3': geometry.get('vs3', '-'),
+                'vl1': vl1 if vl1 else '-',
+                'vl2': vl2 if vl2 else '-',
+                'vl3': vl3 if vl3 else '-',
+                'vs1': vs1 if vs1 else '-',
+                'vs2': vs2 if vs2 else '-',
+                'vs3': vs3 if vs3 else '-',
             }
 
+            # Helper to get result value with default
+            def get_result(key, default_val=0, default_unc=0):
+                r = results.get(key)
+                if r:
+                    return r.value, r.uncertainty
+                return default_val, default_unc
+
             # Create mock results object for report generator
+            class MockValue:
+                def __init__(self, value, uncertainty):
+                    self.value = value
+                    self.uncertainty = uncertainty
+
             class MockResults:
                 pass
 
             mock_results = MockResults()
-            mock_results.density = type('obj', (object,), {
-                'value': results['Density'].value,
-                'uncertainty': results['Density'].uncertainty
-            })()
-            mock_results.longitudinal_velocity = type('obj', (object,), {
-                'value': results['Vl'].value,
-                'uncertainty': results['Vl'].uncertainty
-            })()
-            mock_results.shear_velocity = type('obj', (object,), {
-                'value': results['Vs'].value,
-                'uncertainty': results['Vs'].uncertainty
-            })()
-            mock_results.poissons_ratio = type('obj', (object,), {
-                'value': results['Poisson'].value,
-                'uncertainty': results['Poisson'].uncertainty
-            })()
-            mock_results.shear_modulus = type('obj', (object,), {
-                'value': results['G'].value,
-                'uncertainty': results['G'].uncertainty
-            })()
-            mock_results.youngs_modulus = type('obj', (object,), {
-                'value': results['E'].value,
-                'uncertainty': results['E'].uncertainty
-            })()
-            mock_results.flexural_frequency = type('obj', (object,), {
-                'value': results['ff'].value,
-                'uncertainty': results['ff'].uncertainty
-            })()
-            mock_results.torsional_frequency = type('obj', (object,), {
-                'value': results['ft'].value,
-                'uncertainty': results['ft'].uncertainty
-            })()
+            v, u = get_result('Density')
+            mock_results.density = MockValue(v, u)
+            v, u = get_result('Vl')
+            mock_results.longitudinal_velocity = MockValue(v, u)
+            v, u = get_result('Vs')
+            mock_results.shear_velocity = MockValue(v, u)
+            v, u = get_result('Poisson')
+            mock_results.poissons_ratio = MockValue(v, u)
+            v, u = get_result('G')
+            mock_results.shear_modulus = MockValue(v, u)
+            v, u = get_result('E')
+            mock_results.youngs_modulus = MockValue(v, u)
+            v, u = get_result('ff')
+            mock_results.flexural_frequency = MockValue(v, u)
+            v, u = get_result('ft')
+            mock_results.torsional_frequency = MockValue(v, u)
             mock_results.is_valid = 'Valid: True' in (test.notes or '')
             mock_results.validity_notes = test.notes or ''
 
@@ -299,6 +397,56 @@ def report(test_id):
                 flash(f'Template not found: {template_path}', 'danger')
                 return redirect(url_for('sonic.view', test_id=test_id))
 
+            # Generate velocity chart for report
+            chart_path = None
+            if vl1 > 0 and vs1 > 0:
+                try:
+                    fig, ax = plt.subplots(figsize=(7, 4))
+
+                    x_vl = [0.8, 1.0, 1.2]
+                    x_vs = [1.8, 2.0, 2.2]
+
+                    # Plot bars
+                    bars_vl = ax.bar(x_vl, [vl1, vl2, vl3], width=0.15, label='Longitudinal (Vl)',
+                                    color='#0d6efd', edgecolor='black')
+                    bars_vs = ax.bar(x_vs, [vs1, vs2, vs3], width=0.15, label='Shear (Vs)',
+                                    color='#198754', edgecolor='black')
+
+                    # Add value labels
+                    for bar, val in zip(bars_vl, [vl1, vl2, vl3]):
+                        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 50,
+                               f'{val:.0f}', ha='center', va='bottom', fontsize=8)
+                    for bar, val in zip(bars_vs, [vs1, vs2, vs3]):
+                        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 50,
+                               f'{val:.0f}', ha='center', va='bottom', fontsize=8)
+
+                    # Add average lines
+                    vl_avg = (vl1 + vl2 + vl3) / 3
+                    vs_avg = (vs1 + vs2 + vs3) / 3
+                    ax.axhline(y=vl_avg, xmin=0.1, xmax=0.45, color='#0d6efd',
+                              linestyle='--', linewidth=1.5)
+                    ax.axhline(y=vs_avg, xmin=0.55, xmax=0.9, color='#198754',
+                              linestyle='--', linewidth=1.5)
+
+                    ax.set_ylabel('Velocity (m/s)')
+                    ax.set_title(f'Sound Velocity Measurements - {test.specimen_id}')
+                    ax.set_xticks([1.0, 2.0])
+                    ax.set_xticklabels(['Longitudinal', 'Shear'])
+                    ax.legend(loc='upper right')
+                    ax.grid(True, alpha=0.3, axis='y')
+
+                    # Set y-axis to start near the minimum value
+                    min_val = min(vl1, vl2, vl3, vs1, vs2, vs3) * 0.9
+                    max_val = max(vl1, vl2, vl3) * 1.1
+                    ax.set_ylim(min_val, max_val)
+
+                    chart_path = Path(current_app.config['UPLOAD_FOLDER']) / f'sonic_chart_{test_id}.png'
+                    fig.savefig(chart_path, dpi=150, bbox_inches='tight')
+                    plt.close(fig)
+                except Exception as chart_error:
+                    print(f"Chart generation error: {chart_error}")
+                    chart_path = None
+
             # Generate report
             reports_folder = Path(current_app.root_path).parent / 'reports'
             reports_folder.mkdir(exist_ok=True)
@@ -310,8 +458,13 @@ def report(test_id):
             generator.generate_report(
                 output_path=output_path,
                 data=report_data,
+                chart_path=chart_path,
                 logo_path=logo_path if logo_path.exists() else None
             )
+
+            # Clean up chart temp file
+            if chart_path and chart_path.exists():
+                os.remove(chart_path)
 
             # Audit log
             audit = AuditLog(

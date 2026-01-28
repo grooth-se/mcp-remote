@@ -30,6 +30,22 @@
                 <form method="POST">
                     {{ form.hidden_tag() }}
 
+                    <!-- Certificate Selection -->
+                    <div class="card mb-4 border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="bi bi-link-45deg"></i> Link to Certificate</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-0">
+                                {{ form.certificate_id.label(class="form-label") }}
+                                {{ form.certificate_id(class="form-select", id="certificate_select") }}
+                                <small class="text-muted">
+                                    Select a certificate to auto-fill test information
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <!-- Column 1: Specimen Info -->
                         <div class="col-md-4">
@@ -227,6 +243,17 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Certificate selection - reload page to pre-fill data
+    const certSelect = document.getElementById('certificate_select');
+    if (certSelect) {
+        certSelect.addEventListener('change', function() {
+            const certId = this.value;
+            if (certId && certId !== '0') {
+                window.location.href = "{{ url_for('sonic.new') }}?certificate=" + certId;
+            }
+        });
+    }
+
     // Toggle diameter/side_length based on specimen type
     const typeRadios = document.querySelectorAll('input[name="specimen_type"]');
     const diameterGroup = document.getElementById('diameter-group');

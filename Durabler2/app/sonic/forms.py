@@ -9,6 +9,9 @@ from wtforms.validators import DataRequired, Optional, NumberRange
 class SpecimenForm(FlaskForm):
     """Form for sonic specimen geometry and velocity measurements."""
 
+    # Certificate selection (populated dynamically in route)
+    certificate_id = SelectField('Link to Certificate', coerce=int, validators=[Optional()])
+
     # Specimen identification
     specimen_id = StringField('Specimen ID', validators=[DataRequired()])
     material = StringField('Material', validators=[Optional()])

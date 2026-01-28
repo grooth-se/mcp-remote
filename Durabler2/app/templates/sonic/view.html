@@ -93,6 +93,18 @@
             </div>
         </div>
 
+        <!-- Velocity Chart -->
+        {% if velocity_chart %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-bar-chart-fill"></i> Velocity Chart</h5>
+            </div>
+            <div class="card-body">
+                {{ velocity_chart | safe }}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Velocity Measurements -->
         <div class="card mb-4">
             <div class="card-header">
