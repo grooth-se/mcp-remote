@@ -153,29 +153,17 @@ def new():
             form.location_orientation.data = cert.location_orientation
 
     if form.validate_on_submit():
-        # Create test record
-        test = TestRecord(
-            test_id=form.test_id.data,
-            test_method='KIC',
-            specimen_id=form.specimen_id.data,
-            material=form.material.data,
-            test_date=form.test_date.data or datetime.now().date(),
-            temperature=str(form.temperature.data) if form.temperature.data else '23',
-            location_orientation=form.location_orientation.data,
-            notes=form.notes.data,
-            status='DRAFT',
-            created_by=current_user.id
-        )
-
         # Link to certificate if selected
+        certificate_id = None
+        cert_number = None
         if form.certificate_id.data and form.certificate_id.data != 0:
             cert = Certificate.query.get(form.certificate_id.data)
             if cert:
-                test.certificate_id = cert.id
-                test.certificate_number = cert.certificate_number_with_rev
+                certificate_id = cert.id
+                cert_number = cert.certificate_number_with_rev
 
-        # Build geometry dictionary
-        geometry = {
+        # Build specimen geometry dictionary
+        specimen_geometry = {
             'type': form.specimen_type.data,
             'W': form.W.data,
             'B': form.B.data,
@@ -191,9 +179,9 @@ def new():
             if val is not None and val > 0:
                 crack_measurements.append(val)
         if len(crack_measurements) == 5:
-            geometry['crack_measurements'] = crack_measurements
+            specimen_geometry['crack_measurements'] = crack_measurements
 
-        # Build material dictionary
+        # Build material properties dictionary
         material_props = {
             'yield_strength': form.yield_strength.data,
             'ultimate_strength': form.ultimate_strength.data,
@@ -201,8 +189,28 @@ def new():
             'poissons_ratio': form.poissons_ratio.data or 0.3,
         }
 
-        test.specimen_geometry = json.dumps(geometry)
-        test.material_properties = json.dumps(material_props)
+        # Build complete geometry dict (stores all structured data)
+        geometry_data = {
+            'specimen_geometry': specimen_geometry,
+            'material_properties': material_props,
+            'location_orientation': form.location_orientation.data,
+            'notes': form.notes.data,
+        }
+
+        # Create test record
+        test = TestRecord(
+            test_id=form.test_id.data,
+            test_method='KIC',
+            specimen_id=form.specimen_id.data,
+            material=form.material.data,
+            test_date=form.test_date.data or datetime.now().date(),
+            temperature=form.temperature.data if form.temperature.data else 23.0,
+            geometry=geometry_data,
+            status='DRAFT',
+            certificate_id=certificate_id,
+            certificate_number=cert_number,
+            operator_id=current_user.id
+        )
 
         # Process uploaded files
         raw_data = {}
@@ -235,13 +243,13 @@ def new():
                 user_inputs = parse_kic_excel(Path(filepath))
                 # Update geometry from Excel if not provided
                 if user_inputs.W > 0:
-                    geometry['W'] = user_inputs.W
+                    specimen_geometry['W'] = user_inputs.W
                 if user_inputs.B > 0:
-                    geometry['B'] = user_inputs.B
+                    specimen_geometry['B'] = user_inputs.B
                 if user_inputs.a_0 > 0:
-                    geometry['a_0'] = user_inputs.a_0
+                    specimen_geometry['a_0'] = user_inputs.a_0
                 if user_inputs.precrack_measurements:
-                    geometry['crack_measurements'] = user_inputs.precrack_measurements
+                    specimen_geometry['crack_measurements'] = user_inputs.precrack_measurements
 
                 # Update material from Excel
                 if user_inputs.yield_strength > 0:
@@ -251,26 +259,33 @@ def new():
 
                 raw_data['excel_file'] = filename
                 raw_data['mts_results'] = user_inputs.kic_results
-                test.specimen_geometry = json.dumps(geometry)
-                test.material_properties = json.dumps(material_props)
+                # Update geometry_data with new values
+                geometry_data['specimen_geometry'] = specimen_geometry
+                geometry_data['material_properties'] = material_props
                 flash('Excel data imported successfully.', 'success')
             except Exception as e:
                 flash(f'Error parsing Excel: {e}', 'warning')
 
-        test.raw_data = json.dumps(raw_data)
+        # Store raw data in geometry
+        geometry_data['raw_data'] = raw_data
+        test.geometry = geometry_data
+
+        # Add test to session and flush to get ID before creating analysis records
+        db.session.add(test)
+        db.session.flush()
 
         # Run analysis if we have force-displacement data
         if 'force' in raw_data and 'displacement' in raw_data:
             try:
                 # Create specimen and material objects
                 specimen = KICSpecimen(
-                    specimen_type=geometry['type'],
-                    W=geometry['W'],
-                    B=geometry['B'],
-                    B_n=geometry.get('B_n', geometry['B']),
-                    a_0=geometry['a_0'],
-                    S=geometry.get('S'),
-                    crack_measurements=geometry.get('crack_measurements', [])
+                    specimen_type=specimen_geometry['type'],
+                    W=specimen_geometry['W'],
+                    B=specimen_geometry['B'],
+                    B_n=specimen_geometry.get('B_n', specimen_geometry['B']),
+                    a_0=specimen_geometry['a_0'],
+                    S=specimen_geometry.get('S'),
+                    crack_measurements=specimen_geometry.get('crack_measurements', [])
                 )
 
                 material = KICMaterial(
@@ -287,34 +302,35 @@ def new():
                 analyzer = KICAnalyzer(specimen, material, force, displacement)
                 result = analyzer.run_analysis()
 
-                # Store results
-                results_dict = {
-                    'P_max': {'value': result.P_max.value, 'uncertainty': result.P_max.uncertainty},
-                    'P_Q': {'value': result.P_Q.value, 'uncertainty': result.P_Q.uncertainty},
-                    'K_Q': {'value': result.K_Q.value, 'uncertainty': result.K_Q.uncertainty},
-                    'P_ratio': result.P_ratio,
-                    'compliance': result.compliance,
-                    'is_valid': result.is_valid,
-                    'validity_notes': result.validity_notes,
-                }
+                # Store results as individual AnalysisResult records
+                results_to_store = [
+                    ('P_max', result.P_max.value, result.P_max.uncertainty, 'kN'),
+                    ('P_Q', result.P_Q.value, result.P_Q.uncertainty, 'kN'),
+                    ('K_Q', result.K_Q.value, result.K_Q.uncertainty, 'MPa*m^0.5'),
+                    ('P_ratio', result.P_ratio, None, '-'),
+                    ('compliance', result.compliance, None, 'mm/kN'),
+                ]
                 if result.K_IC:
-                    results_dict['K_IC'] = {'value': result.K_IC.value, 'uncertainty': result.K_IC.uncertainty}
+                    results_to_store.append(('K_IC', result.K_IC.value, result.K_IC.uncertainty, 'MPa*m^0.5'))
 
-                # Create AnalysisResult record
-                analysis = AnalysisResult(
-                    test_record=test,
-                    analysis_type='KIC_E399',
-                    result_data=json.dumps(results_dict),
-                    created_by=current_user.id
-                )
-                db.session.add(analysis)
+                for param_name, value, uncertainty, unit in results_to_store:
+                    analysis = AnalysisResult(
+                        test_record_id=test.id,
+                        parameter_name=param_name,
+                        value=value,
+                        uncertainty=uncertainty,
+                        unit=unit,
+                        is_valid=result.is_valid,
+                        validity_notes=', '.join(result.validity_notes) if result.validity_notes else None,
+                        calculated_by_id=current_user.id
+                    )
+                    db.session.add(analysis)
+
                 test.status = 'ANALYZED'
                 flash('KIC analysis completed.', 'success')
             except Exception as e:
                 flash(f'Analysis error: {e}', 'warning')
                 test.status = 'DRAFT'
-
-        db.session.add(test)
 
         # Audit log
         audit = AuditLog(
@@ -343,16 +359,28 @@ def view(test_id):
         flash('Invalid test type.', 'error')
         return redirect(url_for('kic.index'))
 
-    # Parse stored data
-    geometry = json.loads(test.specimen_geometry) if test.specimen_geometry else {}
-    material_props = json.loads(test.material_properties) if test.material_properties else {}
-    raw_data = json.loads(test.raw_data) if test.raw_data else {}
+    # Parse stored data (geometry is JSON dict, not string)
+    geometry_data = test.geometry if test.geometry else {}
+    geometry = geometry_data.get('specimen_geometry', {})
+    material_props = geometry_data.get('material_properties', {})
+    raw_data = geometry_data.get('raw_data', {})
 
-    # Get analysis results
+    # Get analysis results (individual records per parameter)
     results = {}
-    analysis = AnalysisResult.query.filter_by(test_record_id=test.id).first()
-    if analysis:
-        results = json.loads(analysis.result_data) if analysis.result_data else {}
+    analysis_records = AnalysisResult.query.filter_by(test_record_id=test.id).all()
+    validity_notes = []
+    is_valid = True
+    for ar in analysis_records:
+        if ar.parameter_name in ('P_max', 'P_Q', 'K_Q', 'K_IC'):
+            results[ar.parameter_name] = {'value': ar.value, 'uncertainty': ar.uncertainty}
+        else:
+            results[ar.parameter_name] = ar.value
+        if ar.validity_notes:
+            validity_notes.append(ar.validity_notes)
+        if not ar.is_valid:
+            is_valid = False
+    results['is_valid'] = is_valid
+    results['validity_notes'] = validity_notes
 
     # Create plot if we have data
     force_disp_plot = None
@@ -392,14 +420,28 @@ def report(test_id):
 
     if form.validate_on_submit():
         try:
-            # Parse stored data
-            geometry = json.loads(test.specimen_geometry) if test.specimen_geometry else {}
-            material_props = json.loads(test.material_properties) if test.material_properties else {}
-            raw_data = json.loads(test.raw_data) if test.raw_data else {}
+            # Parse stored data (geometry is JSON dict, not string)
+            geometry_data = test.geometry if test.geometry else {}
+            geometry = geometry_data.get('specimen_geometry', {})
+            material_props = geometry_data.get('material_properties', {})
+            raw_data = geometry_data.get('raw_data', {})
 
-            # Get analysis results
-            analysis = AnalysisResult.query.filter_by(test_record_id=test.id).first()
-            results = json.loads(analysis.result_data) if analysis and analysis.result_data else {}
+            # Get analysis results (individual records per parameter)
+            results = {}
+            analysis_records = AnalysisResult.query.filter_by(test_record_id=test.id).all()
+            validity_notes = []
+            is_valid = True
+            for ar in analysis_records:
+                if ar.parameter_name in ('P_max', 'P_Q', 'K_Q', 'K_IC'):
+                    results[ar.parameter_name] = {'value': ar.value, 'uncertainty': ar.uncertainty}
+                else:
+                    results[ar.parameter_name] = ar.value
+                if ar.validity_notes:
+                    validity_notes.append(ar.validity_notes)
+                if not ar.is_valid:
+                    is_valid = False
+            results['is_valid'] = is_valid
+            results['validity_notes'] = validity_notes
 
             # Generate chart image for report
             chart_path = None

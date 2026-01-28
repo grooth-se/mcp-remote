@@ -140,33 +140,37 @@ def new():
             form.location_orientation.data = cert.location_orientation
 
     if form.validate_on_submit():
+        # Link to certificate if selected
+        certificate_id = None
+        cert_number = None
+        if form.certificate_id.data and form.certificate_id.data != 0:
+            cert = Certificate.query.get(form.certificate_id.data)
+            if cert:
+                certificate_id = cert.id
+                cert_number = cert.certificate_number_with_rev
+
+        # Build test parameters/geometry
+        test_params = {
+            'load_level': form.load_level.data,
+            'dwell_time': form.dwell_time.data,
+            'location_orientation': form.location_orientation.data,
+            'notes': form.notes.data,
+        }
+
         # Create test record
         test = TestRecord(
             test_id=form.test_id.data,
             test_method='VICKERS',
             specimen_id=form.specimen_id.data,
             material=form.material.data,
-            test_date=form.test_date.data or datetime.now().date(),
-            temperature=str(form.temperature.data) if form.temperature.data else '23',
-            location_orientation=form.location_orientation.data,
-            notes=form.notes.data,
+            test_date=form.test_date.data or datetime.now(),
+            temperature=form.temperature.data if form.temperature.data else 23.0,
+            geometry=test_params,
             status='DRAFT',
-            created_by=current_user.id
+            certificate_id=certificate_id,
+            certificate_number=cert_number,
+            operator_id=current_user.id
         )
-
-        # Link to certificate if selected
-        if form.certificate_id.data and form.certificate_id.data != 0:
-            cert = Certificate.query.get(form.certificate_id.data)
-            if cert:
-                test.certificate_id = cert.id
-                test.certificate_number = cert.certificate_number_with_rev
-
-        # Build test parameters
-        test_params = {
-            'load_level': form.load_level.data,
-            'dwell_time': form.dwell_time.data,
-        }
-        test.specimen_geometry = json.dumps(test_params)
 
         # Collect readings
         readings = []
@@ -180,8 +184,8 @@ def new():
                     'hardness_value': value,
                 })
 
-        # Store readings as raw data
-        raw_data = {'readings': readings}
+        # Store readings in geometry
+        test_params['readings'] = readings
 
         # Handle photo upload
         if form.photo.data:
@@ -191,9 +195,14 @@ def new():
             filename = f"vickers_{form.test_id.data}_{filename}"
             filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             photo.save(filepath)
-            raw_data['photo_path'] = filename
+            test_params['photo_path'] = filename
 
-        test.raw_data = json.dumps(raw_data)
+        # Update geometry with all data
+        test.geometry = test_params
+
+        # Add test to session and flush to get ID before creating analysis records
+        db.session.add(test)
+        db.session.flush()
 
         # Run analysis if we have readings
         if readings:
@@ -229,29 +238,31 @@ def new():
                 values = np.array([r['hardness_value'] for r in readings])
                 uncertainty_budget = analyzer.get_uncertainty_budget(values, result.mean_hardness.value)
 
-                # Store results
-                results_dict = {
-                    'mean_hardness': {
-                        'value': result.mean_hardness.value,
-                        'uncertainty': result.mean_hardness.uncertainty
-                    },
-                    'std_dev': result.std_dev,
-                    'range_value': result.range_value,
-                    'min_value': result.min_value,
-                    'max_value': result.max_value,
-                    'n_readings': result.n_readings,
-                    'load_level': result.load_level,
-                    'uncertainty_budget': uncertainty_budget,
-                }
+                # Store results as individual AnalysisResult records
+                load_lvl = result.load_level
+                results_to_store = [
+                    ('mean_hardness', result.mean_hardness.value, result.mean_hardness.uncertainty, load_lvl),
+                    ('std_dev', result.std_dev, None, load_lvl),
+                    ('range', result.range_value, None, load_lvl),
+                    ('min_value', result.min_value, None, load_lvl),
+                    ('max_value', result.max_value, None, load_lvl),
+                    ('n_readings', result.n_readings, None, '-'),
+                ]
 
-                # Create AnalysisResult record
-                analysis = AnalysisResult(
-                    test_record=test,
-                    analysis_type='VICKERS_E92',
-                    result_data=json.dumps(results_dict),
-                    created_by=current_user.id
-                )
-                db.session.add(analysis)
+                for param_name, value, uncertainty, unit in results_to_store:
+                    analysis = AnalysisResult(
+                        test_record_id=test.id,
+                        parameter_name=param_name,
+                        value=value,
+                        uncertainty=uncertainty,
+                        unit=unit,
+                        calculated_by_id=current_user.id
+                    )
+                    db.session.add(analysis)
+
+                # Store uncertainty budget in geometry for report generation
+                test_params['uncertainty_budget'] = uncertainty_budget
+                test.geometry = test_params
                 test.status = 'ANALYZED'
                 flash(f'Analysis completed: Mean = {result.mean_hardness.value:.1f} +/- {result.mean_hardness.uncertainty:.1f} {result.load_level}', 'success')
             except Exception as e:
@@ -259,8 +270,6 @@ def new():
                 test.status = 'DRAFT'
         else:
             flash('No hardness readings entered.', 'warning')
-
-        db.session.add(test)
 
         # Audit log
         audit = AuditLog(
@@ -289,16 +298,21 @@ def view(test_id):
         flash('Invalid test type.', 'error')
         return redirect(url_for('vickers.index'))
 
-    # Parse stored data
-    test_params = json.loads(test.specimen_geometry) if test.specimen_geometry else {}
-    raw_data = json.loads(test.raw_data) if test.raw_data else {}
-    readings = raw_data.get('readings', [])
+    # Parse stored data (geometry is JSON dict, not string)
+    test_params = test.geometry if test.geometry else {}
+    readings = test_params.get('readings', [])
 
-    # Get analysis results
+    # Get analysis results (individual records per parameter)
     results = {}
-    analysis = AnalysisResult.query.filter_by(test_record_id=test.id).first()
-    if analysis:
-        results = json.loads(analysis.result_data) if analysis.result_data else {}
+    analysis_records = AnalysisResult.query.filter_by(test_record_id=test.id).all()
+    for ar in analysis_records:
+        if ar.parameter_name == 'mean_hardness':
+            results['mean_hardness'] = {'value': ar.value, 'uncertainty': ar.uncertainty}
+        else:
+            results[ar.parameter_name] = ar.value
+    # Get load level and uncertainty budget from geometry
+    results['load_level'] = test_params.get('load_level', 'HV')
+    results['uncertainty_budget'] = test_params.get('uncertainty_budget', {})
 
     # Create plot if we have readings
     hardness_plot = None
@@ -308,8 +322,8 @@ def view(test_id):
 
     # Get photo path
     photo_url = None
-    if raw_data.get('photo_path'):
-        photo_url = url_for('static', filename=f'uploads/{raw_data["photo_path"]}')
+    if test_params.get('photo_path'):
+        photo_url = url_for('static', filename=f'uploads/{test_params["photo_path"]}')
 
     return render_template('vickers/view.html',
                            test=test,
@@ -338,14 +352,20 @@ def report(test_id):
 
     if form.validate_on_submit():
         try:
-            # Parse stored data
-            test_params = json.loads(test.specimen_geometry) if test.specimen_geometry else {}
-            raw_data = json.loads(test.raw_data) if test.raw_data else {}
-            readings = raw_data.get('readings', [])
+            # Parse stored data (geometry is JSON dict, not string)
+            test_params = test.geometry if test.geometry else {}
+            readings = test_params.get('readings', [])
 
-            # Get analysis results
-            analysis = AnalysisResult.query.filter_by(test_record_id=test.id).first()
-            results = json.loads(analysis.result_data) if analysis and analysis.result_data else {}
+            # Get analysis results (individual records per parameter)
+            results = {}
+            analysis_records = AnalysisResult.query.filter_by(test_record_id=test.id).all()
+            for ar in analysis_records:
+                if ar.parameter_name == 'mean_hardness':
+                    results['mean_hardness'] = {'value': ar.value, 'uncertainty': ar.uncertainty}
+                else:
+                    results[ar.parameter_name] = ar.value
+            results['load_level'] = test_params.get('load_level', 'HV')
+            results['uncertainty_budget'] = test_params.get('uncertainty_budget', {})
 
             # Generate chart image for report
             chart_path = None
