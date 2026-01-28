@@ -241,21 +241,42 @@ def new():
 
             try:
                 user_inputs = parse_kic_excel(Path(filepath))
+
+                # Update test record from Excel if not provided in form
+                if user_inputs.specimen_id and not test.specimen_id:
+                    test.specimen_id = user_inputs.specimen_id
+
                 # Update geometry from Excel if not provided
+                if user_inputs.specimen_type:
+                    specimen_geometry['type'] = user_inputs.specimen_type
                 if user_inputs.W > 0:
                     specimen_geometry['W'] = user_inputs.W
                 if user_inputs.B > 0:
                     specimen_geometry['B'] = user_inputs.B
+                if user_inputs.B_n > 0:
+                    specimen_geometry['B_n'] = user_inputs.B_n
                 if user_inputs.a_0 > 0:
                     specimen_geometry['a_0'] = user_inputs.a_0
+                if user_inputs.S > 0:
+                    specimen_geometry['S'] = user_inputs.S
                 if user_inputs.precrack_measurements:
                     specimen_geometry['crack_measurements'] = user_inputs.precrack_measurements
+                if user_inputs.precrack_final_size > 0:
+                    specimen_geometry['precrack_final_size'] = user_inputs.precrack_final_size
 
                 # Update material from Excel
                 if user_inputs.yield_strength > 0:
                     material_props['yield_strength'] = user_inputs.yield_strength
+                if user_inputs.ultimate_strength > 0:
+                    material_props['ultimate_strength'] = user_inputs.ultimate_strength
                 if user_inputs.youngs_modulus > 0:
                     material_props['youngs_modulus'] = user_inputs.youngs_modulus
+                if user_inputs.poissons_ratio > 0:
+                    material_props['poissons_ratio'] = user_inputs.poissons_ratio
+
+                # Update test temperature if available
+                if user_inputs.test_temperature != 23.0:  # Not default value
+                    test.temperature = user_inputs.test_temperature
 
                 raw_data['excel_file'] = filename
                 raw_data['mts_results'] = user_inputs.kic_results

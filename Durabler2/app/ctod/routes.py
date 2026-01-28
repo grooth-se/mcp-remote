@@ -162,6 +162,11 @@ def new():
                 force = csv_data.force
                 cmod = csv_data.cod  # COD = CMOD (Crack Mouth Opening Displacement)
 
+            # Get specimen ID and type (prefer form, fallback to Excel)
+            specimen_id = form.specimen_id.data or (excel_data.specimen_id if excel_data else '')
+            specimen_type = form.specimen_type.data or (excel_data.specimen_type if excel_data else 'SE(B)')
+            test_temperature = form.test_temperature.data if form.test_temperature.data is not None else (excel_data.test_temperature if excel_data else 23.0)
+
             # Get specimen dimensions (prefer form, fallback to Excel)
             W = form.W.data or (excel_data.W if excel_data else 25.0)
             B = form.B.data or (excel_data.B if excel_data else 12.5)
@@ -187,14 +192,14 @@ def new():
 
             # Create specimen object
             specimen = CTODSpecimen(
-                specimen_id=form.specimen_id.data,
-                specimen_type=form.specimen_type.data,
+                specimen_id=specimen_id,
+                specimen_type=specimen_type,
                 W=W,
                 B=B,
                 a_0=a_0,
                 S=S,
                 B_n=B_n,
-                material=form.material.data or ''
+                material=form.material.data or (excel_data.material if excel_data else '')
             )
 
             # Get material properties (prefer form, fallback to Excel)
@@ -221,7 +226,7 @@ def new():
             # Store geometry, parameters, and raw data
             # Ensure all values are JSON serializable (convert numpy types to Python)
             geometry = {
-                'type': form.specimen_type.data,
+                'type': specimen_type,
                 'W': float(W),
                 'B': float(B),
                 'B_n': float(B_n),
@@ -233,6 +238,10 @@ def new():
                 'poissons_ratio': float(poissons_ratio),
                 'crack_measurements': [float(x) for x in crack_measurements] if crack_measurements else [],
                 'notch_type': form.notch_type.data,
+                # Store final crack measurements from Excel if available
+                'final_crack_measurements': [float(x) for x in excel_data.final_crack_measurements] if excel_data and excel_data.final_crack_measurements else [],
+                # Store MTS CTOD results for comparison
+                'mts_results': excel_data.ctod_results if excel_data else {},
                 # Store data for plotting (subsample if large)
                 'force': [float(x) for x in force[::max(1, len(force)//500)]],
                 'cmod': [float(x) for x in cmod[::max(1, len(cmod)//500)]],
@@ -262,12 +271,12 @@ def new():
                 test_id=test_id,
                 test_method='CTOD',
                 test_standard=form.test_standard.data,
-                specimen_id=form.specimen_id.data,
-                material=form.material.data,
+                specimen_id=specimen_id,
+                material=form.material.data or (excel_data.material if excel_data else ''),
                 batch_number=form.batch_number.data,
                 geometry=geometry,
                 test_date=datetime.now(),
-                temperature=form.test_temperature.data,
+                temperature=test_temperature,
                 status='ANALYZED',
                 certificate_id=selected_cert_id,
                 certificate_number=cert_number,

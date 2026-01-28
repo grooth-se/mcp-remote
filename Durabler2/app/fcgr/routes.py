@@ -197,10 +197,6 @@ def new():
                 excel_file.save(filepath)
                 excel_data = parse_fcgr_excel(filepath)
 
-                # Override form data with Excel data if available
-                if excel_data.specimen_id and not form.specimen_id.data:
-                    form.specimen_id.data = excel_data.specimen_id
-
             # Check if CSV file uploaded - parse for raw data
             csv_data = None
             cycles = None
@@ -225,34 +221,56 @@ def new():
                 P_max = P_max_arr
                 P_min = P_min_arr
 
+            # Get specimen dimensions (prefer form, fallback to Excel)
+            specimen_id = form.specimen_id.data or (excel_data.specimen_id if excel_data else '')
+            specimen_type = form.specimen_type.data or (excel_data.specimen_type if excel_data else 'C(T)')
+            W = form.W.data or (excel_data.W if excel_data else 50.0)
+            B = form.B.data or (excel_data.B if excel_data else 12.5)
+            B_n = form.B_n.data or (excel_data.B_n if excel_data else B)
+            a_0 = form.a_0.data or (excel_data.a_0 if excel_data else 10.0)
+            notch_height = form.notch_height.data or (excel_data.notch_height if excel_data else 0.0)
+
+            # Get material properties (prefer form, fallback to Excel)
+            yield_strength = form.yield_strength.data or (excel_data.yield_strength if excel_data else 0.0)
+            ultimate_strength = form.ultimate_strength.data or (excel_data.ultimate_strength if excel_data else 0.0)
+            youngs_modulus = form.youngs_modulus.data or (excel_data.youngs_modulus if excel_data else 210.0)
+            poissons_ratio = form.poissons_ratio.data or (excel_data.poissons_ratio if excel_data else 0.3)
+
+            # Get test parameters (prefer form, fallback to Excel)
+            control_mode = form.control_mode.data or (excel_data.control_mode if excel_data else 'Load Control')
+            load_ratio = form.load_ratio.data if form.load_ratio.data is not None else (excel_data.load_ratio if excel_data else 0.1)
+            frequency = form.frequency.data or (excel_data.frequency if excel_data else 10.0)
+            wave_shape = form.wave_shape.data or (excel_data.wave_shape if excel_data else 'Sine')
+            test_temperature = form.test_temperature.data if form.test_temperature.data is not None else (excel_data.test_temperature if excel_data else 23.0)
+
             # Create specimen object
             specimen = FCGRSpecimen(
-                specimen_id=form.specimen_id.data,
-                specimen_type=form.specimen_type.data,
-                W=form.W.data,
-                B=form.B.data,
-                B_n=form.B_n.data or form.B.data,
-                a_0=form.a_0.data,
-                notch_height=form.notch_height.data or 0.0,
+                specimen_id=specimen_id,
+                specimen_type=specimen_type,
+                W=W,
+                B=B,
+                B_n=B_n,
+                a_0=a_0,
+                notch_height=notch_height,
                 material=form.material.data or ''
             )
 
             # Create material object
             material = FCGRMaterial(
-                yield_strength=form.yield_strength.data or 0.0,
-                ultimate_strength=form.ultimate_strength.data or 0.0,
-                youngs_modulus=form.youngs_modulus.data,
-                poissons_ratio=form.poissons_ratio.data or 0.3
+                yield_strength=yield_strength,
+                ultimate_strength=ultimate_strength,
+                youngs_modulus=youngs_modulus,
+                poissons_ratio=poissons_ratio
             )
 
             # Create test parameters
             test_params = FCGRTestParameters(
-                control_mode=form.control_mode.data,
-                load_ratio=form.load_ratio.data,
-                frequency=form.frequency.data or 10.0,
-                wave_shape=form.wave_shape.data,
+                control_mode=control_mode,
+                load_ratio=load_ratio,
+                frequency=frequency,
+                wave_shape=wave_shape,
                 environment=form.environment.data or 'Laboratory Air',
-                temperature=form.test_temperature.data or 23.0
+                temperature=test_temperature
             )
 
             # Run analysis
@@ -285,22 +303,25 @@ def new():
             # Store geometry and parameters in JSON
             # Ensure all values are JSON serializable (convert numpy types to Python)
             geometry = {
-                'type': form.specimen_type.data,
-                'W': float(form.W.data),
-                'B': float(form.B.data),
-                'B_n': float(form.B_n.data or form.B.data),
-                'a_0': float(form.a_0.data),
-                'notch_height': float(form.notch_height.data or 0.0),
-                'yield_strength': float(form.yield_strength.data or 0.0),
-                'ultimate_strength': float(form.ultimate_strength.data or 0.0),
-                'youngs_modulus': float(form.youngs_modulus.data),
-                'poissons_ratio': float(form.poissons_ratio.data or 0.3),
-                'load_ratio': float(form.load_ratio.data),
-                'frequency': float(form.frequency.data or 10.0),
-                'control_mode': form.control_mode.data,
-                'wave_shape': form.wave_shape.data,
+                'type': specimen_type,
+                'W': float(W),
+                'B': float(B),
+                'B_n': float(B_n),
+                'a_0': float(a_0),
+                'notch_height': float(notch_height),
+                'yield_strength': float(yield_strength),
+                'ultimate_strength': float(ultimate_strength),
+                'youngs_modulus': float(youngs_modulus),
+                'poissons_ratio': float(poissons_ratio),
+                'load_ratio': float(load_ratio),
+                'frequency': float(frequency),
+                'control_mode': control_mode,
+                'wave_shape': wave_shape,
                 'dadn_method': form.dadn_method.data,
                 'outlier_threshold': float(form.outlier_threshold.data or 30.0),
+                # Store precrack measurements from Excel if available
+                'precrack_measurements': excel_data.precrack_measurements if excel_data else [],
+                'precrack_final_size': float(excel_data.precrack_final_size) if excel_data else 0.0,
                 # Store data arrays for plotting
                 'cycles': [float(p.cycle_count) for p in results.data_points],
                 'crack_lengths': [float(p.crack_length) for p in results.data_points],
@@ -321,12 +342,12 @@ def new():
                 test_id=test_id,
                 test_method='FCGR',
                 test_standard=form.test_standard.data,
-                specimen_id=form.specimen_id.data,
-                material=form.material.data,
+                specimen_id=specimen_id,
+                material=form.material.data or (excel_data.material if excel_data else ''),
                 batch_number=form.batch_number.data,
                 geometry=geometry,
                 test_date=datetime.now(),
-                temperature=form.test_temperature.data,
+                temperature=test_temperature,
                 status='ANALYZED',
                 certificate_id=selected_cert_id,
                 certificate_number=cert_number,
