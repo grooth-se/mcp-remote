@@ -48,8 +48,8 @@ def create_crack_length_plot(cycles, crack_lengths, specimen_id):
         y=crack_lengths,
         mode='lines+markers',
         name='Crack Length',
-        marker=dict(size=4, color='#0d6efd'),
-        line=dict(width=1.5, color='#0d6efd')
+        marker=dict(size=4, color='darkred'),
+        line=dict(width=1.5, color='darkred')
     ))
 
     fig.update_layout(
@@ -75,26 +75,26 @@ def create_paris_law_plot(delta_K, da_dN, paris_result, paris_initial, outlier_m
     dK_outlier = delta_K[outlier_mask]
     dadN_outlier = da_dN[outlier_mask]
 
-    # Plot valid data points
+    # Plot valid data points - darkred circles
     fig.add_trace(go.Scatter(
         x=dK_valid,
         y=dadN_valid,
         mode='markers',
         name='Valid Data',
-        marker=dict(size=6, color='#0d6efd', symbol='circle')
+        marker=dict(size=6, color='darkred', symbol='circle')
     ))
 
-    # Plot outliers
+    # Plot outliers - grey x markers
     if len(dK_outlier) > 0:
         fig.add_trace(go.Scatter(
             x=dK_outlier,
             y=dadN_outlier,
             mode='markers',
             name='Outliers',
-            marker=dict(size=6, color='#dc3545', symbol='x')
+            marker=dict(size=6, color='grey', symbol='x')
         ))
 
-    # Plot Paris law regression line (final - without outliers)
+    # Plot Paris law regression line (final - without outliers) - black
     if paris_result.C > 0 and paris_result.m > 0:
         dK_range = np.logspace(
             np.log10(paris_result.delta_K_range[0] * 0.9),
@@ -108,10 +108,10 @@ def create_paris_law_plot(delta_K, da_dN, paris_result, paris_initial, outlier_m
             y=dadN_fit,
             mode='lines',
             name=f'Paris Law: C={paris_result.C:.2e}, m={paris_result.m:.2f}',
-            line=dict(width=2, color='#198754')
+            line=dict(width=2, color='black')
         ))
 
-    # Plot initial regression line (all data) as dashed
+    # Plot initial regression line (all data) - thin grey dashed
     if paris_initial and paris_initial.C > 0 and paris_initial.m > 0:
         dK_range_init = np.logspace(
             np.log10(paris_initial.delta_K_range[0] * 0.9),
@@ -125,7 +125,7 @@ def create_paris_law_plot(delta_K, da_dN, paris_result, paris_initial, outlier_m
             y=dadN_fit_init,
             mode='lines',
             name=f'Initial Fit (all data)',
-            line=dict(width=1.5, color='#6c757d', dash='dash')
+            line=dict(width=1, color='grey', dash='dash')
         ))
 
     fig.update_layout(
@@ -706,9 +706,9 @@ def report(test_id):
             outlier_mask = np.array(geometry.get('outlier_mask', []))
 
             if len(cycles) > 0:
-                # Crack length plot
+                # Crack length plot - darkred
                 fig1, ax1 = plt.subplots(figsize=(5, 3.5))
-                ax1.plot(cycles, crack_lengths, 'b-', linewidth=1.5, marker='o', markersize=3)
+                ax1.plot(cycles, crack_lengths, color='darkred', linewidth=1.5, marker='o', markersize=3)
                 ax1.set_xlabel('Cycles (N)')
                 ax1.set_ylabel('Crack Length, a (mm)')
                 ax1.set_title(f'Crack Growth - {test.specimen_id}')
@@ -722,14 +722,18 @@ def report(test_id):
                 fig2, ax2 = plt.subplots(figsize=(5, 3.5))
 
                 valid_mask = ~outlier_mask
-                ax2.loglog(delta_K[valid_mask], da_dN[valid_mask], 'bo', markersize=4, label='Valid Data')
+                # Valid data - darkred circles
+                ax2.loglog(delta_K[valid_mask], da_dN[valid_mask], 'o', color='darkred',
+                          markersize=4, label='Valid Data')
+                # Outliers - grey x markers
                 if np.any(outlier_mask):
-                    ax2.loglog(delta_K[outlier_mask], da_dN[outlier_mask], 'rx', markersize=5, label='Outliers')
+                    ax2.loglog(delta_K[outlier_mask], da_dN[outlier_mask], 'x', color='grey',
+                              markersize=5, label='Outliers')
 
-                # Regression line
+                # Regression line - black
                 dK_fit = np.logspace(np.log10(dK_min.value * 0.9), np.log10(dK_max.value * 1.1), 100)
                 dadN_fit = paris_C.value * dK_fit ** paris_m.value
-                ax2.loglog(dK_fit, dadN_fit, 'g-', linewidth=2,
+                ax2.loglog(dK_fit, dadN_fit, '-', color='black', linewidth=2,
                           label=f'C={paris_C.value:.2e}, m={paris_m.value:.2f}')
 
                 ax2.set_xlabel('ΔK (MPa√m)')
