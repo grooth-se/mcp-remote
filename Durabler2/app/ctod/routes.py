@@ -139,7 +139,9 @@ def new():
 
     if form.validate_on_submit():
         try:
-            # Parse Excel file if uploaded
+            # ============================================================
+            # STEP 1: Parse Excel file first (primary data source)
+            # ============================================================
             excel_data = None
             if form.excel_file.data:
                 excel_file = form.excel_file.data
@@ -147,8 +149,11 @@ def new():
                 filepath = Path(current_app.config['UPLOAD_FOLDER']) / filename
                 excel_file.save(filepath)
                 excel_data = parse_ctod_excel(filepath)
+                flash(f'Excel data imported: Specimen {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm', 'info')
 
-            # Parse CSV file if uploaded
+            # ============================================================
+            # STEP 2: Parse CSV file for raw test data
+            # ============================================================
             csv_data = None
             force = None
             cmod = None
@@ -162,33 +167,96 @@ def new():
                 force = csv_data.force
                 cmod = csv_data.cod  # COD = CMOD (Crack Mouth Opening Displacement)
 
-            # Get specimen ID and type (prefer form, fallback to Excel)
-            specimen_id = form.specimen_id.data or (excel_data.specimen_id if excel_data else '')
-            specimen_type = form.specimen_type.data or (excel_data.specimen_type if excel_data else 'SE(B)')
-            test_temperature = form.test_temperature.data if form.test_temperature.data is not None else (excel_data.test_temperature if excel_data else 23.0)
+            # ============================================================
+            # STEP 3: Extract values - Excel takes precedence over form
+            # ============================================================
 
-            # Get specimen dimensions (prefer form, fallback to Excel)
-            W = form.W.data or (excel_data.W if excel_data else 25.0)
-            B = form.B.data or (excel_data.B if excel_data else 12.5)
-            B_n = form.B_n.data or (excel_data.B_n if excel_data else B)
-            a_0 = form.a_0.data or (excel_data.a_0 if excel_data else W * 0.5)
-            S = form.S.data or (excel_data.S if excel_data else W * 4)
+            # Specimen identification - Excel first, then form
+            if excel_data and excel_data.specimen_id:
+                specimen_id = excel_data.specimen_id
+            else:
+                specimen_id = form.specimen_id.data or ''
 
-            # Get 9-point crack measurements
+            # Specimen type - Excel first, then form
+            if excel_data and excel_data.specimen_type:
+                specimen_type = excel_data.specimen_type
+            else:
+                specimen_type = form.specimen_type.data or 'SE(B)'
+
+            # Test temperature - Excel first, then form
+            if excel_data and excel_data.test_temperature != 23.0:
+                test_temperature = excel_data.test_temperature
+            elif form.test_temperature.data is not None:
+                test_temperature = form.test_temperature.data
+            else:
+                test_temperature = 23.0
+
+            # Specimen dimensions - Excel takes precedence when available
+            if excel_data and excel_data.W > 0:
+                W = excel_data.W
+            else:
+                W = form.W.data or 25.0
+
+            if excel_data and excel_data.B > 0:
+                B = excel_data.B
+            else:
+                B = form.B.data or 12.5
+
+            if excel_data and excel_data.B_n > 0:
+                B_n = excel_data.B_n
+            else:
+                B_n = form.B_n.data or B
+
+            if excel_data and excel_data.a_0 > 0:
+                a_0 = excel_data.a_0
+            else:
+                a_0 = form.a_0.data or W * 0.5
+
+            if excel_data and excel_data.S > 0:
+                S = excel_data.S
+            else:
+                S = form.S.data or W * 4
+
+            # 9-point crack measurements - Excel takes precedence
             crack_measurements = []
-            for field_name in ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9']:
-                val = getattr(form, field_name).data
-                if val and val > 0:
-                    crack_measurements.append(val)
-
-            if len(crack_measurements) != 9 and excel_data:
+            if excel_data and len(excel_data.precrack_measurements) == 9:
                 crack_measurements = excel_data.precrack_measurements
+            else:
+                # Try to get from form
+                for field_name in ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9']:
+                    val = getattr(form, field_name).data
+                    if val and val > 0:
+                        crack_measurements.append(val)
 
-            # Calculate average crack length if measurements available
+            # Calculate average crack length if 9 measurements available
             if len(crack_measurements) == 9:
                 a_avg = (0.5 * crack_measurements[0] + sum(crack_measurements[1:8]) +
                         0.5 * crack_measurements[8]) / 8
                 a_0 = a_avg
+
+            # Material properties - Excel takes precedence
+            if excel_data and excel_data.yield_strength > 0:
+                yield_strength = excel_data.yield_strength
+            else:
+                yield_strength = form.yield_strength.data or 500
+
+            if excel_data and excel_data.ultimate_strength > 0:
+                ultimate_strength = excel_data.ultimate_strength
+            else:
+                ultimate_strength = form.ultimate_strength.data or 600
+
+            if excel_data and excel_data.youngs_modulus > 0:
+                youngs_modulus = excel_data.youngs_modulus
+            else:
+                youngs_modulus = form.youngs_modulus.data or 210
+
+            if excel_data and excel_data.poissons_ratio > 0:
+                poissons_ratio = excel_data.poissons_ratio
+            else:
+                poissons_ratio = form.poissons_ratio.data or 0.3
+
+            # Material name - form takes precedence (user may want to specify)
+            material_name = form.material.data or (excel_data.material if excel_data else '')
 
             # Create specimen object
             specimen = CTODSpecimen(
@@ -199,14 +267,8 @@ def new():
                 a_0=a_0,
                 S=S,
                 B_n=B_n,
-                material=form.material.data or (excel_data.material if excel_data else '')
+                material=material_name
             )
-
-            # Get material properties (prefer form, fallback to Excel)
-            yield_strength = form.yield_strength.data or (excel_data.yield_strength if excel_data else 500)
-            ultimate_strength = form.ultimate_strength.data or (excel_data.ultimate_strength if excel_data else 600)
-            youngs_modulus = form.youngs_modulus.data or (excel_data.youngs_modulus if excel_data else 210)
-            poissons_ratio = form.poissons_ratio.data or (excel_data.poissons_ratio if excel_data else 0.3)
 
             material = CTODMaterial(
                 yield_strength=yield_strength,
@@ -215,7 +277,15 @@ def new():
                 poissons_ratio=poissons_ratio
             )
 
-            # Run analysis
+            # Log extracted values for debugging
+            current_app.logger.info(f'CTOD Analysis - Specimen: {specimen_id}, W={W}, B={B}, a_0={a_0}, S={S}')
+            current_app.logger.info(f'CTOD Analysis - Material: yield={yield_strength} MPa, E={youngs_modulus} GPa')
+            if crack_measurements:
+                current_app.logger.info(f'CTOD Analysis - Crack measurements: {crack_measurements}')
+
+            # ============================================================
+            # STEP 4: Run analysis
+            # ============================================================
             if force is None or cmod is None:
                 flash('Please upload CSV test data with Force and CMOD columns.', 'danger')
                 return render_template('ctod/new.html', form=form, certificate=certificate)
@@ -272,7 +342,7 @@ def new():
                 test_method='CTOD',
                 test_standard=form.test_standard.data,
                 specimen_id=specimen_id,
-                material=form.material.data or (excel_data.material if excel_data else ''),
+                material=material_name,
                 batch_number=form.batch_number.data,
                 geometry=geometry,
                 test_date=datetime.now(),
