@@ -118,7 +118,10 @@ def new():
     form = SpecimenForm()
 
     # Populate certificate dropdown
-    certificates = Certificate.query.order_by(Certificate.certificate_number.desc()).all()
+    certificates = Certificate.query.order_by(
+        Certificate.year.desc(),
+        Certificate.cert_id.desc()
+    ).all()
     form.certificate_id.choices = [(0, '-- Select Certificate --')] + [
         (c.id, f"{c.certificate_number_with_rev} - {c.customer or 'No customer'}")
         for c in certificates
