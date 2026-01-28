@@ -160,7 +160,7 @@ def new():
                 csv_file.save(filepath)
                 csv_data = parse_ctod_csv(filepath)
                 force = csv_data.force
-                cmod = csv_data.cmod
+                cmod = csv_data.cod  # COD = CMOD (Crack Mouth Opening Displacement)
 
             # Get specimen dimensions (prefer form, fallback to Excel)
             W = form.W.data or (excel_data.W if excel_data else 25.0)
@@ -219,23 +219,24 @@ def new():
             results = analyzer.run_analysis(force, cmod, specimen, material)
 
             # Store geometry, parameters, and raw data
+            # Ensure all values are JSON serializable (convert numpy types to Python)
             geometry = {
                 'type': form.specimen_type.data,
-                'W': W,
-                'B': B,
-                'B_n': B_n,
-                'a_0': a_0,
-                'S': S,
-                'yield_strength': yield_strength,
-                'ultimate_strength': ultimate_strength,
-                'youngs_modulus': youngs_modulus,
-                'poissons_ratio': poissons_ratio,
-                'crack_measurements': crack_measurements,
+                'W': float(W),
+                'B': float(B),
+                'B_n': float(B_n),
+                'a_0': float(a_0),
+                'S': float(S),
+                'yield_strength': float(yield_strength),
+                'ultimate_strength': float(ultimate_strength) if ultimate_strength else None,
+                'youngs_modulus': float(youngs_modulus),
+                'poissons_ratio': float(poissons_ratio),
+                'crack_measurements': [float(x) for x in crack_measurements] if crack_measurements else [],
                 'notch_type': form.notch_type.data,
                 # Store data for plotting (subsample if large)
-                'force': force[::max(1, len(force)//500)].tolist(),
-                'cmod': cmod[::max(1, len(cmod)//500)].tolist(),
-                'elastic_coeffs': list(results.get('elastic_coeffs', [0, 0])),
+                'force': [float(x) for x in force[::max(1, len(force)//500)]],
+                'cmod': [float(x) for x in cmod[::max(1, len(cmod)//500)]],
+                'elastic_coeffs': [float(np.real(c)) for c in results.get('elastic_coeffs', [0, 0])],
             }
 
             # Store CTOD points for plotting
@@ -244,9 +245,9 @@ def new():
                 ctod_result = results.get(ctod_type)
                 if ctod_result:
                     ctod_points[ctod_type] = {
-                        'force': ctod_result.force.value,
-                        'cmod': ctod_result.cmod.value,
-                        'ctod': ctod_result.ctod_value.value
+                        'force': float(ctod_result.force.value),
+                        'cmod': float(ctod_result.cmod.value),
+                        'ctod': float(ctod_result.ctod_value.value)
                     }
             geometry['ctod_points'] = ctod_points
 
@@ -343,14 +344,16 @@ def new():
                 db.session.add(AnalysisResult(
                     test_record_id=test_record.id,
                     parameter_name='compliance',
-                    value=compliance,
+                    value=float(compliance),
                     uncertainty=0,
                     unit='mm/kN',
                     calculated_by_id=current_user.id
                 ))
 
-            # Validity notes
-            test_record.notes = f"Valid: {results.get('is_valid', False)}. {results.get('validity_summary', '')}"
+            # Store validity info in geometry
+            geometry['is_valid'] = results.get('is_valid', False)
+            geometry['validity_summary'] = results.get('validity_summary', '')
+            test_record.geometry = geometry  # Update with validity info
 
             # Audit log
             audit = AuditLog(
@@ -499,12 +502,12 @@ def report(test_id):
                         (r.value, r.uncertainty),
                         (pt.get('force', 0), 0.1),
                         (pt.get('cmod', 0), 0.01),
-                        'Valid: True' in (test.notes or '')
+                        geometry.get('is_valid', False)
                     )
 
             report_results['compliance'] = results.get('compliance').value if results.get('compliance') else None
-            report_results['is_valid'] = 'Valid: True' in (test.notes or '')
-            report_results['validity_summary'] = test.notes or ''
+            report_results['is_valid'] = geometry.get('is_valid', False)
+            report_results['validity_summary'] = geometry.get('validity_summary', '')
 
             # Prepare report data
             report_data = CTODReportGenerator.prepare_report_data(

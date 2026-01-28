@@ -283,29 +283,30 @@ def new():
                 return render_template('fcgr/new.html', form=form, certificate=certificate)
 
             # Store geometry and parameters in JSON
+            # Ensure all values are JSON serializable (convert numpy types to Python)
             geometry = {
                 'type': form.specimen_type.data,
-                'W': form.W.data,
-                'B': form.B.data,
-                'B_n': form.B_n.data or form.B.data,
-                'a_0': form.a_0.data,
-                'notch_height': form.notch_height.data or 0.0,
-                'yield_strength': form.yield_strength.data or 0.0,
-                'ultimate_strength': form.ultimate_strength.data or 0.0,
-                'youngs_modulus': form.youngs_modulus.data,
-                'poissons_ratio': form.poissons_ratio.data or 0.3,
-                'load_ratio': form.load_ratio.data,
-                'frequency': form.frequency.data or 10.0,
+                'W': float(form.W.data),
+                'B': float(form.B.data),
+                'B_n': float(form.B_n.data or form.B.data),
+                'a_0': float(form.a_0.data),
+                'notch_height': float(form.notch_height.data or 0.0),
+                'yield_strength': float(form.yield_strength.data or 0.0),
+                'ultimate_strength': float(form.ultimate_strength.data or 0.0),
+                'youngs_modulus': float(form.youngs_modulus.data),
+                'poissons_ratio': float(form.poissons_ratio.data or 0.3),
+                'load_ratio': float(form.load_ratio.data),
+                'frequency': float(form.frequency.data or 10.0),
                 'control_mode': form.control_mode.data,
                 'wave_shape': form.wave_shape.data,
                 'dadn_method': form.dadn_method.data,
-                'outlier_threshold': form.outlier_threshold.data or 30.0,
+                'outlier_threshold': float(form.outlier_threshold.data or 30.0),
                 # Store data arrays for plotting
-                'cycles': [p.cycle_count for p in results.data_points],
-                'crack_lengths': [p.crack_length for p in results.data_points],
-                'delta_K': [p.delta_K for p in results.data_points],
-                'da_dN': [p.da_dN for p in results.data_points],
-                'outlier_mask': [p.is_outlier for p in results.data_points],
+                'cycles': [float(p.cycle_count) for p in results.data_points],
+                'crack_lengths': [float(p.crack_length) for p in results.data_points],
+                'delta_K': [float(p.delta_K) for p in results.data_points],
+                'da_dN': [float(p.da_dN) for p in results.data_points],
+                'outlier_mask': [bool(p.is_outlier) for p in results.data_points],
             }
 
             # Create test record
@@ -334,16 +335,16 @@ def new():
             db.session.add(test_record)
             db.session.flush()
 
-            # Store results
+            # Store results (ensure all values are Python floats)
             results_data = [
-                ('paris_C', results.paris_law.C, results.paris_law.std_error_C, '-'),
-                ('paris_m', results.paris_law.m, results.paris_law.std_error_m, '-'),
-                ('r_squared', results.paris_law.r_squared, 0, '-'),
-                ('n_points', results.paris_law.n_points, 0, '-'),
-                ('delta_K_min', results.paris_law.delta_K_range[0], 0, 'MPa√m'),
-                ('delta_K_max', results.paris_law.delta_K_range[1], 0, 'MPa√m'),
-                ('final_crack', results.final_crack_length, 0, 'mm'),
-                ('total_cycles', results.total_cycles, 0, 'cycles'),
+                ('paris_C', float(results.paris_law.C), float(results.paris_law.std_error_C), '-'),
+                ('paris_m', float(results.paris_law.m), float(results.paris_law.std_error_m), '-'),
+                ('r_squared', float(results.paris_law.r_squared), 0, '-'),
+                ('n_points', float(results.paris_law.n_points), 0, '-'),
+                ('delta_K_min', float(results.paris_law.delta_K_range[0]), 0, 'MPa√m'),
+                ('delta_K_max', float(results.paris_law.delta_K_range[1]), 0, 'MPa√m'),
+                ('final_crack', float(results.final_crack_length), 0, 'mm'),
+                ('total_cycles', float(results.total_cycles), 0, 'cycles'),
             ]
 
             for name, value, uncertainty, unit in results_data:
@@ -357,8 +358,10 @@ def new():
                 )
                 db.session.add(result)
 
-            # Store validity
-            test_record.notes = f"Valid: {results.is_valid}. " + "; ".join(results.validity_notes)
+            # Store validity in geometry
+            geometry['is_valid'] = results.is_valid
+            geometry['validity_notes'] = results.validity_notes
+            test_record.geometry = geometry  # Update with validity info
 
             # Audit log
             audit = AuditLog(
@@ -545,8 +548,8 @@ def report(test_id):
             mock_results.n_outliers = sum(geometry.get('outlier_mask', []))
             mock_results.total_cycles = int(total_cycles.value) if total_cycles else 0
             mock_results.final_crack_length = final_crack.value if final_crack else 0
-            mock_results.is_valid = 'Valid: True' in (test.notes or '')
-            mock_results.validity_notes = [test.notes] if test.notes else []
+            mock_results.is_valid = geometry.get('is_valid', False)
+            mock_results.validity_notes = geometry.get('validity_notes', [])
 
             # Prepare report data
             report_data = FCGRReportGenerator.prepare_report_data(
