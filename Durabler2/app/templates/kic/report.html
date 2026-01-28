@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Generate KIC Report{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('kic.index') }}">KIC Tests</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('kic.view', test_id=test.id) }}">{{ test.test_id }}</a></li>
+        <li class="breadcrumb-item active">Generate Report</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0"><i class="bi bi-file-earmark-pdf"></i> Generate KIC Report</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <!-- Test Summary -->
+                    <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title">Test Information</h6>
+                            <dl class="row mb-0">
+                                <dt class="col-5">Test ID:</dt>
+                                <dd class="col-7">{{ test.test_id }}</dd>
+                                <dt class="col-5">Specimen:</dt>
+                                <dd class="col-7">{{ test.specimen_id or '-' }}</dd>
+                                <dt class="col-5">Material:</dt>
+                                <dd class="col-7">{{ test.material or '-' }}</dd>
+                                <dt class="col-5">Temperature:</dt>
+                                <dd class="col-7">{{ test.temperature or 23 }} C</dd>
+                                <dt class="col-5">Test Date:</dt>
+                                <dd class="col-7">{{ test.test_date.strftime('%Y-%m-%d') if test.test_date else '-' }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <!-- Report Options -->
+                    <div class="mb-4">
+                        {{ form.certificate_number.label(class="form-label") }}
+                        {{ form.certificate_number(class="form-control") }}
+                        <small class="text-muted">Enter or confirm the certificate number for the report</small>
+                    </div>
+
+                    <div class="mb-4">
+                        {{ form.include_photos.label(class="form-label") }}
+                        {{ form.include_photos(class="form-select") }}
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-success btn-lg") }}
+                        <a href="{{ url_for('kic.view', test_id=test.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Report Preview -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-eye"></i> Report Contents</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li><i class="bi bi-check text-success"></i> Test identification and conditions</li>
+                    <li><i class="bi bi-check text-success"></i> Specimen geometry (W, B, Bn, a<sub>0</sub>, S)</li>
+                    <li><i class="bi bi-check text-success"></i> Material properties</li>
+                    <li><i class="bi bi-check text-success"></i> 5-point crack measurements</li>
+                    <li><i class="bi bi-check text-success"></i> K<sub>Q</sub> / K<sub>IC</sub> results with uncertainties</li>
+                    <li><i class="bi bi-check text-success"></i> Force vs Displacement plot</li>
+                    <li><i class="bi bi-check text-success"></i> P<sub>max</sub>/P<sub>Q</sub> ratio check</li>
+                    <li><i class="bi bi-check text-success"></i> Validity assessment per ASTM E399</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

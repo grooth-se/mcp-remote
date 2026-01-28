@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}KIC Test - {{ test.test_id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('kic.index') }}">KIC Tests</a></li>
+        <li class="breadcrumb-item active">{{ test.test_id }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-lightning"></i> {{ test.test_id }}</h2>
+        <p class="text-muted mb-0">
+            {{ test.specimen_id or 'No specimen ID' }} |
+            {{ test.material or 'No material' }} |
+            {{ test.temperature or 23 }} C |
+            {{ test.test_date.strftime('%Y-%m-%d') if test.test_date else 'No date' }}
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('kic.report', test_id=test.id) }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-pdf"></i> Generate Report
+        </a>
+        <a href="{{ url_for('kic.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left column: Results -->
+    <div class="col-lg-4">
+        <!-- KIC Results -->
+        <div class="card mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-lightning"></i> KIC Results</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    {% set K_Q = results.get('K_Q') %}
+                    {% set K_IC = results.get('K_IC') %}
+                    {% if K_Q %}
+                    <tr class="table-warning">
+                        <td><strong>K<sub>Q</sub> (Conditional)</strong></td>
+                        <td class="text-end">
+                            <strong>{{ "%.1f"|format(K_Q.value) }}</strong> +/- {{ "%.1f"|format(K_Q.uncertainty) }} MPa<span style="white-space: nowrap">&radic;m</span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% if K_IC %}
+                    <tr class="table-success">
+                        <td><strong>K<sub>IC</sub> (Valid)</strong></td>
+                        <td class="text-end">
+                            <strong>{{ "%.1f"|format(K_IC.value) }}</strong> +/- {{ "%.1f"|format(K_IC.uncertainty) }} MPa<span style="white-space: nowrap">&radic;m</span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr class="table-secondary">
+                        <td>K<sub>IC</sub></td>
+                        <td class="text-end"><em>CONDITIONAL</em></td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Force Results -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Test Summary</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>P<sub>max</sub></td>
+                        <td class="text-end">
+                            {% set P_max = results.get('P_max') %}
+                            {{ "%.2f"|format(P_max.value) if P_max else '-' }} kN
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>P<sub>Q</sub> (5% secant)</td>
+                        <td class="text-end">
+                            {% set P_Q = results.get('P_Q') %}
+                            {{ "%.2f"|format(P_Q.value) if P_Q else '-' }} kN
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>P<sub>max</sub>/P<sub>Q</sub></td>
+                        <td class="text-end">
+                            {% set P_ratio = results.get('P_ratio') %}
+                            {% if P_ratio %}
+                            <span class="{{ 'text-success' if P_ratio <= 1.10 else 'text-danger' }}">
+                                {{ "%.3f"|format(P_ratio) }}
+                                {% if P_ratio <= 1.10 %}
+                                <i class="bi bi-check-circle"></i>
+                                {% else %}
+                                <i class="bi bi-x-circle"></i> (> 1.10)
+                                {% endif %}
+                            </span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Compliance</td>
+                        <td class="text-end">
+                            {% set comp = results.get('compliance') %}
+                            {{ "%.4f"|format(comp) if comp else '-' }} mm/kN
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Specimen Geometry -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-rulers"></i> Specimen</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>Type</td>
+                        <td class="text-end">{{ geometry.get('type', '-') }}</td>
+                    </tr>
+                    <tr>
+                        <td>W</td>
+                        <td class="text-end">{{ "%.2f"|format(geometry.get('W', 0)) }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>B</td>
+                        <td class="text-end">{{ "%.2f"|format(geometry.get('B', 0)) }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>Bn</td>
+                        <td class="text-end">{{ "%.2f"|format(geometry.get('B_n', 0)) }} mm</td>
+                    </tr>
+                    <tr>
+                        <td>a<sub>0</sub></td>
+                        <td class="text-end">{{ "%.2f"|format(geometry.get('a_0', 0)) }} mm</td>
+                    </tr>
+                    {% if geometry.get('type') == 'SE(B)' %}
+                    <tr>
+                        <td>S</td>
+                        <td class="text-end">{{ "%.1f"|format(geometry.get('S', 0)) }} mm</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td>a<sub>0</sub>/W</td>
+                        <td class="text-end">
+                            {% set W = geometry.get('W', 1) %}
+                            {% set a = geometry.get('a_0', 0) %}
+                            {% set ratio = a / W if W > 0 else 0 %}
+                            <span class="{{ 'text-success' if 0.45 <= ratio <= 0.55 else 'text-danger' }}">
+                                {{ "%.3f"|format(ratio) }}
+                                {% if 0.45 <= ratio <= 0.55 %}
+                                <i class="bi bi-check-circle"></i>
+                                {% else %}
+                                <i class="bi bi-x-circle"></i>
+                                {% endif %}
+                            </span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Certificate Link -->
+        {% if test.certificate %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Certificate</h5>
+            </div>
+            <div class="card-body text-center">
+                <a href="{{ url_for('certificates.view', cert_id=test.certificate.id) }}" class="btn btn-outline-info">
+                    <i class="bi bi-journal-text"></i> {{ test.certificate_number }}
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right column: Plot -->
+    <div class="col-lg-8">
+        <!-- Force-Displacement Plot -->
+        {% if force_disp_plot %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Force vs Displacement</h5>
+            </div>
+            <div class="card-body">
+                {{ force_disp_plot | safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 5-Point Crack Measurements -->
+        {% if geometry.get('crack_measurements') and geometry.get('crack_measurements')|length == 5 %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-rulers"></i> 5-Point Crack Measurements (ASTM E399)</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm text-center mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>a<sub>1</sub></th>
+                                <th>a<sub>2</sub></th>
+                                <th class="table-primary">a<sub>3</sub></th>
+                                <th>a<sub>4</sub></th>
+                                <th>a<sub>5</sub></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                {% for val in geometry.get('crack_measurements', []) %}
+                                <td{% if loop.index == 3 %} class="table-primary"{% endif %}>{{ "%.2f"|format(val) }}</td>
+                                {% endfor %}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                {% set meas = geometry.get('crack_measurements', []) %}
+                {% if meas|length == 5 %}
+                {% set avg = (0.5 * meas[0] + meas[1] + meas[2] + meas[3] + 0.5 * meas[4]) / 4 %}
+                <p class="text-muted small mt-2 mb-0">
+                    Average: {{ "%.3f"|format(avg) }} mm (using weighted formula per E399: (0.5a1 + a2 + a3 + a4 + 0.5a5) / 4)
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Validity Notes -->
+        {% if results.get('validity_notes') %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-{{ 'check-circle text-success' if results.get('is_valid') else 'exclamation-triangle text-warning' }}"></i>
+                    Validity Assessment
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <span class="badge bg-{{ 'success' if results.get('is_valid') else 'warning' }} fs-6">
+                        {{ 'VALID - KIC' if results.get('is_valid') else 'CONDITIONAL - KQ' }}
+                    </span>
+                </div>
+                <ul class="mb-0">
+                    {% for note in results.get('validity_notes', []) %}
+                    <li>{{ note }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Additional Notes -->
+        {% if test.notes %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-chat-left-text"></i> Notes</h5>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0" style="white-space: pre-wrap;">{{ test.notes }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

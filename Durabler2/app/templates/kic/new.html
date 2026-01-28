@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}New KIC Test{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('kic.index') }}">KIC Tests</a></li>
+        <li class="breadcrumb-item active">New Test</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-lg-10">
+        <div class="card shadow">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0"><i class="bi bi-lightning"></i> New KIC Fracture Toughness Test (ASTM E399)</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <!-- Test Identification -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-tag"></i> Test Identification</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    {{ form.test_id.label(class="form-label") }}
+                                    {{ form.test_id(class="form-control", placeholder="e.g., KIC-2025-001") }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    {{ form.specimen_id.label(class="form-label") }}
+                                    {{ form.specimen_id(class="form-control") }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    {{ form.certificate_id.label(class="form-label") }}
+                                    {{ form.certificate_id(class="form-select") }}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    {{ form.test_date.label(class="form-label") }}
+                                    {{ form.test_date(class="form-control", type="date") }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    {{ form.temperature.label(class="form-label") }}
+                                    {{ form.temperature(class="form-control") }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    {{ form.location_orientation.label(class="form-label") }}
+                                    {{ form.location_orientation(class="form-control") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Specimen Geometry -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-rulers"></i> Specimen Geometry</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    {{ form.specimen_type.label(class="form-label") }}
+                                    {{ form.specimen_type(class="form-select") }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    {{ form.W.label(class="form-label") }}
+                                    {{ form.W(class="form-control") }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    {{ form.B.label(class="form-label") }}
+                                    {{ form.B(class="form-control") }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    {{ form.B_n.label(class="form-label") }}
+                                    {{ form.B_n(class="form-control", placeholder="Same as B if no side grooves") }}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    {{ form.a_0.label(class="form-label") }}
+                                    {{ form.a_0(class="form-control") }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    {{ form.S.label(class="form-label") }}
+                                    {{ form.S(class="form-control", placeholder="4W typical for SE(B)") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5-Point Crack Measurements -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-rulers"></i> 5-Point Crack Measurements (ASTM E399)</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                Enter 5-point crack length measurements per ASTM E399 Section 9.1.2.
+                                Points a1 and a5 at quarter thickness, a2-a4 equally spaced across center.
+                            </p>
+                            <div class="row">
+                                <div class="col mb-3">
+                                    {{ form.crack_1.label(class="form-label") }}
+                                    {{ form.crack_1(class="form-control form-control-sm") }}
+                                </div>
+                                <div class="col mb-3">
+                                    {{ form.crack_2.label(class="form-label") }}
+                                    {{ form.crack_2(class="form-control form-control-sm") }}
+                                </div>
+                                <div class="col mb-3">
+                                    {{ form.crack_3.label(class="form-label") }}
+                                    {{ form.crack_3(class="form-control form-control-sm") }}
+                                </div>
+                                <div class="col mb-3">
+                                    {{ form.crack_4.label(class="form-label") }}
+                                    {{ form.crack_4(class="form-control form-control-sm") }}
+                                </div>
+                                <div class="col mb-3">
+                                    {{ form.crack_5.label(class="form-label") }}
+                                    {{ form.crack_5(class="form-control form-control-sm") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Material Properties -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-gear"></i> Material Properties</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    {{ form.material.label(class="form-label") }}
+                                    {{ form.material(class="form-control", placeholder="e.g., S355J2") }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    {{ form.yield_strength.label(class="form-label") }}
+                                    {{ form.yield_strength(class="form-control") }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    {{ form.ultimate_strength.label(class="form-label") }}
+                                    {{ form.ultimate_strength(class="form-control") }}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    {{ form.youngs_modulus.label(class="form-label") }}
+                                    {{ form.youngs_modulus(class="form-control") }}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    {{ form.poissons_ratio.label(class="form-label") }}
+                                    {{ form.poissons_ratio(class="form-control") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Files -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-upload"></i> Data Files</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    {{ form.csv_file.label(class="form-label") }}
+                                    {{ form.csv_file(class="form-control") }}
+                                    <small class="text-muted">MTS TestSuite CSV export with Force-Displacement data</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    {{ form.excel_file.label(class="form-label") }}
+                                    {{ form.excel_file(class="form-control") }}
+                                    <small class="text-muted">MTS Analysis Report Excel export (optional)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-4">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control", rows=3, placeholder="Additional notes...") }}
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('kic.index') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
+                        </a>
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Sidebar -->
+    <div class="col-lg-2">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Help</h6>
+            </div>
+            <div class="card-body small">
+                <p><strong>ASTM E399</strong></p>
+                <p>Plane-Strain Fracture Toughness of Metallic Materials</p>
+                <hr>
+                <p><strong>Specimen Types:</strong></p>
+                <ul class="ps-3">
+                    <li>SE(B) - Single Edge Bend</li>
+                    <li>C(T) - Compact Tension</li>
+                </ul>
+                <hr>
+                <p><strong>Validity Checks:</strong></p>
+                <ul class="ps-3">
+                    <li>Pmax/PQ &le; 1.10</li>
+                    <li>0.45 &le; a/W &le; 0.55</li>
+                    <li>Plane-strain size req.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -44,6 +44,7 @@ def create_app(config_name='default'):
     from .sonic import sonic_bp
     from .fcgr import fcgr_bp
     from .ctod import ctod_bp
+    from .kic import kic_bp
     from .certificates import certificates_bp
 
     app.register_blueprint(main_bp)
@@ -52,6 +53,7 @@ def create_app(config_name='default'):
     app.register_blueprint(sonic_bp, url_prefix='/sonic')
     app.register_blueprint(fcgr_bp, url_prefix='/fcgr')
     app.register_blueprint(ctod_bp, url_prefix='/ctod')
+    app.register_blueprint(kic_bp, url_prefix='/kic')
     app.register_blueprint(certificates_bp, url_prefix='/certificates')
 
     # Create database tables (development only)
