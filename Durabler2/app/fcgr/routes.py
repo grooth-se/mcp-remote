@@ -474,6 +474,10 @@ def specimen():
                 'outlier_threshold': float(form.outlier_threshold.data or 2.5),
                 'precrack_measurements': excel_data.get('precrack_measurements', []),
                 'precrack_final_size': float(excel_data.get('precrack_final_size', 0)),
+                # Raw data for crack length vs cycles plot (all points)
+                'raw_cycles': [float(c) for c in cycles],
+                'raw_crack_lengths': [float(a) for a in crack_lengths],
+                # Processed data for Paris law plot (after da/dN calculation)
                 'cycles': [float(p.cycle_count) for p in results.data_points],
                 'crack_lengths': [float(p.crack_length) for p in results.data_points],
                 'delta_K': [float(p.delta_K) for p in results.data_points],
@@ -727,9 +731,11 @@ def view(test_id):
     results = {r.parameter_name: r for r in test.results.all()}
     geometry = test.geometry or {}
 
-    # Get data arrays for plotting
-    cycles = geometry.get('cycles', [])
-    crack_lengths = geometry.get('crack_lengths', [])
+    # Get raw data for crack length plot (all points, no outlier filtering)
+    raw_cycles = geometry.get('raw_cycles', geometry.get('cycles', []))
+    raw_crack_lengths = geometry.get('raw_crack_lengths', geometry.get('crack_lengths', []))
+
+    # Get processed data for Paris law plot (with outlier info)
     delta_K = np.array(geometry.get('delta_K', []))
     da_dN = np.array(geometry.get('da_dN', []))
     outlier_mask = np.array(geometry.get('outlier_mask', []))
@@ -738,8 +744,8 @@ def view(test_id):
     crack_plot = None
     paris_plot = None
 
-    if len(cycles) > 0:
-        crack_plot = create_crack_length_plot(cycles, crack_lengths, test.specimen_id)
+    if len(raw_cycles) > 0:
+        crack_plot = create_crack_length_plot(raw_cycles, raw_crack_lengths, test.specimen_id)
 
     if len(delta_K) > 0:
         # Create mock Paris law result for plotting
@@ -922,16 +928,18 @@ def report(test_id):
             plot1_path = None
             plot2_path = None
 
-            cycles = geometry.get('cycles', [])
-            crack_lengths = geometry.get('crack_lengths', [])
+            # Raw data for crack length plot (all points)
+            raw_cycles = geometry.get('raw_cycles', geometry.get('cycles', []))
+            raw_crack_lengths = geometry.get('raw_crack_lengths', geometry.get('crack_lengths', []))
+            # Processed data for Paris law plot
             delta_K = np.array(geometry.get('delta_K', []))
             da_dN = np.array(geometry.get('da_dN', []))
             outlier_mask = np.array(geometry.get('outlier_mask', []))
 
-            if len(cycles) > 0:
+            if len(raw_cycles) > 0:
                 # Crack length plot - darkred (larger figure for full-width report)
                 fig1, ax1 = plt.subplots(figsize=(8, 5))
-                ax1.plot(cycles, crack_lengths, color='darkred', linewidth=1.5, marker='o', markersize=3,
+                ax1.plot(raw_cycles, raw_crack_lengths, color='darkred', linewidth=1.5, marker='o', markersize=3,
                         label='Crack Length, a (mm)')
                 ax1.set_xlabel('Cycles (N)')
                 ax1.set_ylabel('Crack Length, a (mm)')

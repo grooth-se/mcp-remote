@@ -22,10 +22,9 @@ class ReadingForm(FlaskForm):
 class SpecimenForm(FlaskForm):
     """Form for Vickers specimen data entry."""
 
-    # Test identification
-    test_id = StringField('Test ID', validators=[DataRequired()])
-    specimen_id = StringField('Specimen SN', validators=[Optional()])
+    # Test identification (Certificate and Specimen SN are main trace numbers)
     certificate_id = SelectField('Link to Certificate', coerce=int, validators=[Optional()])
+    specimen_id = StringField('Specimen SN', validators=[DataRequired()])
 
     # Material info
     material = StringField('Material', validators=[Optional()])
@@ -66,7 +65,22 @@ class SpecimenForm(FlaskForm):
         validators=[Optional()]
     )
 
-    # Hardness readings - up to 10 readings
+    # Number of indents to report
+    num_readings = SelectField(
+        'Number of Indents',
+        choices=[
+            ('3', '3 indents'),
+            ('5', '5 indents'),
+            ('6', '6 indents'),
+            ('10', '10 indents'),
+            ('15', '15 indents'),
+            ('20', '20 indents'),
+        ],
+        default='5',
+        validators=[DataRequired()]
+    )
+
+    # Hardness readings - up to 20 readings
     reading_1_location = StringField('Location 1', validators=[Optional()])
     reading_1_value = FloatField('HV 1', validators=[Optional(), NumberRange(min=1)])
 
@@ -96,6 +110,36 @@ class SpecimenForm(FlaskForm):
 
     reading_10_location = StringField('Location 10', validators=[Optional()])
     reading_10_value = FloatField('HV 10', validators=[Optional(), NumberRange(min=1)])
+
+    reading_11_location = StringField('Location 11', validators=[Optional()])
+    reading_11_value = FloatField('HV 11', validators=[Optional(), NumberRange(min=1)])
+
+    reading_12_location = StringField('Location 12', validators=[Optional()])
+    reading_12_value = FloatField('HV 12', validators=[Optional(), NumberRange(min=1)])
+
+    reading_13_location = StringField('Location 13', validators=[Optional()])
+    reading_13_value = FloatField('HV 13', validators=[Optional(), NumberRange(min=1)])
+
+    reading_14_location = StringField('Location 14', validators=[Optional()])
+    reading_14_value = FloatField('HV 14', validators=[Optional(), NumberRange(min=1)])
+
+    reading_15_location = StringField('Location 15', validators=[Optional()])
+    reading_15_value = FloatField('HV 15', validators=[Optional(), NumberRange(min=1)])
+
+    reading_16_location = StringField('Location 16', validators=[Optional()])
+    reading_16_value = FloatField('HV 16', validators=[Optional(), NumberRange(min=1)])
+
+    reading_17_location = StringField('Location 17', validators=[Optional()])
+    reading_17_value = FloatField('HV 17', validators=[Optional(), NumberRange(min=1)])
+
+    reading_18_location = StringField('Location 18', validators=[Optional()])
+    reading_18_value = FloatField('HV 18', validators=[Optional(), NumberRange(min=1)])
+
+    reading_19_location = StringField('Location 19', validators=[Optional()])
+    reading_19_value = FloatField('HV 19', validators=[Optional(), NumberRange(min=1)])
+
+    reading_20_location = StringField('Location 20', validators=[Optional()])
+    reading_20_value = FloatField('HV 20', validators=[Optional(), NumberRange(min=1)])
 
     # Indent photo
     photo = FileField('Indent Photo', validators=[

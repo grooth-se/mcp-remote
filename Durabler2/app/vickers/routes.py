@@ -21,6 +21,16 @@ from utils.analysis.vickers_calculations import VickersAnalyzer, VickersResult
 from utils.models.vickers_specimen import VickersTestData, VickersReading, VickersLoadLevel
 
 
+def generate_vickers_test_id():
+    """Generate unique test ID for Vickers test."""
+    today = datetime.now()
+    prefix = f"VH-{today.strftime('%y%m%d')}"
+    count = TestRecord.query.filter(
+        TestRecord.test_id.like(f'{prefix}%')
+    ).count()
+    return f"{prefix}-{count + 1:03d}"
+
+
 def create_hardness_profile_plot(readings, load_level):
     """Create interactive Hardness Profile plot using Plotly.
 
@@ -56,37 +66,31 @@ def create_hardness_profile_plot(readings, load_level):
 
     fig = go.Figure()
 
-    # Bar chart for readings
-    fig.add_trace(go.Bar(
+    # Line plot with markers (darkred)
+    fig.add_trace(go.Scatter(
         x=list(range(1, len(values) + 1)),
         y=values,
+        mode='lines+markers+text',
         text=[f'{v:.1f}' for v in values],
-        textposition='outside',
+        textposition='top center',
+        textfont=dict(size=10),
         name='Readings',
-        marker_color='steelblue',
+        line=dict(color='darkred', width=2),
+        marker=dict(color='darkred', size=10, symbol='circle'),
         hovertemplate='%{customdata}<br>%{y:.1f} ' + load_level + '<extra></extra>',
         customdata=locations
     ))
 
-    # Mean line
+    # Mean line (grey dotted)
     fig.add_hline(
         y=mean_val,
-        line_dash='dash',
-        line_color='red',
+        line_dash='dot',
+        line_color='grey',
+        line_width=2,
         annotation_text=f'Mean: {mean_val:.1f}',
-        annotation_position='right'
+        annotation_position='right',
+        annotation_font=dict(color='grey')
     )
-
-    # +/- 1 std dev band
-    if std_val > 0:
-        fig.add_hrect(
-            y0=mean_val - std_val,
-            y1=mean_val + std_val,
-            fillcolor='rgba(255, 0, 0, 0.1)',
-            line_width=0,
-            annotation_text=f'+/-1s: {std_val:.1f}',
-            annotation_position='left'
-        )
 
     fig.update_layout(
         title=f'Hardness Profile ({load_level})',
@@ -95,7 +99,8 @@ def create_hardness_profile_plot(readings, load_level):
         template='plotly_white',
         showlegend=False,
         height=400,
-        yaxis=dict(range=[0, max(values) * 1.2])
+        xaxis=dict(tickmode='linear', tick0=1, dtick=1),
+        yaxis=dict(range=[0, max(values) * 1.15])
     )
 
     return fig.to_html(full_html=False, include_plotlyjs='cdn')
@@ -159,17 +164,21 @@ def new():
                 certificate_id = cert.id
                 cert_number = cert.certificate_number_with_rev
 
+        # Generate test ID automatically
+        test_id = generate_vickers_test_id()
+
         # Build test parameters/geometry
         test_params = {
             'load_level': form.load_level.data,
             'dwell_time': form.dwell_time.data,
+            'num_readings': form.num_readings.data,
             'location_orientation': form.location_orientation.data,
             'notes': form.notes.data,
         }
 
         # Create test record
         test = TestRecord(
-            test_id=form.test_id.data,
+            test_id=test_id,
             test_method='VICKERS',
             specimen_id=form.specimen_id.data,
             material=form.material.data,
@@ -182,9 +191,10 @@ def new():
             operator_id=current_user.id
         )
 
-        # Collect readings
+        # Collect readings (up to 20)
         readings = []
-        for i in range(1, 11):
+        num_readings = int(form.num_readings.data or 5)
+        for i in range(1, num_readings + 1):
             location = getattr(form, f'reading_{i}_location').data
             value = getattr(form, f'reading_{i}_value').data
             if value is not None and value > 0:
@@ -202,7 +212,7 @@ def new():
             photo = form.photo.data
             filename = secure_filename(photo.filename)
             # Add test_id prefix to avoid collisions
-            filename = f"vickers_{form.test_id.data}_{filename}"
+            filename = f"vickers_{test_id}_{filename}"
             filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             photo.save(filepath)
             test_params['photo_path'] = filename
@@ -387,33 +397,30 @@ def report(test_id):
 
                 values = [r['hardness_value'] for r in readings]
                 mean_val = np.mean(values)
-                std_val = np.std(values, ddof=1) if len(values) > 1 else 0
 
                 fig, ax = plt.subplots(figsize=(8, 5))
 
-                # Bar chart
-                x = range(1, len(values) + 1)
-                bars = ax.bar(x, values, color='steelblue', edgecolor='black')
+                # Line plot with markers (darkred)
+                x = list(range(1, len(values) + 1))
+                ax.plot(x, values, color='darkred', linewidth=2, marker='o',
+                        markersize=10, markerfacecolor='darkred', markeredgecolor='darkred')
 
-                # Add value labels
-                for bar, val in zip(bars, values):
-                    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 2,
-                            f'{val:.1f}', ha='center', va='bottom', fontsize=9)
+                # Add value labels above points
+                for xi, val in zip(x, values):
+                    ax.text(xi, val + max(values) * 0.02, f'{val:.1f}',
+                            ha='center', va='bottom', fontsize=9)
 
-                # Mean line
-                ax.axhline(y=mean_val, color='red', linestyle='--',
+                # Mean line (grey dotted)
+                ax.axhline(y=mean_val, color='grey', linestyle=':', linewidth=2,
                            label=f'Mean: {mean_val:.1f}')
-
-                # +/- 1 std dev
-                if std_val > 0:
-                    ax.axhspan(mean_val - std_val, mean_val + std_val,
-                               alpha=0.2, color='red', label=f'+/-1s: {std_val:.1f}')
 
                 ax.set_xlabel('Reading Number')
                 ax.set_ylabel(f'Hardness ({test_params.get("load_level", "HV")})')
                 ax.set_title('Hardness Profile')
-                ax.legend()
-                ax.set_ylim(0, max(values) * 1.25)
+                ax.legend(loc='upper right')
+                ax.set_xlim(0.5, len(values) + 0.5)
+                ax.set_ylim(0, max(values) * 1.15)
+                ax.set_xticks(x)
                 ax.grid(True, alpha=0.3, axis='y')
 
                 chart_path = Path(current_app.config['REPORTS_FOLDER']) / f'vickers_chart_{test.id}.png'

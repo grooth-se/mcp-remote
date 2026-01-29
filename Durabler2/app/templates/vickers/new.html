@@ -27,17 +27,15 @@
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    {{ form.test_id.label(class="form-label") }}
-                                    {{ form.test_id(class="form-control", placeholder="e.g., VH-2025-001") }}
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    {{ form.specimen_id.label(class="form-label") }}
-                                    {{ form.specimen_id(class="form-control") }}
-                                </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-6 mb-3">
                                     {{ form.certificate_id.label(class="form-label") }}
                                     {{ form.certificate_id(class="form-select") }}
+                                    <small class="text-muted">Certificate number is a main trace number</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    {{ form.specimen_id.label(class="form-label") }}
+                                    {{ form.specimen_id(class="form-control") }}
+                                    <small class="text-muted">Specimen SN is a main trace number</small>
                                 </div>
                             </div>
                             <div class="row">
@@ -64,17 +62,21 @@
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-3 mb-3">
                                     {{ form.load_level.label(class="form-label") }}
                                     {{ form.load_level(class="form-select") }}
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-3 mb-3">
                                     {{ form.dwell_time.label(class="form-label") }}
                                     {{ form.dwell_time(class="form-select") }}
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-3 mb-3">
                                     {{ form.temperature.label(class="form-label") }}
                                     {{ form.temperature(class="form-control") }}
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    {{ form.num_readings.label(class="form-label") }}
+                                    {{ form.num_readings(class="form-select", id="num_readings", onchange="updateReadingsTable()") }}
                                 </div>
                             </div>
                         </div>
@@ -90,7 +92,7 @@
                                 Enter hardness readings. At least 3 readings recommended per ASTM E92.
                             </p>
                             <div class="table-responsive">
-                                <table class="table table-sm">
+                                <table class="table table-sm" id="readings-table">
                                     <thead class="table-light">
                                         <tr>
                                             <th width="10%">#</th>
@@ -99,8 +101,8 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for i in range(1, 11) %}
-                                        <tr>
+                                        {% for i in range(1, 21) %}
+                                        <tr class="reading-row" data-row="{{ i }}">
                                             <td class="align-middle text-center"><strong>{{ i }}</strong></td>
                                             <td>{{ form['reading_' ~ i ~ '_location'](class="form-control form-control-sm", placeholder="e.g., Center, Edge, HAZ...") }}</td>
                                             <td>{{ form['reading_' ~ i ~ '_value'](class="form-control form-control-sm", placeholder="e.g., 245") }}</td>
@@ -173,4 +175,30 @@
         </div>
     </div>
 </div>
+
+<script>
+function updateReadingsTable() {
+    const numReadings = parseInt(document.getElementById('num_readings').value) || 5;
+    const rows = document.querySelectorAll('.reading-row');
+
+    rows.forEach(function(row) {
+        const rowNum = parseInt(row.getAttribute('data-row'));
+        if (rowNum <= numReadings) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+            // Clear hidden fields
+            const inputs = row.querySelectorAll('input');
+            inputs.forEach(function(input) {
+                input.value = '';
+            });
+        }
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateReadingsTable();
+});
+</script>
 {% endblock %}
