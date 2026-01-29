@@ -451,7 +451,7 @@ def specimen():
                 P_max=P_max,
                 P_min=P_min,
                 method=form.dadn_method.data,
-                outlier_percentage=form.outlier_threshold.data or 30.0
+                outlier_threshold=form.outlier_threshold.data or 2.5
             )
 
             # Build geometry dict for storage
@@ -471,7 +471,7 @@ def specimen():
                 'control_mode': control_mode,
                 'wave_shape': wave_shape,
                 'dadn_method': form.dadn_method.data,
-                'outlier_threshold': float(form.outlier_threshold.data or 30.0),
+                'outlier_threshold': float(form.outlier_threshold.data or 2.5),
                 'precrack_measurements': excel_data.get('precrack_measurements', []),
                 'precrack_final_size': float(excel_data.get('precrack_final_size', 0)),
                 'cycles': [float(p.cycle_count) for p in results.data_points],
@@ -849,7 +849,7 @@ def report(test_id):
                 'wave_shape': geometry.get('wave_shape', 'Sine'),
                 'environment': 'Laboratory Air',
                 'dadn_method': geometry.get('dadn_method', 'Secant'),
-                'outlier_threshold': geometry.get('outlier_threshold', 30),
+                'outlier_threshold': geometry.get('outlier_threshold', 2.5),
             }
 
             # Create mock results object for report
@@ -913,13 +913,10 @@ def report(test_id):
             )
 
             # Get template and logo paths
-            template_path = Path(current_app.root_path).parent / 'templates' / 'fcgr_e647_report_template.docx'
+            # Skip template - use from-scratch generation for better plot layout
+            template_path = None
             logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
-
-            # Template is optional - will fall back to from-scratch generation
-            if not template_path.exists():
-                template_path = None
-                current_app.logger.info('FCGR template not found, using from-scratch generation')
+            current_app.logger.info('FCGR: Using from-scratch report generation')
 
             # Generate plots for report
             plot1_path = None
@@ -932,8 +929,8 @@ def report(test_id):
             outlier_mask = np.array(geometry.get('outlier_mask', []))
 
             if len(cycles) > 0:
-                # Crack length plot - darkred
-                fig1, ax1 = plt.subplots(figsize=(5, 3.5))
+                # Crack length plot - darkred (larger figure for full-width report)
+                fig1, ax1 = plt.subplots(figsize=(8, 5))
                 ax1.plot(cycles, crack_lengths, color='darkred', linewidth=1.5, marker='o', markersize=3,
                         label='Crack Length, a (mm)')
                 ax1.set_xlabel('Cycles (N)')
@@ -954,8 +951,8 @@ def report(test_id):
                 plt.close(fig1)
 
             if len(delta_K) > 0 and paris_C:
-                # Paris law plot
-                fig2, ax2 = plt.subplots(figsize=(5, 3.5))
+                # Paris law plot (larger figure for full-width report)
+                fig2, ax2 = plt.subplots(figsize=(8, 5))
 
                 valid_mask = ~outlier_mask
                 # Valid data - darkred circles
@@ -992,6 +989,13 @@ def report(test_id):
                 fig2.savefig(plot2_path, dpi=150, bbox_inches='tight')
                 plt.close(fig2)
 
+            # Build photo paths from geometry
+            photo_paths = []
+            for photo in geometry.get('photos', []):
+                photo_path = Path(current_app.root_path) / 'static' / 'uploads' / photo['filename']
+                if photo_path.exists():
+                    photo_paths.append(photo_path)
+
             # Generate report
             reports_folder = Path(current_app.root_path).parent / 'reports'
             reports_folder.mkdir(exist_ok=True)
@@ -1005,7 +1009,8 @@ def report(test_id):
                 data=report_data,
                 plot1_path=plot1_path,
                 plot2_path=plot2_path,
-                logo_path=logo_path if logo_path.exists() else None
+                logo_path=logo_path if logo_path.exists() else None,
+                photo_paths=photo_paths if photo_paths else None
             )
 
             # Clean up plot temp files

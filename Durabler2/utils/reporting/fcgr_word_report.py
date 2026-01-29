@@ -12,7 +12,7 @@ from datetime import datetime
 
 from docx import Document
 from docx.shared import Inches, Cm, Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 
 
 class FCGRReportGenerator:
@@ -289,7 +289,7 @@ class FCGRReportGenerator:
         quality_data = [
             ('Valid Data Points:', str(data.get('n_valid_points', '-'))),
             ('Outliers Removed:', str(data.get('n_outliers', '-'))),
-            ('Outlier Threshold:', f"{data.get('outlier_threshold', '30')}%"),
+            ('Outlier Threshold:', f"{data.get('outlier_threshold', '2.5')}σ"),
         ]
 
         for i, (label, value) in enumerate(quality_data):
@@ -315,7 +315,7 @@ class FCGRReportGenerator:
         # Plot 1: Crack Length vs Cycles
         if plot1_path and plot1_path.exists():
             doc.add_heading('Crack Length vs Cycles', level=1)
-            doc.add_picture(str(plot1_path), width=Inches(5.5))
+            doc.add_picture(str(plot1_path), width=Inches(6.5))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
             # Add caption
@@ -329,7 +329,7 @@ class FCGRReportGenerator:
         # Plot 2: da/dN vs Delta-K (Paris Law)
         if plot2_path and plot2_path.exists():
             doc.add_heading('da/dN vs ΔK (Paris Law)', level=1)
-            doc.add_picture(str(plot2_path), width=Inches(5.5))
+            doc.add_picture(str(plot2_path), width=Inches(6.5))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
             # Add caption
@@ -345,7 +345,7 @@ class FCGRReportGenerator:
             doc.add_heading('Crack Surface', level=1)
             for i, photo_path in enumerate(photo_paths):
                 if photo_path and photo_path.exists():
-                    doc.add_picture(str(photo_path), width=Inches(4.0))
+                    doc.add_picture(str(photo_path), width=Inches(5.5))
                     doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
             # Add caption
@@ -446,26 +446,29 @@ class FCGRReportGenerator:
         if '{{plot1}}' in full_text and plot1_path and plot1_path.exists():
             paragraph.clear()
             run = paragraph.add_run()
-            run.add_picture(str(plot1_path), width=Inches(3.2))
+            run.add_picture(str(plot1_path), width=Inches(6.5))
             return
 
         # Handle plot2 placeholder (da/dN vs Delta-K)
         if '{{plot2}}' in full_text and plot2_path and plot2_path.exists():
             paragraph.clear()
             run = paragraph.add_run()
-            run.add_picture(str(plot2_path), width=Inches(3.2))
+            run.add_picture(str(plot2_path), width=Inches(6.5))
             return
 
-        # Handle combined plots placeholder (both plots side by side)
+        # Handle combined plots placeholder (each plot on its own row, full width)
         if '{{plots}}' in full_text:
             paragraph.clear()
             if plot1_path and plot1_path.exists():
                 run = paragraph.add_run()
-                run.add_picture(str(plot1_path), width=Inches(3.0))
+                run.add_picture(str(plot1_path), width=Inches(6.5))
             if plot2_path and plot2_path.exists():
-                run = paragraph.add_run("  ")  # Space between plots
+                # Add line breaks to separate plots vertically
                 run = paragraph.add_run()
-                run.add_picture(str(plot2_path), width=Inches(3.0))
+                run.add_break(WD_BREAK.LINE)
+                run.add_break(WD_BREAK.LINE)
+                run = paragraph.add_run()
+                run.add_picture(str(plot2_path), width=Inches(6.5))
             return
 
         # Handle photos placeholder
@@ -475,9 +478,8 @@ class FCGRReportGenerator:
                 for i, photo_path in enumerate(photo_paths):
                     if photo_path and photo_path.exists():
                         run = paragraph.add_run()
-                        run.add_picture(str(photo_path), width=Inches(2.5))
-                        if i < len(photo_paths) - 1:
-                            paragraph.add_run("  ")  # Space between photos
+                        run.add_picture(str(photo_path), width=Inches(5.5))
+                        paragraph.add_run()  # Line break between photos
             else:
                 paragraph.add_run("No crack surface photos attached.")
             return
@@ -618,7 +620,7 @@ class FCGRReportGenerator:
 
         # da/dN calculation method
         data['dadn_method'] = test_params.get('dadn_method', 'Secant')
-        data['outlier_threshold'] = test_params.get('outlier_threshold', '30')
+        data['outlier_threshold'] = test_params.get('outlier_threshold', '2.5')
 
         # Results from FCGRResult object
         if results:

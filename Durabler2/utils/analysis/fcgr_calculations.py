@@ -216,9 +216,12 @@ class FCGRAnalyzer:
                                     n_points: int = 7,
                                     poly_order: int = 2) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Calculate da/dN using incremental polynomial method per E647.
+        Calculate da/dN using incremental polynomial method per ASTM E647.
 
-        Fits a polynomial to local data points and takes derivative.
+        Fits a normalized polynomial to local data points and takes derivative.
+        Uses E647 normalization to avoid numerical issues with large cycle counts:
+            Ĉ = (N - C1) / C2  where C1 = center, C2 = half-range
+            â = (a - a1) / a2  where a1 = center, a2 = half-range
 
         Parameters
         ----------
@@ -227,9 +230,9 @@ class FCGRAnalyzer:
         crack_lengths : np.ndarray
             Crack length array (mm)
         n_points : int
-            Number of points for local fit (default 7)
+            Number of points for local fit (default 7, E647 recommends 7-9)
         poly_order : int
-            Polynomial order (default 2)
+            Polynomial order (default 2, E647 specifies 2nd order)
 
         Returns
         -------
@@ -250,14 +253,39 @@ class FCGRAnalyzer:
             N_local = cycles[start:end]
             a_local = crack_lengths[start:end]
 
-            # Fit polynomial a = f(N)
+            # E647 normalization for numerical stability
+            # Normalize cycles: Ĉ = (N - C1) / C2
+            C1 = (N_local[0] + N_local[-1]) / 2  # Center of cycle range
+            C2 = (N_local[-1] - N_local[0]) / 2  # Half-range of cycles
+            if C2 == 0:
+                continue
+            N_norm = (N_local - C1) / C2
+
+            # Normalize crack length: â = (a - a1) / a2
+            a1 = (a_local[0] + a_local[-1]) / 2  # Center of crack length range
+            a2 = (a_local[-1] - a_local[0]) / 2  # Half-range of crack length
+            if a2 == 0:
+                a2 = 1.0  # Avoid division by zero for flat regions
+            a_norm = (a_local - a1) / a2
+
+            # Fit polynomial â = f(Ĉ) in normalized space
             try:
-                coeffs = np.polyfit(N_local, a_local, poly_order)
-                # Derivative: da/dN at N[i]
+                coeffs = np.polyfit(N_norm, a_norm, poly_order)
+
+                # Derivative in normalized space: dâ/dĈ
                 deriv_coeffs = np.polyder(coeffs)
-                da_dN[i] = np.polyval(deriv_coeffs, cycles[i])
-                valid_mask[i] = True
-            except:
+
+                # Evaluate at center point (Ĉ = 0 for the center point i)
+                N_i_norm = (cycles[i] - C1) / C2
+                da_dN_norm = np.polyval(deriv_coeffs, N_i_norm)
+
+                # Convert back to real units: da/dN = (a2/C2) * (dâ/dĈ)
+                da_dN[i] = (a2 / C2) * da_dN_norm
+
+                # Only accept positive growth rates
+                if da_dN[i] > 0:
+                    valid_mask[i] = True
+            except Exception:
                 continue
 
         return cycles[valid_mask], crack_lengths[valid_mask], da_dN[valid_mask]
@@ -265,16 +293,16 @@ class FCGRAnalyzer:
     def paris_law_regression(self, delta_K: np.ndarray,
                              da_dN: np.ndarray,
                              exclude_outliers: bool = True,
-                             outlier_percentage: float = 30.0) -> Tuple[ParisLawResult, ParisLawResult, np.ndarray]:
+                             outlier_threshold: float = 2.5) -> Tuple[ParisLawResult, ParisLawResult, np.ndarray]:
         """
-        Perform Paris law regression with percentage-based outlier detection.
+        Perform Paris law regression with log-scale residual outlier detection.
 
         Method:
-        1. Run initial linear regression with all data points
-        2. Classify a point as outlier if da/dN deviates more than
-           the specified percentage from the regression line
-        3. Re-run regression without outliers
-        4. Return both regression results for plotting
+        1. Run initial linear regression with all data points in log-log space
+        2. Calculate residuals in log space (symmetric on log scale)
+        3. Classify a point as outlier if |residual| > threshold × std_dev
+        4. Re-run regression without outliers
+        5. Return both regression results for plotting
 
         Uses log-log linear regression:
         log(da/dN) = log(C) + m * log(Delta-K)
@@ -286,9 +314,9 @@ class FCGRAnalyzer:
         da_dN : np.ndarray
             Crack growth rate array (mm/cycle)
         exclude_outliers : bool
-            If True, remove outliers based on percentage deviation
-        outlier_percentage : float
-            Percentage deviation threshold for outlier detection (e.g., 30 = 30%)
+            If True, remove outliers based on log-scale residuals
+        outlier_threshold : float
+            Number of standard deviations for outlier detection (e.g., 2.5)
 
         Returns
         -------
@@ -319,10 +347,13 @@ class FCGRAnalyzer:
         C_init = 10**intercept_init
         r_squared_init = r_value_init**2
 
+        # Calculate residuals in log space (predicted log values)
+        log_dadN_predicted = intercept_init + slope_init * log_dK
+        residuals = log_dadN - log_dadN_predicted
+
         # Calculate uncertainties for initial fit
         n_init = len(dK)
-        y_pred_init = intercept_init + slope_init * log_dK
-        ss_res_init = np.sum((log_dadN - y_pred_init)**2)
+        ss_res_init = np.sum(residuals**2)
         ss_x_init = np.sum((log_dK - np.mean(log_dK))**2)
         std_error_m_init = np.sqrt(ss_res_init / (n_init - 2) / ss_x_init) if ss_x_init > 0 and n_init > 2 else 0
         std_error_logC_init = std_error_m_init * np.sqrt(np.sum(log_dK**2) / n_init) if n_init > 0 else 0
@@ -339,15 +370,12 @@ class FCGRAnalyzer:
             std_error_m=std_error_m_init
         )
 
-        # Step 2: Identify outliers based on percentage deviation
-        # Calculate predicted da/dN values from initial regression
-        dadN_predicted = C_init * dK**m_init
+        # Step 2: Identify outliers based on log-scale residuals
+        # Calculate standard deviation of residuals
+        std_residuals = np.std(residuals)
 
-        # Calculate percentage deviation: |actual - predicted| / predicted * 100
-        percentage_deviation = np.abs(dadN - dadN_predicted) / dadN_predicted * 100
-
-        # Mark outliers (points deviating more than threshold percentage)
-        outlier_mask_valid = percentage_deviation > outlier_percentage
+        # Mark outliers (points where |residual| > threshold × std_dev)
+        outlier_mask_valid = np.abs(residuals) > outlier_threshold * std_residuals
 
         # Create full outlier mask (for original array size)
         outlier_mask_full = np.zeros(len(delta_K), dtype=bool)
@@ -581,7 +609,7 @@ class FCGRAnalyzer:
     def analyze_fcgr_data(self, cycles: np.ndarray, compliance: np.ndarray,
                           P_max: np.ndarray, P_min: np.ndarray,
                           method: str = 'secant',
-                          outlier_percentage: float = 30.0) -> FCGRResult:
+                          outlier_threshold: float = 2.5) -> FCGRResult:
         """
         Perform complete FCGR analysis.
 
@@ -597,8 +625,8 @@ class FCGRAnalyzer:
             Minimum load array (kN)
         method : str
             da/dN calculation method: 'secant' or 'polynomial'
-        outlier_percentage : float
-            Percentage deviation threshold for outlier detection (default 30%)
+        outlier_threshold : float
+            Number of standard deviations for outlier detection (default 2.5)
 
         Returns
         -------
@@ -632,10 +660,10 @@ class FCGRAnalyzer:
             for dP, a in zip(delta_P_mid, a_valid)
         ])
 
-        # Paris law regression with percentage-based outlier detection
+        # Paris law regression with log-scale residual outlier detection
         # Returns both initial (all data) and final (without outliers) results
         paris_initial, paris_final, outlier_mask = self.paris_law_regression(
-            delta_K, da_dN, exclude_outliers=True, outlier_percentage=outlier_percentage
+            delta_K, da_dN, exclude_outliers=True, outlier_threshold=outlier_threshold
         )
 
         # Create data points with outlier flags from regression
@@ -680,7 +708,7 @@ class FCGRAnalyzer:
                               crack_lengths: np.ndarray,
                               P_max: np.ndarray, P_min: np.ndarray,
                               method: str = 'secant',
-                              outlier_percentage: float = 30.0) -> FCGRResult:
+                              outlier_threshold: float = 2.5) -> FCGRResult:
         """
         Perform FCGR analysis from pre-calculated crack lengths.
 
@@ -699,8 +727,8 @@ class FCGRAnalyzer:
             Minimum load array (kN)
         method : str
             da/dN calculation method: 'secant' or 'polynomial'
-        outlier_percentage : float
-            Percentage deviation threshold for outlier detection (default 30%)
+        outlier_threshold : float
+            Number of standard deviations for outlier detection (default 2.5)
 
         Returns
         -------
@@ -731,9 +759,9 @@ class FCGRAnalyzer:
             for dP, a in zip(delta_P_mid, a_valid)
         ])
 
-        # Paris law regression with percentage-based outlier detection
+        # Paris law regression with log-scale residual outlier detection
         paris_initial, paris_final, outlier_mask = self.paris_law_regression(
-            delta_K, da_dN, exclude_outliers=True, outlier_percentage=outlier_percentage
+            delta_K, da_dN, exclude_outliers=True, outlier_threshold=outlier_threshold
         )
 
         # Create data points with outlier flags from regression

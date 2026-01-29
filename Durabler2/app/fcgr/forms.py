@@ -112,13 +112,13 @@ class SpecimenForm(FlaskForm):
 
     # Analysis parameters
     dadn_method = SelectField('da/dN Calculation Method', choices=[
-        ('secant', 'Secant (Point-to-Point)'),
-        ('polynomial', 'Incremental Polynomial')
+        ('polynomial', 'Incremental Polynomial (Recommended)'),
+        ('secant', 'Secant (Point-to-Point)')
     ])
-    outlier_threshold = FloatField('Outlier Threshold (%)', validators=[
+    outlier_threshold = FloatField('Outlier Threshold (σ)', validators=[
         Optional(),
-        NumberRange(min=5, max=100)
-    ], default=60.0)
+        NumberRange(min=1.0, max=5.0, message='Typically 2.0-3.0 standard deviations')
+    ], default=2.5)
 
     # Test standard
     test_standard = SelectField('Test Standard', choices=[
