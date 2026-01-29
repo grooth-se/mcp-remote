@@ -2,33 +2,37 @@
 Word report generator for FCGR E647 test results.
 
 Populates a Word template with test data, Paris law results, plots, and photos.
+Uses same layout style as CTOD E1290 and KIC E399 reports for consistency.
 """
 
 import re
 from pathlib import Path
 from typing import Dict, Any, Optional, List
+from datetime import datetime
+
 from docx import Document
-from docx.shared import Inches, Cm
+from docx.shared import Inches, Cm, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 
 class FCGRReportGenerator:
     """
-    Generate FCGR test reports from Word template.
+    Generate FCGR test reports from Word template or from scratch.
 
     Uses placeholder syntax {{placeholder_name}} in template.
     """
 
-    def __init__(self, template_path: Path):
+    def __init__(self, template_path: Optional[Path] = None):
         """
         Initialize report generator.
 
         Parameters
         ----------
-        template_path : Path
-            Path to Word template file
+        template_path : Path, optional
+            Path to Word template file. If None, creates report from scratch.
         """
         self.template_path = template_path
-        if not template_path.exists():
+        if template_path and not template_path.exists():
             raise FileNotFoundError(f"Template not found: {template_path}")
 
     def generate_report(
@@ -41,7 +45,7 @@ class FCGRReportGenerator:
         photo_paths: Optional[List[Path]] = None
     ) -> Path:
         """
-        Generate report by populating template with data.
+        Generate report by populating template with data or creating from scratch.
 
         Parameters
         ----------
@@ -63,6 +67,12 @@ class FCGRReportGenerator:
         Path
             Path to generated report
         """
+        # Create from scratch if no template
+        if not self.template_path or not self.template_path.exists():
+            doc = self._create_report_from_scratch(data, plot1_path, plot2_path, logo_path, photo_paths)
+            doc.save(output_path)
+            return output_path
+
         doc = Document(self.template_path)
 
         # Replace placeholders in page headers
@@ -89,6 +99,329 @@ class FCGRReportGenerator:
 
         doc.save(output_path)
         return output_path
+
+    def _create_report_from_scratch(
+        self,
+        data: Dict[str, Any],
+        plot1_path: Optional[Path],
+        plot2_path: Optional[Path],
+        logo_path: Optional[Path],
+        photo_paths: Optional[List[Path]]
+    ) -> Document:
+        """Create report without template - matches CTOD E1290 layout."""
+        doc = Document()
+
+        # Set up styles
+        style = doc.styles['Normal']
+        style.font.name = 'Calibri'
+        style.font.size = Pt(11)
+
+        # Header with logo (centered, same as CTOD/KIC)
+        if logo_path and logo_path.exists():
+            doc.add_picture(str(logo_path), width=Inches(2))
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # Title (same style as CTOD/KIC)
+        title = doc.add_heading('Fatigue Crack Growth Rate Test Report', level=0)
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # Subtitle with standard reference
+        subtitle = doc.add_paragraph('ASTM E647 - Fatigue Crack Growth Rates')
+        subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        doc.add_paragraph()
+
+        # Test Information table (4-column layout like CTOD/KIC)
+        doc.add_heading('Test Information', level=1)
+        table = doc.add_table(rows=8, cols=4)
+        table.style = 'Table Grid'
+
+        # Two-column layout: Label | Value | Label | Value
+        info_data = [
+            ('Certificate Number:', data.get('certificate_number', ''), 'Test Date:', data.get('test_date', '')),
+            ('Test Project:', data.get('test_project', ''), 'Temperature:', f"{data.get('temperature', '23')} °C"),
+            ('Customer:', data.get('customer', ''), 'Test Standard:', 'ASTM E647'),
+            ('Customer Order:', data.get('customer_order', ''), 'Test Equipment:', 'MTS Landmark 500kN'),
+            ('Product S/N:', data.get('product_sn', ''), 'Specimen ID:', data.get('specimen_id', '')),
+            ('Material:', data.get('material', ''), 'Location/Orientation:', data.get('location_orientation', '')),
+            ('Specimen Type:', data.get('specimen_type', 'C(T)'), 'Side Grooves:', data.get('side_grooves', 'No')),
+            ('Environment:', data.get('environment', 'Laboratory Air'), 'a₀/W Ratio:', data.get('a_W_ratio', '-')),
+        ]
+
+        for i, (label1, value1, label2, value2) in enumerate(info_data):
+            table.rows[i].cells[0].text = label1
+            table.rows[i].cells[1].text = str(value1)
+            table.rows[i].cells[2].text = label2
+            table.rows[i].cells[3].text = str(value2)
+            # Bold the labels
+            if table.rows[i].cells[0].paragraphs[0].runs:
+                table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+            if table.rows[i].cells[2].paragraphs[0].runs:
+                table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
+
+        doc.add_paragraph()
+
+        # Specimen Geometry table (same format as CTOD/KIC)
+        doc.add_heading('Specimen Geometry', level=1)
+        table = doc.add_table(rows=6, cols=3)
+        table.style = 'Table Grid'
+
+        # Header row
+        headers = ['Parameter', 'Value', 'Unit']
+        for i, header in enumerate(headers):
+            table.rows[0].cells[i].text = header
+            table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+        dim_data = [
+            ('Specimen Type', data.get('specimen_type', 'C(T)'), '-'),
+            ('Width W', data.get('W', ''), 'mm'),
+            ('Thickness B', data.get('B', ''), 'mm'),
+            ('Net Thickness Bₙ', data.get('B_n', data.get('B', '')), 'mm'),
+            ('Initial Crack a₀', data.get('a_0', ''), 'mm'),
+        ]
+
+        for i, (param, value, unit) in enumerate(dim_data):
+            table.rows[i+1].cells[0].text = param
+            table.rows[i+1].cells[1].text = str(value)
+            table.rows[i+1].cells[2].text = unit
+
+        doc.add_paragraph()
+
+        # Material Properties table (same format as CTOD/KIC)
+        doc.add_heading('Material Properties', level=1)
+        table = doc.add_table(rows=5, cols=3)
+        table.style = 'Table Grid'
+
+        # Header row
+        for i, header in enumerate(headers):
+            table.rows[0].cells[i].text = header
+            table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+        mat_data = [
+            ('Yield Strength σys', data.get('yield_strength', ''), 'MPa'),
+            ('Ultimate Strength σu', data.get('ultimate_strength', '-'), 'MPa'),
+            ("Young's Modulus E", data.get('youngs_modulus', ''), 'GPa'),
+            ("Poisson's Ratio ν", data.get('poissons_ratio', '0.3'), '-'),
+        ]
+
+        for i, (param, value, unit) in enumerate(mat_data):
+            table.rows[i+1].cells[0].text = param
+            table.rows[i+1].cells[1].text = str(value)
+            table.rows[i+1].cells[2].text = unit
+
+        doc.add_paragraph()
+
+        # Test Parameters table (FCGR-specific)
+        doc.add_heading('Test Parameters', level=1)
+        table = doc.add_table(rows=6, cols=3)
+        table.style = 'Table Grid'
+
+        # Header row
+        for i, header in enumerate(headers):
+            table.rows[0].cells[i].text = header
+            table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+        param_data = [
+            ('Load Ratio R', data.get('load_ratio', '0.1'), '-'),
+            ('Frequency f', data.get('frequency', '10'), 'Hz'),
+            ('Control Mode', data.get('control_mode', 'Load Control'), '-'),
+            ('Wave Shape', data.get('wave_shape', 'Sine'), '-'),
+            ('da/dN Method', data.get('dadn_method', 'Secant'), '-'),
+        ]
+
+        for i, (param, value, unit) in enumerate(param_data):
+            table.rows[i+1].cells[0].text = param
+            table.rows[i+1].cells[1].text = str(value)
+            table.rows[i+1].cells[2].text = unit
+
+        doc.add_paragraph()
+
+        # Paris Law Results table (4-column like CTOD/KIC results)
+        doc.add_heading('Paris Law Results', level=1)
+        table = doc.add_table(rows=9, cols=4)
+        table.style = 'Table Grid'
+
+        # Header row
+        result_headers = ['Parameter', 'Value', 'U (k=2)', 'Unit']
+        for i, header in enumerate(result_headers):
+            table.rows[0].cells[i].text = header
+            table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+        # Format Paris law coefficient C in scientific notation
+        paris_C = data.get('paris_C', '-')
+        paris_C_error = data.get('paris_C_error', '-')
+        if isinstance(paris_C, (int, float)) and paris_C != '-':
+            paris_C = f"{paris_C:.4e}"
+        if isinstance(paris_C_error, (int, float)) and paris_C_error != '-':
+            paris_C_error = f"±{paris_C_error:.4e}"
+
+        paris_m = data.get('paris_m', '-')
+        paris_m_error = data.get('paris_m_error', '-')
+        if isinstance(paris_m, (int, float)) and paris_m != '-':
+            paris_m = f"{paris_m:.4f}"
+        if isinstance(paris_m_error, (int, float)) and paris_m_error != '-':
+            paris_m_error = f"±{paris_m_error:.4f}"
+
+        results_data = [
+            ('Paris Coefficient C', paris_C, paris_C_error, 'm/cycle/(MPa√m)^m'),
+            ('Paris Exponent m', paris_m, paris_m_error, '-'),
+            ('R² (fit quality)', self._format_value(data.get('paris_r_squared', '-')), '-', '-'),
+            ('Valid Data Points', str(data.get('paris_n_points', '-')), '-', '-'),
+            ('ΔK Range (min)', self._format_value(data.get('delta_K_min', '-')), '-', 'MPa√m'),
+            ('ΔK Range (max)', self._format_value(data.get('delta_K_max', '-')), '-', 'MPa√m'),
+            ('Total Cycles', str(data.get('total_cycles', '-')), '-', '-'),
+            ('Final Crack Length', self._format_value(data.get('final_crack_length', '-')), '-', 'mm'),
+        ]
+
+        for i, (param, value, unc, unit) in enumerate(results_data):
+            table.rows[i+1].cells[0].text = param
+            table.rows[i+1].cells[1].text = str(value)
+            table.rows[i+1].cells[2].text = str(unc)
+            table.rows[i+1].cells[3].text = unit
+
+        doc.add_paragraph()
+
+        # Data Quality table
+        doc.add_heading('Data Quality', level=1)
+        table = doc.add_table(rows=4, cols=2)
+        table.style = 'Table Grid'
+
+        quality_data = [
+            ('Valid Data Points:', str(data.get('n_valid_points', '-'))),
+            ('Outliers Removed:', str(data.get('n_outliers', '-'))),
+            ('Outlier Threshold:', f"{data.get('outlier_threshold', '30')}%"),
+        ]
+
+        for i, (label, value) in enumerate(quality_data):
+            table.rows[i].cells[0].text = label
+            table.rows[i].cells[1].text = value
+            if table.rows[i].cells[0].paragraphs[0].runs:
+                table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+
+        # Add totals row
+        table.rows[3].cells[0].text = 'Total Data Points:'
+        n_valid = data.get('n_valid_points', 0)
+        n_outliers = data.get('n_outliers', 0)
+        try:
+            total = int(n_valid) + int(n_outliers)
+            table.rows[3].cells[1].text = str(total)
+        except (ValueError, TypeError):
+            table.rows[3].cells[1].text = '-'
+        if table.rows[3].cells[0].paragraphs[0].runs:
+            table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
+
+        doc.add_paragraph()
+
+        # Plot 1: Crack Length vs Cycles
+        if plot1_path and plot1_path.exists():
+            doc.add_heading('Crack Length vs Cycles', level=1)
+            doc.add_picture(str(plot1_path), width=Inches(5.5))
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            # Add caption
+            caption = doc.add_paragraph('Figure 1: Crack length as a function of fatigue cycles')
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption.runs[0].font.size = Pt(10)
+            caption.runs[0].font.italic = True
+
+            doc.add_paragraph()
+
+        # Plot 2: da/dN vs Delta-K (Paris Law)
+        if plot2_path and plot2_path.exists():
+            doc.add_heading('da/dN vs ΔK (Paris Law)', level=1)
+            doc.add_picture(str(plot2_path), width=Inches(5.5))
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            # Add caption
+            caption = doc.add_paragraph('Figure 2: Fatigue crack growth rate (da/dN) vs stress intensity factor range (ΔK)')
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption.runs[0].font.size = Pt(10)
+            caption.runs[0].font.italic = True
+
+            doc.add_paragraph()
+
+        # Crack Surface Photos (if available)
+        if photo_paths:
+            doc.add_heading('Crack Surface', level=1)
+            for i, photo_path in enumerate(photo_paths):
+                if photo_path and photo_path.exists():
+                    doc.add_picture(str(photo_path), width=Inches(4.0))
+                    doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            # Add caption
+            caption = doc.add_paragraph('Figure 3: Crack surface photographs')
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption.runs[0].font.size = Pt(10)
+            caption.runs[0].font.italic = True
+
+            doc.add_paragraph()
+
+        # Validity Assessment (same style as CTOD/KIC)
+        doc.add_heading('Validity Assessment per ASTM E647', level=1)
+
+        validity_status = data.get('is_valid', '-')
+
+        # Validity statement paragraph
+        if validity_status == 'VALID':
+            validity_text = "The test meets all validity requirements of ASTM E647. The Paris law coefficients are valid for the tested ΔK range."
+        else:
+            validity_text = "The test data should be reviewed. See validity notes below."
+
+        status_para = doc.add_paragraph()
+        status_run = status_para.add_run(f"Status: {validity_status}")
+        status_run.bold = True
+
+        doc.add_paragraph(validity_text)
+
+        # List validity notes if any
+        validity_notes = data.get('validity_notes', '')
+        if validity_notes and validity_notes != 'All checks passed':
+            notes_para = doc.add_paragraph()
+            notes_para.add_run("Validity Notes:").bold = True
+            for note in validity_notes.split('\n'):
+                if note.strip():
+                    doc.add_paragraph(f"• {note.strip()}")
+
+        doc.add_paragraph()
+
+        # Approval Signatures (4 rows like CTOD/KIC)
+        doc.add_heading('Approval', level=1)
+        sig_table = doc.add_table(rows=4, cols=4)
+        sig_table.style = 'Table Grid'
+
+        sig_headers = ['Role', 'Name', 'Signature', 'Date']
+        for i, header in enumerate(sig_headers):
+            sig_table.rows[0].cells[i].text = header
+            sig_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+        sig_table.rows[1].cells[0].text = 'Tested by:'
+        sig_table.rows[2].cells[0].text = 'Reviewed by:'
+        sig_table.rows[3].cells[0].text = 'Approved by:'
+
+        doc.add_paragraph()
+
+        # Footer with generation timestamp
+        footer_para = doc.add_paragraph()
+        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        footer_run = footer_para.add_run(
+            f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} | ASTM E647 FCGR Test Report"
+        )
+        footer_run.font.size = Pt(9)
+
+        return doc
+
+    def _format_value(self, value) -> str:
+        """Format a value for display."""
+        if value is None or value == '-':
+            return '-'
+        if isinstance(value, float):
+            if abs(value) < 0.0001 or abs(value) > 10000:
+                return f"{value:.4e}"
+            elif abs(value) < 1:
+                return f"{value:.4f}"
+            else:
+                return f"{value:.2f}"
+        return str(value)
 
     def _replace_in_paragraph(
         self,

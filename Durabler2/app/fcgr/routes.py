@@ -691,9 +691,10 @@ def report(test_id):
             template_path = Path(current_app.root_path).parent / 'templates' / 'fcgr_e647_report_template.docx'
             logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
 
+            # Template is optional - will fall back to from-scratch generation
             if not template_path.exists():
-                flash(f'Template not found: {template_path}', 'danger')
-                return redirect(url_for('fcgr.view', test_id=test_id))
+                template_path = None
+                current_app.logger.info('FCGR template not found, using from-scratch generation')
 
             # Generate plots for report
             plot1_path = None
