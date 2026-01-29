@@ -100,8 +100,8 @@
                             <dt class="col-5">Test Standard:</dt>
                             <dd class="col-7">{{ cert.test_standard or '-' }}</dd>
 
-                            <dt class="col-5">Test Project:</dt>
-                            <dd class="col-7">{{ cert.test_project or '-' }}</dd>
+                            <dt class="col-5">Provningsorder:</dt>
+                            <dd class="col-7">{{ cert.provningsorder or '-' }}</dd>
 
                             <dt class="col-5">Project Name:</dt>
                             <dd class="col-7">{{ cert.project_name or '-' }}</dd>
@@ -126,26 +126,32 @@
             </div>
         </div>
 
-        <!-- Specimen Information -->
+        <!-- Test Article Information -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-box"></i> Specimen Information</h5>
+                <h5 class="mb-0"><i class="bi bi-box"></i> Test Article Information</h5>
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
                         <dl class="row">
-                            <dt class="col-5">Material:</dt>
+                            <dt class="col-5">Material / HT:</dt>
                             <dd class="col-7">{{ cert.material or '-' }}</dd>
 
-                            <dt class="col-5">Specimen ID:</dt>
-                            <dd class="col-7">{{ cert.specimen_id or '-' }}</dd>
+                            <dt class="col-5">Test Article S/N:</dt>
+                            <dd class="col-7">{{ cert.test_article_sn or '-' }}</dd>
+
+                            <dt class="col-5">Customer Specimen:</dt>
+                            <dd class="col-7">{{ cert.customer_specimen_info or '-' }}</dd>
                         </dl>
                     </div>
                     <div class="col-md-6">
                         <dl class="row">
                             <dt class="col-5">Location/Orient.:</dt>
                             <dd class="col-7">{{ cert.location_orientation or '-' }}</dd>
+
+                            <dt class="col-5">Requirement:</dt>
+                            <dd class="col-7">{{ cert.requirement or '-' }}</dd>
 
                             <dt class="col-5">Temperature:</dt>
                             <dd class="col-7">{{ cert.temperature or '-' }}</dd>
@@ -297,6 +303,11 @@
             <a href="{{ url_for('certificates.edit', cert_id=cert.id) }}" class="btn btn-primary">
                 <i class="bi bi-pencil"></i> Edit Certificate
             </a>
+            <form method="POST" action="{{ url_for('certificates.copy', cert_id=cert.id) }}" class="d-inline">
+                <button type="submit" class="btn btn-outline-success" title="Create a new certificate with copied data">
+                    <i class="bi bi-copy"></i> Copy to New
+                </button>
+            </form>
             <form method="POST" action="{{ url_for('certificates.create_revision', cert_id=cert.id) }}" class="d-inline">
                 <button type="submit" class="btn btn-outline-info">
                     <i class="bi bi-files"></i> Create Revision

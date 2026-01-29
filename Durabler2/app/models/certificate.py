@@ -31,7 +31,7 @@ class Certificate(db.Model):
     cert_date = db.Column(db.Date)
 
     # Test information
-    test_project = db.Column(db.String(100))
+    provningsorder = db.Column(db.String(100))  # Test order (previously test_project)
     project_name = db.Column(db.String(100))
     test_standard = db.Column(db.String(50))
 
@@ -43,8 +43,10 @@ class Certificate(db.Model):
     product = db.Column(db.String(100))
     product_sn = db.Column(db.String(50))
     material = db.Column(db.String(100))
-    specimen_id = db.Column(db.String(50))
+    test_article_sn = db.Column(db.String(100))  # Test article S/N (previously specimen_id)
+    customer_specimen_info = db.Column(db.String(200))  # Customer specimen info
     location_orientation = db.Column(db.String(100))
+    requirement = db.Column(db.String(200))  # Test requirements
     temperature = db.Column(db.String(20))
 
     # Comment
@@ -67,6 +69,25 @@ class Certificate(db.Model):
     __table_args__ = (
         db.UniqueConstraint('year', 'cert_id', 'revision', name='uq_cert_year_id_rev'),
     )
+
+    # Backwards compatibility properties
+    @property
+    def test_project(self):
+        """Backwards compatibility - alias for provningsorder."""
+        return self.provningsorder
+
+    @test_project.setter
+    def test_project(self, value):
+        self.provningsorder = value
+
+    @property
+    def specimen_id(self):
+        """Backwards compatibility - alias for test_article_sn."""
+        return self.test_article_sn
+
+    @specimen_id.setter
+    def specimen_id(self, value):
+        self.test_article_sn = value
 
     @property
     def certificate_number(self) -> str:

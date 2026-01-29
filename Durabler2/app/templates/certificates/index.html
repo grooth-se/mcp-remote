@@ -93,7 +93,7 @@
                     <tr>
                         <th>Certificate No.</th>
                         <th>Date</th>
-                        <th>Project</th>
+                        <th>Provningsorder</th>
                         <th>Customer</th>
                         <th>Standard</th>
                         <th>Material</th>
@@ -111,7 +111,7 @@
                             </a>
                         </td>
                         <td>{{ cert.cert_date.strftime('%Y-%m-%d') if cert.cert_date else '-' }}</td>
-                        <td>{{ cert.test_project or '-' }}</td>
+                        <td>{{ cert.provningsorder or '-' }}</td>
                         <td>{{ cert.customer or '-' }}</td>
                         <td><small>{{ cert.test_standard or '-' }}</small></td>
                         <td><small>{{ cert.material or '-' }}</small></td>

@@ -24,12 +24,13 @@ class CertificateForm(FlaskForm):
     cert_date = DateField('Date', validators=[Optional()])
 
     # Test information
-    test_project = StringField('Test Project', validators=[Optional()])
+    provningsorder = StringField('Provningsorder', validators=[Optional()])
     project_name = StringField('Project Name', validators=[Optional()])
     test_standard = SelectField('Test Standard', choices=[
         ('', '-- Select --'),
         ('ASTM E8/E8M', 'ASTM E8/E8M - Tensile'),
         ('ISO 6892-1', 'ISO 6892-1 - Tensile'),
+        ('ASTM E23', 'ASTM E23 - Charpy'),
         ('ASTM E1875', 'ASTM E1875 - Sonic Resonance'),
         ('ASTM E647', 'ASTM E647 - FCGR'),
         ('ASTM E1820', 'ASTM E1820 - CTOD/J-Integral'),
@@ -47,9 +48,11 @@ class CertificateForm(FlaskForm):
     # Product/Specimen information
     product = StringField('Product', validators=[Optional()])
     product_sn = StringField('Product S/N', validators=[Optional()])
-    material = StringField('Material', validators=[Optional()])
-    specimen_id = StringField('Specimen ID', validators=[Optional()])
+    material = StringField('Material / HT', validators=[Optional()])
+    test_article_sn = StringField('Test Article S/N', validators=[Optional()])
+    customer_specimen_info = StringField('Customer Specimen Info', validators=[Optional()])
     location_orientation = StringField('Location/Orientation', validators=[Optional()])
+    requirement = StringField('Requirement', validators=[Optional()])
     temperature = StringField('Temperature', validators=[Optional()])
 
     # Comment

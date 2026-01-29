@@ -82,8 +82,8 @@
                         <div class="card-header"><h6 class="mb-0">Test Information</h6></div>
                         <div class="card-body">
                             <div class="mb-3">
-                                {{ form.test_project.label(class="form-label") }}
-                                {{ form.test_project(class="form-control") }}
+                                {{ form.provningsorder.label(class="form-label") }}
+                                {{ form.provningsorder(class="form-control") }}
                             </div>
                             <div class="mb-3">
                                 {{ form.project_name.label(class="form-label") }}
@@ -105,10 +105,10 @@
                     </div>
                 </div>
 
-                <!-- Column 3: Specimen Information -->
+                <!-- Column 3: Test Article Information -->
                 <div class="col-md-3">
                     <div class="card mb-3">
-                        <div class="card-header"><h6 class="mb-0">Specimen Information</h6></div>
+                        <div class="card-header"><h6 class="mb-0">Test Article Information</h6></div>
                         <div class="card-body">
                             <div class="mb-3">
                                 {{ form.product.label(class="form-label") }}
@@ -123,12 +123,20 @@
                                 {{ form.material(class="form-control") }}
                             </div>
                             <div class="mb-3">
-                                {{ form.specimen_id.label(class="form-label") }}
-                                {{ form.specimen_id(class="form-control") }}
+                                {{ form.test_article_sn.label(class="form-label") }}
+                                {{ form.test_article_sn(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.customer_specimen_info.label(class="form-label") }}
+                                {{ form.customer_specimen_info(class="form-control") }}
                             </div>
                             <div class="mb-3">
                                 {{ form.location_orientation.label(class="form-label") }}
                                 {{ form.location_orientation(class="form-control") }}
+                            </div>
+                            <div class="mb-3">
+                                {{ form.requirement.label(class="form-label") }}
+                                {{ form.requirement(class="form-control") }}
                             </div>
                             <div class="mb-3">
                                 {{ form.temperature.label(class="form-label") }}

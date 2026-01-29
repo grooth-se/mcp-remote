@@ -36,12 +36,13 @@ def index():
         search_pattern = f'%{search_term}%'
         query = query.filter(
             db.or_(
-                Certificate.test_project.ilike(search_pattern),
+                Certificate.provningsorder.ilike(search_pattern),
                 Certificate.project_name.ilike(search_pattern),
                 Certificate.customer.ilike(search_pattern),
                 Certificate.customer_order.ilike(search_pattern),
                 Certificate.product_sn.ilike(search_pattern),
-                Certificate.specimen_id.ilike(search_pattern),
+                Certificate.test_article_sn.ilike(search_pattern),
+                Certificate.customer_specimen_info.ilike(search_pattern),
                 Certificate.material.ilike(search_pattern),
                 Certificate.comment.ilike(search_pattern)
             )
@@ -99,7 +100,7 @@ def new():
             cert_id=form.cert_id.data,
             revision=form.revision.data,
             cert_date=form.cert_date.data,
-            test_project=form.test_project.data,
+            provningsorder=form.provningsorder.data,
             project_name=form.project_name.data,
             test_standard=form.test_standard.data,
             customer=form.customer.data,
@@ -107,8 +108,10 @@ def new():
             product=form.product.data,
             product_sn=form.product_sn.data,
             material=form.material.data,
-            specimen_id=form.specimen_id.data,
+            test_article_sn=form.test_article_sn.data,
+            customer_specimen_info=form.customer_specimen_info.data,
             location_orientation=form.location_orientation.data,
+            requirement=form.requirement.data,
             temperature=form.temperature.data,
             comment=form.comment.data,
             reported=form.reported.data,
@@ -162,7 +165,7 @@ def edit(cert_id):
         old_values = {
             'certificate_number': cert.certificate_number,
             'customer': cert.customer,
-            'test_project': cert.test_project
+            'provningsorder': cert.provningsorder
         }
 
         # Update certificate
@@ -170,7 +173,7 @@ def edit(cert_id):
         cert.cert_id = form.cert_id.data
         cert.revision = form.revision.data
         cert.cert_date = form.cert_date.data
-        cert.test_project = form.test_project.data
+        cert.provningsorder = form.provningsorder.data
         cert.project_name = form.project_name.data
         cert.test_standard = form.test_standard.data
         cert.customer = form.customer.data
@@ -178,8 +181,10 @@ def edit(cert_id):
         cert.product = form.product.data
         cert.product_sn = form.product_sn.data
         cert.material = form.material.data
-        cert.specimen_id = form.specimen_id.data
+        cert.test_article_sn = form.test_article_sn.data
+        cert.customer_specimen_info = form.customer_specimen_info.data
         cert.location_orientation = form.location_orientation.data
+        cert.requirement = form.requirement.data
         cert.temperature = form.temperature.data
         cert.comment = form.comment.data
         cert.reported = form.reported.data
@@ -217,7 +222,7 @@ def create_revision(cert_id):
         cert_id=cert.cert_id,
         revision=cert.revision + 1,
         cert_date=date.today(),
-        test_project=cert.test_project,
+        provningsorder=cert.provningsorder,
         project_name=cert.project_name,
         test_standard=cert.test_standard,
         customer=cert.customer,
@@ -225,8 +230,10 @@ def create_revision(cert_id):
         product=cert.product,
         product_sn=cert.product_sn,
         material=cert.material,
-        specimen_id=cert.specimen_id,
+        test_article_sn=cert.test_article_sn,
+        customer_specimen_info=cert.customer_specimen_info,
         location_orientation=cert.location_orientation,
+        requirement=cert.requirement,
         temperature=cert.temperature,
         comment=f"Revision of {cert.certificate_number_with_rev}",
         reported=False,
@@ -252,6 +259,62 @@ def create_revision(cert_id):
     db.session.commit()
 
     flash(f'Created revision {new_cert.certificate_number_with_rev}', 'success')
+    return redirect(url_for('certificates.edit', cert_id=new_cert.id))
+
+
+@certificates_bp.route('/<int:cert_id>/copy', methods=['POST'])
+@login_required
+def copy(cert_id):
+    """Copy certificate to create a new one with next available ID."""
+    cert = Certificate.query.get_or_404(cert_id)
+
+    # Get next available ID for current year
+    current_year = datetime.now().year
+    next_id = Certificate.get_next_cert_id(current_year)
+
+    # Create new certificate copying all data except cert number and status
+    new_cert = Certificate(
+        year=current_year,
+        cert_id=next_id,
+        revision=1,
+        cert_date=date.today(),
+        provningsorder=cert.provningsorder,
+        project_name=cert.project_name,
+        test_standard=cert.test_standard,
+        customer=cert.customer,
+        customer_order=cert.customer_order,
+        product=cert.product,
+        product_sn=cert.product_sn,
+        material=cert.material,
+        test_article_sn=cert.test_article_sn,
+        customer_specimen_info=cert.customer_specimen_info,
+        location_orientation=cert.location_orientation,
+        requirement=cert.requirement,
+        temperature=cert.temperature,
+        comment=f"Copy of {cert.certificate_number_with_rev}",
+        reported=False,
+        invoiced=False,
+        created_by_id=current_user.id
+    )
+
+    db.session.add(new_cert)
+
+    # Audit log
+    audit = AuditLog(
+        user_id=current_user.id,
+        action='COPY',
+        table_name='certificates',
+        new_values={
+            'certificate_number': new_cert.certificate_number,
+            'copied_from': cert.certificate_number_with_rev
+        },
+        ip_address=request.remote_addr
+    )
+    db.session.add(audit)
+
+    db.session.commit()
+
+    flash(f'Created {new_cert.certificate_number} (copy of {cert.certificate_number})', 'success')
     return redirect(url_for('certificates.edit', cert_id=new_cert.id))
 
 
@@ -312,10 +375,10 @@ def search():
     else:
         certs = Certificate.query.filter(
             db.or_(
-                Certificate.test_project.ilike(pattern),
+                Certificate.provningsorder.ilike(pattern),
                 Certificate.customer.ilike(pattern),
                 Certificate.product_sn.ilike(pattern),
-                Certificate.specimen_id.ilike(pattern)
+                Certificate.test_article_sn.ilike(pattern)
             )
         ).order_by(Certificate.year.desc(), Certificate.cert_id.desc()).limit(10).all()
 
@@ -324,7 +387,7 @@ def search():
         'certificate_number': c.certificate_number,
         'certificate_number_with_rev': c.certificate_number_with_rev,
         'customer': c.customer or '',
-        'test_project': c.test_project or ''
+        'provningsorder': c.provningsorder or ''
     } for c in certs])
 
 
@@ -372,12 +435,14 @@ def import_excel():
                 'Date': 'cert_date',
                 'Product': 'product',
                 'Product S/N': 'product_sn',
-                'Test Project': 'test_project',
+                'Provningsorder': 'provningsorder',
                 'Project name': 'project_name',
                 'Test standard': 'test_standard',
                 'Material/ HT': 'material',
-                'Specimen ID': 'specimen_id',
+                'Test article SN': 'test_article_sn',
+                'Customer Specimen Info': 'customer_specimen_info',
                 'Location/orient.:': 'location_orientation',
+                'Requirement': 'requirement',
                 'Temperature': 'temperature',
                 'Customer': 'customer',
                 'Customer order': 'customer_order',
@@ -429,31 +494,42 @@ def import_excel():
                         db.session.add(cert)
 
                     # Set other fields
-                    cert_date = row_data[col_map.get('cert_date', 4)]
+                    cert_date = row_data[col_map.get('cert_date')] if col_map.get('cert_date') is not None else None
                     if cert_date:
                         if isinstance(cert_date, datetime):
                             cert.cert_date = cert_date.date()
                         elif isinstance(cert_date, date):
                             cert.cert_date = cert_date
 
-                    cert.product = str(row_data[col_map.get('product', 5)] or '') if col_map.get('product') else ''
-                    cert.product_sn = str(row_data[col_map.get('product_sn', 6)] or '') if col_map.get('product_sn') else ''
-                    cert.test_project = str(row_data[col_map.get('test_project', 7)] or '') if col_map.get('test_project') else ''
-                    cert.project_name = str(row_data[col_map.get('project_name', 8)] or '') if col_map.get('project_name') else ''
-                    cert.test_standard = str(row_data[col_map.get('test_standard', 9)] or '') if col_map.get('test_standard') else ''
-                    cert.material = str(row_data[col_map.get('material', 10)] or '') if col_map.get('material') else ''
-                    cert.specimen_id = str(row_data[col_map.get('specimen_id', 11)] or '') if col_map.get('specimen_id') else ''
-                    cert.location_orientation = str(row_data[col_map.get('location_orientation', 12)] or '') if col_map.get('location_orientation') else ''
-                    cert.temperature = str(row_data[col_map.get('temperature', 13)] or '') if col_map.get('temperature') else ''
-                    cert.customer = str(row_data[col_map.get('customer', 14)] or '') if col_map.get('customer') else ''
-                    cert.customer_order = str(row_data[col_map.get('customer_order', 15)] or '') if col_map.get('customer_order') else ''
-                    cert.comment = str(row_data[col_map.get('comment', 16)] or '') if col_map.get('comment') else ''
+                    # Helper to get string value from column
+                    def get_str(field):
+                        idx = col_map.get(field)
+                        if idx is not None and idx < len(row_data):
+                            return str(row_data[idx] or '')
+                        return ''
 
-                    # Boolean fields
-                    reported = row_data[col_map.get('reported', 17)] if col_map.get('reported') else None
-                    invoiced = row_data[col_map.get('invoiced', 18)] if col_map.get('invoiced') else None
-                    cert.reported = bool(reported) if reported else False
-                    cert.invoiced = bool(invoiced) if invoiced else False
+                    cert.product = get_str('product')
+                    cert.product_sn = get_str('product_sn')
+                    cert.provningsorder = get_str('provningsorder')
+                    cert.project_name = get_str('project_name')
+                    cert.test_standard = get_str('test_standard')
+                    cert.material = get_str('material')
+                    cert.test_article_sn = get_str('test_article_sn')
+                    cert.customer_specimen_info = get_str('customer_specimen_info')
+                    cert.location_orientation = get_str('location_orientation')
+                    cert.requirement = get_str('requirement')
+                    cert.temperature = get_str('temperature')
+                    cert.customer = get_str('customer')
+                    cert.customer_order = get_str('customer_order')
+                    cert.comment = get_str('comment')
+
+                    # Boolean fields - 'X' or 'x' means True
+                    reported_idx = col_map.get('reported')
+                    invoiced_idx = col_map.get('invoiced')
+                    reported = row_data[reported_idx] if reported_idx is not None and reported_idx < len(row_data) else None
+                    invoiced = row_data[invoiced_idx] if invoiced_idx is not None and invoiced_idx < len(row_data) else None
+                    cert.reported = str(reported).upper() == 'X' if reported else False
+                    cert.invoiced = str(invoiced).upper() == 'X' if invoiced else False
 
                     imported += 1
 
