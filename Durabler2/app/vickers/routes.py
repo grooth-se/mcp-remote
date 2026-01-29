@@ -133,11 +133,21 @@ def new():
         form.certificate_id.data = cert_id
         cert = Certificate.query.get(cert_id)
         if cert:
-            # Pre-fill form from certificate data
+            # Pre-fill form from certificate data (certificate register is the master)
             form.material.data = cert.material
-            form.specimen_id.data = cert.specimen_id
-            form.temperature.data = float(cert.temperature) if cert.temperature else 23.0
+            form.specimen_id.data = cert.test_article_sn  # Specimen SN
+            form.customer_specimen_info.data = cert.customer_specimen_info
+            form.requirement.data = cert.requirement
             form.location_orientation.data = cert.location_orientation
+            # Parse temperature - handle string format
+            if cert.temperature:
+                try:
+                    temp_str = cert.temperature.replace('°C', '').replace('C', '').strip()
+                    form.temperature.data = float(temp_str)
+                except (ValueError, AttributeError):
+                    form.temperature.data = 23.0
+            else:
+                form.temperature.data = 23.0
 
     if form.validate_on_submit():
         # Link to certificate if selected

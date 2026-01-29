@@ -128,14 +128,25 @@ def new():
     selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else cert_id
     certificate = Certificate.query.get(selected_cert_id) if selected_cert_id else None
 
-    # Pre-fill from certificate
+    # Pre-fill from certificate (certificate register is the master)
     if request.method == 'GET' and certificate:
         if certificate.material:
             form.material.data = certificate.material
-        if certificate.specimen_id:
-            form.specimen_id.data = certificate.specimen_id
+        if certificate.test_article_sn:
+            form.specimen_id.data = certificate.test_article_sn  # Specimen SN
         if certificate.product_sn:
             form.batch_number.data = certificate.product_sn
+        if certificate.customer_specimen_info:
+            form.customer_specimen_info.data = certificate.customer_specimen_info
+        if certificate.requirement:
+            form.requirement.data = certificate.requirement
+        # Parse temperature - handle string format
+        if certificate.temperature:
+            try:
+                temp_str = certificate.temperature.replace('°C', '').replace('C', '').strip()
+                form.test_temperature.data = float(temp_str)
+            except (ValueError, AttributeError):
+                form.test_temperature.data = 23.0
 
     if form.validate_on_submit():
         try:

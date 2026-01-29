@@ -28,9 +28,13 @@ class SpecimenForm(FlaskForm):
     - Yield point method: ReH, ReL
     """
     # Specimen identification
-    specimen_id = StringField('Specimen ID', validators=[DataRequired()])
+    specimen_id = StringField('Specimen SN', validators=[DataRequired()])
     material = StringField('Material', validators=[Optional()])
     batch_number = StringField('Batch/Heat Number', validators=[Optional()])
+
+    # Additional certificate fields
+    customer_specimen_info = StringField('Customer Specimen Info', validators=[Optional()])
+    requirement = StringField('Requirement', validators=[Optional()])
 
     # Specimen type
     specimen_type = SelectField('Specimen Type', choices=[

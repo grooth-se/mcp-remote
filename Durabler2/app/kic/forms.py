@@ -13,8 +13,12 @@ class SpecimenForm(FlaskForm):
 
     # Test identification
     test_id = StringField('Test ID', validators=[DataRequired()])
-    specimen_id = StringField('Specimen ID', validators=[Optional()])
+    specimen_id = StringField('Specimen SN', validators=[Optional()])
     certificate_id = SelectField('Link to Certificate', coerce=int, validators=[Optional()])
+
+    # Additional certificate fields (for display/reference)
+    customer_specimen_info = StringField('Customer Specimen Info', validators=[Optional()])
+    requirement = StringField('Requirement', validators=[Optional()])
 
     # Specimen type
     specimen_type = SelectField(

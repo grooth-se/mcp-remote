@@ -256,12 +256,16 @@ def specimen():
     if request.method == 'GET':
         if csv_info.get('test_run_name'):
             form.specimen_id.data = csv_info['test_run_name']
-        # Pre-fill from certificate if linked
+        # Pre-fill from certificate if linked (certificate register is the master)
         if certificate:
             if certificate.material:
                 form.material.data = certificate.material
-            if certificate.specimen_id:
-                form.specimen_id.data = certificate.specimen_id
+            if certificate.test_article_sn:
+                form.specimen_id.data = certificate.test_article_sn  # Specimen SN
+            if certificate.customer_specimen_info:
+                form.customer_specimen_info.data = certificate.customer_specimen_info
+            if certificate.requirement:
+                form.requirement.data = certificate.requirement
             if certificate.test_standard:
                 # Map certificate standard to form choices
                 std_map = {
@@ -269,6 +273,13 @@ def specimen():
                     'ISO 6892-1': 'ISO 6892-1:2019'
                 }
                 form.test_standard.data = std_map.get(certificate.test_standard, form.test_standard.data)
+            # Parse temperature - handle string format
+            if certificate.temperature:
+                try:
+                    temp_str = certificate.temperature.replace('°C', '').replace('C', '').strip()
+                    form.test_temperature.data = float(temp_str)
+                except (ValueError, AttributeError):
+                    pass
 
     if form.validate_on_submit():
         try:
