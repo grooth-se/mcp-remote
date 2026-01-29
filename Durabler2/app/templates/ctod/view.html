@@ -96,6 +96,12 @@
                         </td>
                     </tr>
                     <tr>
+                        <td>V<sub>p</sub> (Plastic CMOD)</td>
+                        <td class="text-end">
+                            {{ "%.4f"|format(Vp) if Vp else '-' }} mm
+                        </td>
+                    </tr>
+                    <tr>
                         <td>K<sub>max</sub></td>
                         <td class="text-end">
                             {% set K_max = results.get('K_max') %}
@@ -214,6 +220,78 @@
                 <p class="text-muted small mt-2 mb-0">
                     Average: {{ "%.3f"|format(geometry.get('a_0', 0)) }} mm (using weighted formula per E1290)
                 </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Pre-crack Compliance -->
+        {% if geometry.get('precrack') %}
+        <div class="card mb-4">
+            <div class="card-header {% if geometry.precrack.compliance.is_valid %}bg-success{% else %}bg-warning{% endif %} text-white">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Pre-crack Compliance (E1820)</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr><td>Pre-crack Cycles</td><td class="text-end">{{ "{:,}".format(geometry.precrack.total_cycles|int) }}</td></tr>
+                    <tr><td>Kmax during pre-crack</td><td class="text-end">{{ "%.2f"|format(geometry.precrack.K_max) }} MPa√m</td></tr>
+                    <tr><td>Load Ratio (R)</td><td class="text-end">{{ "%.2f"|format(geometry.precrack.load_ratio) }}</td></tr>
+                </table>
+                <h6>Compliance Checks</h6>
+                <ul class="list-group list-group-flush">
+                    {% for check in geometry.precrack.compliance.checks %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                        <span>{{ check.name }}<br><small class="text-muted">{{ check.requirement }}</small></span>
+                        <span class="badge {% if check.passed %}bg-success{% else %}bg-danger{% endif %}">
+                            {% if check.passed %}PASS{% else %}FAIL{% endif %}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Uncertainty Budget -->
+        {% if geometry.get('uncertainty_budget') %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Uncertainty Budget (ISO 17025)</h5>
+            </div>
+            <div class="card-body">
+                <h6>Input Uncertainties</h6>
+                <table class="table table-sm">
+                    <thead><tr><th>Source</th><th>Type</th><th class="text-end">Value</th></tr></thead>
+                    <tbody>
+                        <tr><td>Force measurement</td><td>B</td><td class="text-end">{{ geometry.uncertainty_inputs.force_pct }} %</td></tr>
+                        <tr><td>CMOD measurement</td><td>B</td><td class="text-end">{{ geometry.uncertainty_inputs.displacement_pct }} %</td></tr>
+                        <tr><td>Specimen dimensions</td><td>B</td><td class="text-end">{{ geometry.uncertainty_inputs.dimension_pct }} %</td></tr>
+                    </tbody>
+                </table>
+                <h6>Combined Uncertainty</h6>
+                <table class="table table-sm">
+                    <tr><td>Combined standard uncertainty (uc)</td><td class="text-end">{{ "%.2f"|format(geometry.uncertainty_budget.combined) }} %</td></tr>
+                    <tr><td>Coverage factor (k)</td><td class="text-end">{{ geometry.uncertainty_budget.coverage_factor }}</td></tr>
+                    <tr class="table-warning"><td><strong>Expanded uncertainty (U)</strong></td><td class="text-end"><strong>{{ "%.2f"|format(geometry.uncertainty_budget.expanded) }} %</strong></td></tr>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Crack Surface Photos -->
+        {% if photo_urls %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-camera"></i> Crack Surface Photos</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for photo in photo_urls %}
+                    <div class="col-md-4 mb-3">
+                        <img src="{{ photo.url }}" class="img-fluid rounded" alt="Crack photo">
+                        {% if photo.description %}<p class="small text-muted mt-1 mb-0">{{ photo.description }}</p>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
         {% endif %}

@@ -115,6 +115,43 @@ class SpecimenForm(FlaskForm):
         ('ISO 12135', 'ISO 12135')
     ])
 
+    # Pre-crack data
+    precrack_csv_file = FileField('Pre-crack Test Data (CSV)', validators=[
+        Optional(),
+        FileAllowed(['csv'], 'CSV files only')
+    ])
+
+    # Crack surface photos
+    photo_1 = FileField('Crack Photo 1', validators=[
+        Optional(),
+        FileAllowed(['jpg', 'jpeg', 'png'], 'Image files only')
+    ])
+    photo_2 = FileField('Crack Photo 2', validators=[
+        Optional(),
+        FileAllowed(['jpg', 'jpeg', 'png'], 'Image files only')
+    ])
+    photo_3 = FileField('Crack Photo 3', validators=[
+        Optional(),
+        FileAllowed(['jpg', 'jpeg', 'png'], 'Image files only')
+    ])
+    photo_description_1 = StringField('Photo 1 Description', validators=[Optional()])
+    photo_description_2 = StringField('Photo 2 Description', validators=[Optional()])
+    photo_description_3 = StringField('Photo 3 Description', validators=[Optional()])
+
+    # Uncertainty parameters (ISO 17025)
+    force_uncertainty = FloatField('Force Uncertainty (%)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=10, message='Typically 0.5-2%')
+    ], default=1.0)
+    displacement_uncertainty = FloatField('Displacement Uncertainty (%)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=10)
+    ], default=1.0)
+    dimension_uncertainty = FloatField('Dimension Uncertainty (%)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=5)
+    ], default=0.5)
+
     # Notes
     notes = TextAreaField('Notes', validators=[Optional()])
 

@@ -26,6 +26,7 @@ from utils.data_acquisition.fcgr_excel_parser import parse_fcgr_excel
 from utils.data_acquisition.fcgr_csv_parser import (
     parse_fcgr_csv, extract_cycle_extrema, calculate_compliance_per_cycle
 )
+from utils.data_acquisition.precrack_csv_parser import parse_precrack_csv, validate_precrack_compliance
 from utils.reporting.fcgr_word_report import FCGRReportGenerator
 
 
@@ -47,18 +48,25 @@ def create_crack_length_plot(cycles, crack_lengths, specimen_id):
         x=cycles,
         y=crack_lengths,
         mode='lines+markers',
-        name='Crack Length',
+        name='Crack Length, a (mm)',
         marker=dict(size=4, color='darkred'),
         line=dict(width=1.5, color='darkred')
     ))
+
+    # Y-axis: 1 mm tick intervals, start at 0
+    y_max = max(crack_lengths) if len(crack_lengths) > 0 else 1
+    y_range_max = y_max * 1.05  # 5% margin
 
     fig.update_layout(
         title=f'Crack Length vs Cycles - {specimen_id}',
         xaxis_title='Cycles (N)',
         yaxis_title='Crack Length, a (mm)',
+        xaxis=dict(range=[0, None]),  # Start X-axis at 0
+        yaxis=dict(range=[0, y_range_max], dtick=1),  # Start Y-axis at 0, 1 mm steps
         template='plotly_white',
         height=400,
-        showlegend=False
+        showlegend=True,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
 
     return pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
@@ -111,7 +119,7 @@ def create_paris_law_plot(delta_K, da_dN, paris_result, paris_initial, outlier_m
             line=dict(width=2, color='black')
         ))
 
-    # Plot initial regression line (all data) - thin grey dashed
+    # Plot initial regression line (all data) - thin grey dotted
     if paris_initial and paris_initial.C > 0 and paris_initial.m > 0:
         dK_range_init = np.logspace(
             np.log10(paris_initial.delta_K_range[0] * 0.9),
@@ -124,19 +132,21 @@ def create_paris_law_plot(delta_K, da_dN, paris_result, paris_initial, outlier_m
             x=dK_range_init,
             y=dadN_fit_init,
             mode='lines',
-            name=f'Initial Fit (all data)',
-            line=dict(width=1, color='grey', dash='dash')
+            name=f'Initial Fit: C={paris_initial.C:.2e}, m={paris_initial.m:.2f}',
+            line=dict(width=1, color='grey', dash='dot')
         ))
 
     fig.update_layout(
         title=f'Paris Law Plot - {specimen_id}',
         xaxis_title='ΔK (MPa√m)',
         yaxis_title='da/dN (mm/cycle)',
-        xaxis_type='log',
-        yaxis_type='log',
+        xaxis=dict(type='log', showgrid=True, gridwidth=1, gridcolor='lightgrey',
+                   minor=dict(showgrid=True, gridwidth=0.5, gridcolor='#f0f0f0')),
+        yaxis=dict(type='log', showgrid=True, gridwidth=1, gridcolor='lightgrey',
+                   minor=dict(showgrid=True, gridwidth=0.5, gridcolor='#f0f0f0')),
         template='plotly_white',
         height=450,
-        legend=dict(yanchor="bottom", y=0.01, xanchor="left", x=0.01)
+        legend=dict(yanchor="bottom", y=0.01, xanchor="right", x=0.99)
     )
 
     return pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
@@ -469,6 +479,90 @@ def specimen():
                 'delta_K': [float(p.delta_K) for p in results.data_points],
                 'da_dN': [float(p.da_dN) for p in results.data_points],
                 'outlier_mask': [bool(p.is_outlier) for p in results.data_points],
+                # Initial Paris law fit (before outlier removal)
+                'paris_initial_C': float(results.paris_law_initial.C) if results.paris_law_initial else None,
+                'paris_initial_m': float(results.paris_law_initial.m) if results.paris_law_initial else None,
+                'paris_initial_dK_min': float(results.paris_law_initial.delta_K_range[0]) if results.paris_law_initial else None,
+                'paris_initial_dK_max': float(results.paris_law_initial.delta_K_range[1]) if results.paris_law_initial else None,
+            }
+
+            # Handle photo uploads (save to static/uploads for serving)
+            photos = []
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            photos_folder = Path(current_app.root_path) / 'static' / 'uploads'
+            photos_folder.mkdir(parents=True, exist_ok=True)
+            for i in range(1, 4):
+                photo_field = getattr(form, f'photo_{i}', None)
+                desc_field = getattr(form, f'photo_description_{i}', None)
+                if photo_field and photo_field.data:
+                    photo = photo_field.data
+                    filename = secure_filename(photo.filename)
+                    filename = f"fcgr_{timestamp}_{i}_{filename}"
+                    filepath = photos_folder / filename
+                    photo.save(filepath)
+                    photos.append({
+                        'filename': filename,
+                        'description': desc_field.data if desc_field else ''
+                    })
+            if photos:
+                geometry['photos'] = photos
+
+            # Handle pre-crack CSV
+            if form.precrack_csv_file.data:
+                precrack_file = form.precrack_csv_file.data
+                precrack_filename = secure_filename(precrack_file.filename)
+                precrack_path = Path(current_app.config['UPLOAD_FOLDER']) / f"precrack_{timestamp}_{precrack_filename}"
+                precrack_file.save(precrack_path)
+
+                # Parse pre-crack data
+                precrack_geometry = {
+                    'W': W,
+                    'B': B,
+                    'a_0': a_0,
+                    'specimen_type': specimen_type,
+                    'notch_height': notch_height,
+                    'yield_strength': yield_strength,
+                    'youngs_modulus': youngs_modulus
+                }
+                precrack_data = parse_precrack_csv(precrack_path, precrack_geometry)
+
+                # Estimate expected K for compliance check (initial test deltaK)
+                expected_K = results.data_points[0].delta_K if results.data_points else 20.0
+
+                # Validate compliance
+                precrack_compliance = validate_precrack_compliance(
+                    precrack_data,
+                    expected_K=expected_K,
+                    test_standard='ASTM E647',
+                    specimen_geometry=precrack_geometry
+                )
+
+                geometry['precrack'] = {
+                    'filename': precrack_filename,
+                    'total_cycles': precrack_data['total_cycles'],
+                    'K_max': precrack_data['K_max'],
+                    'K_min': precrack_data['K_min'],
+                    'load_ratio': precrack_data['load_ratio'],
+                    'compliance': precrack_compliance
+                }
+
+            # Store uncertainty inputs
+            geometry['uncertainty_inputs'] = {
+                'force_pct': form.force_uncertainty.data or 1.0,
+                'displacement_pct': form.displacement_uncertainty.data or 1.0,
+                'dimension_pct': form.dimension_uncertainty.data or 0.5
+            }
+
+            # Calculate uncertainty budget
+            force_u = (form.force_uncertainty.data or 1.0) / 100
+            disp_u = (form.displacement_uncertainty.data or 1.0) / 100
+            dim_u = (form.dimension_uncertainty.data or 0.5) / 100
+            # Combined uncertainty (simplified RSS for FCGR)
+            combined = (force_u**2 + disp_u**2 + 4*dim_u**2)**0.5 * 100
+            geometry['uncertainty_budget'] = {
+                'combined': combined,
+                'expanded': combined * 2,
+                'coverage_factor': 2.0
             }
 
             # Handle re-analysis vs new test
@@ -667,12 +761,35 @@ def view(test_id):
                 (dK_min.value if dK_min else 1, dK_max.value if dK_max else 100),
                 (1e-7, 1e-3)
             )
+
+            # Create initial Paris law object (before outlier removal)
+            paris_initial = None
+            paris_init_C = geometry.get('paris_initial_C')
+            paris_init_m = geometry.get('paris_initial_m')
+            paris_init_dK_min = geometry.get('paris_initial_dK_min')
+            paris_init_dK_max = geometry.get('paris_initial_dK_max')
+            if paris_init_C and paris_init_m:
+                paris_initial = MockParis(
+                    paris_init_C, paris_init_m,
+                    (paris_init_dK_min or 1, paris_init_dK_max or 100),
+                    (1e-7, 1e-3)
+                )
+
             paris_plot = create_paris_law_plot(
-                delta_K, da_dN, paris_result, None, outlier_mask, test.specimen_id
+                delta_K, da_dN, paris_result, paris_initial, outlier_mask, test.specimen_id
             )
 
+    # Build photo URLs
+    photo_urls = []
+    for photo in geometry.get('photos', []):
+        photo_urls.append({
+            'url': url_for('static', filename=f"uploads/{photo['filename']}"),
+            'description': photo.get('description', '')
+        })
+
     return render_template('fcgr/view.html', test=test, results=results,
-                          geometry=geometry, crack_plot=crack_plot, paris_plot=paris_plot)
+                          geometry=geometry, crack_plot=crack_plot, paris_plot=paris_plot,
+                          photo_urls=photo_urls)
 
 
 @fcgr_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])
@@ -817,10 +934,20 @@ def report(test_id):
             if len(cycles) > 0:
                 # Crack length plot - darkred
                 fig1, ax1 = plt.subplots(figsize=(5, 3.5))
-                ax1.plot(cycles, crack_lengths, color='darkred', linewidth=1.5, marker='o', markersize=3)
+                ax1.plot(cycles, crack_lengths, color='darkred', linewidth=1.5, marker='o', markersize=3,
+                        label='Crack Length, a (mm)')
                 ax1.set_xlabel('Cycles (N)')
                 ax1.set_ylabel('Crack Length, a (mm)')
                 ax1.set_title(f'Crack Growth - {test.specimen_id}')
+
+                # Start both axes at 0
+                ax1.set_xlim(left=0)
+                ax1.set_ylim(bottom=0)
+
+                # Y-axis with 1 mm steps
+                ax1.yaxis.set_major_locator(plt.MultipleLocator(1))
+
+                ax1.legend(fontsize=7, loc='upper left')
                 ax1.grid(True, alpha=0.3)
                 plot1_path = Path(current_app.config['UPLOAD_FOLDER']) / f'fcgr_plot1_{test_id}.png'
                 fig1.savefig(plot1_path, dpi=150, bbox_inches='tight')
@@ -839,16 +966,27 @@ def report(test_id):
                     ax2.loglog(delta_K[outlier_mask], da_dN[outlier_mask], 'x', color='grey',
                               markersize=5, label='Outliers')
 
-                # Regression line - black
+                # Initial regression line (all data) - grey dotted
+                paris_init_C = geometry.get('paris_initial_C')
+                paris_init_m = geometry.get('paris_initial_m')
+                paris_init_dK_min = geometry.get('paris_initial_dK_min')
+                paris_init_dK_max = geometry.get('paris_initial_dK_max')
+                if paris_init_C and paris_init_m:
+                    dK_fit_init = np.logspace(np.log10(paris_init_dK_min * 0.9), np.log10(paris_init_dK_max * 1.1), 100)
+                    dadN_fit_init = paris_init_C * dK_fit_init ** paris_init_m
+                    ax2.loglog(dK_fit_init, dadN_fit_init, ':', color='grey', linewidth=1,
+                              label=f'Initial: C={paris_init_C:.2e}, m={paris_init_m:.2f}')
+
+                # Final regression line (without outliers) - black solid
                 dK_fit = np.logspace(np.log10(dK_min.value * 0.9), np.log10(dK_max.value * 1.1), 100)
                 dadN_fit = paris_C.value * dK_fit ** paris_m.value
                 ax2.loglog(dK_fit, dadN_fit, '-', color='black', linewidth=2,
-                          label=f'C={paris_C.value:.2e}, m={paris_m.value:.2f}')
+                          label=f'Final: C={paris_C.value:.2e}, m={paris_m.value:.2f}')
 
                 ax2.set_xlabel('ΔK (MPa√m)')
                 ax2.set_ylabel('da/dN (mm/cycle)')
                 ax2.set_title(f'Paris Law - {test.specimen_id}')
-                ax2.legend(fontsize=8)
+                ax2.legend(fontsize=6, loc='lower right')
                 ax2.grid(True, alpha=0.3, which='both')
                 plot2_path = Path(current_app.config['UPLOAD_FOLDER']) / f'fcgr_plot2_{test_id}.png'
                 fig2.savefig(plot2_path, dpi=150, bbox_inches='tight')

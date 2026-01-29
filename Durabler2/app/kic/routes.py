@@ -19,6 +19,7 @@ from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
 # Import calculation utilities
 from utils.data_acquisition.kic_csv_parser import parse_kic_csv, KICTestData
 from utils.data_acquisition.kic_excel_parser import parse_kic_excel
+from utils.data_acquisition.precrack_csv_parser import parse_precrack_csv, validate_precrack_compliance
 from utils.analysis.kic_calculations import KICAnalyzer
 from utils.models.kic_specimen import KICSpecimen, KICMaterial
 from utils.reporting.kic_word_report import KICReportGenerator
@@ -101,13 +102,21 @@ def create_force_displacement_plot(force, displacement, P_Q=None, P_max=None, se
             marker=dict(color='grey', size=12, symbol='square-open', line=dict(width=2, color='grey'))
         ))
 
+    # Limit Y-axis to 1.1 times max force
+    import numpy as np
+    max_force = float(np.max(force)) if len(force) > 0 else 1
+    y_max = max_force * 1.1
+    y_tick = y_max / 12  # 12 steps on Y-axis
+
     fig.update_layout(
         title='Force vs Displacement (ASTM E399)',
         xaxis_title='Displacement (mm)',
         yaxis_title='Force (kN)',
+        xaxis=dict(dtick=1),  # 1 mm steps on X-axis
+        yaxis=dict(range=[0, y_max], dtick=y_tick),  # 12 steps on Y-axis
         template='plotly_white',
         showlegend=True,
-        legend=dict(yanchor='top', y=0.99, xanchor='left', x=0.01),
+        legend=dict(yanchor='top', y=0.99, xanchor='right', x=0.99),
         height=500
     )
 
@@ -438,6 +447,85 @@ def specimen():
                 'raw_data': raw_data,
             }
 
+            # Handle photo uploads (save to static/uploads for serving)
+            photos = []
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            photos_folder = Path(current_app.root_path) / 'static' / 'uploads'
+            photos_folder.mkdir(parents=True, exist_ok=True)
+            for i in range(1, 4):
+                photo_field = getattr(form, f'photo_{i}', None)
+                desc_field = getattr(form, f'photo_description_{i}', None)
+                if photo_field and photo_field.data:
+                    photo = photo_field.data
+                    filename = secure_filename(photo.filename)
+                    filename = f"kic_{timestamp}_{i}_{filename}"
+                    filepath = photos_folder / filename
+                    photo.save(filepath)
+                    photos.append({
+                        'filename': filename,
+                        'description': desc_field.data if desc_field else ''
+                    })
+            if photos:
+                geometry_data['photos'] = photos
+
+            # Handle pre-crack CSV
+            if form.precrack_csv_file.data:
+                precrack_file = form.precrack_csv_file.data
+                precrack_filename = secure_filename(precrack_file.filename)
+                precrack_path = Path(current_app.config['UPLOAD_FOLDER']) / f"precrack_{timestamp}_{precrack_filename}"
+                precrack_file.save(precrack_path)
+
+                # Parse pre-crack data
+                precrack_geometry = {
+                    'W': W,
+                    'B': B,
+                    'a_0': a_0,
+                    'specimen_type': specimen_type,
+                    'S': S,
+                    'yield_strength': yield_strength,
+                    'youngs_modulus': youngs_modulus
+                }
+                precrack_data = parse_precrack_csv(precrack_path, precrack_geometry)
+
+                # Estimate expected K for compliance check (use K_Q estimate)
+                expected_K = result.K_Q.value if result else 50.0
+
+                # Validate compliance
+                precrack_compliance = validate_precrack_compliance(
+                    precrack_data,
+                    expected_K=expected_K,
+                    test_standard='ASTM E399',
+                    specimen_geometry=precrack_geometry
+                )
+
+                geometry_data['precrack'] = {
+                    'filename': precrack_filename,
+                    'total_cycles': precrack_data['total_cycles'],
+                    'K_max': precrack_data['K_max'],
+                    'K_min': precrack_data['K_min'],
+                    'load_ratio': precrack_data['load_ratio'],
+                    'compliance': precrack_compliance
+                }
+
+            # Store uncertainty inputs
+            geometry_data['uncertainty_inputs'] = {
+                'force_pct': form.force_uncertainty.data or 1.0,
+                'displacement_pct': form.displacement_uncertainty.data or 1.0,
+                'dimension_pct': form.dimension_uncertainty.data or 0.5
+            }
+
+            # Calculate uncertainty budget
+            force_u = (form.force_uncertainty.data or 1.0) / 100
+            disp_u = (form.displacement_uncertainty.data or 1.0) / 100
+            dim_u = (form.dimension_uncertainty.data or 0.5) / 100
+            # Combined uncertainty (simplified RSS)
+            combined = (force_u**2 + disp_u**2 + 4*dim_u**2)**0.5 * 100  # approx for K
+            geometry_data['uncertainty_budget'] = {
+                'combined': combined,
+                'expanded': combined * 2,
+                'coverage_factor': 2.0
+            }
+
             # Handle re-analysis vs new test
             if reanalyze_id:
                 test = TestRecord.query.get_or_404(reanalyze_id)
@@ -628,12 +716,28 @@ def view(test_id):
             P_max=P_max
         )
 
+    # Build photo URLs
+    photo_urls = []
+    for photo in geometry_data.get('photos', []):
+        photo_urls.append({
+            'url': url_for('static', filename=f"uploads/{photo['filename']}"),
+            'description': photo.get('description', '')
+        })
+
+    # Merge geometry_data into geometry for template access
+    geometry.update({
+        'precrack': geometry_data.get('precrack'),
+        'uncertainty_inputs': geometry_data.get('uncertainty_inputs'),
+        'uncertainty_budget': geometry_data.get('uncertainty_budget'),
+    })
+
     return render_template('kic/view.html',
                            test=test,
                            geometry=geometry,
                            material_props=material_props,
                            results=results,
-                           force_disp_plot=force_disp_plot)
+                           force_disp_plot=force_disp_plot,
+                           photo_urls=photo_urls)
 
 
 @kic_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])

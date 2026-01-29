@@ -23,6 +23,7 @@ from utils.analysis.ctod_calculations import CTODAnalyzer, CTODResult
 from utils.models.ctod_specimen import CTODSpecimen, CTODMaterial
 from utils.data_acquisition.ctod_excel_parser import parse_ctod_excel
 from utils.data_acquisition.ctod_csv_parser import parse_ctod_test_csv as parse_ctod_csv
+from utils.data_acquisition.precrack_csv_parser import parse_precrack_csv, validate_precrack_compliance
 from utils.reporting.ctod_word_report import CTODReportGenerator
 
 
@@ -37,8 +38,13 @@ def generate_test_id():
 
 
 def create_force_cmod_plot(force, cmod, specimen_id, elastic_coeffs=None, ctod_points=None):
-    """Create Force vs CMOD plot with elastic line and CTOD points."""
+    """Create Force vs CMOD plot with elastic line and CTOD points.
+
+    Returns:
+        tuple: (html_string, Vp) where Vp is the plastic CMOD (mm) or None
+    """
     fig = go.Figure()
+    Vp = None  # Plastic CMOD
 
     # Main test data - darkred
     fig.add_trace(go.Scatter(
@@ -48,6 +54,12 @@ def create_force_cmod_plot(force, cmod, specimen_id, elastic_coeffs=None, ctod_p
         name='Test Data',
         line=dict(width=2, color='darkred')
     ))
+
+    # Find Pmax point
+    max_force = max(force) if len(force) > 0 else 1
+    idx_max = np.argmax(force)
+    P_max = force[idx_max]
+    V_max = cmod[idx_max]
 
     # Elastic loading line - thin grey dashed
     if elastic_coeffs is not None:
@@ -62,6 +74,31 @@ def create_force_cmod_plot(force, cmod, specimen_id, elastic_coeffs=None, ctod_p
             mode='lines',
             name='Elastic Line',
             line=dict(width=1, color='grey', dash='dash')
+        ))
+
+        # Draw parallel line through Pmax point to find plastic CMOD (Vp)
+        # Line parallel to elastic: V = F * slope + (V_max - P_max * slope)
+        # At F=0: Vp = V_max - P_max * slope
+        Vp = float(V_max - P_max * slope)
+        if Vp < 0:
+            Vp = 0  # Vp cannot be negative
+
+        # Draw the parallel line from Pmax to x-axis
+        fig.add_trace(go.Scatter(
+            x=[Vp, V_max],
+            y=[0, P_max],
+            mode='lines',
+            name=f'Plastic Line (Vp={Vp:.4f} mm)',
+            line=dict(width=1, color='grey', dash='dot')
+        ))
+
+        # Mark Vp on x-axis
+        fig.add_trace(go.Scatter(
+            x=[Vp],
+            y=[0],
+            mode='markers',
+            name=f'Vp = {Vp:.4f} mm',
+            marker=dict(size=10, color='grey', symbol='triangle-up')
         ))
 
     # Mark CTOD points - grey with different shapes
@@ -82,16 +119,22 @@ def create_force_cmod_plot(force, cmod, specimen_id, elastic_coeffs=None, ctod_p
                     marker=dict(size=12, color='grey', symbol=symbol, line=dict(width=2, color='grey'))
                 ))
 
+    # Limit Y-axis to 1.1 times max force
+    y_max = max_force * 1.1
+    y_tick = y_max / 12  # 12 steps on Y-axis
+
     fig.update_layout(
         title=f'Force vs CMOD - {specimen_id}',
         xaxis_title='CMOD (mm)',
         yaxis_title='Force (kN)',
+        xaxis=dict(dtick=1),  # 1 mm steps on X-axis
+        yaxis=dict(range=[0, y_max], dtick=y_tick),  # 12 steps on Y-axis
         template='plotly_white',
         height=450,
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
     )
 
-    return pio.to_html(fig, full_html=False, include_plotlyjs='cdn')
+    return pio.to_html(fig, full_html=False, include_plotlyjs='cdn'), Vp
 
 
 @ctod_bp.route('/')
@@ -412,6 +455,86 @@ def specimen():
                     }
             geometry['ctod_points'] = ctod_points
 
+            # Handle photo uploads (save to static/uploads for serving)
+            photos = []
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            photos_folder = Path(current_app.root_path) / 'static' / 'uploads'
+            photos_folder.mkdir(parents=True, exist_ok=True)
+            for i in range(1, 4):
+                photo_field = getattr(form, f'photo_{i}', None)
+                desc_field = getattr(form, f'photo_description_{i}', None)
+                if photo_field and photo_field.data:
+                    photo = photo_field.data
+                    filename = secure_filename(photo.filename)
+                    filename = f"ctod_{timestamp}_{i}_{filename}"
+                    filepath = photos_folder / filename
+                    photo.save(filepath)
+                    photos.append({
+                        'filename': filename,
+                        'description': desc_field.data if desc_field else ''
+                    })
+            if photos:
+                geometry['photos'] = photos
+
+            # Handle pre-crack CSV
+            if form.precrack_csv_file.data:
+                precrack_file = form.precrack_csv_file.data
+                precrack_filename = secure_filename(precrack_file.filename)
+                precrack_path = Path(current_app.config['UPLOAD_FOLDER']) / f"precrack_{timestamp}_{precrack_filename}"
+                precrack_file.save(precrack_path)
+
+                # Parse pre-crack data
+                precrack_geometry = {
+                    'W': W,
+                    'B': B,
+                    'a_0': a_0,
+                    'specimen_type': specimen_type,
+                    'S': S,
+                    'yield_strength': yield_strength,
+                    'youngs_modulus': youngs_modulus
+                }
+                precrack_data = parse_precrack_csv(precrack_path, precrack_geometry)
+
+                # Estimate expected K for compliance check
+                expected_K = results.get('K_max', {})
+                expected_K_val = expected_K.value if hasattr(expected_K, 'value') else 50.0
+
+                # Validate compliance
+                precrack_compliance = validate_precrack_compliance(
+                    precrack_data,
+                    expected_K=expected_K_val,
+                    test_standard=form.test_standard.data or 'ASTM E1820',
+                    specimen_geometry=precrack_geometry
+                )
+
+                geometry['precrack'] = {
+                    'filename': precrack_filename,
+                    'total_cycles': precrack_data['total_cycles'],
+                    'K_max': precrack_data['K_max'],
+                    'K_min': precrack_data['K_min'],
+                    'load_ratio': precrack_data['load_ratio'],
+                    'compliance': precrack_compliance
+                }
+
+            # Store uncertainty inputs
+            geometry['uncertainty_inputs'] = {
+                'force_pct': form.force_uncertainty.data or 1.0,
+                'displacement_pct': form.displacement_uncertainty.data or 1.0,
+                'dimension_pct': form.dimension_uncertainty.data or 0.5
+            }
+
+            # Calculate uncertainty budget
+            force_u = (form.force_uncertainty.data or 1.0) / 100
+            disp_u = (form.displacement_uncertainty.data or 1.0) / 100
+            dim_u = (form.dimension_uncertainty.data or 0.5) / 100
+            # Combined uncertainty (simplified RSS for CTOD)
+            combined = (force_u**2 + disp_u**2 + 4*dim_u**2)**0.5 * 100
+            geometry['uncertainty_budget'] = {
+                'combined': combined,
+                'expanded': combined * 2,
+                'coverage_factor': 2.0
+            }
+
             # Handle re-analysis vs new test
             if reanalyze_id:
                 # Update existing test record
@@ -635,15 +758,25 @@ def view(test_id):
 
     # Create plot
     force_cmod_plot = None
+    Vp = None  # Plastic CMOD
     if len(force) > 0 and len(cmod) > 0:
-        force_cmod_plot = create_force_cmod_plot(
+        force_cmod_plot, Vp = create_force_cmod_plot(
             force, cmod, test.specimen_id,
             elastic_coeffs=elastic_coeffs,
             ctod_points=ctod_points
         )
 
+    # Build photo URLs
+    photo_urls = []
+    for photo in geometry.get('photos', []):
+        photo_urls.append({
+            'url': url_for('static', filename=f"uploads/{photo['filename']}"),
+            'description': photo.get('description', '')
+        })
+
     return render_template('ctod/view.html', test=test, results=results,
-                          geometry=geometry, force_cmod_plot=force_cmod_plot)
+                          geometry=geometry, force_cmod_plot=force_cmod_plot,
+                          photo_urls=photo_urls, Vp=Vp)
 
 
 @ctod_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])
@@ -764,7 +897,36 @@ def report(test_id):
 
             if len(force) > 0 and len(cmod) > 0:
                 fig, ax = plt.subplots(figsize=(6, 4))
-                ax.plot(cmod, force, color='darkred', linewidth=1.5)
+
+                # Main test data - darkred
+                ax.plot(cmod, force, color='darkred', linewidth=1.5, label='Test Data')
+
+                # Find Pmax point
+                idx_max = np.argmax(force)
+                P_max_val = force[idx_max]
+                V_max = cmod[idx_max]
+
+                # Elastic line - dashed grey
+                elastic_coeffs = geometry.get('elastic_coeffs')
+                Vp = None
+                if elastic_coeffs:
+                    slope, intercept = elastic_coeffs
+                    cmod_elastic = np.linspace(0, max(cmod) * 0.6, 100)
+                    force_elastic = (cmod_elastic - intercept) / slope
+                    force_elastic = np.maximum(force_elastic, 0)
+                    ax.plot(cmod_elastic, force_elastic, '--', color='grey', linewidth=1, label='Elastic Line')
+
+                    # Calculate plastic CMOD (Vp)
+                    Vp = V_max - P_max_val * slope
+                    if Vp < 0:
+                        Vp = 0
+
+                    # Plastic line parallel to elastic through Pmax - dotted grey
+                    ax.plot([Vp, V_max], [0, P_max_val], ':', color='grey', linewidth=1,
+                           label=f'Plastic Line (Vp={Vp:.4f} mm)')
+
+                    # Mark Vp on x-axis - grey triangle
+                    ax.plot(Vp, 0, '^', color='grey', markersize=8, label=f'Vp = {Vp:.4f} mm')
 
                 # Mark CTOD points - grey with different markers
                 for ctod_type, marker in [('delta_m', 'o'), ('delta_c', 'D'), ('delta_u', 's')]:
@@ -777,7 +939,17 @@ def report(test_id):
                 ax.set_xlabel('CMOD (mm)')
                 ax.set_ylabel('Force (kN)')
                 ax.set_title(f'Force vs CMOD - {test.specimen_id}')
-                ax.legend(fontsize=8)
+
+                # Y-axis limit to 1.1 * max force with 12 steps
+                y_max = P_max_val * 1.1
+                ax.set_ylim(0, y_max)
+                ax.yaxis.set_major_locator(plt.MultipleLocator(y_max / 12))
+
+                # X-axis with 1 mm steps
+                ax.xaxis.set_major_locator(plt.MultipleLocator(1))
+
+                # Legend in upper right
+                ax.legend(fontsize=7, loc='upper right')
                 ax.grid(True, alpha=0.3)
 
                 chart_path = Path(current_app.config['UPLOAD_FOLDER']) / f'ctod_chart_{test_id}.png'
