@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}New KIC Test{% endblock %}
+{% block title %}{% if is_specimen_step %}Review &amp; Analyze KIC Test{% else %}New KIC Test{% endif %}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('kic.index') }}">KIC Tests</a></li>
+        {% if is_specimen_step %}
+        <li class="breadcrumb-item"><a href="{{ url_for('kic.new') }}">Upload</a></li>
+        <li class="breadcrumb-item active">Review &amp; Analyze</li>
+        {% else %}
         <li class="breadcrumb-item active">New Test</li>
+        {% endif %}
     </ol>
 </nav>
 
@@ -14,9 +19,39 @@
     <div class="col-lg-10">
         <div class="card shadow">
             <div class="card-header bg-warning text-dark">
-                <h4 class="mb-0"><i class="bi bi-lightning"></i> New KIC Fracture Toughness Test (ASTM E399)</h4>
+                <h4 class="mb-0">
+                    <i class="bi bi-lightning"></i>
+                    {% if is_specimen_step %}Step 2: Review Imported Data &amp; Run Analysis{% else %}New KIC Fracture Toughness Test (ASTM E399){% endif %}
+                </h4>
             </div>
             <div class="card-body">
+                {% if is_specimen_step and excel_data %}
+                <!-- Imported Data Summary -->
+                <div class="alert alert-success mb-4">
+                    <h6 class="alert-heading"><i class="bi bi-check-circle"></i> Data Imported from Excel</h6>
+                    <div class="row small">
+                        <div class="col-md-4">
+                            <strong>File:</strong> {{ excel_data.filename }}<br>
+                            <strong>Specimen:</strong> {{ excel_data.specimen_id }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>W:</strong> {{ excel_data.W }} mm |
+                            <strong>B:</strong> {{ excel_data.B }} mm<br>
+                            <strong>a₀:</strong> {{ "%.2f"|format(excel_data.a_0) }} mm
+                            {% if excel_data.a_0_notch and excel_data.a_0_notch != excel_data.a_0 %}
+                            <span class="text-muted">(notch: {{ "%.2f"|format(excel_data.a_0_notch) }} mm)</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Yield:</strong> {{ excel_data.yield_strength }} MPa<br>
+                            <strong>E:</strong> {{ excel_data.youngs_modulus }} GPa
+                        </div>
+                    </div>
+                    <hr class="my-2">
+                    <p class="mb-0 small"><i class="bi bi-pencil"></i> Review and edit the values below before running analysis. Certificate data will override Excel data where applicable.</p>
+                </div>
+                {% endif %}
+
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
 
@@ -162,7 +197,20 @@
                         </div>
                     </div>
 
-                    <!-- Data Files -->
+                    {% if is_specimen_step %}
+                    <!-- CSV Upload for analysis (specimen step) -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-file-earmark-bar-graph"></i> Raw Test Data</h6>
+                        </div>
+                        <div class="card-body">
+                            {{ form.csv_file.label(class="form-label") }}
+                            {{ form.csv_file(class="form-control", accept=".csv") }}
+                            <small class="text-muted">Force-Displacement data from MTS (required for analysis)</small>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- Data Files (original step) -->
                     <div class="card mb-4">
                         <div class="card-header bg-light">
                             <h6 class="mb-0"><i class="bi bi-upload"></i> Data Files</h6>
@@ -182,6 +230,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
 
                     <!-- Notes -->
                     <div class="mb-4">
@@ -190,10 +239,19 @@
                     </div>
 
                     <div class="d-flex justify-content-between">
+                        {% if is_specimen_step %}
+                        <a href="{{ url_for('kic.new') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Upload
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-calculator"></i> Run Analysis
+                        </button>
+                        {% else %}
                         <a href="{{ url_for('kic.index') }}" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-left"></i> Cancel
                         </a>
                         {{ form.submit(class="btn btn-primary btn-lg") }}
+                        {% endif %}
                     </div>
                 </form>
             </div>

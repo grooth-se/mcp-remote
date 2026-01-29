@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 
 from flask import (render_template, redirect, url_for, flash, request,
-                   current_app, send_file)
+                   current_app, send_file, session)
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 from . import fcgr_bp
-from .forms import SpecimenForm, ReportForm
+from .forms import UploadForm, SpecimenForm, ReportForm
 from app.extensions import db
 from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
 

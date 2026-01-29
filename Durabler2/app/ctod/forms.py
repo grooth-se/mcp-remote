@@ -1,10 +1,23 @@
 """Forms for CTOD (E1290) test module."""
 
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileAllowed
+from flask_wtf.file import FileField, FileAllowed, FileRequired
 from wtforms import (StringField, FloatField, SelectField, TextAreaField,
                      SubmitField, FieldList)
 from wtforms.validators import DataRequired, Optional, NumberRange
+
+
+class UploadForm(FlaskForm):
+    """Form for uploading Excel/CSV files - Step 1."""
+    excel_file = FileField('MTS Analysis Report (Excel)', validators=[
+        FileRequired('Excel file is required'),
+        FileAllowed(['xlsx', 'xls'], 'Excel files only!')
+    ])
+    csv_file = FileField('Raw Test Data (CSV - optional)', validators=[
+        FileAllowed(['csv'], 'CSV files only!')
+    ])
+    certificate_id = SelectField('Link to Certificate', coerce=int, validators=[Optional()])
+    submit = SubmitField('Upload & Verify Import')
 
 
 class SpecimenForm(FlaskForm):

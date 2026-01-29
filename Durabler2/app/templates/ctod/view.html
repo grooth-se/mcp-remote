@@ -21,6 +21,9 @@
         </p>
     </div>
     <div>
+        <a href="{{ url_for('ctod.reanalyze', test_id=test.id) }}" class="btn btn-warning">
+            <i class="bi bi-arrow-repeat"></i> Re-analyze
+        </a>
         <a href="{{ url_for('ctod.report', test_id=test.id) }}" class="btn btn-success">
             <i class="bi bi-file-earmark-pdf"></i> Generate Report
         </a>

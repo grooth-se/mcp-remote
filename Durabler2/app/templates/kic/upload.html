@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Upload KIC Test Data{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('kic.index') }}">KIC Tests</a></li>
+        <li class="breadcrumb-item active">Upload Test Data</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-upload"></i> Step 1: Upload Test Data (E399)</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <!-- Certificate Selection -->
+                    <div class="card mb-4 border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="bi bi-link-45deg"></i> Link to Certificate</h6>
+                        </div>
+                        <div class="card-body">
+                            {{ form.certificate_id(class="form-select", id="certificate_select") }}
+                            <small class="text-muted">Select a certificate to auto-fill test information</small>
+                        </div>
+                    </div>
+
+                    <!-- File Upload -->
+                    <div class="card mb-4">
+                        <div class="card-header"><h6 class="mb-0"><i class="bi bi-file-earmark-spreadsheet"></i> Data Files</h6></div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.excel_file.label(class="form-label fw-bold") }}
+                                    {{ form.excel_file(class="form-control", accept=".xlsx,.xls") }}
+                                    <small class="text-muted">MTS Analysis Report with specimen geometry and material properties</small>
+                                    {% if form.excel_file.errors %}
+                                        {% for error in form.excel_file.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.csv_file.label(class="form-label") }}
+                                    {{ form.csv_file(class="form-control", accept=".csv") }}
+                                    <small class="text-muted">Raw Force-Displacement data (optional - can upload in next step)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Info Box -->
+                    <div class="alert alert-info">
+                        <h6 class="alert-heading"><i class="bi bi-info-circle"></i> What happens next?</h6>
+                        <p class="mb-0">After uploading, you'll see a summary of imported data for verification. You can review and edit any values before running the analysis.</p>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                        <a href="{{ url_for('kic.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const certSelect = document.getElementById('certificate_select');
+    if (certSelect) {
+        certSelect.addEventListener('change', function() {
+            const certId = this.value;
+            if (certId && certId !== '0') {
+                window.location.href = "{{ url_for('kic.new') }}?certificate=" + certId;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

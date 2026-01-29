@@ -12,8 +12,9 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
 
+from flask import session
 from . import ctod_bp
-from .forms import SpecimenForm, ReportForm
+from .forms import UploadForm, SpecimenForm, ReportForm
 from app.extensions import db
 from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
 
@@ -106,7 +107,110 @@ def index():
 @ctod_bp.route('/new', methods=['GET', 'POST'])
 @login_required
 def new():
-    """Create new CTOD test."""
+    """Step 1: Upload Excel file and verify imported data."""
+    form = UploadForm()
+
+    # Populate certificate dropdown
+    certificates = Certificate.query.order_by(
+        Certificate.year.desc(),
+        Certificate.cert_id.desc()
+    ).limit(100).all()
+    form.certificate_id.choices = [(0, '-- Select Certificate --')] + [
+        (c.id, f"{c.certificate_number_with_rev} - {c.customer or 'No customer'}")
+        for c in certificates
+    ]
+
+    # Get certificate from URL parameter
+    cert_id = request.args.get('certificate', type=int)
+    if request.method == 'GET' and cert_id:
+        form.certificate_id.data = cert_id
+
+    if form.validate_on_submit():
+        try:
+            # Save and parse Excel file
+            excel_file = form.excel_file.data
+            filename = secure_filename(excel_file.filename)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            saved_filename = f"{timestamp}_{filename}"
+            filepath = Path(current_app.config['UPLOAD_FOLDER']) / saved_filename
+            excel_file.save(filepath)
+
+            excel_data = parse_ctod_excel(filepath)
+
+            # Calculate a_0 from 9-point measurements if available
+            a_0_calculated = excel_data.a_0
+            crack_measurements = excel_data.precrack_measurements
+            if len(crack_measurements) == 9:
+                a_avg = (0.5 * crack_measurements[0] + sum(crack_measurements[1:8]) +
+                        0.5 * crack_measurements[8]) / 8
+                a_0_calculated = a_avg
+                current_app.logger.info(f'CTOD: Calculated crack length from 9-point measurements: a_0={a_0_calculated:.3f} mm')
+
+            # Store parsed data in session
+            session['ctod_excel_path'] = str(filepath)
+            session['ctod_excel_data'] = {
+                'filename': filename,
+                'specimen_id': excel_data.specimen_id,
+                'specimen_type': excel_data.specimen_type,
+                'W': excel_data.W,
+                'B': excel_data.B,
+                'B_n': excel_data.B_n,
+                'a_0': a_0_calculated,
+                'a_0_notch': excel_data.a_0,  # Original notch length
+                'S': excel_data.S,
+                'yield_strength': excel_data.yield_strength,
+                'ultimate_strength': excel_data.ultimate_strength,
+                'youngs_modulus': excel_data.youngs_modulus,
+                'poissons_ratio': excel_data.poissons_ratio,
+                'test_temperature': excel_data.test_temperature,
+                'material': excel_data.material,
+                'crack_measurements': crack_measurements,
+                'final_crack_measurements': excel_data.final_crack_measurements,
+                'ctod_results': excel_data.ctod_results,
+            }
+
+            # Store certificate selection
+            if form.certificate_id.data and form.certificate_id.data > 0:
+                session['ctod_certificate_id'] = form.certificate_id.data
+            else:
+                session.pop('ctod_certificate_id', None)
+
+            # Handle optional CSV file
+            if form.csv_file.data:
+                csv_file = form.csv_file.data
+                csv_filename = secure_filename(csv_file.filename)
+                csv_saved = f"{timestamp}_{csv_filename}"
+                csv_filepath = Path(current_app.config['UPLOAD_FOLDER']) / csv_saved
+                csv_file.save(csv_filepath)
+                session['ctod_csv_path'] = str(csv_filepath)
+            else:
+                session.pop('ctod_csv_path', None)
+
+            flash(f'Excel data imported: {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm, a₀={a_0_calculated:.2f}mm', 'success')
+            return redirect(url_for('ctod.specimen'))
+
+        except Exception as e:
+            flash(f'Error parsing Excel file: {str(e)}', 'danger')
+            import traceback
+            traceback.print_exc()
+
+    return render_template('ctod/upload.html', form=form)
+
+
+@ctod_bp.route('/specimen', methods=['GET', 'POST'])
+@login_required
+def specimen():
+    """Step 2: Review imported data and run analysis."""
+    # Check if Excel was uploaded
+    if 'ctod_excel_data' not in session:
+        flash('Please upload an Excel file first.', 'warning')
+        return redirect(url_for('ctod.new'))
+
+    excel_data = session.get('ctod_excel_data', {})
+    certificate_id = session.get('ctod_certificate_id')
+    certificate = Certificate.query.get(certificate_id) if certificate_id else None
+    reanalyze_id = session.get('ctod_reanalyze_id')
+
     form = SpecimenForm()
 
     # Populate certificate dropdown
@@ -119,164 +223,119 @@ def new():
         for c in certificates
     ]
 
-    # Get certificate from URL parameter or form selection
-    cert_id = request.args.get('certificate', type=int)
-    if request.method == 'GET' and cert_id:
-        form.certificate_id.data = cert_id
+    # Pre-fill form from Excel data and certificate
+    if request.method == 'GET':
+        # Pre-fill from Excel data
+        if excel_data.get('specimen_id'):
+            form.specimen_id.data = excel_data['specimen_id']
+        if excel_data.get('specimen_type'):
+            form.specimen_type.data = excel_data['specimen_type']
+        if excel_data.get('W'):
+            form.W.data = excel_data['W']
+        if excel_data.get('B'):
+            form.B.data = excel_data['B']
+        if excel_data.get('B_n'):
+            form.B_n.data = excel_data['B_n']
+        if excel_data.get('a_0'):
+            form.a_0.data = excel_data['a_0']
+        if excel_data.get('S'):
+            form.S.data = excel_data['S']
+        if excel_data.get('yield_strength'):
+            form.yield_strength.data = excel_data['yield_strength']
+        if excel_data.get('ultimate_strength'):
+            form.ultimate_strength.data = excel_data['ultimate_strength']
+        if excel_data.get('youngs_modulus'):
+            form.youngs_modulus.data = excel_data['youngs_modulus']
+        if excel_data.get('poissons_ratio'):
+            form.poissons_ratio.data = excel_data['poissons_ratio']
+        if excel_data.get('test_temperature'):
+            form.test_temperature.data = excel_data['test_temperature']
+        if excel_data.get('material'):
+            form.material.data = excel_data['material']
 
-    # Get selected certificate
-    selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else cert_id
-    certificate = Certificate.query.get(selected_cert_id) if selected_cert_id else None
+        # Pre-fill 9-point crack measurements
+        crack_measurements = excel_data.get('crack_measurements', [])
+        if len(crack_measurements) == 9:
+            for i, val in enumerate(crack_measurements):
+                getattr(form, f'a{i+1}').data = val
 
-    # Pre-fill from certificate (certificate register is the master)
-    if request.method == 'GET' and certificate:
-        if certificate.material:
-            form.material.data = certificate.material
-        if certificate.test_article_sn:
-            form.specimen_id.data = certificate.test_article_sn  # Specimen SN
-        if certificate.product_sn:
-            form.batch_number.data = certificate.product_sn
-        if certificate.customer_specimen_info:
-            form.customer_specimen_info.data = certificate.customer_specimen_info
-        if certificate.requirement:
-            form.requirement.data = certificate.requirement
-        # Parse temperature - handle string format
-        if certificate.temperature:
-            try:
-                temp_str = certificate.temperature.replace('°C', '').replace('C', '').strip()
-                form.test_temperature.data = float(temp_str)
-            except (ValueError, AttributeError):
-                form.test_temperature.data = 23.0
+        # Certificate data overrides Excel data (certificate is master)
+        if certificate:
+            if certificate.material:
+                form.material.data = certificate.material
+            if certificate.test_article_sn:
+                form.specimen_id.data = certificate.test_article_sn
+            if certificate.product_sn:
+                form.batch_number.data = certificate.product_sn
+            if certificate.customer_specimen_info:
+                form.customer_specimen_info.data = certificate.customer_specimen_info
+            if certificate.requirement:
+                form.requirement.data = certificate.requirement
+            if certificate.temperature:
+                try:
+                    temp_str = certificate.temperature.replace('°C', '').replace('C', '').strip()
+                    form.test_temperature.data = float(temp_str)
+                except (ValueError, AttributeError):
+                    pass
+            form.certificate_id.data = certificate_id
 
     if form.validate_on_submit():
         try:
-            # ============================================================
-            # STEP 1: Parse Excel file first (primary data source)
-            # ============================================================
-            excel_data = None
-            if form.excel_file.data:
-                excel_file = form.excel_file.data
-                filename = secure_filename(excel_file.filename)
-                filepath = Path(current_app.config['UPLOAD_FOLDER']) / filename
-                excel_file.save(filepath)
-                excel_data = parse_ctod_excel(filepath)
-                flash(f'Excel data imported: Specimen {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm', 'info')
-
-            # ============================================================
-            # STEP 2: Parse CSV file for raw test data
-            # ============================================================
-            csv_data = None
+            # Get CSV data for analysis
+            csv_path = session.get('ctod_csv_path')
             force = None
             cmod = None
 
-            if form.csv_file.data:
+            if csv_path and Path(csv_path).exists():
+                csv_data = parse_ctod_csv(csv_path)
+                force = csv_data.force
+                cmod = csv_data.cod
+            elif form.csv_file.data:
+                # User uploaded CSV in this step
                 csv_file = form.csv_file.data
                 filename = secure_filename(csv_file.filename)
-                filepath = Path(current_app.config['UPLOAD_FOLDER']) / filename
-                csv_file.save(filepath)
-                csv_data = parse_ctod_csv(filepath)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                csv_filepath = Path(current_app.config['UPLOAD_FOLDER']) / f"{timestamp}_{filename}"
+                csv_file.save(csv_filepath)
+                csv_data = parse_ctod_csv(csv_filepath)
                 force = csv_data.force
-                cmod = csv_data.cod  # COD = CMOD (Crack Mouth Opening Displacement)
+                cmod = csv_data.cod
 
-            # ============================================================
-            # STEP 3: Extract values - Excel takes precedence over form
-            # ============================================================
+            if force is None or cmod is None:
+                flash('Please upload CSV test data with Force and CMOD columns.', 'danger')
+                return render_template('ctod/new.html', form=form, certificate=certificate,
+                                     excel_data=excel_data, is_specimen_step=True)
 
-            # Specimen identification - Excel "Name of the Test Run" takes precedence
-            if excel_data and excel_data.specimen_id:
-                specimen_id = excel_data.specimen_id
-                current_app.logger.info(f'CTOD: Using specimen_id from Excel "Name of the Test Run": {specimen_id}')
-            else:
-                specimen_id = form.specimen_id.data or ''
-                current_app.logger.info(f'CTOD: Using specimen_id from form: {specimen_id}')
+            # Get values from form (user may have edited them)
+            specimen_id = form.specimen_id.data or ''
+            specimen_type = form.specimen_type.data or 'SE(B)'
+            W = form.W.data or 25.0
+            B = form.B.data or 12.5
+            B_n = form.B_n.data or B
+            a_0 = form.a_0.data or W * 0.5
+            S = form.S.data or W * 4
+            yield_strength = form.yield_strength.data or 500
+            ultimate_strength = form.ultimate_strength.data or 600
+            youngs_modulus = form.youngs_modulus.data or 210
+            poissons_ratio = form.poissons_ratio.data or 0.3
+            test_temperature = form.test_temperature.data or 23.0
+            material_name = form.material.data or ''
 
-            # Specimen type - Excel first, then form
-            if excel_data and excel_data.specimen_type:
-                specimen_type = excel_data.specimen_type
-            else:
-                specimen_type = form.specimen_type.data or 'SE(B)'
-
-            # Test temperature - Excel first, then form
-            if excel_data and excel_data.test_temperature != 23.0:
-                test_temperature = excel_data.test_temperature
-            elif form.test_temperature.data is not None:
-                test_temperature = form.test_temperature.data
-            else:
-                test_temperature = 23.0
-
-            # Specimen dimensions - Excel takes precedence when available
-            if excel_data and excel_data.W > 0:
-                W = excel_data.W
-            else:
-                W = form.W.data or 25.0
-
-            if excel_data and excel_data.B > 0:
-                B = excel_data.B
-            else:
-                B = form.B.data or 12.5
-
-            if excel_data and excel_data.B_n > 0:
-                B_n = excel_data.B_n
-            else:
-                B_n = form.B_n.data or B
-
-            if excel_data and excel_data.a_0 > 0:
-                a_0 = excel_data.a_0
-            else:
-                a_0 = form.a_0.data or W * 0.5
-
-            if excel_data and excel_data.S > 0:
-                S = excel_data.S
-            else:
-                S = form.S.data or W * 4
-
-            # 9-point crack measurements - Excel takes precedence
+            # Get crack measurements from form
             crack_measurements = []
-            if excel_data and len(excel_data.precrack_measurements) == 9:
-                crack_measurements = excel_data.precrack_measurements
-            else:
-                # Try to get from form
-                for field_name in ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9']:
-                    val = getattr(form, field_name).data
-                    if val and val > 0:
-                        crack_measurements.append(val)
+            for field_name in ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9']:
+                val = getattr(form, field_name).data
+                if val and val > 0:
+                    crack_measurements.append(val)
 
-            # IMPORTANT: For CTOD analysis, a_0 should be the actual crack length
-            # (from precrack measurements), not the notch length!
-            # Calculate average crack length from 9-point measurements per ASTM E1820
+            # Recalculate a_0 if 9-point measurements provided
             if len(crack_measurements) == 9:
                 a_avg = (0.5 * crack_measurements[0] + sum(crack_measurements[1:8]) +
                         0.5 * crack_measurements[8]) / 8
                 a_0 = a_avg
                 current_app.logger.info(f'CTOD: Using calculated crack length from 9-point measurements: a_0={a_0:.3f} mm')
 
-            # Material properties - Excel takes precedence
-            if excel_data and excel_data.yield_strength > 0:
-                yield_strength = excel_data.yield_strength
-            else:
-                yield_strength = form.yield_strength.data or 500
-
-            if excel_data and excel_data.ultimate_strength > 0:
-                ultimate_strength = excel_data.ultimate_strength
-            else:
-                ultimate_strength = form.ultimate_strength.data or 600
-
-            if excel_data and excel_data.youngs_modulus > 0:
-                youngs_modulus = excel_data.youngs_modulus
-            else:
-                youngs_modulus = form.youngs_modulus.data or 210
-
-            if excel_data and excel_data.poissons_ratio > 0:
-                poissons_ratio = excel_data.poissons_ratio
-            else:
-                poissons_ratio = form.poissons_ratio.data or 0.3
-
-            # Material name - form takes precedence (user may want to specify)
-            material_name = form.material.data or (excel_data.material if excel_data else '')
-
-            # ============================================================
-            # STEP 3b: Validate required values after Excel/form merge
-            # ============================================================
+            # Validate required values
             validation_errors = []
             if not W or W <= 0:
                 validation_errors.append('Width (W) is required')
@@ -289,11 +348,12 @@ def new():
 
             if validation_errors:
                 for error in validation_errors:
-                    flash(f'{error}. Please provide in form or upload Excel file with this data.', 'danger')
-                return render_template('ctod/new.html', form=form, certificate=certificate)
+                    flash(f'{error}', 'danger')
+                return render_template('ctod/new.html', form=form, certificate=certificate,
+                                     excel_data=excel_data, is_specimen_step=True)
 
-            # Create specimen object
-            specimen = CTODSpecimen(
+            # Create specimen and material objects
+            specimen_obj = CTODSpecimen(
                 specimen_id=specimen_id,
                 specimen_type=specimen_type,
                 W=W,
@@ -304,31 +364,22 @@ def new():
                 material=material_name
             )
 
-            material = CTODMaterial(
+            material_obj = CTODMaterial(
                 yield_strength=yield_strength,
                 ultimate_strength=ultimate_strength,
                 youngs_modulus=youngs_modulus,
                 poissons_ratio=poissons_ratio
             )
 
-            # Log extracted values for debugging
+            # Log values for debugging
             current_app.logger.info(f'CTOD Analysis - Specimen: {specimen_id}, W={W}, B={B}, a_0={a_0}, S={S}')
             current_app.logger.info(f'CTOD Analysis - Material: yield={yield_strength} MPa, E={youngs_modulus} GPa')
-            if crack_measurements:
-                current_app.logger.info(f'CTOD Analysis - Crack measurements: {crack_measurements}')
 
-            # ============================================================
-            # STEP 4: Run analysis
-            # ============================================================
-            if force is None or cmod is None:
-                flash('Please upload CSV test data with Force and CMOD columns.', 'danger')
-                return render_template('ctod/new.html', form=form, certificate=certificate)
-
+            # Run analysis
             analyzer = CTODAnalyzer()
-            results = analyzer.run_analysis(force, cmod, specimen, material)
+            results = analyzer.run_analysis(force, cmod, specimen_obj, material_obj)
 
-            # Store geometry, parameters, and raw data
-            # Ensure all values are JSON serializable (convert numpy types to Python)
+            # Build geometry dict for storage
             geometry = {
                 'type': specimen_type,
                 'W': float(W),
@@ -342,11 +393,8 @@ def new():
                 'poissons_ratio': float(poissons_ratio),
                 'crack_measurements': [float(x) for x in crack_measurements] if crack_measurements else [],
                 'notch_type': form.notch_type.data,
-                # Store final crack measurements from Excel if available
-                'final_crack_measurements': [float(x) for x in excel_data.final_crack_measurements] if excel_data and excel_data.final_crack_measurements else [],
-                # Store MTS CTOD results for comparison
-                'mts_results': excel_data.ctod_results if excel_data else {},
-                # Store data for plotting (subsample if large)
+                'final_crack_measurements': excel_data.get('final_crack_measurements', []),
+                'mts_results': excel_data.get('ctod_results', {}),
                 'force': [float(x) for x in force[::max(1, len(force)//500)]],
                 'cmod': [float(x) for x in cmod[::max(1, len(cmod)//500)]],
                 'elastic_coeffs': [float(np.real(c)) for c in results.get('elastic_coeffs', [0, 0])],
@@ -364,33 +412,53 @@ def new():
                     }
             geometry['ctod_points'] = ctod_points
 
-            # Create test record
-            test_id = generate_test_id()
+            # Handle re-analysis vs new test
+            if reanalyze_id:
+                # Update existing test record
+                test_record = TestRecord.query.get_or_404(reanalyze_id)
+                test_record.specimen_id = specimen_id
+                test_record.material = material_name
+                test_record.batch_number = form.batch_number.data
+                test_record.geometry = geometry
+                test_record.temperature = test_temperature
+                test_record.test_standard = form.test_standard.data
+                test_record.status = 'REANALYZED'
 
-            selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else None
-            selected_cert = Certificate.query.get(selected_cert_id) if selected_cert_id else None
-            cert_number = selected_cert.certificate_number_with_rev if selected_cert else None
+                # Delete old analysis results
+                AnalysisResult.query.filter_by(test_record_id=test_record.id).delete()
+                db.session.flush()
 
-            test_record = TestRecord(
-                test_id=test_id,
-                test_method='CTOD',
-                test_standard=form.test_standard.data,
-                specimen_id=specimen_id,
-                material=material_name,
-                batch_number=form.batch_number.data,
-                geometry=geometry,
-                test_date=datetime.now(),
-                temperature=test_temperature,
-                status='ANALYZED',
-                certificate_id=selected_cert_id,
-                certificate_number=cert_number,
-                operator_id=current_user.id
-            )
-            db.session.add(test_record)
-            db.session.flush()
+                # Clear reanalyze flag
+                session.pop('ctod_reanalyze_id', None)
+                action = 'REANALYZE'
+                test_id = test_record.test_id
+            else:
+                # Create new test record
+                test_id = generate_test_id()
+                selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else None
+                selected_cert = Certificate.query.get(selected_cert_id) if selected_cert_id else None
+                cert_number = selected_cert.certificate_number_with_rev if selected_cert else None
 
-            # Store results
-            # P_max
+                test_record = TestRecord(
+                    test_id=test_id,
+                    test_method='CTOD',
+                    test_standard=form.test_standard.data,
+                    specimen_id=specimen_id,
+                    material=material_name,
+                    batch_number=form.batch_number.data,
+                    geometry=geometry,
+                    test_date=datetime.now(),
+                    temperature=test_temperature,
+                    status='ANALYZED',
+                    certificate_id=selected_cert_id,
+                    certificate_number=cert_number,
+                    operator_id=current_user.id
+                )
+                db.session.add(test_record)
+                db.session.flush()
+                action = 'CREATE'
+
+            # Store analysis results
             P_max = results.get('P_max')
             if P_max:
                 db.session.add(AnalysisResult(
@@ -402,7 +470,6 @@ def new():
                     calculated_by_id=current_user.id
                 ))
 
-            # CMOD_max
             CMOD_max = results.get('CMOD_max')
             if CMOD_max:
                 db.session.add(AnalysisResult(
@@ -414,7 +481,6 @@ def new():
                     calculated_by_id=current_user.id
                 ))
 
-            # K_max
             K_max = results.get('K_max')
             if K_max:
                 db.session.add(AnalysisResult(
@@ -426,7 +492,6 @@ def new():
                     calculated_by_id=current_user.id
                 ))
 
-            # CTOD values
             for ctod_type in ['delta_c', 'delta_u', 'delta_m']:
                 ctod_result = results.get(ctod_type)
                 if ctod_result:
@@ -439,7 +504,6 @@ def new():
                         calculated_by_id=current_user.id
                     ))
 
-            # a/W ratio
             a_W = results.get('a_W_ratio')
             if a_W:
                 db.session.add(AnalysisResult(
@@ -451,7 +515,6 @@ def new():
                     calculated_by_id=current_user.id
                 ))
 
-            # Compliance
             compliance = results.get('compliance')
             if compliance:
                 db.session.add(AnalysisResult(
@@ -463,24 +526,34 @@ def new():
                     calculated_by_id=current_user.id
                 ))
 
-            # Store validity info in geometry
+            # Update geometry with validity info
             geometry['is_valid'] = results.get('is_valid', False)
             geometry['validity_summary'] = results.get('validity_summary', '')
-            test_record.geometry = geometry  # Update with validity info
+            test_record.geometry = geometry
 
             # Audit log
             audit = AuditLog(
                 user_id=current_user.id,
-                action='CREATE',
+                action=action,
                 table_name='test_records',
                 record_id=test_record.id,
-                new_values={'test_id': test_id, 'specimen_id': form.specimen_id.data},
+                new_values={'test_id': test_id, 'specimen_id': specimen_id},
                 ip_address=request.remote_addr
             )
             db.session.add(audit)
             db.session.commit()
 
-            flash(f'Analysis complete! Test ID: {test_id}', 'success')
+            # Clear session data
+            session.pop('ctod_excel_path', None)
+            session.pop('ctod_excel_data', None)
+            session.pop('ctod_csv_path', None)
+            session.pop('ctod_certificate_id', None)
+
+            if action == 'REANALYZE':
+                flash(f'Re-analysis complete! Test ID: {test_id}', 'success')
+            else:
+                flash(f'Analysis complete! Test ID: {test_id}', 'success')
+
             if not results.get('is_valid', False):
                 flash('Warning: Test validity issues detected.', 'warning')
 
@@ -492,7 +565,52 @@ def new():
             import traceback
             traceback.print_exc()
 
-    return render_template('ctod/new.html', form=form, certificate=certificate)
+    return render_template('ctod/new.html', form=form, certificate=certificate,
+                         excel_data=excel_data, is_specimen_step=True)
+
+
+@ctod_bp.route('/<int:test_id>/reanalyze', methods=['GET', 'POST'])
+@login_required
+def reanalyze(test_id):
+    """Re-analyze test with modified parameters."""
+    test = TestRecord.query.get_or_404(test_id)
+    geometry = test.geometry or {}
+
+    # Store test data in session for the specimen step
+    session['ctod_excel_data'] = {
+        'filename': f'(Re-analysis of {test.test_id})',
+        'specimen_id': test.specimen_id,
+        'specimen_type': geometry.get('type', 'SE(B)'),
+        'W': geometry.get('W'),
+        'B': geometry.get('B'),
+        'B_n': geometry.get('B_n'),
+        'a_0': geometry.get('a_0'),
+        'S': geometry.get('S'),
+        'yield_strength': geometry.get('yield_strength'),
+        'ultimate_strength': geometry.get('ultimate_strength'),
+        'youngs_modulus': geometry.get('youngs_modulus'),
+        'poissons_ratio': geometry.get('poissons_ratio'),
+        'test_temperature': test.temperature,
+        'material': test.material,
+        'crack_measurements': geometry.get('crack_measurements', []),
+        'final_crack_measurements': geometry.get('final_crack_measurements', []),
+        'ctod_results': geometry.get('mts_results', {}),
+    }
+
+    # Mark this as a re-analysis
+    session['ctod_reanalyze_id'] = test_id
+
+    # Store certificate if linked
+    if test.certificate_id:
+        session['ctod_certificate_id'] = test.certificate_id
+    else:
+        session.pop('ctod_certificate_id', None)
+
+    # Clear any old CSV path - user must re-upload for re-analysis
+    session.pop('ctod_csv_path', None)
+
+    flash(f'Loaded test {test.test_id} for re-analysis. Please upload the CSV test data and modify parameters as needed.', 'info')
+    return redirect(url_for('ctod.specimen'))
 
 
 @ctod_bp.route('/<int:test_id>')

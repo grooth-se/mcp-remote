@@ -6,13 +6,13 @@ from pathlib import Path
 
 from flask import (
     render_template, redirect, url_for, flash, request,
-    current_app, send_file
+    current_app, send_file, session
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from . import kic_bp
-from .forms import SpecimenForm, ReportForm
+from .forms import UploadForm, SpecimenForm, ReportForm
 from app.extensions import db
 from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
 
@@ -124,199 +124,249 @@ def index():
     return render_template('kic/index.html', tests=tests)
 
 
+def generate_test_id():
+    """Generate unique KIC test ID."""
+    today = datetime.now()
+    prefix = f"KIC-{today.strftime('%y%m%d')}"
+    count = TestRecord.query.filter(
+        TestRecord.test_id.like(f'{prefix}%')
+    ).count()
+    return f"{prefix}-{count + 1:03d}"
+
+
 @kic_bp.route('/new', methods=['GET', 'POST'])
 @login_required
 def new():
-    """Create a new KIC test."""
+    """Step 1: Upload Excel file and verify imported data."""
+    form = UploadForm()
+
+    # Populate certificate dropdown
+    certificates = Certificate.query.order_by(
+        Certificate.year.desc(),
+        Certificate.cert_id.desc()
+    ).limit(100).all()
+    form.certificate_id.choices = [(0, '-- Select Certificate --')] + [
+        (c.id, f"{c.certificate_number_with_rev} - {c.customer or 'No customer'}")
+        for c in certificates
+    ]
+
+    # Get certificate from URL parameter
+    cert_id = request.args.get('certificate', type=int)
+    if request.method == 'GET' and cert_id:
+        form.certificate_id.data = cert_id
+
+    if form.validate_on_submit():
+        try:
+            # Save and parse Excel file
+            excel_file = form.excel_file.data
+            filename = secure_filename(excel_file.filename)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            saved_filename = f"{timestamp}_{filename}"
+            filepath = Path(current_app.config['UPLOAD_FOLDER']) / saved_filename
+            excel_file.save(filepath)
+
+            excel_data = parse_kic_excel(filepath)
+
+            # Calculate a_0 from 5-point measurements if available
+            a_0_calculated = excel_data.a_0
+            crack_measurements = excel_data.precrack_measurements or []
+            if len(crack_measurements) == 5:
+                a = crack_measurements
+                a_0_calculated = (0.5 * a[0] + a[1] + a[2] + a[3] + 0.5 * a[4]) / 4
+                current_app.logger.info(f'KIC: Calculated crack length from 5-point measurements: a_0={a_0_calculated:.3f} mm')
+
+            # Store parsed data in session
+            session['kic_excel_path'] = str(filepath)
+            session['kic_excel_data'] = {
+                'filename': filename,
+                'specimen_id': excel_data.specimen_id,
+                'specimen_type': excel_data.specimen_type,
+                'W': excel_data.W,
+                'B': excel_data.B,
+                'B_n': excel_data.B_n,
+                'a_0': a_0_calculated,
+                'a_0_notch': excel_data.a_0,
+                'S': excel_data.S,
+                'yield_strength': excel_data.yield_strength,
+                'ultimate_strength': excel_data.ultimate_strength,
+                'youngs_modulus': excel_data.youngs_modulus,
+                'poissons_ratio': excel_data.poissons_ratio,
+                'test_temperature': excel_data.test_temperature,
+                'material': excel_data.material,
+                'crack_measurements': crack_measurements,
+                'precrack_final_size': excel_data.precrack_final_size,
+                'kic_results': excel_data.kic_results,
+            }
+
+            # Store certificate selection
+            if form.certificate_id.data and form.certificate_id.data > 0:
+                session['kic_certificate_id'] = form.certificate_id.data
+            else:
+                session.pop('kic_certificate_id', None)
+
+            # Handle optional CSV file
+            if form.csv_file.data:
+                csv_file = form.csv_file.data
+                csv_filename = secure_filename(csv_file.filename)
+                csv_saved = f"{timestamp}_{csv_filename}"
+                csv_filepath = Path(current_app.config['UPLOAD_FOLDER']) / csv_saved
+                csv_file.save(csv_filepath)
+                session['kic_csv_path'] = str(csv_filepath)
+            else:
+                session.pop('kic_csv_path', None)
+
+            flash(f'Excel data imported: {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm, a₀={a_0_calculated:.2f}mm', 'success')
+            return redirect(url_for('kic.specimen'))
+
+        except Exception as e:
+            flash(f'Error parsing Excel file: {str(e)}', 'danger')
+            import traceback
+            traceback.print_exc()
+
+    return render_template('kic/upload.html', form=form)
+
+
+@kic_bp.route('/specimen', methods=['GET', 'POST'])
+@login_required
+def specimen():
+    """Step 2: Review imported data and run analysis."""
+    # Check if Excel was uploaded
+    if 'kic_excel_data' not in session:
+        flash('Please upload an Excel file first.', 'warning')
+        return redirect(url_for('kic.new'))
+
+    excel_data = session.get('kic_excel_data', {})
+    certificate_id = session.get('kic_certificate_id')
+    certificate = Certificate.query.get(certificate_id) if certificate_id else None
+    reanalyze_id = session.get('kic_reanalyze_id')
+
     form = SpecimenForm()
 
     # Populate certificate dropdown
     certificates = Certificate.query.order_by(
         Certificate.year.desc(),
         Certificate.cert_id.desc()
-    ).all()
+    ).limit(100).all()
     form.certificate_id.choices = [(0, '-- Select Certificate --')] + [
         (c.id, f"{c.certificate_number_with_rev} - {c.customer or 'No customer'}")
         for c in certificates
     ]
 
-    # Check if coming from certificate page
-    cert_id = request.args.get('certificate', type=int)
-    if cert_id and request.method == 'GET':
-        form.certificate_id.data = cert_id
-        cert = Certificate.query.get(cert_id)
-        if cert:
-            # Pre-fill form from certificate data (certificate is the master)
-            form.material.data = cert.material
-            form.specimen_id.data = cert.test_article_sn  # Specimen SN from certificate
-            form.customer_specimen_info.data = cert.customer_specimen_info
-            form.requirement.data = cert.requirement
-            form.location_orientation.data = cert.location_orientation
-            # Parse temperature - handle string format
-            if cert.temperature:
+    # Pre-fill form from Excel data and certificate
+    if request.method == 'GET':
+        # Generate test ID
+        form.test_id.data = generate_test_id()
+
+        # Pre-fill from Excel data
+        if excel_data.get('specimen_id'):
+            form.specimen_id.data = excel_data['specimen_id']
+        if excel_data.get('specimen_type'):
+            form.specimen_type.data = excel_data['specimen_type']
+        if excel_data.get('W'):
+            form.W.data = excel_data['W']
+        if excel_data.get('B'):
+            form.B.data = excel_data['B']
+        if excel_data.get('B_n'):
+            form.B_n.data = excel_data['B_n']
+        if excel_data.get('a_0'):
+            form.a_0.data = excel_data['a_0']
+        if excel_data.get('S'):
+            form.S.data = excel_data['S']
+        if excel_data.get('yield_strength'):
+            form.yield_strength.data = excel_data['yield_strength']
+        if excel_data.get('ultimate_strength'):
+            form.ultimate_strength.data = excel_data['ultimate_strength']
+        if excel_data.get('youngs_modulus'):
+            form.youngs_modulus.data = excel_data['youngs_modulus']
+        if excel_data.get('poissons_ratio'):
+            form.poissons_ratio.data = excel_data['poissons_ratio']
+        if excel_data.get('test_temperature'):
+            form.temperature.data = excel_data['test_temperature']
+        if excel_data.get('material'):
+            form.material.data = excel_data['material']
+
+        # Pre-fill 5-point crack measurements
+        crack_measurements = excel_data.get('crack_measurements', [])
+        if len(crack_measurements) == 5:
+            for i, val in enumerate(crack_measurements):
+                getattr(form, f'crack_{i+1}').data = val
+
+        # Certificate data overrides Excel data
+        if certificate:
+            if certificate.material:
+                form.material.data = certificate.material
+            if certificate.test_article_sn:
+                form.specimen_id.data = certificate.test_article_sn
+            if certificate.customer_specimen_info:
+                form.customer_specimen_info.data = certificate.customer_specimen_info
+            if certificate.requirement:
+                form.requirement.data = certificate.requirement
+            if certificate.location_orientation:
+                form.location_orientation.data = certificate.location_orientation
+            if certificate.temperature:
                 try:
-                    # Remove units like "°C" or "C"
-                    temp_str = cert.temperature.replace('°C', '').replace('C', '').strip()
+                    temp_str = certificate.temperature.replace('°C', '').replace('C', '').strip()
                     form.temperature.data = float(temp_str)
                 except (ValueError, AttributeError):
-                    form.temperature.data = 23.0
-            else:
-                form.temperature.data = 23.0
+                    pass
+            form.certificate_id.data = certificate_id
 
     if form.validate_on_submit():
         try:
-            # ============================================================
-            # STEP 1: Parse Excel file first (primary data source)
-            # ============================================================
-            excel_data = None
-            raw_data = {}
+            # Get CSV data for analysis
+            csv_path = session.get('kic_csv_path')
+            force = None
+            displacement = None
 
-            if form.excel_file.data:
-                excel_file = form.excel_file.data
-                filename = secure_filename(excel_file.filename)
-                filepath = Path(current_app.config['UPLOAD_FOLDER']) / filename
-                excel_file.save(filepath)
-
-                try:
-                    excel_data = parse_kic_excel(filepath)
-                    raw_data['excel_file'] = filename
-                    raw_data['mts_results'] = excel_data.kic_results
-                    current_app.logger.info(f'KIC Excel import: Specimen {excel_data.specimen_id}, W={excel_data.W}, B={excel_data.B}')
-                    flash(f'Excel data imported: Specimen {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm', 'info')
-                except Exception as e:
-                    current_app.logger.warning(f'Error parsing Excel: {e}')
-                    flash(f'Error parsing Excel: {e}', 'warning')
-
-            # ============================================================
-            # STEP 2: Parse CSV file for raw force-displacement data
-            # ============================================================
-            if form.csv_file.data:
+            if csv_path and Path(csv_path).exists():
+                test_data = parse_kic_csv(csv_path)
+                force = test_data.force
+                displacement = test_data.displacement
+            elif form.csv_file.data:
+                # User uploaded CSV in this step
                 csv_file = form.csv_file.data
                 filename = secure_filename(csv_file.filename)
-                filepath = Path(current_app.config['UPLOAD_FOLDER']) / filename
-                csv_file.save(filepath)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                csv_filepath = Path(current_app.config['UPLOAD_FOLDER']) / f"{timestamp}_{filename}"
+                csv_file.save(csv_filepath)
+                test_data = parse_kic_csv(csv_filepath)
+                force = test_data.force
+                displacement = test_data.displacement
 
-                try:
-                    test_data = parse_kic_csv(filepath)
-                    raw_data['force'] = test_data.force.tolist()
-                    raw_data['displacement'] = test_data.displacement.tolist()
-                    raw_data['time'] = test_data.time.tolist()
-                    raw_data['csv_file'] = filename
-                    flash('CSV data imported successfully.', 'success')
-                except Exception as e:
-                    current_app.logger.warning(f'Error parsing CSV: {e}')
-                    flash(f'Error parsing CSV: {e}', 'warning')
+            if force is None or displacement is None:
+                flash('Please upload CSV test data with Force and Displacement columns.', 'danger')
+                return render_template('kic/new.html', form=form, certificate=certificate,
+                                     excel_data=excel_data, is_specimen_step=True)
 
-            # ============================================================
-            # STEP 3: Extract values - Excel takes precedence over form
-            # ============================================================
+            # Get values from form
+            specimen_id = form.specimen_id.data or ''
+            specimen_type = form.specimen_type.data or 'SE(B)'
+            W = form.W.data or 25.0
+            B = form.B.data or 12.0
+            B_n = form.B_n.data or B
+            a_0 = form.a_0.data or 12.5
+            S = form.S.data if specimen_type == 'SE(B)' else None
+            yield_strength = form.yield_strength.data or 500.0
+            ultimate_strength = form.ultimate_strength.data
+            youngs_modulus = form.youngs_modulus.data or 210.0
+            poissons_ratio = form.poissons_ratio.data or 0.3
+            temperature = form.temperature.data or 23.0
+            material_name = form.material.data or ''
 
-            # Specimen identification - Excel "Name of the Test Run" takes precedence
-            if excel_data and excel_data.specimen_id:
-                specimen_id = excel_data.specimen_id
-                current_app.logger.info(f'KIC: Using specimen_id from Excel "Name of the Test Run": {specimen_id}')
-            else:
-                specimen_id = form.specimen_id.data or ''
-                current_app.logger.info(f'KIC: Using specimen_id from form: {specimen_id}')
-
-            # Specimen type
-            if excel_data and excel_data.specimen_type:
-                specimen_type = excel_data.specimen_type
-            else:
-                specimen_type = form.specimen_type.data or 'SE(B)'
-
-            # Specimen dimensions - Excel takes precedence
-            if excel_data and excel_data.W > 0:
-                W = excel_data.W
-            else:
-                W = form.W.data or 25.0
-
-            if excel_data and excel_data.B > 0:
-                B = excel_data.B
-            else:
-                B = form.B.data or 12.0
-
-            if excel_data and excel_data.B_n > 0:
-                B_n = excel_data.B_n
-            else:
-                B_n = form.B_n.data or B
-
-            if excel_data and excel_data.a_0 > 0:
-                a_0 = excel_data.a_0
-            else:
-                a_0 = form.a_0.data or 12.5
-
-            if excel_data and excel_data.S > 0:
-                S = excel_data.S
-            else:
-                S = form.S.data if specimen_type == 'SE(B)' else None
-
-            # Crack measurements - Excel first
+            # Get crack measurements from form
             crack_measurements = []
-            if excel_data and excel_data.precrack_measurements:
-                crack_measurements = excel_data.precrack_measurements
-            else:
-                # Collect from form
-                for i in range(1, 6):
-                    val = getattr(form, f'crack_{i}').data
-                    if val is not None and val > 0:
-                        crack_measurements.append(val)
+            for i in range(1, 6):
+                val = getattr(form, f'crack_{i}').data
+                if val is not None and val > 0:
+                    crack_measurements.append(val)
 
-            # Precrack final size
-            precrack_final_size = None
-            if excel_data and excel_data.precrack_final_size > 0:
-                precrack_final_size = excel_data.precrack_final_size
-
-            # IMPORTANT: For KIC analysis, a_0 should be the actual crack length
-            # (from precrack measurements), not the notch length!
-            # Calculate average crack length from 5-point measurements per ASTM E399
+            # Recalculate a_0 if 5-point measurements provided
             if len(crack_measurements) == 5:
                 a = crack_measurements
-                # E399 formula: a = (0.5*a1 + a2 + a3 + a4 + 0.5*a5) / 4
-                a_0_calculated = (0.5 * a[0] + a[1] + a[2] + a[3] + 0.5 * a[4]) / 4
-                a_0 = a_0_calculated
+                a_0 = (0.5 * a[0] + a[1] + a[2] + a[3] + 0.5 * a[4]) / 4
                 current_app.logger.info(f'KIC: Using calculated crack length from 5-point measurements: a_0={a_0:.3f} mm')
-            elif precrack_final_size and precrack_final_size > 0:
-                # Fall back to precrack final size from compliance
-                a_0 = precrack_final_size
-                current_app.logger.info(f'KIC: Using precrack final size: a_0={a_0:.3f} mm')
 
-            # Material properties - Excel takes precedence
-            if excel_data and excel_data.yield_strength > 0:
-                yield_strength = excel_data.yield_strength
-            else:
-                yield_strength = form.yield_strength.data or 500.0
-
-            if excel_data and excel_data.ultimate_strength > 0:
-                ultimate_strength = excel_data.ultimate_strength
-            else:
-                ultimate_strength = form.ultimate_strength.data
-
-            if excel_data and excel_data.youngs_modulus > 0:
-                youngs_modulus = excel_data.youngs_modulus
-            else:
-                youngs_modulus = form.youngs_modulus.data or 210.0
-
-            if excel_data and excel_data.poissons_ratio > 0:
-                poissons_ratio = excel_data.poissons_ratio
-            else:
-                poissons_ratio = form.poissons_ratio.data or 0.3
-
-            # Temperature - Excel first
-            if excel_data and excel_data.test_temperature != 23.0:
-                temperature = excel_data.test_temperature
-            else:
-                temperature = form.temperature.data if form.temperature.data else 23.0
-
-            # Log extracted values
-            current_app.logger.info(f'KIC Analysis - Specimen: {specimen_id}, W={W}, B={B}, a_0={a_0}')
-            current_app.logger.info(f'KIC Analysis - Material: yield={yield_strength} MPa, E={youngs_modulus} GPa')
-            if crack_measurements:
-                current_app.logger.info(f'KIC Analysis - Crack measurements: {crack_measurements}')
-
-            # ============================================================
-            # STEP 3b: Validate required values after Excel/form merge
-            # ============================================================
+            # Validate required values
             validation_errors = []
             if not W or W <= 0:
                 validation_errors.append('Width (W) is required')
@@ -329,26 +379,33 @@ def new():
 
             if validation_errors:
                 for error in validation_errors:
-                    flash(f'{error}. Please provide in form or upload Excel file with this data.', 'danger')
-                # Get certificate for re-rendering the form
-                cert_id = request.args.get('certificate', type=int)
-                cert = Certificate.query.get(cert_id) if cert_id else None
-                return render_template('kic/new.html', form=form, certificate=cert)
+                    flash(f'{error}', 'danger')
+                return render_template('kic/new.html', form=form, certificate=certificate,
+                                     excel_data=excel_data, is_specimen_step=True)
 
-            # ============================================================
-            # STEP 4: Build data structures and create test record
-            # ============================================================
+            # Create specimen and material objects
+            import numpy as np
+            specimen_obj = KICSpecimen(
+                specimen_id=specimen_id,
+                specimen_type=specimen_type,
+                W=W,
+                B=B,
+                B_n=B_n,
+                a_0=a_0,
+                S=S or 0.0
+            )
 
-            # Link to certificate if selected
-            certificate_id = None
-            cert_number = None
-            if form.certificate_id.data and form.certificate_id.data != 0:
-                cert = Certificate.query.get(form.certificate_id.data)
-                if cert:
-                    certificate_id = cert.id
-                    cert_number = cert.certificate_number_with_rev
+            material_obj = KICMaterial(
+                yield_strength=yield_strength,
+                youngs_modulus=youngs_modulus,
+                poissons_ratio=poissons_ratio
+            )
 
-            # Build specimen geometry dictionary
+            # Run analysis
+            analyzer = KICAnalyzer()
+            result = analyzer.run_analysis(np.array(force), np.array(displacement), specimen_obj, material_obj)
+
+            # Build geometry dict for storage
             specimen_geometry = {
                 'type': specimen_type,
                 'W': W,
@@ -359,10 +416,7 @@ def new():
             }
             if len(crack_measurements) == 5:
                 specimen_geometry['crack_measurements'] = crack_measurements
-            if precrack_final_size:
-                specimen_geometry['precrack_final_size'] = precrack_final_size
 
-            # Build material properties dictionary
             material_props = {
                 'yield_strength': yield_strength,
                 'ultimate_strength': ultimate_strength,
@@ -370,7 +424,12 @@ def new():
                 'poissons_ratio': poissons_ratio,
             }
 
-            # Build complete geometry dict (stores all structured data)
+            raw_data = {
+                'force': force.tolist() if hasattr(force, 'tolist') else list(force),
+                'displacement': displacement.tolist() if hasattr(displacement, 'tolist') else list(displacement),
+                'mts_results': excel_data.get('kic_results', {}),
+            }
+
             geometry_data = {
                 'specimen_geometry': specimen_geometry,
                 'material_properties': material_props,
@@ -379,99 +438,149 @@ def new():
                 'raw_data': raw_data,
             }
 
-            # Create test record
-            test = TestRecord(
-                test_id=form.test_id.data,
-                test_method='KIC',
-                specimen_id=specimen_id,
-                material=form.material.data,
-                test_date=form.test_date.data or datetime.now().date(),
-                temperature=temperature,
-                geometry=geometry_data,
-                status='DRAFT',
-                certificate_id=certificate_id,
-                certificate_number=cert_number,
-                operator_id=current_user.id
-            )
+            # Handle re-analysis vs new test
+            if reanalyze_id:
+                test = TestRecord.query.get_or_404(reanalyze_id)
+                test.specimen_id = specimen_id
+                test.material = material_name
+                test.temperature = temperature
+                test.geometry = geometry_data
+                test.status = 'REANALYZED'
 
-            # Add test to session and flush to get ID before creating analysis records
-            db.session.add(test)
-            db.session.flush()
+                # Delete old analysis results
+                AnalysisResult.query.filter_by(test_record_id=test.id).delete()
+                db.session.flush()
 
-            # Run analysis if we have force-displacement data
-            if 'force' in raw_data and 'displacement' in raw_data:
-                # Create specimen and material objects
-                specimen = KICSpecimen(
+                session.pop('kic_reanalyze_id', None)
+                action = 'REANALYZE'
+                test_id = test.test_id
+            else:
+                test_id = form.test_id.data
+                selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else None
+                selected_cert = Certificate.query.get(selected_cert_id) if selected_cert_id else None
+                cert_number = selected_cert.certificate_number_with_rev if selected_cert else None
+
+                test = TestRecord(
+                    test_id=test_id,
+                    test_method='KIC',
                     specimen_id=specimen_id,
-                    specimen_type=specimen_geometry['type'],
-                    W=specimen_geometry['W'],
-                    B=specimen_geometry['B'],
-                    B_n=specimen_geometry.get('B_n', specimen_geometry['B']),
-                    a_0=specimen_geometry['a_0'],
-                    S=specimen_geometry.get('S') or 0.0
+                    material=material_name,
+                    test_date=form.test_date.data or datetime.now().date(),
+                    temperature=temperature,
+                    geometry=geometry_data,
+                    status='ANALYZED',
+                    certificate_id=selected_cert_id,
+                    certificate_number=cert_number,
+                    operator_id=current_user.id
                 )
+                db.session.add(test)
+                db.session.flush()
+                action = 'CREATE'
 
-                material = KICMaterial(
-                    yield_strength=material_props['yield_strength'],
-                    youngs_modulus=material_props['youngs_modulus'],
-                    poissons_ratio=material_props.get('poissons_ratio', 0.3)
+            # Store analysis results
+            results_to_store = [
+                ('P_max', result.P_max.value, result.P_max.uncertainty, 'kN'),
+                ('P_Q', result.P_Q.value, result.P_Q.uncertainty, 'kN'),
+                ('K_Q', result.K_Q.value, result.K_Q.uncertainty, 'MPa*m^0.5'),
+                ('P_ratio', result.P_ratio, None, '-'),
+                ('compliance', result.compliance, None, 'mm/kN'),
+            ]
+            if result.K_IC:
+                results_to_store.append(('K_IC', result.K_IC.value, result.K_IC.uncertainty, 'MPa*m^0.5'))
+
+            for param_name, value, uncertainty, unit in results_to_store:
+                analysis = AnalysisResult(
+                    test_record_id=test.id,
+                    parameter_name=param_name,
+                    value=value,
+                    uncertainty=uncertainty,
+                    unit=unit,
+                    is_valid=result.is_valid,
+                    validity_notes=', '.join(result.validity_notes) if result.validity_notes else None,
+                    calculated_by_id=current_user.id
                 )
-
-                import numpy as np
-                force = np.array(raw_data['force'])
-                displacement = np.array(raw_data['displacement'])
-
-                # Run KIC analysis
-                analyzer = KICAnalyzer()
-                result = analyzer.run_analysis(force, displacement, specimen, material)
-
-                # Store results as individual AnalysisResult records
-                results_to_store = [
-                    ('P_max', result.P_max.value, result.P_max.uncertainty, 'kN'),
-                    ('P_Q', result.P_Q.value, result.P_Q.uncertainty, 'kN'),
-                    ('K_Q', result.K_Q.value, result.K_Q.uncertainty, 'MPa*m^0.5'),
-                    ('P_ratio', result.P_ratio, None, '-'),
-                    ('compliance', result.compliance, None, 'mm/kN'),
-                ]
-                if result.K_IC:
-                    results_to_store.append(('K_IC', result.K_IC.value, result.K_IC.uncertainty, 'MPa*m^0.5'))
-
-                for param_name, value, uncertainty, unit in results_to_store:
-                    analysis = AnalysisResult(
-                        test_record_id=test.id,
-                        parameter_name=param_name,
-                        value=value,
-                        uncertainty=uncertainty,
-                        unit=unit,
-                        is_valid=result.is_valid,
-                        validity_notes=', '.join(result.validity_notes) if result.validity_notes else None,
-                        calculated_by_id=current_user.id
-                    )
-                    db.session.add(analysis)
-
-                test.status = 'ANALYZED'
-                flash('KIC analysis completed.', 'success')
+                db.session.add(analysis)
 
             # Audit log
             audit = AuditLog(
                 user_id=current_user.id,
-                action='CREATE',
+                action=action,
                 table_name='test_record',
                 record_id=test.id,
-                new_values=json.dumps({'test_id': test.test_id, 'test_method': 'KIC'})
+                new_values=json.dumps({'test_id': test_id, 'test_method': 'KIC'})
             )
             db.session.add(audit)
             db.session.commit()
 
-            flash(f'KIC test {test.test_id} created.', 'success')
+            # Clear session data
+            session.pop('kic_excel_path', None)
+            session.pop('kic_excel_data', None)
+            session.pop('kic_csv_path', None)
+            session.pop('kic_certificate_id', None)
+
+            if action == 'REANALYZE':
+                flash(f'Re-analysis complete! Test ID: {test_id}', 'success')
+            else:
+                flash(f'KIC analysis complete! Test ID: {test_id}', 'success')
+
+            if not result.is_valid:
+                flash(f'Warning: {", ".join(result.validity_notes)}', 'warning')
+
             return redirect(url_for('kic.view', test_id=test.id))
 
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'Error creating KIC test: {e}')
-            flash(f'Error creating test: {e}', 'error')
+            flash(f'Analysis error: {str(e)}', 'danger')
+            import traceback
+            traceback.print_exc()
 
-    return render_template('kic/new.html', form=form)
+    return render_template('kic/new.html', form=form, certificate=certificate,
+                         excel_data=excel_data, is_specimen_step=True)
+
+
+@kic_bp.route('/<int:test_id>/reanalyze', methods=['GET', 'POST'])
+@login_required
+def reanalyze(test_id):
+    """Re-analyze test with modified parameters."""
+    test = TestRecord.query.get_or_404(test_id)
+    geometry_data = test.geometry or {}
+    geometry = geometry_data.get('specimen_geometry', {})
+    material_props = geometry_data.get('material_properties', {})
+
+    # Store test data in session for the specimen step
+    session['kic_excel_data'] = {
+        'filename': f'(Re-analysis of {test.test_id})',
+        'specimen_id': test.specimen_id,
+        'specimen_type': geometry.get('type', 'SE(B)'),
+        'W': geometry.get('W'),
+        'B': geometry.get('B'),
+        'B_n': geometry.get('B_n'),
+        'a_0': geometry.get('a_0'),
+        'S': geometry.get('S'),
+        'yield_strength': material_props.get('yield_strength'),
+        'ultimate_strength': material_props.get('ultimate_strength'),
+        'youngs_modulus': material_props.get('youngs_modulus'),
+        'poissons_ratio': material_props.get('poissons_ratio'),
+        'test_temperature': test.temperature,
+        'material': test.material,
+        'crack_measurements': geometry.get('crack_measurements', []),
+        'kic_results': geometry_data.get('raw_data', {}).get('mts_results', {}),
+    }
+
+    # Mark this as a re-analysis
+    session['kic_reanalyze_id'] = test_id
+
+    # Store certificate if linked
+    if test.certificate_id:
+        session['kic_certificate_id'] = test.certificate_id
+    else:
+        session.pop('kic_certificate_id', None)
+
+    # Clear any old CSV path - user must re-upload for re-analysis
+    session.pop('kic_csv_path', None)
+
+    flash(f'Loaded test {test.test_id} for re-analysis. Please upload the CSV test data and modify parameters as needed.', 'info')
+    return redirect(url_for('kic.specimen'))
 
 
 @kic_bp.route('/<int:test_id>')
