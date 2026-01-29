@@ -241,11 +241,13 @@ def new():
             # STEP 3: Extract values - Excel takes precedence over form
             # ============================================================
 
-            # Specimen identification - Excel first, then form
+            # Specimen identification - Excel "Name of the Test Run" takes precedence
             if excel_data and excel_data.specimen_id:
                 specimen_id = excel_data.specimen_id
+                current_app.logger.info(f'FCGR: Using specimen_id from Excel "Name of the Test Run": {specimen_id}')
             else:
                 specimen_id = form.specimen_id.data or ''
+                current_app.logger.info(f'FCGR: Using specimen_id from form: {specimen_id}')
 
             # Specimen type - Excel first, then form
             if excel_data and excel_data.specimen_type:
