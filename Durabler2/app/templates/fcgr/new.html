@@ -1,12 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}New FCGR Test{% endblock %}
+{% block title %}{% if is_specimen_step %}Review &amp; Analyze FCGR Test{% else %}New FCGR Test{% endif %}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('fcgr.index') }}">FCGR Tests</a></li>
+        {% if is_specimen_step %}
+        <li class="breadcrumb-item"><a href="{{ url_for('fcgr.new') }}">Upload</a></li>
+        <li class="breadcrumb-item active">Review &amp; Analyze</li>
+        {% else %}
         <li class="breadcrumb-item active">New Test</li>
+        {% endif %}
     </ol>
 </nav>
 
@@ -14,9 +19,36 @@
     <div class="col-lg-10">
         <div class="card shadow">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-graph-up"></i> New FCGR Test (E647)</h4>
+                <h4 class="mb-0">
+                    <i class="bi bi-graph-up"></i>
+                    {% if is_specimen_step %}Step 2: Review Imported Data &amp; Run Analysis{% else %}New FCGR Test (E647){% endif %}
+                </h4>
             </div>
             <div class="card-body">
+                {% if is_specimen_step and excel_data %}
+                <!-- Imported Data Summary -->
+                <div class="alert alert-success mb-4">
+                    <h6 class="alert-heading"><i class="bi bi-check-circle"></i> Data Imported from Excel</h6>
+                    <div class="row small">
+                        <div class="col-md-4">
+                            <strong>File:</strong> {{ excel_data.filename }}<br>
+                            <strong>Specimen:</strong> {{ excel_data.specimen_id }}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>W:</strong> {{ excel_data.W }} mm |
+                            <strong>B:</strong> {{ excel_data.B }} mm<br>
+                            <strong>a₀:</strong> {{ "%.2f"|format(excel_data.a_0) }} mm
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Yield:</strong> {{ excel_data.yield_strength }} MPa<br>
+                            <strong>E:</strong> {{ excel_data.youngs_modulus }} GPa
+                        </div>
+                    </div>
+                    <hr class="my-2">
+                    <p class="mb-0 small"><i class="bi bi-pencil"></i> Review and edit the values below before running analysis. Certificate data will override Excel data where applicable.</p>
+                </div>
+                {% endif %}
+
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
 
@@ -34,7 +66,18 @@
                         </div>
                     </div>
 
-                    <!-- File Upload -->
+                    {% if is_specimen_step %}
+                    <!-- CSV Upload for analysis (specimen step) -->
+                    <div class="card mb-4">
+                        <div class="card-header"><h6 class="mb-0"><i class="bi bi-file-earmark-bar-graph"></i> Raw Test Data</h6></div>
+                        <div class="card-body">
+                            {{ form.csv_file.label(class="form-label") }}
+                            {{ form.csv_file(class="form-control", accept=".csv") }}
+                            <small class="text-muted">Cyclic test data with cycles, loads, crack lengths (required for analysis)</small>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- File Upload (original step) -->
                     <div class="card mb-4">
                         <div class="card-header"><h6 class="mb-0"><i class="bi bi-upload"></i> Data Files</h6></div>
                         <div class="card-body">
@@ -56,6 +99,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
 
                     <div class="row">
                         <!-- Specimen Information -->
@@ -217,7 +261,16 @@
                     </div>
 
                     <div class="d-grid gap-2">
+                        {% if is_specimen_step %}
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-calculator"></i> Run Analysis
+                        </button>
+                        <a href="{{ url_for('fcgr.new') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Upload
+                        </a>
+                        {% else %}
                         {{ form.submit(class="btn btn-primary btn-lg") }}
+                        {% endif %}
                         <a href="{{ url_for('fcgr.index') }}" class="btn btn-outline-secondary">Cancel</a>
                     </div>
                 </form>

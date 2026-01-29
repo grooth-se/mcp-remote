@@ -20,6 +20,9 @@
         </p>
     </div>
     <div>
+        <a href="{{ url_for('fcgr.reanalyze', test_id=test.id) }}" class="btn btn-warning">
+            <i class="bi bi-arrow-repeat"></i> Re-analyze
+        </a>
         <a href="{{ url_for('fcgr.report', test_id=test.id) }}" class="btn btn-success">
             <i class="bi bi-file-earmark-pdf"></i> Generate Report
         </a>

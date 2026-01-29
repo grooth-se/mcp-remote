@@ -155,7 +155,112 @@ def index():
 @fcgr_bp.route('/new', methods=['GET', 'POST'])
 @login_required
 def new():
-    """Create new FCGR test."""
+    """Step 1: Upload Excel file and verify imported data."""
+    form = UploadForm()
+
+    # Populate certificate dropdown
+    certificates = Certificate.query.order_by(
+        Certificate.year.desc(),
+        Certificate.cert_id.desc()
+    ).limit(100).all()
+    form.certificate_id.choices = [(0, '-- Select Certificate --')] + [
+        (c.id, f"{c.certificate_number_with_rev} - {c.customer or 'No customer'}")
+        for c in certificates
+    ]
+
+    # Get certificate from URL parameter
+    cert_id = request.args.get('certificate', type=int)
+    if request.method == 'GET' and cert_id:
+        form.certificate_id.data = cert_id
+
+    if form.validate_on_submit():
+        try:
+            # Save and parse Excel file
+            excel_file = form.excel_file.data
+            filename = secure_filename(excel_file.filename)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            saved_filename = f"{timestamp}_{filename}"
+            filepath = Path(current_app.config['UPLOAD_FOLDER']) / saved_filename
+            excel_file.save(filepath)
+
+            excel_data = parse_fcgr_excel(filepath)
+
+            # Calculate a_0 from 5-point measurements if available
+            a_0_calculated = excel_data.a_0
+            precrack_measurements = excel_data.precrack_measurements or []
+            if len(precrack_measurements) == 5:
+                a = precrack_measurements
+                a_0_calculated = (0.5 * a[0] + a[1] + a[2] + a[3] + 0.5 * a[4]) / 4
+                current_app.logger.info(f'FCGR: Calculated crack length from 5-point measurements: a_0={a_0_calculated:.3f} mm')
+
+            # Store parsed data in session
+            session['fcgr_excel_path'] = str(filepath)
+            session['fcgr_excel_data'] = {
+                'filename': filename,
+                'specimen_id': excel_data.specimen_id,
+                'specimen_type': excel_data.specimen_type,
+                'W': excel_data.W,
+                'B': excel_data.B,
+                'B_n': excel_data.B_n,
+                'a_0': a_0_calculated,
+                'a_0_notch': excel_data.a_0,
+                'notch_height': excel_data.notch_height,
+                'yield_strength': excel_data.yield_strength,
+                'ultimate_strength': excel_data.ultimate_strength,
+                'youngs_modulus': excel_data.youngs_modulus,
+                'poissons_ratio': excel_data.poissons_ratio,
+                'test_temperature': excel_data.test_temperature,
+                'material': excel_data.material,
+                'precrack_measurements': precrack_measurements,
+                'precrack_final_size': excel_data.precrack_final_size,
+                'control_mode': excel_data.control_mode,
+                'load_ratio': excel_data.load_ratio,
+                'frequency': excel_data.frequency,
+                'wave_shape': excel_data.wave_shape,
+            }
+
+            # Store certificate selection
+            if form.certificate_id.data and form.certificate_id.data > 0:
+                session['fcgr_certificate_id'] = form.certificate_id.data
+            else:
+                session.pop('fcgr_certificate_id', None)
+
+            # Handle optional CSV file
+            if form.csv_file.data:
+                csv_file = form.csv_file.data
+                csv_filename = secure_filename(csv_file.filename)
+                csv_saved = f"{timestamp}_{csv_filename}"
+                csv_filepath = Path(current_app.config['UPLOAD_FOLDER']) / csv_saved
+                csv_file.save(csv_filepath)
+                session['fcgr_csv_path'] = str(csv_filepath)
+            else:
+                session.pop('fcgr_csv_path', None)
+
+            flash(f'Excel data imported: {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm, a₀={a_0_calculated:.2f}mm', 'success')
+            return redirect(url_for('fcgr.specimen'))
+
+        except Exception as e:
+            flash(f'Error parsing Excel file: {str(e)}', 'danger')
+            import traceback
+            traceback.print_exc()
+
+    return render_template('fcgr/upload.html', form=form)
+
+
+@fcgr_bp.route('/specimen', methods=['GET', 'POST'])
+@login_required
+def specimen():
+    """Step 2: Review imported data and run analysis."""
+    # Check if Excel was uploaded
+    if 'fcgr_excel_data' not in session:
+        flash('Please upload an Excel file first.', 'warning')
+        return redirect(url_for('fcgr.new'))
+
+    excel_data = session.get('fcgr_excel_data', {})
+    certificate_id = session.get('fcgr_certificate_id')
+    certificate = Certificate.query.get(certificate_id) if certificate_id else None
+    reanalyze_id = session.get('fcgr_reanalyze_id')
+
     form = SpecimenForm()
 
     # Populate certificate dropdown
@@ -168,221 +273,138 @@ def new():
         for c in certificates
     ]
 
-    # Get certificate from URL parameter or form selection
-    cert_id = request.args.get('certificate', type=int)
-    if request.method == 'GET' and cert_id:
-        form.certificate_id.data = cert_id
+    # Pre-fill form from Excel data and certificate
+    if request.method == 'GET':
+        # Pre-fill from Excel data
+        if excel_data.get('specimen_id'):
+            form.specimen_id.data = excel_data['specimen_id']
+        if excel_data.get('specimen_type'):
+            form.specimen_type.data = excel_data['specimen_type']
+        if excel_data.get('W'):
+            form.W.data = excel_data['W']
+        if excel_data.get('B'):
+            form.B.data = excel_data['B']
+        if excel_data.get('B_n'):
+            form.B_n.data = excel_data['B_n']
+        if excel_data.get('a_0'):
+            form.a_0.data = excel_data['a_0']
+        if excel_data.get('notch_height'):
+            form.notch_height.data = excel_data['notch_height']
+        if excel_data.get('yield_strength'):
+            form.yield_strength.data = excel_data['yield_strength']
+        if excel_data.get('ultimate_strength'):
+            form.ultimate_strength.data = excel_data['ultimate_strength']
+        if excel_data.get('youngs_modulus'):
+            form.youngs_modulus.data = excel_data['youngs_modulus']
+        if excel_data.get('poissons_ratio'):
+            form.poissons_ratio.data = excel_data['poissons_ratio']
+        if excel_data.get('test_temperature'):
+            form.test_temperature.data = excel_data['test_temperature']
+        if excel_data.get('material'):
+            form.material.data = excel_data['material']
+        if excel_data.get('control_mode'):
+            form.control_mode.data = excel_data['control_mode']
+        if excel_data.get('load_ratio') is not None:
+            form.load_ratio.data = excel_data['load_ratio']
+        if excel_data.get('frequency'):
+            form.frequency.data = excel_data['frequency']
+        if excel_data.get('wave_shape'):
+            form.wave_shape.data = excel_data['wave_shape']
 
-    # Get selected certificate
-    selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else cert_id
-    certificate = Certificate.query.get(selected_cert_id) if selected_cert_id else None
-
-    # Pre-fill from certificate (certificate register is the master)
-    if request.method == 'GET' and certificate:
-        if certificate.material:
-            form.material.data = certificate.material
-        if certificate.test_article_sn:
-            form.specimen_id.data = certificate.test_article_sn  # Specimen SN
-        if certificate.product_sn:
-            form.batch_number.data = certificate.product_sn
-        if certificate.customer_specimen_info:
-            form.customer_specimen_info.data = certificate.customer_specimen_info
-        if certificate.requirement:
-            form.requirement.data = certificate.requirement
-        # Parse temperature - handle string format
-        if certificate.temperature:
-            try:
-                temp_str = certificate.temperature.replace('°C', '').replace('C', '').strip()
-                form.test_temperature.data = float(temp_str)
-            except (ValueError, AttributeError):
-                form.test_temperature.data = 23.0
+        # Certificate data overrides Excel data
+        if certificate:
+            if certificate.material:
+                form.material.data = certificate.material
+            if certificate.test_article_sn:
+                form.specimen_id.data = certificate.test_article_sn
+            if certificate.product_sn:
+                form.batch_number.data = certificate.product_sn
+            if certificate.customer_specimen_info:
+                form.customer_specimen_info.data = certificate.customer_specimen_info
+            if certificate.requirement:
+                form.requirement.data = certificate.requirement
+            if certificate.temperature:
+                try:
+                    temp_str = certificate.temperature.replace('°C', '').replace('C', '').strip()
+                    form.test_temperature.data = float(temp_str)
+                except (ValueError, AttributeError):
+                    pass
+            form.certificate_id.data = certificate_id
 
     if form.validate_on_submit():
         try:
-            # ============================================================
-            # STEP 1: Parse Excel file first (primary data source)
-            # ============================================================
-            excel_data = None
-            if form.excel_file.data:
-                excel_file = form.excel_file.data
-                filename = secure_filename(excel_file.filename)
-                filepath = Path(current_app.config['UPLOAD_FOLDER']) / filename
-                excel_file.save(filepath)
-                excel_data = parse_fcgr_excel(filepath)
-                flash(f'Excel data imported: Specimen {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm', 'info')
-
-            # ============================================================
-            # STEP 2: Parse CSV file for raw test data
-            # ============================================================
+            # Get CSV data for analysis
+            csv_path = session.get('fcgr_csv_path')
             csv_data = None
             cycles = None
-            crack_lengths = None
             P_max = None
             P_min = None
+            compliance_arr = None
 
-            if form.csv_file.data:
+            if csv_path and Path(csv_path).exists():
+                csv_data = parse_fcgr_csv(csv_path)
+                cycle_nums, P_max_arr, P_min_arr, COD_max, COD_min = extract_cycle_extrema(csv_data)
+                _, compliance_arr = calculate_compliance_per_cycle(csv_data)
+                cycles = cycle_nums.astype(float)
+                P_max = P_max_arr
+                P_min = P_min_arr
+            elif form.csv_file.data:
+                # User uploaded CSV in this step
                 csv_file = form.csv_file.data
                 filename = secure_filename(csv_file.filename)
-                filepath = Path(current_app.config['UPLOAD_FOLDER']) / filename
-                csv_file.save(filepath)
-                csv_data = parse_fcgr_csv(filepath)
-
-                # Extract cycle extrema (P_max, P_min per cycle)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                csv_filepath = Path(current_app.config['UPLOAD_FOLDER']) / f"{timestamp}_{filename}"
+                csv_file.save(csv_filepath)
+                csv_data = parse_fcgr_csv(csv_filepath)
                 cycle_nums, P_max_arr, P_min_arr, COD_max, COD_min = extract_cycle_extrema(csv_data)
-
-                # Calculate compliance per cycle
                 _, compliance_arr = calculate_compliance_per_cycle(csv_data)
-
                 cycles = cycle_nums.astype(float)
                 P_max = P_max_arr
                 P_min = P_min_arr
 
-            # ============================================================
-            # STEP 3: Extract values - Excel takes precedence over form
-            # ============================================================
+            if csv_data is None or cycles is None:
+                flash('Please upload CSV test data with cyclic Force-Displacement data.', 'danger')
+                return render_template('fcgr/new.html', form=form, certificate=certificate,
+                                     excel_data=excel_data, is_specimen_step=True)
 
-            # Specimen identification - Excel "Name of the Test Run" takes precedence
-            if excel_data and excel_data.specimen_id:
-                specimen_id = excel_data.specimen_id
-                current_app.logger.info(f'FCGR: Using specimen_id from Excel "Name of the Test Run": {specimen_id}')
-            else:
-                specimen_id = form.specimen_id.data or ''
-                current_app.logger.info(f'FCGR: Using specimen_id from form: {specimen_id}')
-
-            # Specimen type - Excel first, then form
-            if excel_data and excel_data.specimen_type:
-                specimen_type = excel_data.specimen_type
-            else:
-                specimen_type = form.specimen_type.data or 'C(T)'
-
-            # Specimen dimensions - Excel takes precedence
-            if excel_data and excel_data.W > 0:
-                W = excel_data.W
-            else:
-                W = form.W.data or 50.0
-
-            if excel_data and excel_data.B > 0:
-                B = excel_data.B
-            else:
-                B = form.B.data or 12.5
-
-            if excel_data and excel_data.B_n > 0:
-                B_n = excel_data.B_n
-            else:
-                B_n = form.B_n.data or B
-
-            if excel_data and excel_data.a_0 > 0:
-                a_0 = excel_data.a_0
-            else:
-                a_0 = form.a_0.data or 10.0
-
-            # IMPORTANT: For FCGR analysis, a_0 should be the actual crack length
-            # (from precrack measurements), not the notch length!
-            # Get precrack measurements
-            precrack_measurements = []
-            if excel_data and excel_data.precrack_measurements:
-                precrack_measurements = excel_data.precrack_measurements
-
-            # Calculate average crack length from 5-point measurements per ASTM E647
-            if len(precrack_measurements) == 5:
-                a = precrack_measurements
-                # E647 formula (same as E399): a = (0.5*a1 + a2 + a3 + a4 + 0.5*a5) / 4
-                a_0_calculated = (0.5 * a[0] + a[1] + a[2] + a[3] + 0.5 * a[4]) / 4
-                a_0 = a_0_calculated
-                current_app.logger.info(f'FCGR: Using calculated crack length from 5-point measurements: a_0={a_0:.3f} mm')
-            elif excel_data and excel_data.precrack_final_size > 0:
-                # Fall back to precrack final size from compliance
-                a_0 = excel_data.precrack_final_size
-                current_app.logger.info(f'FCGR: Using precrack final size: a_0={a_0:.3f} mm')
-
-            if excel_data and excel_data.notch_height > 0:
-                notch_height = excel_data.notch_height
-            else:
-                notch_height = form.notch_height.data or 0.0
-
-            # Material properties - Excel takes precedence
-            if excel_data and excel_data.yield_strength > 0:
-                yield_strength = excel_data.yield_strength
-            else:
-                yield_strength = form.yield_strength.data or 0.0
-
-            if excel_data and excel_data.ultimate_strength > 0:
-                ultimate_strength = excel_data.ultimate_strength
-            else:
-                ultimate_strength = form.ultimate_strength.data or 0.0
-
-            if excel_data and excel_data.youngs_modulus > 0:
-                youngs_modulus = excel_data.youngs_modulus
-            else:
-                youngs_modulus = form.youngs_modulus.data or 210.0
-
-            if excel_data and excel_data.poissons_ratio > 0:
-                poissons_ratio = excel_data.poissons_ratio
-            else:
-                poissons_ratio = form.poissons_ratio.data or 0.3
-
-            # Test parameters - Excel takes precedence
-            if excel_data and excel_data.control_mode:
-                control_mode = excel_data.control_mode
-            else:
-                control_mode = form.control_mode.data or 'Load Control'
-
-            if excel_data and excel_data.load_ratio is not None:
-                load_ratio = excel_data.load_ratio
-            elif form.load_ratio.data is not None:
-                load_ratio = form.load_ratio.data
-            else:
-                load_ratio = 0.1
-
-            if excel_data and excel_data.frequency > 0:
-                frequency = excel_data.frequency
-            else:
-                frequency = form.frequency.data or 10.0
-
-            if excel_data and excel_data.wave_shape:
-                wave_shape = excel_data.wave_shape
-            else:
-                wave_shape = form.wave_shape.data or 'Sine'
-
-            if excel_data and excel_data.test_temperature != 23.0:
-                test_temperature = excel_data.test_temperature
-            elif form.test_temperature.data is not None:
-                test_temperature = form.test_temperature.data
-            else:
-                test_temperature = 23.0
-
-            # Material name - form takes precedence (user may want to specify)
+            # Get values from form
+            specimen_id = form.specimen_id.data or ''
+            specimen_type = form.specimen_type.data or 'C(T)'
+            W = form.W.data or 50.0
+            B = form.B.data or 12.5
+            B_n = form.B_n.data or B
+            a_0 = form.a_0.data or 10.0
+            notch_height = form.notch_height.data or 0.0
+            yield_strength = form.yield_strength.data or 0.0
+            ultimate_strength = form.ultimate_strength.data or 0.0
+            youngs_modulus = form.youngs_modulus.data or 210.0
+            poissons_ratio = form.poissons_ratio.data or 0.3
+            test_temperature = form.test_temperature.data or 23.0
             material_name = form.material.data or ''
+            control_mode = form.control_mode.data or 'Load Control'
+            load_ratio = form.load_ratio.data if form.load_ratio.data is not None else 0.1
+            frequency = form.frequency.data or 10.0
+            wave_shape = form.wave_shape.data or 'Sine'
 
-            # Log extracted values
-            current_app.logger.info(f'FCGR Analysis - Specimen: {specimen_id}, W={W}, B={B}, a_0={a_0}')
-            current_app.logger.info(f'FCGR Analysis - Material: yield={yield_strength} MPa, E={youngs_modulus} GPa')
-            current_app.logger.info(f'FCGR Analysis - Test params: R={load_ratio}, f={frequency} Hz')
-
-            # ============================================================
-            # STEP 3b: Validate required values after Excel/form merge
-            # ============================================================
+            # Validate required values
             validation_errors = []
             if not W or W <= 0:
                 validation_errors.append('Width (W) is required')
             if not B or B <= 0:
                 validation_errors.append('Thickness (B) is required')
             if not a_0 or a_0 <= 0:
-                validation_errors.append('Initial notch length (a₀) is required')
+                validation_errors.append('Initial crack length (a₀) is required')
             if not youngs_modulus or youngs_modulus <= 0:
                 validation_errors.append("Young's modulus (E) is required")
 
             if validation_errors:
                 for error in validation_errors:
-                    flash(f'{error}. Please provide in form or upload Excel file with this data.', 'danger')
-                return render_template('fcgr/new.html', form=form, certificate=certificate)
+                    flash(f'{error}', 'danger')
+                return render_template('fcgr/new.html', form=form, certificate=certificate,
+                                     excel_data=excel_data, is_specimen_step=True)
 
-            # ============================================================
-            # STEP 4: Create analysis objects and run analysis
-            # ============================================================
-
-            # Create specimen object
-            specimen = FCGRSpecimen(
+            # Create analysis objects
+            specimen_obj = FCGRSpecimen(
                 specimen_id=specimen_id,
                 specimen_type=specimen_type,
                 W=W,
@@ -393,15 +415,13 @@ def new():
                 material=material_name
             )
 
-            # Create material object
-            material = FCGRMaterial(
+            material_obj = FCGRMaterial(
                 yield_strength=yield_strength,
                 ultimate_strength=ultimate_strength,
                 youngs_modulus=youngs_modulus,
                 poissons_ratio=poissons_ratio
             )
 
-            # Create test parameters
             test_params = FCGRTestParameters(
                 control_mode=control_mode,
                 load_ratio=load_ratio,
@@ -412,34 +432,19 @@ def new():
             )
 
             # Run analysis
-            analyzer = FCGRAnalyzer(specimen, material, test_params)
+            analyzer = FCGRAnalyzer(specimen_obj, material_obj, test_params)
+            crack_lengths = np.array([analyzer.crack_length_from_compliance(c) for c in compliance_arr])
 
-            if csv_data and cycles is not None:
-                # Calculate crack lengths from compliance
-                crack_lengths = np.array([
-                    analyzer.crack_length_from_compliance(c) for c in compliance_arr
-                ])
+            results = analyzer.analyze_from_raw_data(
+                cycles=cycles,
+                crack_lengths=crack_lengths,
+                P_max=P_max,
+                P_min=P_min,
+                method=form.dadn_method.data,
+                outlier_percentage=form.outlier_threshold.data or 30.0
+            )
 
-                # Use raw data from CSV
-                results = analyzer.analyze_from_raw_data(
-                    cycles=cycles,
-                    crack_lengths=crack_lengths,
-                    P_max=P_max,
-                    P_min=P_min,
-                    method=form.dadn_method.data,
-                    outlier_percentage=form.outlier_threshold.data or 30.0
-                )
-            elif excel_data:
-                # Use MTS analysis data
-                # Create synthetic data from Excel results for now
-                flash('Excel-only analysis not fully implemented. Please also upload CSV data.', 'warning')
-                return render_template('fcgr/new.html', form=form, certificate=certificate)
-            else:
-                flash('Please upload test data (CSV or Excel file).', 'danger')
-                return render_template('fcgr/new.html', form=form, certificate=certificate)
-
-            # Store geometry and parameters in JSON
-            # Ensure all values are JSON serializable (convert numpy types to Python)
+            # Build geometry dict for storage
             geometry = {
                 'type': specimen_type,
                 'W': float(W),
@@ -457,10 +462,8 @@ def new():
                 'wave_shape': wave_shape,
                 'dadn_method': form.dadn_method.data,
                 'outlier_threshold': float(form.outlier_threshold.data or 30.0),
-                # Store precrack measurements from Excel if available
-                'precrack_measurements': excel_data.precrack_measurements if excel_data else [],
-                'precrack_final_size': float(excel_data.precrack_final_size) if excel_data else 0.0,
-                # Store data arrays for plotting
+                'precrack_measurements': excel_data.get('precrack_measurements', []),
+                'precrack_final_size': float(excel_data.get('precrack_final_size', 0)),
                 'cycles': [float(p.cycle_count) for p in results.data_points],
                 'crack_lengths': [float(p.crack_length) for p in results.data_points],
                 'delta_K': [float(p.delta_K) for p in results.data_points],
@@ -468,33 +471,49 @@ def new():
                 'outlier_mask': [bool(p.is_outlier) for p in results.data_points],
             }
 
-            # Create test record
-            test_id = generate_test_id()
+            # Handle re-analysis vs new test
+            if reanalyze_id:
+                test_record = TestRecord.query.get_or_404(reanalyze_id)
+                test_record.specimen_id = specimen_id
+                test_record.material = material_name
+                test_record.batch_number = form.batch_number.data
+                test_record.temperature = test_temperature
+                test_record.geometry = geometry
+                test_record.status = 'REANALYZED'
 
-            # Get certificate from form selection
-            selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else None
-            selected_cert = Certificate.query.get(selected_cert_id) if selected_cert_id else None
-            cert_number = selected_cert.certificate_number_with_rev if selected_cert else None
+                # Delete old analysis results
+                AnalysisResult.query.filter_by(test_record_id=test_record.id).delete()
+                db.session.flush()
 
-            test_record = TestRecord(
-                test_id=test_id,
-                test_method='FCGR',
-                test_standard=form.test_standard.data,
-                specimen_id=specimen_id,
-                material=form.material.data or (excel_data.material if excel_data else ''),
-                batch_number=form.batch_number.data,
-                geometry=geometry,
-                test_date=datetime.now(),
-                temperature=test_temperature,
-                status='ANALYZED',
-                certificate_id=selected_cert_id,
-                certificate_number=cert_number,
-                operator_id=current_user.id
-            )
-            db.session.add(test_record)
-            db.session.flush()
+                session.pop('fcgr_reanalyze_id', None)
+                action = 'REANALYZE'
+                test_id = test_record.test_id
+            else:
+                test_id = generate_test_id()
+                selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else None
+                selected_cert = Certificate.query.get(selected_cert_id) if selected_cert_id else None
+                cert_number = selected_cert.certificate_number_with_rev if selected_cert else None
 
-            # Store results (ensure all values are Python floats)
+                test_record = TestRecord(
+                    test_id=test_id,
+                    test_method='FCGR',
+                    test_standard=form.test_standard.data,
+                    specimen_id=specimen_id,
+                    material=material_name,
+                    batch_number=form.batch_number.data,
+                    geometry=geometry,
+                    test_date=datetime.now(),
+                    temperature=test_temperature,
+                    status='ANALYZED',
+                    certificate_id=selected_cert_id,
+                    certificate_number=cert_number,
+                    operator_id=current_user.id
+                )
+                db.session.add(test_record)
+                db.session.flush()
+                action = 'CREATE'
+
+            # Store analysis results
             results_data = [
                 ('paris_C', float(results.paris_law.C), float(results.paris_law.std_error_C), '-'),
                 ('paris_m', float(results.paris_law.m), float(results.paris_law.std_error_m), '-'),
@@ -507,36 +526,45 @@ def new():
             ]
 
             for name, value, uncertainty, unit in results_data:
-                result = AnalysisResult(
+                db.session.add(AnalysisResult(
                     test_record_id=test_record.id,
                     parameter_name=name,
                     value=value,
                     uncertainty=uncertainty,
                     unit=unit,
                     calculated_by_id=current_user.id
-                )
-                db.session.add(result)
+                ))
 
-            # Store validity in geometry
+            # Update geometry with validity info
             geometry['is_valid'] = results.is_valid
             geometry['validity_notes'] = results.validity_notes
-            test_record.geometry = geometry  # Update with validity info
+            test_record.geometry = geometry
 
             # Audit log
             audit = AuditLog(
                 user_id=current_user.id,
-                action='CREATE',
+                action=action,
                 table_name='test_records',
                 record_id=test_record.id,
-                new_values={'test_id': test_id, 'specimen_id': form.specimen_id.data},
+                new_values={'test_id': test_id, 'specimen_id': specimen_id},
                 ip_address=request.remote_addr
             )
             db.session.add(audit)
             db.session.commit()
 
-            flash(f'Analysis complete! Test ID: {test_id}', 'success')
+            # Clear session data
+            session.pop('fcgr_excel_path', None)
+            session.pop('fcgr_excel_data', None)
+            session.pop('fcgr_csv_path', None)
+            session.pop('fcgr_certificate_id', None)
+
+            if action == 'REANALYZE':
+                flash(f'Re-analysis complete! Test ID: {test_id}', 'success')
+            else:
+                flash(f'FCGR analysis complete! Test ID: {test_id}', 'success')
+
             if not results.is_valid:
-                flash(f'Warning: Test validity issues detected.', 'warning')
+                flash('Warning: Test validity issues detected.', 'warning')
 
             return redirect(url_for('fcgr.view', test_id=test_record.id))
 
@@ -546,7 +574,55 @@ def new():
             import traceback
             traceback.print_exc()
 
-    return render_template('fcgr/new.html', form=form, certificate=certificate)
+    return render_template('fcgr/new.html', form=form, certificate=certificate,
+                         excel_data=excel_data, is_specimen_step=True)
+
+
+@fcgr_bp.route('/<int:test_id>/reanalyze', methods=['GET', 'POST'])
+@login_required
+def reanalyze(test_id):
+    """Re-analyze test with modified parameters."""
+    test = TestRecord.query.get_or_404(test_id)
+    geometry = test.geometry or {}
+
+    # Store test data in session for the specimen step
+    session['fcgr_excel_data'] = {
+        'filename': f'(Re-analysis of {test.test_id})',
+        'specimen_id': test.specimen_id,
+        'specimen_type': geometry.get('type', 'C(T)'),
+        'W': geometry.get('W'),
+        'B': geometry.get('B'),
+        'B_n': geometry.get('B_n'),
+        'a_0': geometry.get('a_0'),
+        'notch_height': geometry.get('notch_height'),
+        'yield_strength': geometry.get('yield_strength'),
+        'ultimate_strength': geometry.get('ultimate_strength'),
+        'youngs_modulus': geometry.get('youngs_modulus'),
+        'poissons_ratio': geometry.get('poissons_ratio'),
+        'test_temperature': test.temperature,
+        'material': test.material,
+        'precrack_measurements': geometry.get('precrack_measurements', []),
+        'precrack_final_size': geometry.get('precrack_final_size', 0),
+        'control_mode': geometry.get('control_mode'),
+        'load_ratio': geometry.get('load_ratio'),
+        'frequency': geometry.get('frequency'),
+        'wave_shape': geometry.get('wave_shape'),
+    }
+
+    # Mark this as a re-analysis
+    session['fcgr_reanalyze_id'] = test_id
+
+    # Store certificate if linked
+    if test.certificate_id:
+        session['fcgr_certificate_id'] = test.certificate_id
+    else:
+        session.pop('fcgr_certificate_id', None)
+
+    # Clear any old CSV path - user must re-upload for re-analysis
+    session.pop('fcgr_csv_path', None)
+
+    flash(f'Loaded test {test.test_id} for re-analysis. Please upload the CSV test data and modify parameters as needed.', 'info')
+    return redirect(url_for('fcgr.specimen'))
 
 
 @fcgr_bp.route('/<int:test_id>')
