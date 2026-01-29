@@ -111,7 +111,7 @@ class KICReportGenerator:
                                      logo_path: Optional[Path],
                                      precrack_measurements: Optional[List[float]] = None,
                                      crack_photo_path: Optional[Path] = None) -> Document:
-        """Create report without template."""
+        """Create report without template - matches CTOD E1290 layout."""
         doc = Document()
 
         # Set up styles
@@ -119,47 +119,55 @@ class KICReportGenerator:
         style.font.name = 'Calibri'
         style.font.size = Pt(11)
 
-        # Header with logo
+        # Header with logo (centered, same as CTOD)
         if logo_path and logo_path.exists():
             doc.add_picture(str(logo_path), width=Inches(2))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        # Title
+        # Title (same style as CTOD)
         title = doc.add_heading('KIC Fracture Toughness Test Report', level=0)
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        # Subtitle
+        # Subtitle with standard reference
         subtitle = doc.add_paragraph('ASTM E399 - Plane-Strain Fracture Toughness')
         subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         doc.add_paragraph()
 
-        # Test Information table
+        # Test Information table (2-column layout like CTOD)
         doc.add_heading('Test Information', level=1)
-        table = doc.add_table(rows=7, cols=2)
+        table = doc.add_table(rows=9, cols=4)
         table.style = 'Table Grid'
 
+        # Two-column layout: Label | Value | Label | Value
         info_data = [
-            ('Certificate Number:', test_info.get('certificate_number', '')),
-            ('Test Project:', test_info.get('test_project', '')),
-            ('Customer:', test_info.get('customer', '')),
-            ('Specimen ID:', test_info.get('specimen_id', '')),
-            ('Material:', test_info.get('material', '')),
-            ('Test Date:', test_info.get('test_date', '')),
-            ('Temperature:', f"{test_info.get('temperature', '23')} C"),
+            ('Certificate Number:', test_info.get('certificate_number', ''), 'Test Date:', test_info.get('test_date', '')),
+            ('Test Project:', test_info.get('test_project', ''), 'Temperature:', f"{test_info.get('temperature', '23')} °C"),
+            ('Customer:', test_info.get('customer', ''), 'Test Standard:', 'ASTM E399'),
+            ('Customer Order:', test_info.get('customer_order', ''), 'Test Equipment:', 'MTS Landmark 500kN'),
+            ('Product S/N:', test_info.get('product_sn', ''), 'Specimen ID:', test_info.get('specimen_id', '')),
+            ('Material:', test_info.get('material', ''), 'Location/Orientation:', test_info.get('location_orientation', '')),
+            ('Notch Type:', dimensions.get('notch_type', 'Fatigue pre-crack'), 'Side Grooves:', dimensions.get('side_grooves', 'No')),
+            ('Specimen Type:', dimensions.get('specimen_type', 'SE(B)'), 'a₀/W Ratio:', self._calc_a_w_ratio(dimensions)),
+            ('Ligament (W-a₀):', self._calc_ligament(dimensions), '', ''),
         ]
 
-        for i, (label, value) in enumerate(info_data):
-            table.rows[i].cells[0].text = label
-            table.rows[i].cells[1].text = value
-            # Bold the label
-            table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+        for i, (label1, value1, label2, value2) in enumerate(info_data):
+            table.rows[i].cells[0].text = label1
+            table.rows[i].cells[1].text = str(value1)
+            table.rows[i].cells[2].text = label2
+            table.rows[i].cells[3].text = str(value2)
+            # Bold the labels
+            if table.rows[i].cells[0].paragraphs[0].runs:
+                table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+            if table.rows[i].cells[2].paragraphs[0].runs:
+                table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
 
         doc.add_paragraph()
 
-        # Specimen Dimensions table
-        doc.add_heading('Specimen Dimensions', level=1)
-        table = doc.add_table(rows=6, cols=3)
+        # Specimen Geometry table (same format as CTOD)
+        doc.add_heading('Specimen Geometry', level=1)
+        table = doc.add_table(rows=7, cols=3)
         table.style = 'Table Grid'
 
         # Header row
@@ -169,10 +177,11 @@ class KICReportGenerator:
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
         dim_data = [
-            ('Specimen Type', dimensions.get('specimen_type', ''), '-'),
+            ('Specimen Type', dimensions.get('specimen_type', 'SE(B)'), '-'),
             ('Width W', dimensions.get('W', ''), 'mm'),
             ('Thickness B', dimensions.get('B', ''), 'mm'),
-            ('Crack length a_0', dimensions.get('a_0', ''), 'mm'),
+            ('Net Thickness Bₙ', dimensions.get('B_n', dimensions.get('B', '')), 'mm'),
+            ('Crack length a₀', dimensions.get('a_0', ''), 'mm'),
             ('Span S', dimensions.get('S', '-'), 'mm'),
         ]
 
@@ -183,9 +192,9 @@ class KICReportGenerator:
 
         doc.add_paragraph()
 
-        # Material Properties table
+        # Material Properties table (same format as CTOD)
         doc.add_heading('Material Properties', level=1)
-        table = doc.add_table(rows=4, cols=3)
+        table = doc.add_table(rows=5, cols=3)
         table.style = 'Table Grid'
 
         # Header row
@@ -194,9 +203,10 @@ class KICReportGenerator:
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
         mat_data = [
-            ('Yield strength sigma_ys', material_props.get('yield_strength', ''), 'MPa'),
-            ("Young's modulus E", material_props.get('youngs_modulus', ''), 'GPa'),
-            ("Poisson's ratio nu", material_props.get('poissons_ratio', ''), '-'),
+            ('Yield Strength σys', material_props.get('yield_strength', ''), 'MPa'),
+            ('Ultimate Strength σu', material_props.get('ultimate_strength', '-'), 'MPa'),
+            ("Young's Modulus E", material_props.get('youngs_modulus', ''), 'GPa'),
+            ("Poisson's Ratio ν", material_props.get('poissons_ratio', '0.3'), '-'),
         ]
 
         for i, (param, value, unit) in enumerate(mat_data):
@@ -206,23 +216,25 @@ class KICReportGenerator:
 
         doc.add_paragraph()
 
-        # Precrack Measurements table (if available)
+        # Precrack Measurements table (if available, same format as CTOD crack measurements)
         if precrack_measurements and len(precrack_measurements) > 0:
-            doc.add_heading('Precrack Measurements', level=1)
+            doc.add_heading('Crack Length Measurements', level=1)
             num_rows = len(precrack_measurements) + 2  # +1 for header, +1 for average
             table = doc.add_table(rows=num_rows, cols=3)
             table.style = 'Table Grid'
 
             # Header row
-            precrack_headers = ['Measurement', 'Value', 'Unit']
+            precrack_headers = ['Position', 'Value', 'Unit']
             for i, header in enumerate(precrack_headers):
                 table.rows[0].cells[i].text = header
                 table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
-            # Individual measurements
+            # Individual measurements with position labels
+            position_labels = ['Surface (1/4B)', 'Quarter (1/4)', 'Center', 'Quarter (3/4)', 'Surface (3/4B)']
             for i, meas in enumerate(precrack_measurements, 1):
-                table.rows[i].cells[0].text = f'Crack {i}'
-                table.rows[i].cells[1].text = f'{meas:.2f}'
+                label = position_labels[i-1] if i <= len(position_labels) else f'a{i}'
+                table.rows[i].cells[0].text = label
+                table.rows[i].cells[1].text = f'{meas:.3f}'
                 table.rows[i].cells[2].text = 'mm'
 
             # Calculate and add average (E399 formula for 5 measurements)
@@ -234,7 +246,7 @@ class KICReportGenerator:
 
             avg_row = len(precrack_measurements) + 1
             table.rows[avg_row].cells[0].text = 'Average (E399)'
-            table.rows[avg_row].cells[1].text = f'{avg_crack:.2f}'
+            table.rows[avg_row].cells[1].text = f'{avg_crack:.3f}'
             table.rows[avg_row].cells[2].text = 'mm'
             # Bold the average row
             for cell in table.rows[avg_row].cells:
@@ -244,9 +256,9 @@ class KICReportGenerator:
 
             doc.add_paragraph()
 
-        # Results table
+        # Test Results table (4-column like CTOD: Parameter | Value | Uncertainty | Requirement)
         doc.add_heading('Test Results', level=1)
-        table = doc.add_table(rows=7, cols=4)
+        table = doc.add_table(rows=8, cols=4)
         table.style = 'Table Grid'
 
         # Header row
@@ -256,14 +268,16 @@ class KICReportGenerator:
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
         if results:
+            # Format like CTOD results table
             results_data = [
-                ('P_max', f'{results.P_max.value:.2f}', f'+/-{results.P_max.uncertainty:.2f}', 'kN'),
-                ('P_Q (5% secant)', f'{results.P_Q.value:.2f}', f'+/-{results.P_Q.uncertainty:.2f}', 'kN'),
-                ('P_max/P_Q ratio', f'{results.P_ratio:.3f}', '', '-'),
-                ('K_Q (conditional)', f'{results.K_Q.value:.2f}', f'+/-{results.K_Q.uncertainty:.2f}', 'MPa*sqrt(m)'),
-                ('K_IC', f'{results.K_IC.value:.2f}' if results.K_IC else 'CONDITIONAL',
-                 f'+/-{results.K_IC.uncertainty:.2f}' if results.K_IC else '', 'MPa*sqrt(m)'),
-                ('Compliance', f'{results.compliance:.4f}', '', 'mm/kN'),
+                ('Pmax', f'{results.P_max.value:.2f}', f'±{results.P_max.uncertainty:.2f}', 'kN'),
+                ('PQ (5% secant)', f'{results.P_Q.value:.2f}', f'±{results.P_Q.uncertainty:.2f}', 'kN'),
+                ('Pmax/PQ ratio', f'{results.P_ratio:.3f}', '-', '≤1.10'),
+                ('KQ (conditional)', f'{results.K_Q.value:.2f}', f'±{results.K_Q.uncertainty:.2f}', 'MPa√m'),
+                ('KIC', f'{results.K_IC.value:.2f}' if results.K_IC else 'CONDITIONAL',
+                 f'±{results.K_IC.uncertainty:.2f}' if results.K_IC else '-', 'MPa√m'),
+                ('Compliance', f'{results.compliance:.6f}', '-', 'mm/kN'),
+                ('Validity', 'VALID' if results.is_valid else 'CONDITIONAL', '-', '-'),
             ]
 
             for i, (param, value, unc, unit) in enumerate(results_data):
@@ -274,74 +288,107 @@ class KICReportGenerator:
 
         doc.add_paragraph()
 
-        # Force-Displacement Plot
+        # Force-Displacement Plot (centered like CTOD)
         if chart_path and chart_path.exists():
             doc.add_heading('Force vs Displacement', level=1)
             doc.add_picture(str(chart_path), width=Inches(5.5))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-            doc.add_paragraph()
-
-        # Crack Surface Photo
-        if crack_photo_path and crack_photo_path.exists():
-            doc.add_heading('Crack Surface', level=1)
-            doc.add_picture(str(crack_photo_path), width=Inches(4.5))
-            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
-
             # Add caption
-            caption = doc.add_paragraph('Figure: Crack surface showing precrack and final fracture')
+            caption = doc.add_paragraph('Figure 1: Force-displacement curve with PQ determination per ASTM E399')
             caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
             caption.runs[0].font.size = Pt(10)
             caption.runs[0].font.italic = True
 
             doc.add_paragraph()
 
-        # Validity Assessment
+        # Crack Surface Photo (if available)
+        if crack_photo_path and crack_photo_path.exists():
+            doc.add_heading('Crack Surface', level=1)
+            doc.add_picture(str(crack_photo_path), width=Inches(4.5))
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            # Add caption
+            caption = doc.add_paragraph('Figure 2: Crack surface showing fatigue precrack and final fracture')
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption.runs[0].font.size = Pt(10)
+            caption.runs[0].font.italic = True
+
+            doc.add_paragraph()
+
+        # Validity Assessment (same style as CTOD)
         doc.add_heading('Validity Assessment per ASTM E399', level=1)
 
         validity_status = "VALID" if results and results.is_valid else "CONDITIONAL"
-        status_para = doc.add_paragraph()
-        status_run = status_para.add_run(f"Overall Status: {validity_status}")
-        status_run.bold = True
+
+        # Validity statement paragraph
         if results and results.is_valid:
-            status_run.font.color.rgb = None  # Use default (black)
+            validity_text = "The test meets all validity requirements of ASTM E399. The result is a valid plane-strain fracture toughness (KIC)."
         else:
-            # Can't easily set color without more complex code, so just make it bold
-            pass
+            validity_text = "The test does not meet all validity requirements of ASTM E399. The result is reported as conditional (KQ)."
 
-        doc.add_paragraph()
+        status_para = doc.add_paragraph()
+        status_run = status_para.add_run(f"Status: {validity_status}")
+        status_run.bold = True
 
+        doc.add_paragraph(validity_text)
+
+        # List validity notes if any
         if results and results.validity_notes:
+            notes_para = doc.add_paragraph()
+            notes_para.add_run("Validity Notes:").bold = True
             for note in results.validity_notes:
-                p = doc.add_paragraph(note, style='List Bullet')
+                doc.add_paragraph(f"• {note}")
 
         doc.add_paragraph()
 
-        # Signatures
+        # Approval Signatures (4 rows like CTOD: header + tested + reviewed + approved)
         doc.add_heading('Approval', level=1)
-        sig_table = doc.add_table(rows=3, cols=3)
+        sig_table = doc.add_table(rows=4, cols=4)
         sig_table.style = 'Table Grid'
 
-        sig_headers = ['Role', 'Name', 'Date']
+        sig_headers = ['Role', 'Name', 'Signature', 'Date']
         for i, header in enumerate(sig_headers):
             sig_table.rows[0].cells[i].text = header
             sig_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
         sig_table.rows[1].cells[0].text = 'Tested by:'
         sig_table.rows[2].cells[0].text = 'Reviewed by:'
+        sig_table.rows[3].cells[0].text = 'Approved by:'
 
         doc.add_paragraph()
 
-        # Footer
+        # Footer with generation timestamp
         footer_para = doc.add_paragraph()
         footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
         footer_run = footer_para.add_run(
-            f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} | ASTM E399 KIC Test Report"
         )
         footer_run.font.size = Pt(9)
-        footer_run.font.color.rgb = None
 
         return doc
+
+    def _calc_a_w_ratio(self, dimensions: Dict[str, str]) -> str:
+        """Calculate a₀/W ratio."""
+        try:
+            W = float(dimensions.get('W', 0))
+            a_0 = float(dimensions.get('a_0', 0))
+            if W > 0:
+                return f"{a_0 / W:.3f}"
+        except (ValueError, TypeError):
+            pass
+        return '-'
+
+    def _calc_ligament(self, dimensions: Dict[str, str]) -> str:
+        """Calculate ligament (W - a₀)."""
+        try:
+            W = float(dimensions.get('W', 0))
+            a_0 = float(dimensions.get('a_0', 0))
+            if W > 0:
+                return f"{W - a_0:.2f} mm"
+        except (ValueError, TypeError):
+            pass
+        return '-'
 
     def _fill_template(self,
                        doc: Document,
