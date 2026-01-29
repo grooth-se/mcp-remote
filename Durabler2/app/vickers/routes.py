@@ -427,17 +427,21 @@ def report(test_id):
                 fig.savefig(chart_path, dpi=150, bbox_inches='tight')
                 plt.close(fig)
 
-            # Prepare report data
+            # Prepare report data - include all test information fields
             test_info = {
                 'certificate_number': form.certificate_number.data or test.test_id,
                 'test_project': test.certificate.test_project if test.certificate else '',
                 'customer': test.certificate.customer if test.certificate else '',
                 'specimen_id': test.specimen_id or '',
+                'customer_specimen_info': test.certificate.customer_specimen_info if test.certificate else '',
                 'material': test.material or '',
+                'requirement': test.certificate.requirement if test.certificate else '',
+                'location_orientation': test_params.get('location_orientation', ''),
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
-                'temperature': test.temperature or '23',
+                'temperature': test.temperature or 23,
                 'load_level': test_params.get('load_level', 'HV 10'),
                 'dwell_time': test_params.get('dwell_time', '15'),
+                'notes': test_params.get('notes', ''),
             }
 
             # Create VickersResult for report
@@ -508,19 +512,31 @@ def report(test_id):
 
             doc.add_paragraph()
 
-            # Test Information
+            # Test Information - all fields except status columns
             doc.add_heading('Test Information', level=1)
-            table = doc.add_table(rows=6, cols=2)
-            table.style = 'Table Grid'
 
+            # Build info data - include all relevant fields
             info_data = [
-                ('Certificate Number:', test_info['certificate_number']),
-                ('Specimen ID:', test_info['specimen_id']),
-                ('Material:', test_info['material']),
-                ('Test Date:', test_info['test_date']),
-                ('Load Level:', test_info['load_level']),
-                ('Dwell Time:', f"{test_info['dwell_time']} s"),
+                ('Certificate Number:', test_info.get('certificate_number', '')),
+                ('Customer:', test_info.get('customer', '')),
+                ('Test Project:', test_info.get('test_project', '')),
+                ('Specimen ID:', test_info.get('specimen_id', '')),
+                ('Customer Specimen Info:', test_info.get('customer_specimen_info', '')),
+                ('Material:', test_info.get('material', '')),
+                ('Requirement:', test_info.get('requirement', '')),
+                ('Location/Orientation:', test_info.get('location_orientation', '')),
+                ('Test Date:', test_info.get('test_date', '')),
+                ('Temperature:', f"{test_info.get('temperature', '23')} °C"),
+                ('Load Level:', test_info.get('load_level', '')),
+                ('Dwell Time:', f"{test_info.get('dwell_time', '15')} s"),
+                ('Test Equipment:', 'q-ness ATM test machine with automatic indenter'),
             ]
+
+            # Filter out empty values for cleaner report
+            info_data = [(label, value) for label, value in info_data if value and str(value).strip()]
+
+            table = doc.add_table(rows=len(info_data), cols=2)
+            table.style = 'Table Grid'
 
             for i, (label, value) in enumerate(info_data):
                 table.rows[i].cells[0].text = label
@@ -572,6 +588,12 @@ def report(test_id):
 
             doc.add_paragraph()
 
+            # Notes (if any)
+            if test_info.get('notes'):
+                doc.add_heading('Notes', level=1)
+                doc.add_paragraph(test_info['notes'])
+                doc.add_paragraph()
+
             # Uncertainty Budget (if requested)
             if form.include_uncertainty_budget.data == 'yes' and uncertainty_budget:
                 doc.add_heading('Uncertainty Budget (k=2)', level=1)
@@ -601,11 +623,35 @@ def report(test_id):
 
             doc.add_paragraph()
 
+            # Indent Photo (if requested and available)
+            if form.include_photo.data == 'yes' and test_params.get('photo_path'):
+                photo_path = Path(current_app.config['UPLOAD_FOLDER']) / test_params['photo_path']
+                if photo_path.exists():
+                    doc.add_heading('Indent Photo', level=1)
+                    doc.add_picture(str(photo_path), width=Inches(4))
+                    doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    doc.add_paragraph()
+
+            # Approval Signatures (4 rows: header + tested + reviewed + approved)
+            doc.add_heading('Approval', level=1)
+            sig_table = doc.add_table(rows=4, cols=4)
+            sig_table.style = 'Table Grid'
+
+            sig_headers = ['Role', 'Name', 'Signature', 'Date']
+            for i, header in enumerate(sig_headers):
+                sig_table.rows[0].cells[i].text = header
+                sig_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+            sig_table.rows[1].cells[0].text = 'Tested by:'
+            sig_table.rows[2].cells[0].text = 'Reviewed by:'
+            sig_table.rows[3].cells[0].text = 'Approved by:'
+
+            doc.add_paragraph()
+
             # Footer
             footer = doc.add_paragraph()
             footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            from datetime import datetime
-            footer.add_run(f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}").font.size = Pt(9)
+            footer.add_run(f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} | ASTM E92 / ISO 6507 Vickers Hardness Test Report").font.size = Pt(9)
 
             # Save document
             output_filename = f"Vickers_Report_{test.test_id.replace(' ', '_')}.docx"
