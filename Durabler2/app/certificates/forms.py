@@ -49,7 +49,7 @@ class CertificateForm(FlaskForm):
     product = StringField('Product', validators=[Optional()])
     product_sn = StringField('Product S/N', validators=[Optional()])
     material = StringField('Material / HT', validators=[Optional()])
-    test_article_sn = StringField('Test Article S/N', validators=[Optional()])
+    test_article_sn = StringField('Specimen SN', validators=[Optional()])
     customer_specimen_info = StringField('Customer Specimen Info', validators=[Optional()])
     location_orientation = StringField('Location/Orientation', validators=[Optional()])
     requirement = StringField('Requirement', validators=[Optional()])

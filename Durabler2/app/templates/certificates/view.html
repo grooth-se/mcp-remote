@@ -115,6 +115,9 @@
                             <dt class="col-5">Customer Order:</dt>
                             <dd class="col-7">{{ cert.customer_order or '-' }}</dd>
 
+                            <dt class="col-5">Specimen SN:</dt>
+                            <dd class="col-7">{{ cert.test_article_sn or '-' }}</dd>
+
                             <dt class="col-5">Product:</dt>
                             <dd class="col-7">{{ cert.product or '-' }}</dd>
 
@@ -137,9 +140,6 @@
                         <dl class="row">
                             <dt class="col-5">Material / HT:</dt>
                             <dd class="col-7">{{ cert.material or '-' }}</dd>
-
-                            <dt class="col-5">Test Article S/N:</dt>
-                            <dd class="col-7">{{ cert.test_article_sn or '-' }}</dd>
 
                             <dt class="col-5">Customer Specimen:</dt>
                             <dd class="col-7">{{ cert.customer_specimen_info or '-' }}</dd>
