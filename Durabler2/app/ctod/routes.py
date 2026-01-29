@@ -239,11 +239,14 @@ def new():
                     if val and val > 0:
                         crack_measurements.append(val)
 
-            # Calculate average crack length if 9 measurements available
+            # IMPORTANT: For CTOD analysis, a_0 should be the actual crack length
+            # (from precrack measurements), not the notch length!
+            # Calculate average crack length from 9-point measurements per ASTM E1820
             if len(crack_measurements) == 9:
                 a_avg = (0.5 * crack_measurements[0] + sum(crack_measurements[1:8]) +
                         0.5 * crack_measurements[8]) / 8
                 a_0 = a_avg
+                current_app.logger.info(f'CTOD: Using calculated crack length from 9-point measurements: a_0={a_0:.3f} mm')
 
             # Material properties - Excel takes precedence
             if excel_data and excel_data.yield_strength > 0:

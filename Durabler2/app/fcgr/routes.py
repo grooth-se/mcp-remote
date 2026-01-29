@@ -274,6 +274,25 @@ def new():
             else:
                 a_0 = form.a_0.data or 10.0
 
+            # IMPORTANT: For FCGR analysis, a_0 should be the actual crack length
+            # (from precrack measurements), not the notch length!
+            # Get precrack measurements
+            precrack_measurements = []
+            if excel_data and excel_data.precrack_measurements:
+                precrack_measurements = excel_data.precrack_measurements
+
+            # Calculate average crack length from 5-point measurements per ASTM E647
+            if len(precrack_measurements) == 5:
+                a = precrack_measurements
+                # E647 formula (same as E399): a = (0.5*a1 + a2 + a3 + a4 + 0.5*a5) / 4
+                a_0_calculated = (0.5 * a[0] + a[1] + a[2] + a[3] + 0.5 * a[4]) / 4
+                a_0 = a_0_calculated
+                current_app.logger.info(f'FCGR: Using calculated crack length from 5-point measurements: a_0={a_0:.3f} mm')
+            elif excel_data and excel_data.precrack_final_size > 0:
+                # Fall back to precrack final size from compliance
+                a_0 = excel_data.precrack_final_size
+                current_app.logger.info(f'FCGR: Using precrack final size: a_0={a_0:.3f} mm')
+
             if excel_data and excel_data.notch_height > 0:
                 notch_height = excel_data.notch_height
             else:
