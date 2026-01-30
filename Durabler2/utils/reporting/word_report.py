@@ -1,34 +1,35 @@
 """
 Word report generator for tensile test results.
 
-Populates a Word template with test data and results.
+Populates a Word template with test data and results, or creates report from scratch.
 """
 
 import re
 from pathlib import Path
 from typing import Dict, Any, Optional
 from docx import Document
-from docx.shared import Inches, Cm
+from docx.shared import Inches, Cm, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 
 class TensileReportGenerator:
     """
-    Generate tensile test reports from Word template.
+    Generate tensile test reports from Word template or from scratch.
 
     Uses placeholder syntax {{placeholder_name}} in template.
     """
 
-    def __init__(self, template_path: Path):
+    def __init__(self, template_path: Optional[Path] = None):
         """
         Initialize report generator.
 
         Parameters
         ----------
-        template_path : Path
-            Path to Word template file
+        template_path : Path, optional
+            Path to Word template file. If None, creates report from scratch.
         """
         self.template_path = template_path
-        if not template_path.exists():
+        if template_path and not template_path.exists():
             raise FileNotFoundError(f"Template not found: {template_path}")
 
     def generate_report(
@@ -57,6 +58,12 @@ class TensileReportGenerator:
         Path
             Path to generated report
         """
+        # Create from scratch if no template
+        if not self.template_path or not self.template_path.exists():
+            doc = self._create_report_from_scratch(data, chart_path, logo_path)
+            doc.save(output_path)
+            return output_path
+
         doc = Document(self.template_path)
 
         # Replace placeholders in page headers
@@ -81,8 +88,295 @@ class TensileReportGenerator:
                     for paragraph in cell.paragraphs:
                         self._replace_in_paragraph(paragraph, data, chart_path, logo_path)
 
+        # Add disclaimer to page footer (visible on all pages)
+        disclaimer_text = (
+            "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
+            "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
+            "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
+            "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
+            "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
+        )
+        for section in doc.sections:
+            footer = section.footer
+            footer.is_linked_to_previous = False
+            footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            footer_para.clear()
+            footer_run = footer_para.add_run(disclaimer_text)
+            footer_run.font.size = Pt(7)
+            footer_run.italic = True
+
         doc.save(output_path)
         return output_path
+
+    def _create_report_from_scratch(
+        self,
+        data: Dict[str, Any],
+        chart_path: Optional[Path],
+        logo_path: Optional[Path]
+    ) -> Document:
+        """Create report without template - matches Vickers layout."""
+        from docx.shared import RGBColor
+
+        doc = Document()
+
+        # Set compact paragraph spacing for entire document
+        style = doc.styles['Normal']
+        style.paragraph_format.space_before = Pt(0)
+        style.paragraph_format.space_after = Pt(3)
+        style.paragraph_format.line_spacing = 1.0
+        style.font.name = 'Calibri'
+        style.font.size = Pt(10)
+
+        # Set compact heading styles with dark green color
+        dark_green = RGBColor(0x00, 0x64, 0x00)
+        for i in range(1, 4):
+            heading_style = doc.styles[f'Heading {i}']
+            heading_style.paragraph_format.space_before = Pt(8)
+            heading_style.paragraph_format.space_after = Pt(4)
+            heading_style.font.color.rgb = dark_green
+
+        # Add header with logo on left, certificate info on right (5-line layout)
+        for section in doc.sections:
+            # Set narrower margins for compact layout
+            section.top_margin = Cm(1.5)
+            section.bottom_margin = Cm(1.5)
+            section.left_margin = Cm(2.0)
+            section.right_margin = Cm(2.0)
+            header = section.header
+            header.is_linked_to_previous = False
+
+            # Row 1: Logo - left aligned
+            logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+            logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            logo_para.paragraph_format.space_after = Pt(0)
+            if logo_path and logo_path.exists():
+                logo_run = logo_para.add_run()
+                logo_run.add_picture(str(logo_path), width=Cm(5.0))  # 50mm width
+
+            # Row 2: Title - centered, font size 12
+            title_para = header.add_paragraph()
+            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            title_para.paragraph_format.space_before = Pt(0)
+            title_para.paragraph_format.space_after = Pt(0)
+            title_run = title_para.add_run('Tensile Test Report')
+            title_run.bold = True
+            title_run.font.size = Pt(12)
+
+            # Row 3: Standard - centered, font size 8
+            std_para = header.add_paragraph()
+            std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            std_para.paragraph_format.space_before = Pt(0)
+            std_para.paragraph_format.space_after = Pt(0)
+            std_run = std_para.add_run(data.get('test_standard', 'ASTM E8/E8M-22'))
+            std_run.font.size = Pt(8)
+
+            # Row 4: Certificate - right aligned, font size 8
+            cert_para = header.add_paragraph()
+            cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            cert_para.paragraph_format.space_before = Pt(0)
+            cert_para.paragraph_format.space_after = Pt(0)
+            cert_run = cert_para.add_run(f"Certificate: {data.get('certificate_number', '')}")
+            cert_run.font.size = Pt(8)
+
+            # Row 5: Date - right aligned, font size 8
+            date_para = header.add_paragraph()
+            date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            date_para.paragraph_format.space_before = Pt(0)
+            date_para.paragraph_format.space_after = Pt(0)
+            date_run = date_para.add_run(f"Date: {data.get('test_date', '')}")
+            date_run.font.size = Pt(8)
+
+        # Test Information table
+        heading = doc.add_heading('Test Information', level=1)
+        heading.paragraph_format.space_before = Pt(0)
+        heading.paragraph_format.space_after = Pt(6)
+
+        table = doc.add_table(rows=7, cols=4)
+        table.style = 'Table Grid'
+
+        # Two-column layout: Label | Value | Label | Value
+        info_data = [
+            ('Test Project:', data.get('test_project', ''), 'Temperature:', f"{data.get('test_temperature', '23')} °C"),
+            ('Customer:', data.get('customer', ''), 'Test Standard:', data.get('test_standard', 'ASTM E8/E8M-22')),
+            ('Customer Order:', data.get('customer_order', ''), 'Test Equipment:', data.get('test_equipment', 'MTS Landmark 500kN')),
+            ('Product S/N:', data.get('product_sn', ''), 'Specimen ID:', data.get('specimen_id', '')),
+            ('Material:', data.get('material', ''), 'Location/Orientation:', data.get('location_orientation', '')),
+            ('Strain Source:', data.get('strain_source', 'Extensometer'), 'Extensometer:', data.get('extensometer', 'MTS Extensometer')),
+            ('Yield Method:', data.get('yield_method', 'Rp0.2'), 'Operator:', data.get('operator', '')),
+        ]
+
+        for i, (label1, value1, label2, value2) in enumerate(info_data):
+            table.rows[i].cells[0].text = label1
+            table.rows[i].cells[1].text = str(value1)
+            table.rows[i].cells[2].text = label2
+            table.rows[i].cells[3].text = str(value2)
+            # Bold the labels
+            if table.rows[i].cells[0].paragraphs[0].runs:
+                table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+            if table.rows[i].cells[2].paragraphs[0].runs:
+                table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
+
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+        # Specimen Dimensions table
+        heading = doc.add_heading('Specimen Dimensions', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
+        table = doc.add_table(rows=6, cols=3)
+        table.style = 'Table Grid'
+
+        # Header row
+        headers = ['Parameter', 'Value', 'Unit']
+        for i, header_text in enumerate(headers):
+            table.rows[0].cells[i].text = header_text
+            table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+        specimen_type = data.get('specimen_type', 'Rectangular')
+        if specimen_type == 'Round':
+            dim_data = [
+                ('Geometry Type', 'Round', '-'),
+                ('Diameter d₀', data.get('d0', data.get('diameter', '')), 'mm'),
+                ('Gauge Length L₀', data.get('L0', data.get('gauge_length', '')), 'mm'),
+                ('Cross-section Area', data.get('cross_section_area', data.get('initial_area', '')), 'mm²'),
+                ('Final Diameter df', data.get('df', '-'), 'mm'),
+            ]
+        else:
+            dim_data = [
+                ('Geometry Type', 'Rectangular', '-'),
+                ('Width w₀', data.get('w0', data.get('width', '')), 'mm'),
+                ('Thickness t₀', data.get('t0', data.get('thickness', '')), 'mm'),
+                ('Gauge Length L₀', data.get('L0', data.get('gauge_length', '')), 'mm'),
+                ('Cross-section Area', data.get('cross_section_area', data.get('initial_area', '')), 'mm²'),
+            ]
+
+        for i, (param, value, unit) in enumerate(dim_data):
+            table.rows[i+1].cells[0].text = param
+            table.rows[i+1].cells[1].text = str(value)
+            table.rows[i+1].cells[2].text = unit
+
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+        # Test Results table
+        heading = doc.add_heading('Test Results', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
+        table = doc.add_table(rows=10, cols=4)
+        table.style = 'Table Grid'
+
+        # Header row
+        result_headers = ['Parameter', 'Value', 'U (k=2)', 'Unit']
+        for i, header_text in enumerate(result_headers):
+            table.rows[0].cells[i].text = header_text
+            table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+        # Get yield method values
+        yield_method = data.get('yield_method', 'Rp0.2/Rp0.5')
+        if 'ReH' in yield_method or 'yield_point' in yield_method.lower():
+            yield_val = data.get('ReH', '-')
+            yield_unc = data.get('ReH_uncertainty', '-')
+            yield_label = 'ReH (Upper Yield)'
+        else:
+            yield_val = data.get('Rp02', '-')
+            yield_unc = data.get('Rp02_uncertainty', '-')
+            yield_label = 'Rp0.2 (Offset Yield)'
+
+        results_data = [
+            ("Young's Modulus E", data.get('E', '-'), data.get('E_uncertainty', '-'), 'GPa'),
+            (yield_label, yield_val, yield_unc, 'MPa'),
+            ('Rm (Tensile Strength)', data.get('Rm', '-'), data.get('Rm_uncertainty', '-'), 'MPa'),
+            ('Ag (Uniform Elongation)', data.get('Ag', '-'), data.get('Ag_uncertainty', '-'), '%'),
+            ('A (Total Elongation)', data.get('A', '-'), data.get('A_uncertainty', '-'), '%'),
+            ('Z (Reduction of Area)', data.get('Z', '-'), data.get('Z_uncertainty', '-'), '%'),
+            ('Stress Rate at Yield', data.get('stress_rate_yield', '-'), '-', 'MPa/s'),
+            ('Strain Rate at Yield', data.get('strain_rate_yield', '-'), '-', 's⁻¹'),
+            (data.get('ratio_label', 'Rp0.2/Rm'), data.get('yield_tensile_ratio', '-'), '-', '-'),
+        ]
+
+        for i, (param, value, unc, unit) in enumerate(results_data):
+            table.rows[i+1].cells[0].text = param
+            table.rows[i+1].cells[1].text = str(value)
+            table.rows[i+1].cells[2].text = str(unc)
+            table.rows[i+1].cells[3].text = unit
+
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+        # Stress-Strain Plot
+        if chart_path and chart_path.exists():
+            heading = doc.add_heading('Stress-Strain Curve', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+            doc.add_picture(str(chart_path), width=Inches(5.5))
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            # Add caption
+            caption = doc.add_paragraph('Figure 1: Engineering stress-strain curve per ASTM E8/E8M')
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            caption.runs[0].font.size = Pt(10)
+            caption.runs[0].font.italic = True
+
+        # Comments section
+        comments = data.get('comments', '')
+        if comments:
+            heading = doc.add_heading('Comments', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+            doc.add_paragraph(comments)
+
+        # Approval Signatures
+        heading = doc.add_heading('Approval', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
+        sig_table = doc.add_table(rows=4, cols=4)
+        sig_table.style = 'Table Grid'
+
+        sig_headers = ['Role', 'Name', 'Signature', 'Date']
+        for i, header_text in enumerate(sig_headers):
+            sig_table.rows[0].cells[i].text = header_text
+            sig_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+        sig_table.rows[1].cells[0].text = 'Tested by:'
+        sig_table.rows[2].cells[0].text = 'Reviewed by:'
+        sig_table.rows[3].cells[0].text = 'Approved by:'
+
+        # Compact signature table rows
+        for row in sig_table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+        # Add disclaimer to page footer (visible on all pages)
+        disclaimer_text = (
+            "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
+            "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
+            "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
+            "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
+            "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
+        )
+        for section in doc.sections:
+            footer = section.footer
+            footer.is_linked_to_previous = False
+            footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            footer_para.clear()
+            footer_run = footer_para.add_run(disclaimer_text)
+            footer_run.font.size = Pt(7)
+            footer_run.italic = True
+
+        return doc
 
     def _replace_in_paragraph(
         self,

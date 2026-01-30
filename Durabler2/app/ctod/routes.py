@@ -882,13 +882,8 @@ def report(test_id):
                 crack_measurements=geometry.get('crack_measurements', [])
             )
 
-            # Get template and logo paths
-            template_path = Path(current_app.root_path).parent / 'templates' / 'ctod_e1290_report_template.docx'
+            # Get logo path (use from-scratch report generation)
             logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
-
-            if not template_path.exists():
-                flash(f'Template not found: {template_path}', 'danger')
-                return redirect(url_for('ctod.view', test_id=test_id))
 
             # Generate chart
             chart_path = None
@@ -963,7 +958,7 @@ def report(test_id):
             report_filename = f"CTOD_Report_{test.specimen_id or test.test_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
             output_path = reports_folder / report_filename
 
-            generator = CTODReportGenerator(template_path)
+            generator = CTODReportGenerator(None)  # Use from-scratch generation
             generator.generate_report(
                 output_path=output_path,
                 data=report_data,

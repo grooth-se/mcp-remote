@@ -401,13 +401,8 @@ def report(test_id):
                 results=mock_results
             )
 
-            # Get template and logo paths
-            template_path = Path(current_app.root_path).parent / 'templates' / 'sonic_e1875_report_template.docx'
+            # Get logo path (use from-scratch report generation)
             logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
-
-            if not template_path.exists():
-                flash(f'Template not found: {template_path}', 'danger')
-                return redirect(url_for('sonic.view', test_id=test_id))
 
             # Generate velocity chart for report
             chart_path = None
@@ -466,7 +461,7 @@ def report(test_id):
             report_filename = f"Sonic_Report_{test.specimen_id or test.test_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
             output_path = reports_folder / report_filename
 
-            generator = SonicReportGenerator(template_path)
+            generator = SonicReportGenerator(None)  # Use from-scratch generation
             generator.generate_report(
                 output_path=output_path,
                 data=report_data,

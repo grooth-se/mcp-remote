@@ -1049,13 +1049,8 @@ def report(test_id):
                     fig.savefig(chart_path, dpi=150, bbox_inches='tight')
                     plt.close(fig)
 
-            # Get template and logo paths
-            template_path = Path(current_app.root_path).parent / 'templates' / 'tensile_report_template.docx'
+            # Get logo path (use from-scratch report generation)
             logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
-
-            if not template_path.exists():
-                flash(f'Template not found: {template_path}', 'danger')
-                return redirect(url_for('tensile.view', test_id=test_id))
 
             # Generate report
             reports_folder = Path(current_app.root_path).parent / 'reports'
@@ -1064,7 +1059,7 @@ def report(test_id):
             report_filename = f"Tensile_Report_{test.specimen_id or test.test_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
             output_path = reports_folder / report_filename
 
-            generator = TensileReportGenerator(template_path)
+            generator = TensileReportGenerator(None)  # Use from-scratch generation
             generator.generate_report(
                 output_path=output_path,
                 data=report_data,
