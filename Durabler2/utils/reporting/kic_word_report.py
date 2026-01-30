@@ -111,37 +111,88 @@ class KICReportGenerator:
                                      logo_path: Optional[Path],
                                      precrack_measurements: Optional[List[float]] = None,
                                      crack_photo_path: Optional[Path] = None) -> Document:
-        """Create report without template - matches CTOD E1290 layout."""
+        """Create report without template - matches Vickers layout."""
+        from docx.shared import RGBColor
+
         doc = Document()
 
-        # Set up styles
+        # Set compact paragraph spacing for entire document
         style = doc.styles['Normal']
+        style.paragraph_format.space_before = Pt(0)
+        style.paragraph_format.space_after = Pt(3)
+        style.paragraph_format.line_spacing = 1.0
         style.font.name = 'Calibri'
-        style.font.size = Pt(11)
+        style.font.size = Pt(10)
 
-        # Header with logo (centered, same as CTOD)
-        if logo_path and logo_path.exists():
-            doc.add_picture(str(logo_path), width=Inches(2))
-            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Set compact heading styles with dark green color
+        dark_green = RGBColor(0x00, 0x64, 0x00)
+        for i in range(1, 4):
+            heading_style = doc.styles[f'Heading {i}']
+            heading_style.paragraph_format.space_before = Pt(8)
+            heading_style.paragraph_format.space_after = Pt(4)
+            heading_style.font.color.rgb = dark_green
 
-        # Title (same style as CTOD)
-        title = doc.add_heading('KIC Fracture Toughness Test Report', level=0)
-        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Add header with logo on left, certificate info on right (5-line layout)
+        for section in doc.sections:
+            # Set narrower margins for compact layout
+            section.top_margin = Cm(1.5)
+            section.bottom_margin = Cm(1.5)
+            section.left_margin = Cm(2.0)
+            section.right_margin = Cm(2.0)
+            header = section.header
+            header.is_linked_to_previous = False
 
-        # Subtitle with standard reference
-        subtitle = doc.add_paragraph('ASTM E399 - Plane-Strain Fracture Toughness')
-        subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Row 1: Logo - left aligned
+            logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+            logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            logo_para.paragraph_format.space_after = Pt(0)
+            if logo_path and logo_path.exists():
+                logo_run = logo_para.add_run()
+                logo_run.add_picture(str(logo_path), width=Cm(5.0))  # 50mm width
 
-        doc.add_paragraph()
+            # Row 2: Title - centered, font size 12
+            title_para = header.add_paragraph()
+            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            title_para.paragraph_format.space_before = Pt(0)
+            title_para.paragraph_format.space_after = Pt(0)
+            title_run = title_para.add_run('KIC Fracture Toughness Test Report')
+            title_run.bold = True
+            title_run.font.size = Pt(12)
 
-        # Test Information table (2-column layout like CTOD)
-        doc.add_heading('Test Information', level=1)
-        table = doc.add_table(rows=9, cols=4)
+            # Row 3: Standard - centered, font size 8
+            std_para = header.add_paragraph()
+            std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            std_para.paragraph_format.space_before = Pt(0)
+            std_para.paragraph_format.space_after = Pt(0)
+            std_run = std_para.add_run('ASTM E399')
+            std_run.font.size = Pt(8)
+
+            # Row 4: Certificate - right aligned, font size 8
+            cert_para = header.add_paragraph()
+            cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            cert_para.paragraph_format.space_before = Pt(0)
+            cert_para.paragraph_format.space_after = Pt(0)
+            cert_run = cert_para.add_run(f"Certificate: {test_info.get('certificate_number', '')}")
+            cert_run.font.size = Pt(8)
+
+            # Row 5: Date - right aligned, font size 8
+            date_para = header.add_paragraph()
+            date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            date_para.paragraph_format.space_before = Pt(0)
+            date_para.paragraph_format.space_after = Pt(0)
+            date_run = date_para.add_run(f"Date: {test_info.get('test_date', '')}")
+            date_run.font.size = Pt(8)
+
+        # Test Information table (exclude certificate and date - now in header)
+        heading = doc.add_heading('Test Information', level=1)
+        heading.paragraph_format.space_before = Pt(0)
+        heading.paragraph_format.space_after = Pt(6)
+
+        table = doc.add_table(rows=8, cols=4)
         table.style = 'Table Grid'
 
-        # Two-column layout: Label | Value | Label | Value
+        # Two-column layout: Label | Value | Label | Value (exclude cert/date)
         info_data = [
-            ('Certificate Number:', test_info.get('certificate_number', ''), 'Test Date:', test_info.get('test_date', '')),
             ('Test Project:', test_info.get('test_project', ''), 'Temperature:', f"{test_info.get('temperature', '23')} °C"),
             ('Customer:', test_info.get('customer', ''), 'Test Standard:', 'ASTM E399'),
             ('Customer Order:', test_info.get('customer_order', ''), 'Test Equipment:', 'MTS Landmark 500kN'),
@@ -163,10 +214,17 @@ class KICReportGenerator:
             if table.rows[i].cells[2].paragraphs[0].runs:
                 table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
-        # Specimen Geometry table (same format as CTOD)
-        doc.add_heading('Specimen Geometry', level=1)
+        # Specimen Geometry table
+        heading = doc.add_heading('Specimen Geometry', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
         table = doc.add_table(rows=7, cols=3)
         table.style = 'Table Grid'
 
@@ -190,10 +248,17 @@ class KICReportGenerator:
             table.rows[i+1].cells[1].text = str(value)
             table.rows[i+1].cells[2].text = unit
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
-        # Material Properties table (same format as CTOD)
-        doc.add_heading('Material Properties', level=1)
+        # Material Properties table
+        heading = doc.add_heading('Material Properties', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
         table = doc.add_table(rows=5, cols=3)
         table.style = 'Table Grid'
 
@@ -214,11 +279,18 @@ class KICReportGenerator:
             table.rows[i+1].cells[1].text = str(value)
             table.rows[i+1].cells[2].text = unit
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
-        # Precrack Measurements table (if available, same format as CTOD crack measurements)
+        # Precrack Measurements table (if available)
         if precrack_measurements and len(precrack_measurements) > 0:
-            doc.add_heading('Crack Length Measurements', level=1)
+            heading = doc.add_heading('Crack Length Measurements', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+
             num_rows = len(precrack_measurements) + 2  # +1 for header, +1 for average
             table = doc.add_table(rows=num_rows, cols=3)
             table.style = 'Table Grid'
@@ -254,10 +326,17 @@ class KICReportGenerator:
                     for run in para.runs:
                         run.bold = True
 
-            doc.add_paragraph()
+            # Compact table rows
+            for row in table.rows:
+                for cell in row.cells:
+                    cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                    cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
-        # Test Results table (4-column like CTOD: Parameter | Value | Uncertainty | Requirement)
-        doc.add_heading('Test Results', level=1)
+        # Test Results table
+        heading = doc.add_heading('Test Results', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
         table = doc.add_table(rows=8, cols=4)
         table.style = 'Table Grid'
 
@@ -268,7 +347,7 @@ class KICReportGenerator:
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
         if results:
-            # Format like CTOD results table
+            # Format results table
             results_data = [
                 ('Pmax', f'{results.P_max.value:.2f}', f'±{results.P_max.uncertainty:.2f}', 'kN'),
                 ('PQ (5% secant)', f'{results.P_Q.value:.2f}', f'±{results.P_Q.uncertainty:.2f}', 'kN'),
@@ -286,11 +365,17 @@ class KICReportGenerator:
                 table.rows[i+1].cells[2].text = unc
                 table.rows[i+1].cells[3].text = unit
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
-        # Force-Displacement Plot (centered like CTOD)
+        # Force-Displacement Plot
         if chart_path and chart_path.exists():
-            doc.add_heading('Force vs Displacement', level=1)
+            heading = doc.add_heading('Force vs Displacement', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
             doc.add_picture(str(chart_path), width=Inches(5.5))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
@@ -300,12 +385,12 @@ class KICReportGenerator:
             caption.runs[0].font.size = Pt(10)
             caption.runs[0].font.italic = True
 
-            doc.add_paragraph()
-
         # Crack Surface Photo (if available)
         if crack_photo_path and crack_photo_path.exists():
-            doc.add_heading('Crack Surface', level=1)
-            doc.add_picture(str(crack_photo_path), width=Inches(4.5))
+            heading = doc.add_heading('Crack Surface', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+            doc.add_picture(str(crack_photo_path), width=Inches(4.0))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
             # Add caption
@@ -314,10 +399,10 @@ class KICReportGenerator:
             caption.runs[0].font.size = Pt(10)
             caption.runs[0].font.italic = True
 
-            doc.add_paragraph()
-
-        # Validity Assessment (same style as CTOD)
-        doc.add_heading('Validity Assessment per ASTM E399', level=1)
+        # Validity Assessment
+        heading = doc.add_heading('Validity Assessment per ASTM E399', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
 
         validity_status = "VALID" if results and results.is_valid else "CONDITIONAL"
 
@@ -340,10 +425,11 @@ class KICReportGenerator:
             for note in results.validity_notes:
                 doc.add_paragraph(f"• {note}")
 
-        doc.add_paragraph()
+        # Approval Signatures
+        heading = doc.add_heading('Approval', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
 
-        # Approval Signatures (4 rows like CTOD: header + tested + reviewed + approved)
-        doc.add_heading('Approval', level=1)
         sig_table = doc.add_table(rows=4, cols=4)
         sig_table.style = 'Table Grid'
 
@@ -356,7 +442,11 @@ class KICReportGenerator:
         sig_table.rows[2].cells[0].text = 'Reviewed by:'
         sig_table.rows[3].cells[0].text = 'Approved by:'
 
-        doc.add_paragraph()
+        # Compact signature table rows
+        for row in sig_table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
         # Add disclaimer to page footer (visible on all pages)
         disclaimer_text = (

@@ -498,26 +498,92 @@ def report(test_id):
 
             # Create report from scratch (no template dependency)
             from docx import Document
-            from docx.shared import Inches, Pt
+            from docx.shared import Inches, Pt, Cm
             from docx.enum.text import WD_ALIGN_PARAGRAPH
+            from docx.enum.table import WD_TABLE_ALIGNMENT
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
 
             doc = Document()
 
-            # Title
-            title = doc.add_heading('Vickers Hardness Test Report', level=0)
-            title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Set compact paragraph spacing for entire document
+            style = doc.styles['Normal']
+            style.paragraph_format.space_before = Pt(0)
+            style.paragraph_format.space_after = Pt(3)
+            style.paragraph_format.line_spacing = 1.0
+            style.font.size = Pt(10)
 
-            subtitle = doc.add_paragraph('ASTM E92 / ISO 6507')
-            subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Set compact heading styles with dark green color
+            from docx.shared import RGBColor
+            dark_green = RGBColor(0x00, 0x64, 0x00)  # Dark green color
 
-            doc.add_paragraph()
+            for i in range(1, 4):
+                heading_style = doc.styles[f'Heading {i}']
+                heading_style.paragraph_format.space_before = Pt(8)
+                heading_style.paragraph_format.space_after = Pt(4)
+                heading_style.font.color.rgb = dark_green
 
-            # Test Information - all fields except status columns
-            doc.add_heading('Test Information', level=1)
+            # Add header with logo on left, certificate info on right
+            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'logo.png'
 
-            # Build info data - include all relevant fields
+            for section in doc.sections:
+                # Set narrower margins for compact layout
+                section.top_margin = Cm(1.5)
+                section.bottom_margin = Cm(1.5)
+                section.left_margin = Cm(2.0)
+                section.right_margin = Cm(2.0)
+                header = section.header
+                header.is_linked_to_previous = False
+
+                # Simple 5-line header layout
+                # Row 1: Logo - left aligned
+                logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+                logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                logo_para.paragraph_format.space_after = Pt(0)
+                if logo_path.exists():
+                    logo_run = logo_para.add_run()
+                    logo_run.add_picture(str(logo_path), width=Cm(5.0))  # 50mm width
+
+                # Row 2: Title - centered, font size 12
+                title_para = header.add_paragraph()
+                title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                title_para.paragraph_format.space_before = Pt(0)
+                title_para.paragraph_format.space_after = Pt(0)
+                title_run = title_para.add_run('Vickers Hardness Test Report')
+                title_run.bold = True
+                title_run.font.size = Pt(12)
+
+                # Row 3: Standard - centered, font size 8
+                std_para = header.add_paragraph()
+                std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                std_para.paragraph_format.space_before = Pt(0)
+                std_para.paragraph_format.space_after = Pt(0)
+                std_run = std_para.add_run('ASTM E92 / ISO 6507')
+                std_run.font.size = Pt(8)
+
+                # Row 4: Certificate - right aligned, font size 8
+                cert_para = header.add_paragraph()
+                cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                cert_para.paragraph_format.space_before = Pt(0)
+                cert_para.paragraph_format.space_after = Pt(0)
+                cert_run = cert_para.add_run(f"Certificate: {test_info.get('certificate_number', '')}")
+                cert_run.font.size = Pt(8)
+
+                # Row 5: Date - right aligned, font size 8
+                date_para = header.add_paragraph()
+                date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                date_para.paragraph_format.space_before = Pt(0)
+                date_para.paragraph_format.space_after = Pt(0)
+                date_run = date_para.add_run(f"Date: {test_info.get('test_date', '')}")
+                date_run.font.size = Pt(8)
+
+            # Test Information - exclude certificate number and test date (now in header)
+            heading = doc.add_heading('Test Information', level=1)
+            heading.paragraph_format.space_before = Pt(0)
+            heading.paragraph_format.space_after = Pt(6)
+
+            # Build info data - exclude certificate and date (moved to header)
             info_data = [
-                ('Certificate Number:', test_info.get('certificate_number', '')),
                 ('Customer:', test_info.get('customer', '')),
                 ('Test Project:', test_info.get('test_project', '')),
                 ('Specimen ID:', test_info.get('specimen_id', '')),
@@ -525,7 +591,6 @@ def report(test_id):
                 ('Material:', test_info.get('material', '')),
                 ('Requirement:', test_info.get('requirement', '')),
                 ('Location/Orientation:', test_info.get('location_orientation', '')),
-                ('Test Date:', test_info.get('test_date', '')),
                 ('Temperature:', f"{test_info.get('temperature', '23')} °C"),
                 ('Load Level:', test_info.get('load_level', '')),
                 ('Dwell Time:', f"{test_info.get('dwell_time', '15')} s"),
@@ -539,14 +604,20 @@ def report(test_id):
             table.style = 'Table Grid'
 
             for i, (label, value) in enumerate(info_data):
-                table.rows[i].cells[0].text = label
-                table.rows[i].cells[1].text = str(value)
-                table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
-
-            doc.add_paragraph()
+                row = table.rows[i]
+                row.cells[0].text = label
+                row.cells[1].text = str(value)
+                row.cells[0].paragraphs[0].runs[0].bold = True
+                # Compact row height
+                for cell in row.cells:
+                    cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                    cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
             # Results Summary
-            doc.add_heading('Results Summary', level=1)
+            heading = doc.add_heading('Results Summary', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+
             table = doc.add_table(rows=7, cols=3)
             table.style = 'Table Grid'
 
@@ -556,7 +627,7 @@ def report(test_id):
                 table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
             results_data = [
-                ('Mean Hardness', f'{result_proxy.mean_hardness.value:.1f} +/- {result_proxy.mean_hardness.uncertainty:.1f}', result_proxy.load_level),
+                ('Mean Hardness', f'{result_proxy.mean_hardness.value:.1f} ± {result_proxy.mean_hardness.uncertainty:.1f}', result_proxy.load_level),
                 ('Standard Deviation', f'{result_proxy.std_dev:.1f}', result_proxy.load_level),
                 ('Range', f'{result_proxy.range_value:.1f}', result_proxy.load_level),
                 ('Minimum', f'{result_proxy.min_value:.1f}', result_proxy.load_level),
@@ -569,10 +640,17 @@ def report(test_id):
                 table.rows[i+1].cells[1].text = value
                 table.rows[i+1].cells[2].text = unit
 
-            doc.add_paragraph()
+            # Compact table rows
+            for row in table.rows:
+                for cell in row.cells:
+                    cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                    cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
             # Individual Readings
-            doc.add_heading('Individual Readings', level=1)
+            heading = doc.add_heading('Individual Readings', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+
             table = doc.add_table(rows=len(readings) + 1, cols=3)
             table.style = 'Table Grid'
 
@@ -586,17 +664,26 @@ def report(test_id):
                 table.rows[i+1].cells[1].text = r.get('location', f'Point {i+1}')
                 table.rows[i+1].cells[2].text = f"{r.get('hardness_value', 0):.1f}"
 
-            doc.add_paragraph()
+            # Compact table rows
+            for row in table.rows:
+                for cell in row.cells:
+                    cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                    cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
             # Notes (if any)
             if test_info.get('notes'):
-                doc.add_heading('Notes', level=1)
-                doc.add_paragraph(test_info['notes'])
-                doc.add_paragraph()
+                heading = doc.add_heading('Notes', level=1)
+                heading.paragraph_format.space_before = Pt(12)
+                heading.paragraph_format.space_after = Pt(6)
+                notes_para = doc.add_paragraph(test_info['notes'])
+                notes_para.paragraph_format.space_after = Pt(6)
 
             # Uncertainty Budget (if requested)
             if form.include_uncertainty_budget.data == 'yes' and uncertainty_budget:
-                doc.add_heading('Uncertainty Budget (k=2)', level=1)
+                heading = doc.add_heading('Uncertainty Budget (k=2)', level=1)
+                heading.paragraph_format.space_before = Pt(12)
+                heading.paragraph_format.space_after = Pt(6)
+
                 table = doc.add_table(rows=6, cols=2)
                 table.style = 'Table Grid'
 
@@ -613,27 +700,35 @@ def report(test_id):
                     table.rows[i].cells[0].text = comp
                     table.rows[i].cells[1].text = val
 
-                doc.add_paragraph()
+                # Compact table rows
+                for row in table.rows:
+                    for cell in row.cells:
+                        cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                        cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
             # Chart
             if chart_path and chart_path.exists():
-                doc.add_heading('Hardness Profile', level=1)
+                heading = doc.add_heading('Hardness Profile', level=1)
+                heading.paragraph_format.space_before = Pt(12)
+                heading.paragraph_format.space_after = Pt(6)
                 doc.add_picture(str(chart_path), width=Inches(5.5))
                 doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-            doc.add_paragraph()
 
             # Indent Photo (if requested and available)
             if form.include_photo.data == 'yes' and test_params.get('photo_path'):
                 photo_path = Path(current_app.config['UPLOAD_FOLDER']) / test_params['photo_path']
                 if photo_path.exists():
-                    doc.add_heading('Indent Photo', level=1)
+                    heading = doc.add_heading('Indent Photo', level=1)
+                    heading.paragraph_format.space_before = Pt(12)
+                    heading.paragraph_format.space_after = Pt(6)
                     doc.add_picture(str(photo_path), width=Inches(4))
                     doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    doc.add_paragraph()
 
             # Approval Signatures (4 rows: header + tested + reviewed + approved)
-            doc.add_heading('Approval', level=1)
+            heading = doc.add_heading('Approval', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+
             sig_table = doc.add_table(rows=4, cols=4)
             sig_table.style = 'Table Grid'
 
@@ -646,7 +741,11 @@ def report(test_id):
             sig_table.rows[2].cells[0].text = 'Reviewed by:'
             sig_table.rows[3].cells[0].text = 'Approved by:'
 
-            doc.add_paragraph()
+            # Compact signature table rows
+            for row in sig_table.rows:
+                for cell in row.cells:
+                    cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                    cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
             # Add disclaimer to page footer (visible on all pages)
             disclaimer_text = (

@@ -108,37 +108,88 @@ class FCGRReportGenerator:
         logo_path: Optional[Path],
         photo_paths: Optional[List[Path]]
     ) -> Document:
-        """Create report without template - matches CTOD E1290 layout."""
+        """Create report without template - matches Vickers/CTOD layout."""
+        from docx.shared import RGBColor
+
         doc = Document()
 
-        # Set up styles
+        # Set compact paragraph spacing for entire document
         style = doc.styles['Normal']
+        style.paragraph_format.space_before = Pt(0)
+        style.paragraph_format.space_after = Pt(3)
+        style.paragraph_format.line_spacing = 1.0
         style.font.name = 'Calibri'
-        style.font.size = Pt(11)
+        style.font.size = Pt(10)
 
-        # Header with logo (centered, same as CTOD/KIC)
-        if logo_path and logo_path.exists():
-            doc.add_picture(str(logo_path), width=Inches(2))
-            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Set compact heading styles with dark green color
+        dark_green = RGBColor(0x00, 0x64, 0x00)
+        for i in range(1, 4):
+            heading_style = doc.styles[f'Heading {i}']
+            heading_style.paragraph_format.space_before = Pt(8)
+            heading_style.paragraph_format.space_after = Pt(4)
+            heading_style.font.color.rgb = dark_green
 
-        # Title (same style as CTOD/KIC)
-        title = doc.add_heading('Fatigue Crack Growth Rate Test Report', level=0)
-        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Add header with logo on left, certificate info on right (5-line layout)
+        for section in doc.sections:
+            # Set narrower margins for compact layout
+            section.top_margin = Cm(1.5)
+            section.bottom_margin = Cm(1.5)
+            section.left_margin = Cm(2.0)
+            section.right_margin = Cm(2.0)
+            header = section.header
+            header.is_linked_to_previous = False
 
-        # Subtitle with standard reference
-        subtitle = doc.add_paragraph('ASTM E647 - Fatigue Crack Growth Rates')
-        subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            # Row 1: Logo - left aligned
+            logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+            logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            logo_para.paragraph_format.space_after = Pt(0)
+            if logo_path and logo_path.exists():
+                logo_run = logo_para.add_run()
+                logo_run.add_picture(str(logo_path), width=Cm(5.0))  # 50mm width
 
-        doc.add_paragraph()
+            # Row 2: Title - centered, font size 12
+            title_para = header.add_paragraph()
+            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            title_para.paragraph_format.space_before = Pt(0)
+            title_para.paragraph_format.space_after = Pt(0)
+            title_run = title_para.add_run('Fatigue Crack Growth Rate Test Report')
+            title_run.bold = True
+            title_run.font.size = Pt(12)
 
-        # Test Information table (4-column layout like CTOD/KIC)
-        doc.add_heading('Test Information', level=1)
-        table = doc.add_table(rows=8, cols=4)
+            # Row 3: Standard - centered, font size 8
+            std_para = header.add_paragraph()
+            std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            std_para.paragraph_format.space_before = Pt(0)
+            std_para.paragraph_format.space_after = Pt(0)
+            std_run = std_para.add_run('ASTM E647')
+            std_run.font.size = Pt(8)
+
+            # Row 4: Certificate - right aligned, font size 8
+            cert_para = header.add_paragraph()
+            cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            cert_para.paragraph_format.space_before = Pt(0)
+            cert_para.paragraph_format.space_after = Pt(0)
+            cert_run = cert_para.add_run(f"Certificate: {data.get('certificate_number', '')}")
+            cert_run.font.size = Pt(8)
+
+            # Row 5: Date - right aligned, font size 8
+            date_para = header.add_paragraph()
+            date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            date_para.paragraph_format.space_before = Pt(0)
+            date_para.paragraph_format.space_after = Pt(0)
+            date_run = date_para.add_run(f"Date: {data.get('test_date', '')}")
+            date_run.font.size = Pt(8)
+
+        # Test Information table (exclude certificate and date - now in header)
+        heading = doc.add_heading('Test Information', level=1)
+        heading.paragraph_format.space_before = Pt(0)
+        heading.paragraph_format.space_after = Pt(6)
+
+        table = doc.add_table(rows=7, cols=4)
         table.style = 'Table Grid'
 
-        # Two-column layout: Label | Value | Label | Value
+        # Two-column layout: Label | Value | Label | Value (exclude cert/date)
         info_data = [
-            ('Certificate Number:', data.get('certificate_number', ''), 'Test Date:', data.get('test_date', '')),
             ('Test Project:', data.get('test_project', ''), 'Temperature:', f"{data.get('temperature', '23')} °C"),
             ('Customer:', data.get('customer', ''), 'Test Standard:', 'ASTM E647'),
             ('Customer Order:', data.get('customer_order', ''), 'Test Equipment:', 'MTS Landmark 500kN'),
@@ -159,10 +210,17 @@ class FCGRReportGenerator:
             if table.rows[i].cells[2].paragraphs[0].runs:
                 table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
-        # Specimen Geometry table (same format as CTOD/KIC)
-        doc.add_heading('Specimen Geometry', level=1)
+        # Specimen Geometry table
+        heading = doc.add_heading('Specimen Geometry', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
         table = doc.add_table(rows=6, cols=3)
         table.style = 'Table Grid'
 
@@ -185,10 +243,17 @@ class FCGRReportGenerator:
             table.rows[i+1].cells[1].text = str(value)
             table.rows[i+1].cells[2].text = unit
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
-        # Material Properties table (same format as CTOD/KIC)
-        doc.add_heading('Material Properties', level=1)
+        # Material Properties table
+        heading = doc.add_heading('Material Properties', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
         table = doc.add_table(rows=5, cols=3)
         table.style = 'Table Grid'
 
@@ -209,10 +274,17 @@ class FCGRReportGenerator:
             table.rows[i+1].cells[1].text = str(value)
             table.rows[i+1].cells[2].text = unit
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
         # Test Parameters table (FCGR-specific)
-        doc.add_heading('Test Parameters', level=1)
+        heading = doc.add_heading('Test Parameters', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
         table = doc.add_table(rows=6, cols=3)
         table.style = 'Table Grid'
 
@@ -234,10 +306,17 @@ class FCGRReportGenerator:
             table.rows[i+1].cells[1].text = str(value)
             table.rows[i+1].cells[2].text = unit
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
-        # Paris Law Results table (4-column like CTOD/KIC results)
-        doc.add_heading('Paris Law Results', level=1)
+        # Paris Law Results table
+        heading = doc.add_heading('Paris Law Results', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
         table = doc.add_table(rows=9, cols=4)
         table.style = 'Table Grid'
 
@@ -279,10 +358,17 @@ class FCGRReportGenerator:
             table.rows[i+1].cells[2].text = str(unc)
             table.rows[i+1].cells[3].text = unit
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
         # Data Quality table
-        doc.add_heading('Data Quality', level=1)
+        heading = doc.add_heading('Data Quality', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+
         table = doc.add_table(rows=4, cols=2)
         table.style = 'Table Grid'
 
@@ -310,12 +396,18 @@ class FCGRReportGenerator:
         if table.rows[3].cells[0].paragraphs[0].runs:
             table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
 
-        doc.add_paragraph()
+        # Compact table rows
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
         # Plot 1: Crack Length vs Cycles
         if plot1_path and plot1_path.exists():
-            doc.add_heading('Crack Length vs Cycles', level=1)
-            doc.add_picture(str(plot1_path), width=Inches(6.5))
+            heading = doc.add_heading('Crack Length vs Cycles', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+            doc.add_picture(str(plot1_path), width=Inches(5.5))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
             # Add caption
@@ -324,12 +416,12 @@ class FCGRReportGenerator:
             caption.runs[0].font.size = Pt(10)
             caption.runs[0].font.italic = True
 
-            doc.add_paragraph()
-
         # Plot 2: da/dN vs Delta-K (Paris Law)
         if plot2_path and plot2_path.exists():
-            doc.add_heading('da/dN vs ΔK (Paris Law)', level=1)
-            doc.add_picture(str(plot2_path), width=Inches(6.5))
+            heading = doc.add_heading('da/dN vs ΔK (Paris Law)', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+            doc.add_picture(str(plot2_path), width=Inches(5.5))
             doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
             # Add caption
@@ -338,14 +430,14 @@ class FCGRReportGenerator:
             caption.runs[0].font.size = Pt(10)
             caption.runs[0].font.italic = True
 
-            doc.add_paragraph()
-
         # Crack Surface Photos (if available)
         if photo_paths:
-            doc.add_heading('Crack Surface', level=1)
+            heading = doc.add_heading('Crack Surface', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
             for i, photo_path in enumerate(photo_paths):
                 if photo_path and photo_path.exists():
-                    doc.add_picture(str(photo_path), width=Inches(5.5))
+                    doc.add_picture(str(photo_path), width=Inches(4.0))
                     doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
             # Add caption
@@ -354,10 +446,10 @@ class FCGRReportGenerator:
             caption.runs[0].font.size = Pt(10)
             caption.runs[0].font.italic = True
 
-            doc.add_paragraph()
-
-        # Validity Assessment (same style as CTOD/KIC)
-        doc.add_heading('Validity Assessment per ASTM E647', level=1)
+        # Validity Assessment
+        heading = doc.add_heading('Validity Assessment per ASTM E647', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
 
         validity_status = data.get('is_valid', '-')
 
@@ -382,10 +474,11 @@ class FCGRReportGenerator:
                 if note.strip():
                     doc.add_paragraph(f"• {note.strip()}")
 
-        doc.add_paragraph()
+        # Approval Signatures
+        heading = doc.add_heading('Approval', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
 
-        # Approval Signatures (4 rows like CTOD/KIC)
-        doc.add_heading('Approval', level=1)
         sig_table = doc.add_table(rows=4, cols=4)
         sig_table.style = 'Table Grid'
 
@@ -398,7 +491,11 @@ class FCGRReportGenerator:
         sig_table.rows[2].cells[0].text = 'Reviewed by:'
         sig_table.rows[3].cells[0].text = 'Approved by:'
 
-        doc.add_paragraph()
+        # Compact signature table rows
+        for row in sig_table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
         # Add disclaimer to page footer (visible on all pages)
         disclaimer_text = (
