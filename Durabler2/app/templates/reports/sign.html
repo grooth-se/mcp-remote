@@ -76,13 +76,56 @@
                         </tr>
                         <tr>
                             <th>Certificate</th>
-                            <td>Durabler AB Company Certificate</td>
+                            <td>
+                                {% if has_certificate %}
+                                <span class="text-success"><i class="bi bi-check-circle"></i> Durabler AB Company Certificate</span>
+                                {% else %}
+                                <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Certificate not configured</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         <tr>
                             <th>Algorithm</th>
                             <td>SHA-256 with RSA</td>
                         </tr>
                     </table>
+
+                    <!-- Signing Capability Status -->
+                    <div class="alert {% if can_sign and has_certificate %}alert-success{% else %}alert-warning{% endif %} mt-3">
+                        <h6><i class="bi bi-gear"></i> Signing Capability</h6>
+                        <ul class="mb-0 small">
+                            <li>
+                                PDF Conversion (LibreOffice):
+                                {% if signing_deps.can_convert %}
+                                <span class="text-success"><i class="bi bi-check"></i> Available</span>
+                                {% else %}
+                                <span class="text-danger"><i class="bi bi-x"></i> Not available</span>
+                                {% endif %}
+                            </li>
+                            <li>
+                                Digital Signing (endesive):
+                                {% if signing_deps.can_sign %}
+                                <span class="text-success"><i class="bi bi-check"></i> Available</span>
+                                {% else %}
+                                <span class="text-danger"><i class="bi bi-x"></i> Not available</span>
+                                {% endif %}
+                            </li>
+                            <li>
+                                Company Certificate:
+                                {% if has_certificate %}
+                                <span class="text-success"><i class="bi bi-check"></i> Configured</span>
+                                {% else %}
+                                <span class="text-warning"><i class="bi bi-exclamation"></i> Not configured</span>
+                                {% endif %}
+                            </li>
+                        </ul>
+                        {% if not (can_sign and has_certificate) %}
+                        <hr class="my-2">
+                        <small class="text-muted">
+                            Without full signing capability, the report will be converted to PDF but not cryptographically signed.
+                        </small>
+                        {% endif %}
+                    </div>
 
                     <hr>
 
@@ -107,13 +150,25 @@
                 </div>
             </div>
 
-            <div class="alert alert-warning mt-4">
-                <h5><i class="bi bi-exclamation-triangle"></i> Note</h5>
-                <p class="mb-0">
-                    <strong>Phase 3 Implementation:</strong> Full PDF signing with X.509 certificates will be
-                    implemented in Phase 3. Currently, this creates a placeholder record for the signed PDF.
+            {% if not (can_sign and has_certificate) %}
+            <div class="alert alert-info mt-4">
+                <h5><i class="bi bi-info-circle"></i> Setup Instructions</h5>
+                <p class="mb-2">
+                    To enable full X.509 digital signatures, ensure the following are configured:
                 </p>
+                <ol class="mb-0 small">
+                    {% if not signing_deps.can_convert %}
+                    <li><strong>Install LibreOffice</strong> - Required for Word to PDF conversion</li>
+                    {% endif %}
+                    {% if not signing_deps.can_sign %}
+                    <li><strong>Install signing libraries</strong> - Run: <code>pip install endesive cryptography</code></li>
+                    {% endif %}
+                    {% if not has_certificate %}
+                    <li><strong>Configure company certificate</strong> - Place PKCS#12 (.p12) file in <code>certs/</code> folder</li>
+                    {% endif %}
+                </ol>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>

@@ -32,9 +32,16 @@ Pillow>=10.0.0               # PIL for image processing
 # Word document generation
 python-docx>=1.0.0           # Word report generation
 
-# PDF generation
+# PDF generation and signing
 reportlab>=4.0.0
+pypdf>=4.0.0                 # PDF manipulation
+endesive>=2.15.0             # PDF digital signatures (X.509)
+cryptography>=41.0.0         # Certificate handling
 Jinja2>=3.1.0                # Template engine (also used by Flask)
+
+# Word to PDF conversion (requires LibreOffice installed on system)
+# Or use docx2pdf on Windows (requires Word installed)
+# docx2pdf>=0.1.8            # Windows only - requires MS Word
 
 # Security
 Werkzeug>=3.0.0              # Password hashing, secure filenames

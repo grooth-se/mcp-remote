@@ -211,59 +211,122 @@ def reject(id):
 @approver_required
 def sign(id):
     """Sign and publish the approved report."""
+    from utils.reporting.pdf_signer import (
+        sign_report, create_placeholder_signed_pdf,
+        check_dependencies, PDFSigningError, CertificateError
+    )
+
     approval = ReportApproval.query.get_or_404(id)
 
     if approval.status != STATUS_APPROVED:
         flash('Only approved reports can be signed.', 'danger')
         return redirect(url_for('reports.view', id=id))
 
+    # Check signing capabilities
+    deps = check_dependencies()
+    can_sign = deps['can_sign'] and deps['can_convert']
+
+    # Get certificate configuration
+    certs_folder = Path(current_app.config.get('CERTS_FOLDER', 'certs'))
+    cert_file = current_app.config.get('COMPANY_CERT_FILE', 'durabler_company.p12')
+    cert_password = current_app.config.get('COMPANY_CERT_PASSWORD', '')
+    cert_path = certs_folder / cert_file
+    has_certificate = cert_path.exists()
+
     if request.method == 'POST':
-        # Phase 3 will implement actual PDF signing
-        # For now, just mark as published with placeholder
+        reports_folder = Path(current_app.config['REPORTS_FOLDER'])
 
-        # Generate signed PDF path
-        year = datetime.now().year
-        signed_folder = Path(current_app.config['REPORTS_FOLDER']) / 'signed' / str(year)
-        signed_folder.mkdir(parents=True, exist_ok=True)
+        # Get Word report path
+        word_report_path = None
+        if approval.word_report_path:
+            word_report_path = reports_folder / approval.word_report_path
+            if not word_report_path.exists():
+                # Try alternate location
+                word_report_path = Path(approval.word_report_path)
 
-        pdf_filename = f"{approval.certificate_number.replace(' ', '_')}_signed.pdf"
-        pdf_path = signed_folder / pdf_filename
+        signer_name = current_user.full_name or current_user.username
+        signer_user_id = current_user.user_id or str(current_user.id)
 
-        # Placeholder: In Phase 3, we'll actually convert and sign the PDF
-        # For now, create a simple placeholder
-        import hashlib
-        placeholder_hash = hashlib.sha256(
-            f"{approval.certificate_number}_{datetime.utcnow().isoformat()}".encode()
-        ).hexdigest()
+        try:
+            if can_sign and has_certificate and word_report_path and word_report_path.exists():
+                # Full PDF signing with X.509 certificate
+                result = sign_report(
+                    word_report_path=word_report_path,
+                    output_folder=reports_folder,
+                    certificate_number=approval.certificate_number,
+                    cert_path=cert_path,
+                    cert_password=cert_password,
+                    signer_name=signer_name,
+                    signer_user_id=signer_user_id
+                )
+                signing_method = 'X.509 Digital Signature'
+            else:
+                # Fallback to placeholder (conversion without signing)
+                if word_report_path and word_report_path.exists():
+                    result = create_placeholder_signed_pdf(
+                        word_report_path=word_report_path,
+                        output_folder=reports_folder,
+                        certificate_number=approval.certificate_number,
+                        signer_name=signer_name,
+                        signer_user_id=signer_user_id
+                    )
+                    signing_method = 'PDF Conversion (no digital signature)'
+                else:
+                    # No Word report available - create minimal placeholder
+                    result = create_placeholder_signed_pdf(
+                        word_report_path=Path('/dev/null'),  # Non-existent path
+                        output_folder=reports_folder,
+                        certificate_number=approval.certificate_number,
+                        signer_name=signer_name,
+                        signer_user_id=signer_user_id
+                    )
+                    signing_method = 'Placeholder (no source document)'
 
-        approval.publish(
-            pdf_path=str(pdf_path.relative_to(current_app.config['REPORTS_FOLDER'])),
-            pdf_hash=placeholder_hash
-        )
+            # Update approval record
+            approval.publish(
+                pdf_path=result['pdf_path'],
+                pdf_hash=result['pdf_hash']
+            )
+            approval.signature_timestamp = result['timestamp']
 
-        # Audit log
-        audit = AuditLog(
-            user_id=current_user.id,
-            action='PUBLISH_REPORT',
-            table_name='report_approvals',
-            record_id=approval.id,
-            new_values={
-                'status': STATUS_PUBLISHED,
-                'certificate_number': approval.certificate_number,
-                'signed_by': current_user.full_name or current_user.username,
-                'pdf_hash': placeholder_hash[:16] + '...'
-            },
-            ip_address=request.remote_addr
-        )
-        db.session.add(audit)
-        db.session.commit()
+            # Audit log with detailed signing information
+            audit = AuditLog(
+                user_id=current_user.id,
+                action='PUBLISH_REPORT',
+                table_name='report_approvals',
+                record_id=approval.id,
+                new_values={
+                    'status': STATUS_PUBLISHED,
+                    'certificate_number': approval.certificate_number,
+                    'signed_by': signer_name,
+                    'signer_user_id': signer_user_id,
+                    'signing_method': signing_method,
+                    'pdf_hash': result['pdf_hash'][:16] + '...',
+                    'timestamp': result['timestamp'].isoformat()
+                },
+                ip_address=request.remote_addr
+            )
+            db.session.add(audit)
+            db.session.commit()
 
-        flash(f'Report {approval.certificate_number} signed and published.', 'success')
-        return redirect(url_for('reports.view', id=id))
+            if result.get('is_placeholder'):
+                flash(f'Report {approval.certificate_number} published (PDF converted, digital signature not available).', 'warning')
+            else:
+                flash(f'Report {approval.certificate_number} digitally signed and published.', 'success')
 
+            return redirect(url_for('reports.view', id=id))
+
+        except (PDFSigningError, CertificateError) as e:
+            flash(f'Signing failed: {str(e)}', 'danger')
+            return redirect(url_for('reports.sign', id=id))
+
+    # GET request - show signing page with status info
     return render_template('reports/sign.html',
                            approval=approval,
-                           status_labels=APPROVAL_STATUS_LABELS)
+                           status_labels=APPROVAL_STATUS_LABELS,
+                           can_sign=can_sign,
+                           has_certificate=has_certificate,
+                           signing_deps=deps)
 
 
 @reports_bp.route('/<int:id>/download')

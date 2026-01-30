@@ -1,0 +1,11 @@
+# Never commit certificates or private keys
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+*.cer
+
+# Keep README
+!README.md
+!.gitignore

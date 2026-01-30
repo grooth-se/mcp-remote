@@ -1,6 +1,7 @@
 """Admin routes for user management."""
 from datetime import datetime
-from flask import render_template, redirect, url_for, flash, request
+from pathlib import Path
+from flask import render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user
 
 from . import admin_bp
@@ -195,3 +196,55 @@ def user_toggle_active(id):
     status = 'activated' if user.is_active else 'deactivated'
     flash(f'User {user.username} has been {status}.', 'success')
     return redirect(url_for('admin.users'))
+
+
+@admin_bp.route('/signing')
+@login_required
+@admin_required
+def signing_status():
+    """View PDF signing configuration status."""
+    from utils.reporting.pdf_signer import check_dependencies
+
+    deps = check_dependencies()
+
+    # Get certificate info
+    certs_folder = Path(current_app.config.get('CERTS_FOLDER', 'certs'))
+    cert_file = current_app.config.get('COMPANY_CERT_FILE', 'durabler_company.p12')
+    cert_path = certs_folder / cert_file
+    has_certificate = cert_path.exists()
+
+    cert_info = {
+        'folder': str(certs_folder),
+        'filename': cert_file,
+        'exists': has_certificate,
+        'full_path': str(cert_path)
+    }
+
+    # Get certificate details if it exists
+    if has_certificate:
+        try:
+            from cryptography.hazmat.primitives.serialization import pkcs12
+            from cryptography.hazmat.backends import default_backend
+
+            cert_password = current_app.config.get('COMPANY_CERT_PASSWORD', '')
+            with open(cert_path, 'rb') as f:
+                p12_data = f.read()
+
+            _, certificate, _ = pkcs12.load_key_and_certificates(
+                p12_data,
+                cert_password.encode() if cert_password else None,
+                default_backend()
+            )
+
+            if certificate:
+                cert_info['subject'] = certificate.subject.rfc4514_string()
+                cert_info['issuer'] = certificate.issuer.rfc4514_string()
+                cert_info['valid_from'] = certificate.not_valid_before_utc.isoformat()
+                cert_info['valid_until'] = certificate.not_valid_after_utc.isoformat()
+                cert_info['serial'] = str(certificate.serial_number)
+        except Exception as e:
+            cert_info['error'] = str(e)
+
+    return render_template('admin/signing.html',
+                           deps=deps,
+                           cert_info=cert_info)

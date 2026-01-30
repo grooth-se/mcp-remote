@@ -23,6 +23,11 @@ class Config:
     # Reports output
     REPORTS_FOLDER = basedir / 'reports'
 
+    # PDF Signing (X.509 certificates)
+    CERTS_FOLDER = basedir / 'certs'
+    COMPANY_CERT_FILE = os.environ.get('COMPANY_CERT_FILE') or 'durabler_company.p12'
+    COMPANY_CERT_PASSWORD = os.environ.get('COMPANY_CERT_PASSWORD') or ''
+
     # Session
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
 

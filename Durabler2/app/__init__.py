@@ -26,6 +26,7 @@ def create_app(config_name='default'):
     os.makedirs(app.instance_path, exist_ok=True)
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['REPORTS_FOLDER'], exist_ok=True)
+    os.makedirs(app.config.get('CERTS_FOLDER', 'certs'), exist_ok=True)
 
     # Initialize extensions
     db.init_app(app)

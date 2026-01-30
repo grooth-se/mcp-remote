@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Signing Configuration{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1><i class="bi bi-shield-lock"></i> PDF Signing Configuration</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin.index') }}">Admin</a></li>
+                    <li class="breadcrumb-item active">PDF Signing</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Dependencies Status -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> System Dependencies</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Component</th>
+                                <th>Status</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>LibreOffice</td>
+                                <td>
+                                    {% if deps.libreoffice %}
+                                    <span class="badge bg-success"><i class="bi bi-check"></i> Available</span>
+                                    {% else %}
+                                    <span class="badge bg-danger"><i class="bi bi-x"></i> Not Found</span>
+                                    {% endif %}
+                                </td>
+                                <td><small class="text-muted">Word to PDF conversion</small></td>
+                            </tr>
+                            <tr>
+                                <td>endesive</td>
+                                <td>
+                                    {% if deps.endesive %}
+                                    <span class="badge bg-success"><i class="bi bi-check"></i> Installed</span>
+                                    {% else %}
+                                    <span class="badge bg-danger"><i class="bi bi-x"></i> Not Installed</span>
+                                    {% endif %}
+                                </td>
+                                <td><small class="text-muted">PDF digital signatures</small></td>
+                            </tr>
+                            <tr>
+                                <td>cryptography</td>
+                                <td>
+                                    {% if deps.cryptography %}
+                                    <span class="badge bg-success"><i class="bi bi-check"></i> Installed</span>
+                                    {% else %}
+                                    <span class="badge bg-danger"><i class="bi bi-x"></i> Not Installed</span>
+                                    {% endif %}
+                                </td>
+                                <td><small class="text-muted">Certificate handling</small></td>
+                            </tr>
+                            <tr>
+                                <td>pypdf</td>
+                                <td>
+                                    {% if deps.pypdf %}
+                                    <span class="badge bg-success"><i class="bi bi-check"></i> Installed</span>
+                                    {% else %}
+                                    <span class="badge bg-danger"><i class="bi bi-x"></i> Not Installed</span>
+                                    {% endif %}
+                                </td>
+                                <td><small class="text-muted">PDF manipulation</small></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <hr>
+
+                    <h6>Capability Summary</h6>
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            PDF Conversion
+                            {% if deps.can_convert %}
+                            <span class="badge bg-success">Ready</span>
+                            {% else %}
+                            <span class="badge bg-warning">Not Available</span>
+                            {% endif %}
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Digital Signing
+                            {% if deps.can_sign %}
+                            <span class="badge bg-success">Ready</span>
+                            {% else %}
+                            <span class="badge bg-warning">Not Available</span>
+                            {% endif %}
+                        </li>
+                    </ul>
+
+                    {% if not deps.can_convert or not deps.can_sign %}
+                    <div class="alert alert-info mt-3 mb-0">
+                        <h6><i class="bi bi-info-circle"></i> Installation</h6>
+                        <small>
+                            {% if not deps.libreoffice %}
+                            <strong>LibreOffice:</strong> Install from <a href="https://www.libreoffice.org/" target="_blank">libreoffice.org</a><br>
+                            {% endif %}
+                            {% if not deps.endesive or not deps.cryptography %}
+                            <strong>Python packages:</strong><br>
+                            <code>pip install endesive cryptography pypdf</code>
+                            {% endif %}
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Certificate Status -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header {% if cert_info.exists %}bg-success text-white{% else %}bg-warning{% endif %}">
+                    <h5 class="mb-0">
+                        <i class="bi bi-file-earmark-lock"></i>
+                        Company Certificate
+                        {% if cert_info.exists %}
+                        <span class="badge bg-light text-success ms-2">Configured</span>
+                        {% else %}
+                        <span class="badge bg-light text-warning ms-2">Not Found</span>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Folder</dt>
+                        <dd class="col-sm-8"><code>{{ cert_info.folder }}</code></dd>
+
+                        <dt class="col-sm-4">Filename</dt>
+                        <dd class="col-sm-8"><code>{{ cert_info.filename }}</code></dd>
+
+                        <dt class="col-sm-4">Status</dt>
+                        <dd class="col-sm-8">
+                            {% if cert_info.exists %}
+                            <span class="text-success"><i class="bi bi-check-circle"></i> Found</span>
+                            {% else %}
+                            <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> Not found</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+
+                    {% if cert_info.exists %}
+                    <hr>
+                    <h6>Certificate Details</h6>
+
+                    {% if cert_info.error %}
+                    <div class="alert alert-danger">
+                        <strong>Error reading certificate:</strong><br>
+                        <small>{{ cert_info.error }}</small>
+                    </div>
+                    {% else %}
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-4">Subject</dt>
+                        <dd class="col-sm-8"><code class="small">{{ cert_info.subject }}</code></dd>
+
+                        <dt class="col-sm-4">Issuer</dt>
+                        <dd class="col-sm-8"><code class="small">{{ cert_info.issuer }}</code></dd>
+
+                        <dt class="col-sm-4">Valid From</dt>
+                        <dd class="col-sm-8">{{ cert_info.valid_from }}</dd>
+
+                        <dt class="col-sm-4">Valid Until</dt>
+                        <dd class="col-sm-8">{{ cert_info.valid_until }}</dd>
+
+                        <dt class="col-sm-4">Serial</dt>
+                        <dd class="col-sm-8"><small><code>{{ cert_info.serial[:20] }}...</code></small></dd>
+                    </dl>
+                    {% endif %}
+                    {% else %}
+                    <hr>
+                    <div class="alert alert-info mb-0">
+                        <h6><i class="bi bi-info-circle"></i> Setup Instructions</h6>
+                        <ol class="small mb-0">
+                            <li>Obtain a PKCS#12 certificate (.p12 or .pfx)</li>
+                            <li>Place it in <code>{{ cert_info.folder }}/</code></li>
+                            <li>Name it <code>{{ cert_info.filename }}</code><br>
+                                <small class="text-muted">Or set <code>COMPANY_CERT_FILE</code> env var</small>
+                            </li>
+                            <li>Set certificate password via <code>COMPANY_CERT_PASSWORD</code> env var</li>
+                        </ol>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overall Status -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card {% if deps.can_convert and deps.can_sign and cert_info.exists %}border-success{% else %}border-warning{% endif %}">
+                <div class="card-body text-center">
+                    {% if deps.can_convert and deps.can_sign and cert_info.exists %}
+                    <i class="bi bi-shield-check text-success display-1"></i>
+                    <h3 class="mt-3 text-success">PDF Signing Fully Configured</h3>
+                    <p class="text-muted">
+                        Reports will be converted to PDF and digitally signed with the company X.509 certificate.
+                    </p>
+                    {% elif deps.can_convert %}
+                    <i class="bi bi-shield-exclamation text-warning display-1"></i>
+                    <h3 class="mt-3 text-warning">PDF Conversion Available (No Digital Signing)</h3>
+                    <p class="text-muted">
+                        Reports will be converted to PDF but not cryptographically signed.
+                        {% if not deps.can_sign %}Install signing libraries{% endif %}
+                        {% if not cert_info.exists %}and configure the company certificate{% endif %}
+                        to enable digital signatures.
+                    </p>
+                    {% else %}
+                    <i class="bi bi-shield-x text-danger display-1"></i>
+                    <h3 class="mt-3 text-danger">PDF Signing Not Available</h3>
+                    <p class="text-muted">
+                        Install LibreOffice for PDF conversion and the signing libraries for digital signatures.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
