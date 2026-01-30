@@ -358,6 +358,21 @@ class KICReportGenerator:
 
         doc.add_paragraph()
 
+        # Disclaimer
+        disclaimer_text = (
+            "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
+            "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
+            "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
+            "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
+            "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
+        )
+        disclaimer = doc.add_paragraph()
+        disclaimer_run = disclaimer.add_run(disclaimer_text)
+        disclaimer_run.font.size = Pt(8)
+        disclaimer_run.italic = True
+
+        doc.add_paragraph()
+
         # Footer with generation timestamp
         footer_para = doc.add_paragraph()
         footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
