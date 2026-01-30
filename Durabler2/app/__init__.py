@@ -40,6 +40,7 @@ def create_app(config_name='default'):
     # Register blueprints
     from .main import main_bp
     from .auth import auth_bp
+    from .admin import admin_bp
     from .tensile import tensile_bp
     from .sonic import sonic_bp
     from .fcgr import fcgr_bp
@@ -50,6 +51,7 @@ def create_app(config_name='default'):
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(tensile_bp, url_prefix='/tensile')
     app.register_blueprint(sonic_bp, url_prefix='/sonic')
     app.register_blueprint(fcgr_bp, url_prefix='/fcgr')

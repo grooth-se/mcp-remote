@@ -26,7 +26,12 @@ def login():
             return redirect(url_for('auth.login'))
 
         login_user(user, remember=form.remember_me.data)
-        flash(f'Welcome, {user.username}!', 'success')
+
+        # Update last login timestamp
+        user.update_last_login()
+        db.session.commit()
+
+        flash(f'Welcome, {user.full_name or user.username}!', 'success')
 
         # Redirect to requested page or dashboard
         next_page = request.args.get('next')

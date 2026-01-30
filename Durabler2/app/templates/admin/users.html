@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}User Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1><i class="bi bi-people"></i> User Management</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin.index') }}">Admin</a></li>
+                    <li class="breadcrumb-item active">Users</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-auto">
+            <a href="{{ url_for('admin.user_create') }}" class="btn btn-primary">
+                <i class="bi bi-person-plus"></i> Add User
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>User ID</th>
+                            <th>Username</th>
+                            <th>Full Name</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Last Login</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr class="{{ 'table-secondary' if not user.is_active else '' }}">
+                            <td>
+                                <code>{{ user.user_id or '-' }}</code>
+                            </td>
+                            <td>
+                                <strong>{{ user.username }}</strong>
+                                {% if user.id == current_user.id %}
+                                <span class="badge bg-info">You</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user.full_name or '-' }}</td>
+                            <td>
+                                {% if user.role == 'admin' %}
+                                <span class="badge bg-danger">{{ role_labels.get(user.role, user.role) }}</span>
+                                {% elif user.role == 'approver' %}
+                                <span class="badge bg-success">{{ role_labels.get(user.role, user.role) }}</span>
+                                {% elif user.role == 'engineer' %}
+                                <span class="badge bg-primary">{{ role_labels.get(user.role, user.role) }}</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ role_labels.get(user.role, user.role) }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.is_active %}
+                                <span class="badge bg-success"><i class="bi bi-check-circle"></i> Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.last_login %}
+                                {{ user.last_login.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                <span class="text-muted">Never</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('admin.user_edit', id=user.id) }}"
+                                       class="btn btn-outline-primary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{{ url_for('admin.user_password', id=user.id) }}"
+                                       class="btn btn-outline-warning" title="Change Password">
+                                        <i class="bi bi-key"></i>
+                                    </a>
+                                    {% if user.id != current_user.id %}
+                                    <form action="{{ url_for('admin.user_toggle_active', id=user.id) }}"
+                                          method="POST" class="d-inline">
+                                        <button type="submit"
+                                                class="btn btn-outline-{{ 'danger' if user.is_active else 'success' }}"
+                                                title="{{ 'Deactivate' if user.is_active else 'Activate' }}"
+                                                onclick="return confirm('Are you sure you want to {{ 'deactivate' if user.is_active else 'activate' }} this user?')">
+                                            <i class="bi bi-{{ 'person-dash' if user.is_active else 'person-check' }}"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">No users found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-info-circle"></i> Role Permissions</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Create Tests</th>
+                        <th>Edit Reports</th>
+                        <th>Submit for Approval</th>
+                        <th>Approve & Sign</th>
+                        <th>Manage Users</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="badge bg-secondary">Operator</span></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-x text-muted"></i></td>
+                        <td><i class="bi bi-x text-muted"></i></td>
+                        <td><i class="bi bi-x text-muted"></i></td>
+                        <td><i class="bi bi-x text-muted"></i></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge bg-primary">Test Engineer</span></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-x text-muted"></i></td>
+                        <td><i class="bi bi-x text-muted"></i></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge bg-success">Approver</span></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-x text-muted"></i></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge bg-danger">Administrator</span></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                        <td><i class="bi bi-check text-success"></i></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
