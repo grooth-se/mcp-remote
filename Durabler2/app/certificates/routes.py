@@ -4,7 +4,7 @@ from datetime import datetime, date
 from pathlib import Path
 
 from flask import (render_template, redirect, url_for, flash, request,
-                   jsonify, current_app)
+                   jsonify, current_app, send_file)
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
@@ -143,14 +143,45 @@ def new():
 @login_required
 def view(cert_id):
     """View certificate details."""
+    from app.models import ReportApproval, STATUS_COLORS, APPROVAL_STATUS_LABELS
+
     cert = Certificate.query.get_or_404(cert_id)
 
-    # Get linked test records
+    # Get linked test records with approval status eagerly loaded
     test_records = cert.test_records.all() if cert.test_records else []
+
+    # Calculate approval statistics for this certificate
+    approval_stats = {
+        'total': len(test_records),
+        'with_approval': 0,
+        'draft': 0,
+        'pending': 0,
+        'approved': 0,
+        'rejected': 0,
+        'published': 0
+    }
+
+    for test in test_records:
+        if test.approval:
+            approval_stats['with_approval'] += 1
+            status = test.approval.status
+            if status == 'DRAFT':
+                approval_stats['draft'] += 1
+            elif status == 'PENDING_REVIEW':
+                approval_stats['pending'] += 1
+            elif status == 'APPROVED':
+                approval_stats['approved'] += 1
+            elif status == 'REJECTED':
+                approval_stats['rejected'] += 1
+            elif status == 'PUBLISHED':
+                approval_stats['published'] += 1
 
     return render_template('certificates/view.html',
                            cert=cert,
-                           test_records=test_records)
+                           test_records=test_records,
+                           approval_stats=approval_stats,
+                           status_colors=STATUS_COLORS,
+                           status_labels=APPROVAL_STATUS_LABELS)
 
 
 @certificates_bp.route('/<int:cert_id>/edit', methods=['GET', 'POST'])
@@ -398,6 +429,52 @@ def next_id():
     year = request.args.get('year', datetime.now().year, type=int)
     next_cert_id = Certificate.get_next_cert_id(year)
     return jsonify({'year': year, 'next_id': next_cert_id})
+
+
+@certificates_bp.route('/<int:cert_id>/download-reports')
+@login_required
+def download_reports(cert_id):
+    """Download all signed PDFs for a certificate as a ZIP file."""
+    import zipfile
+    import io
+
+    cert = Certificate.query.get_or_404(cert_id)
+    test_records = cert.test_records.all()
+
+    # Find all published reports
+    signed_files = []
+    reports_folder = Path(current_app.config['REPORTS_FOLDER'])
+
+    for test in test_records:
+        if test.approval and test.approval.status == 'PUBLISHED' and test.approval.signed_pdf_path:
+            pdf_path = reports_folder / test.approval.signed_pdf_path
+            if pdf_path.exists():
+                signed_files.append({
+                    'path': pdf_path,
+                    'name': f"{test.test_id}_{test.test_method}.pdf"
+                })
+
+    if not signed_files:
+        flash('No signed PDFs available for this certificate.', 'warning')
+        return redirect(url_for('certificates.view', cert_id=cert_id))
+
+    # Create ZIP file in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for file_info in signed_files:
+            zip_file.write(file_info['path'], file_info['name'])
+
+    zip_buffer.seek(0)
+
+    # Generate filename
+    zip_filename = f"{cert.certificate_number.replace('-', '_')}_signed_reports.zip"
+
+    return send_file(
+        zip_buffer,
+        as_attachment=True,
+        download_name=zip_filename,
+        mimetype='application/zip'
+    )
 
 
 @certificates_bp.route('/import', methods=['GET', 'POST'])

@@ -179,7 +179,7 @@
         <!-- Status Card -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-flag"></i> Status</h5>
+                <h5 class="mb-0"><i class="bi bi-flag"></i> Certificate Status</h5>
             </div>
             <div class="card-body">
                 <div class="d-flex justify-content-around">
@@ -194,6 +194,77 @@
                 </div>
             </div>
         </div>
+
+        <!-- Report Approval Status -->
+        {% if approval_stats.total > 0 %}
+        <div class="card mb-4">
+            <div class="card-header {% if approval_stats.published == approval_stats.total %}bg-success text-white{% elif approval_stats.pending > 0 %}bg-warning{% else %}bg-light{% endif %}">
+                <h5 class="mb-0">
+                    <i class="bi bi-file-earmark-check"></i> Report Approval
+                    {% if approval_stats.published == approval_stats.total %}
+                    <span class="badge bg-light text-success ms-2">All Published</span>
+                    {% elif approval_stats.pending > 0 %}
+                    <span class="badge bg-danger text-white ms-2">{{ approval_stats.pending }} Pending</span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    {% if approval_stats.published > 0 %}
+                    <div class="col">
+                        <div class="fs-4 fw-bold text-primary">{{ approval_stats.published }}</div>
+                        <small class="text-muted">Published</small>
+                    </div>
+                    {% endif %}
+                    {% if approval_stats.approved > 0 %}
+                    <div class="col">
+                        <div class="fs-4 fw-bold text-success">{{ approval_stats.approved }}</div>
+                        <small class="text-muted">Approved</small>
+                    </div>
+                    {% endif %}
+                    {% if approval_stats.pending > 0 %}
+                    <div class="col">
+                        <div class="fs-4 fw-bold text-warning">{{ approval_stats.pending }}</div>
+                        <small class="text-muted">Pending</small>
+                    </div>
+                    {% endif %}
+                    {% if approval_stats.rejected > 0 %}
+                    <div class="col">
+                        <div class="fs-4 fw-bold text-danger">{{ approval_stats.rejected }}</div>
+                        <small class="text-muted">Rejected</small>
+                    </div>
+                    {% endif %}
+                    {% if approval_stats.draft > 0 %}
+                    <div class="col">
+                        <div class="fs-4 fw-bold text-secondary">{{ approval_stats.draft }}</div>
+                        <small class="text-muted">Draft</small>
+                    </div>
+                    {% endif %}
+                    {% if approval_stats.total - approval_stats.with_approval > 0 %}
+                    <div class="col">
+                        <div class="fs-4 fw-bold text-muted">{{ approval_stats.total - approval_stats.with_approval }}</div>
+                        <small class="text-muted">Not Started</small>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if approval_stats.published > 0 %}
+                <hr>
+                <div class="text-center">
+                    <small class="text-muted">
+                        <i class="bi bi-shield-check text-success"></i>
+                        {{ approval_stats.published }} of {{ approval_stats.total }} reports digitally signed
+                    </small>
+                    <div class="mt-2">
+                        <a href="{{ url_for('certificates.download_reports', cert_id=cert.id) }}"
+                           class="btn btn-sm btn-success">
+                            <i class="bi bi-file-zip"></i> Download All Signed PDFs
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Linked Tests / Test Reports -->
         <div class="card mb-4">
@@ -210,60 +281,110 @@
                             <div>
                                 <strong>{{ test.test_id }}</strong>
                                 <span class="badge ms-1" style="background-color: {{ '#0d6efd' if test.test_method == 'TENSILE' else '#198754' if test.test_method == 'SONIC' else '#ffc107' if test.test_method == 'FCGR' else '#dc3545' if test.test_method == 'CTOD' else '#0dcaf0' if test.test_method == 'KIC' else '#6f42c1' if test.test_method == 'VICKERS' else '#6c757d' }}; color: {{ '#000' if test.test_method == 'FCGR' else '#fff' }}">{{ test.test_method }}</span>
+                                {# Approval Status Badge #}
+                                {% if test.approval %}
+                                <span class="badge bg-{{ test.approval.status_color }} ms-1">
+                                    {{ test.approval.status_label }}
+                                </span>
+                                {% endif %}
                                 <br>
                                 <small class="text-muted">
                                     {{ test.specimen_id or '-' }} |
                                     {{ test.test_date.strftime('%Y-%m-%d') if test.test_date else '-' }}
                                 </small>
                             </div>
-                            <div class="btn-group btn-group-sm">
-                                {% if test.test_method == 'TENSILE' %}
-                                <a href="{{ url_for('tensile.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                <a href="{{ url_for('tensile.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% elif test.test_method == 'SONIC' %}
-                                <a href="{{ url_for('sonic.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                <a href="{{ url_for('sonic.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% elif test.test_method == 'FCGR' %}
-                                <a href="{{ url_for('fcgr.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                <a href="{{ url_for('fcgr.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% elif test.test_method == 'CTOD' %}
-                                <a href="{{ url_for('ctod.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                <a href="{{ url_for('ctod.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% elif test.test_method == 'KIC' %}
-                                <a href="{{ url_for('kic.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                <a href="{{ url_for('kic.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% elif test.test_method == 'VICKERS' %}
-                                <a href="{{ url_for('vickers.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                <a href="{{ url_for('vickers.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-                                {% else %}
-                                <button class="btn btn-outline-secondary" disabled title="View Test">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                                {% endif %}
+                            <div>
+                                {# Test View Button #}
+                                <div class="btn-group btn-group-sm mb-1">
+                                    {% if test.test_method == 'TENSILE' %}
+                                    <a href="{{ url_for('tensile.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('tensile.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
+                                        <i class="bi bi-file-earmark-word"></i>
+                                    </a>
+                                    {% elif test.test_method == 'SONIC' %}
+                                    <a href="{{ url_for('sonic.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('sonic.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
+                                        <i class="bi bi-file-earmark-word"></i>
+                                    </a>
+                                    {% elif test.test_method == 'FCGR' %}
+                                    <a href="{{ url_for('fcgr.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('fcgr.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
+                                        <i class="bi bi-file-earmark-word"></i>
+                                    </a>
+                                    {% elif test.test_method == 'CTOD' %}
+                                    <a href="{{ url_for('ctod.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('ctod.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
+                                        <i class="bi bi-file-earmark-word"></i>
+                                    </a>
+                                    {% elif test.test_method == 'KIC' %}
+                                    <a href="{{ url_for('kic.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('kic.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
+                                        <i class="bi bi-file-earmark-word"></i>
+                                    </a>
+                                    {% elif test.test_method == 'VICKERS' %}
+                                    <a href="{{ url_for('vickers.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('vickers.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
+                                        <i class="bi bi-file-earmark-word"></i>
+                                    </a>
+                                    {% else %}
+                                    <button class="btn btn-outline-secondary" disabled title="View Test">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                                {# Approval Workflow Buttons #}
+                                <div class="btn-group btn-group-sm">
+                                    {% if test.approval %}
+                                        {# Has approval record - show appropriate action #}
+                                        {% if test.approval.status == 'PUBLISHED' %}
+                                        <a href="{{ url_for('reports.download', id=test.approval.id) }}"
+                                           class="btn btn-success" title="Download Signed PDF">
+                                            <i class="bi bi-file-pdf"></i>
+                                        </a>
+                                        {% elif test.approval.status == 'APPROVED' and current_user.can_approve %}
+                                        <a href="{{ url_for('reports.sign', id=test.approval.id) }}"
+                                           class="btn btn-success" title="Sign & Publish">
+                                            <i class="bi bi-pen"></i>
+                                        </a>
+                                        {% elif test.approval.status == 'PENDING_REVIEW' and current_user.can_approve %}
+                                        <a href="{{ url_for('reports.review', id=test.approval.id) }}"
+                                           class="btn btn-warning" title="Review Report">
+                                            <i class="bi bi-check-square"></i>
+                                        </a>
+                                        {% elif test.approval.status in ['DRAFT', 'REJECTED'] and current_user.can_submit %}
+                                        <a href="{{ url_for('reports.view', id=test.approval.id) }}"
+                                           class="btn btn-outline-warning" title="Continue Approval">
+                                            <i class="bi bi-arrow-right"></i>
+                                        </a>
+                                        {% else %}
+                                        <a href="{{ url_for('reports.view', id=test.approval.id) }}"
+                                           class="btn btn-outline-secondary" title="View Approval Status">
+                                            <i class="bi bi-info-circle"></i>
+                                        </a>
+                                        {% endif %}
+                                    {% else %}
+                                        {# No approval record - show start approval button #}
+                                        {% if current_user.can_submit %}
+                                        <form action="{{ url_for('reports.create_from_test', test_id=test.id) }}" method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-outline-primary" title="Start Approval Workflow">
+                                                <i class="bi bi-play-circle"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                     </div>

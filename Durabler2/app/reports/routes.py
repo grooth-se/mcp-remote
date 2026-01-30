@@ -50,6 +50,45 @@ def index():
                            status_colors=STATUS_COLORS)
 
 
+@reports_bp.route('/create-from-test/<int:test_id>', methods=['POST'])
+@login_required
+@engineer_required
+def create_from_test(test_id):
+    """Create a new approval record for a test record."""
+    test_record = TestRecord.query.get_or_404(test_id)
+
+    # Check if approval already exists
+    if test_record.approval:
+        flash(f'Approval record already exists for {test_record.test_id}.', 'info')
+        return redirect(url_for('reports.view', id=test_record.approval.id))
+
+    # Create new approval record
+    approval = ReportApproval.get_or_create(test_record, current_user)
+
+    # Audit log
+    audit = AuditLog(
+        user_id=current_user.id,
+        action='CREATE_APPROVAL',
+        table_name='report_approvals',
+        record_id=approval.id,
+        new_values={
+            'test_id': test_record.test_id,
+            'test_method': test_record.test_method,
+            'certificate_number': test_record.certificate_number
+        },
+        ip_address=request.remote_addr
+    )
+    db.session.add(audit)
+    db.session.commit()
+
+    flash(f'Approval workflow started for {test_record.test_id}.', 'success')
+
+    # Redirect back to certificate view if there's a certificate, otherwise to reports
+    if test_record.certificate_id:
+        return redirect(url_for('certificates.view', cert_id=test_record.certificate_id))
+    return redirect(url_for('reports.view', id=approval.id))
+
+
 @reports_bp.route('/pending')
 @login_required
 @approver_required
