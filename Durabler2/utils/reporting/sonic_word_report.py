@@ -81,7 +81,7 @@ class SonicReportGenerator:
                     for paragraph in cell.paragraphs:
                         self._replace_in_paragraph(paragraph, data, chart_path, logo_path)
 
-        # Add disclaimer at the end of the document
+        # Add disclaimer to page footer (visible on all pages)
         from docx.shared import Pt
         disclaimer_text = (
             "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
@@ -90,11 +90,14 @@ class SonicReportGenerator:
             "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
             "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
         )
-        doc.add_paragraph()
-        disclaimer = doc.add_paragraph()
-        disclaimer_run = disclaimer.add_run(disclaimer_text)
-        disclaimer_run.font.size = Pt(8)
-        disclaimer_run.italic = True
+        for section in doc.sections:
+            footer = section.footer
+            footer.is_linked_to_previous = False
+            footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            footer_para.clear()
+            footer_run = footer_para.add_run(disclaimer_text)
+            footer_run.font.size = Pt(7)
+            footer_run.italic = True
 
         doc.save(output_path)
         return output_path

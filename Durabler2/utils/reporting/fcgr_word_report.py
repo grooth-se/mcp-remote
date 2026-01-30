@@ -400,7 +400,7 @@ class FCGRReportGenerator:
 
         doc.add_paragraph()
 
-        # Disclaimer
+        # Add disclaimer to page footer (visible on all pages)
         disclaimer_text = (
             "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
             "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
@@ -408,20 +408,14 @@ class FCGRReportGenerator:
             "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
             "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
         )
-        disclaimer = doc.add_paragraph()
-        disclaimer_run = disclaimer.add_run(disclaimer_text)
-        disclaimer_run.font.size = Pt(8)
-        disclaimer_run.italic = True
-
-        doc.add_paragraph()
-
-        # Footer with generation timestamp
-        footer_para = doc.add_paragraph()
-        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        footer_run = footer_para.add_run(
-            f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} | ASTM E647 FCGR Test Report"
-        )
-        footer_run.font.size = Pt(9)
+        for section in doc.sections:
+            footer = section.footer
+            footer.is_linked_to_previous = False
+            footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+            footer_para.clear()
+            footer_run = footer_para.add_run(disclaimer_text)
+            footer_run.font.size = Pt(7)
+            footer_run.italic = True
 
         return doc
 
