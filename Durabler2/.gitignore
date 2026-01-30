@@ -17,9 +17,9 @@ env/
 # Instance folder (database, config)
 instance/
 
-# Uploads and reports (user data)
-uploads/
-reports/
+# Uploads and reports (user data, at root level)
+/uploads/
+/reports/
 
 # IDE
 .idea/

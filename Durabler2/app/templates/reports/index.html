@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Reports{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1><i class="bi bi-file-earmark-text"></i> Reports</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Reports</li>
+                </ol>
+            </nav>
+        </div>
+        {% if current_user.can_approve %}
+        <div class="col-auto">
+            <a href="{{ url_for('reports.pending') }}" class="btn btn-warning">
+                <i class="bi bi-hourglass-split"></i> Pending Review
+                {% if pending_reports_count > 0 %}
+                <span class="badge bg-danger">{{ pending_reports_count }}</span>
+                {% endif %}
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="">All Statuses</option>
+                        {% for status, label in status_labels.items() %}
+                        <option value="{{ status }}" {{ 'selected' if status_filter == status else '' }}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Test Method</label>
+                    <select name="test_method" class="form-select">
+                        <option value="">All Methods</option>
+                        {% for method in test_methods %}
+                        <option value="{{ method }}" {{ 'selected' if test_method_filter == method else '' }}>
+                            {{ method }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-filter"></i> Filter
+                    </button>
+                    <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x"></i> Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reports Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Certificate #</th>
+                            <th>Test Method</th>
+                            <th>Specimen ID</th>
+                            <th>Status</th>
+                            <th>Submitted</th>
+                            <th>Reviewed</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in reports %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('reports.view', id=report.id) }}">
+                                    <strong>{{ report.certificate_number or '-' }}</strong>
+                                </a>
+                            </td>
+                            <td>{{ report.test_record.test_method if report.test_record else '-' }}</td>
+                            <td>{{ report.test_record.specimen_id if report.test_record else '-' }}</td>
+                            <td>
+                                <span class="badge bg-{{ status_colors.get(report.status, 'secondary') }}">
+                                    {{ status_labels.get(report.status, report.status) }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if report.submitted_at %}
+                                {{ report.submitted_at.strftime('%Y-%m-%d %H:%M') }}
+                                <br><small class="text-muted">{{ report.submitted_by.username if report.submitted_by else '-' }}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if report.reviewed_at %}
+                                {{ report.reviewed_at.strftime('%Y-%m-%d %H:%M') }}
+                                <br><small class="text-muted">{{ report.reviewed_by.username if report.reviewed_by else '-' }}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('reports.view', id=report.id) }}"
+                                       class="btn btn-outline-primary" title="View">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if report.status == 'PENDING_REVIEW' and current_user.can_approve %}
+                                    <a href="{{ url_for('reports.review', id=report.id) }}"
+                                       class="btn btn-warning" title="Review">
+                                        <i class="bi bi-check-square"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if report.can_download_signed %}
+                                    <a href="{{ url_for('reports.download', id=report.id) }}"
+                                       class="btn btn-success" title="Download PDF">
+                                        <i class="bi bi-file-pdf"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-1"></i>
+                                <p class="mb-0">No reports found.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

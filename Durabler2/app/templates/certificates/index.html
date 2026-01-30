@@ -99,6 +99,7 @@
                         <th>Material</th>
                         <th class="text-center">Tests</th>
                         <th class="text-center">Status</th>
+                        <th class="text-center">Approval</th>
                         <th class="text-center">Actions</th>
                     </tr>
                 </thead>
@@ -130,6 +131,44 @@
                             <span class="badge bg-warning text-dark"><i class="bi bi-check"></i> Reported</span>
                             {% else %}
                             <span class="badge bg-secondary">Open</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {# Get approval status for first test record with an approval #}
+                            {% set approval = None %}
+                            {% for tr in cert.test_records %}
+                                {% if tr.approval %}
+                                    {% set approval = tr.approval %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if approval %}
+                                <span class="badge bg-{{ approval.status_color }}">
+                                    {{ approval.status_label }}
+                                </span>
+                                {# Action link based on status and user role #}
+                                {% if approval.status == 'PENDING_REVIEW' and current_user.can_approve %}
+                                <a href="{{ url_for('reports.review', id=approval.id) }}"
+                                   class="btn btn-sm btn-warning ms-1" title="Review">
+                                    <i class="bi bi-check-square"></i>
+                                </a>
+                                {% elif approval.status == 'APPROVED' and current_user.can_approve %}
+                                <a href="{{ url_for('reports.sign', id=approval.id) }}"
+                                   class="btn btn-sm btn-success ms-1" title="Sign">
+                                    <i class="bi bi-pen"></i>
+                                </a>
+                                {% elif approval.status == 'PUBLISHED' %}
+                                <a href="{{ url_for('reports.download', id=approval.id) }}"
+                                   class="btn btn-sm btn-success ms-1" title="Download PDF">
+                                    <i class="bi bi-file-pdf"></i>
+                                </a>
+                                {% elif approval.status in ['DRAFT', 'REJECTED'] and current_user.can_submit %}
+                                <a href="{{ url_for('reports.view', id=approval.id) }}"
+                                   class="btn btn-sm btn-outline-primary ms-1" title="Continue">
+                                    <i class="bi bi-arrow-right"></i>
+                                </a>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                         <td class="text-center">

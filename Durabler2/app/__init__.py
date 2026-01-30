@@ -48,6 +48,7 @@ def create_app(config_name='default'):
     from .kic import kic_bp
     from .vickers import vickers_bp
     from .certificates import certificates_bp
+    from .reports import reports_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -59,6 +60,7 @@ def create_app(config_name='default'):
     app.register_blueprint(kic_bp, url_prefix='/kic')
     app.register_blueprint(vickers_bp, url_prefix='/vickers')
     app.register_blueprint(certificates_bp, url_prefix='/certificates')
+    app.register_blueprint(reports_bp, url_prefix='/reports')
 
     # Create database tables (development only)
     with app.app_context():

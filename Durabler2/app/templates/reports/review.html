@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Review Report: {{ approval.certificate_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>
+                <i class="bi bi-check-square"></i>
+                Review Report
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('reports.index') }}">Reports</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('reports.view', id=approval.id) }}">{{ approval.certificate_number }}</a></li>
+                    <li class="breadcrumb-item active">Review</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Report Preview -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="bi bi-file-earmark-text"></i>
+                        {{ approval.certificate_number }}
+                        <span class="badge bg-warning text-dark ms-2">Pending Review</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if approval.test_record %}
+                    <table class="table table-sm">
+                        <tr>
+                            <th style="width: 200px;">Test Method</th>
+                            <td>{{ approval.test_record.test_method }}</td>
+                        </tr>
+                        <tr>
+                            <th>Test Standard</th>
+                            <td>{{ approval.test_record.test_standard or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Specimen ID</th>
+                            <td>{{ approval.test_record.specimen_id or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Material</th>
+                            <td>{{ approval.test_record.material or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Test Date</th>
+                            <td>{{ approval.test_record.test_date.strftime('%Y-%m-%d') if approval.test_record.test_date else '-' }}</td>
+                        </tr>
+                    </table>
+                    {% endif %}
+
+                    <hr>
+
+                    <h6>Submitted By</h6>
+                    <p>
+                        <strong>{{ approval.submitted_by.full_name if approval.submitted_by else '-' }}</strong>
+                        ({{ approval.submitted_by.user_id if approval.submitted_by else '-' }})<br>
+                        <small class="text-muted">{{ approval.submitted_at.strftime('%Y-%m-%d %H:%M') if approval.submitted_at else '-' }}</small>
+                    </p>
+
+                    {% if approval.word_report_path %}
+                    <hr>
+                    <h6>Word Report</h6>
+                    <p><code>{{ approval.word_report_path }}</code></p>
+                    <a href="#" class="btn btn-outline-primary btn-sm disabled">
+                        <i class="bi bi-eye"></i> Preview Report
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Approval Decision -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-check2-square"></i> Review Decision</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Approve -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 border-success">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-check-circle text-success fs-1"></i>
+                                    <h5 class="mt-2">Approve</h5>
+                                    <p class="text-muted small">
+                                        Report meets all requirements and is ready for signing.
+                                    </p>
+                                    <form action="{{ url_for('reports.approve', id=approval.id) }}" method="POST">
+                                        <button type="submit" class="btn btn-success"
+                                                onclick="return confirm('Approve this report?')">
+                                            <i class="bi bi-check-lg"></i> Approve Report
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Reject -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 border-danger">
+                                <div class="card-body">
+                                    <div class="text-center mb-3">
+                                        <i class="bi bi-x-circle text-danger fs-1"></i>
+                                        <h5 class="mt-2">Reject</h5>
+                                        <p class="text-muted small">
+                                            Report requires corrections. Provide feedback below.
+                                        </p>
+                                    </div>
+                                    <form action="{{ url_for('reports.reject', id=approval.id) }}" method="POST">
+                                        <div class="mb-3">
+                                            <label class="form-label">Reason for Rejection *</label>
+                                            <textarea name="comments" class="form-control" rows="3"
+                                                      placeholder="Describe what needs to be corrected..."
+                                                      required></textarea>
+                                        </div>
+                                        <button type="submit" class="btn btn-danger w-100"
+                                                onclick="return confirm('Reject this report?')">
+                                            <i class="bi bi-x-lg"></i> Reject Report
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Reviewer Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-person-badge"></i> Reviewer</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Name</dt>
+                        <dd class="col-sm-8">{{ current_user.full_name or current_user.username }}</dd>
+
+                        <dt class="col-sm-4">User ID</dt>
+                        <dd class="col-sm-8"><code>{{ current_user.user_id }}</code></dd>
+
+                        <dt class="col-sm-4">Role</dt>
+                        <dd class="col-sm-8">{{ current_user.role_label }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Guidelines -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Review Guidelines</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="small mb-0">
+                        <li>Verify all test parameters are correct</li>
+                        <li>Check calculations and results</li>
+                        <li>Ensure uncertainty values are appropriate</li>
+                        <li>Verify specimen identification</li>
+                        <li>Check validity assessments</li>
+                        <li>Review any attached photos/plots</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

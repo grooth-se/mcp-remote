@@ -44,16 +44,25 @@
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('tensile.index') }}"><i class="bi bi-arrow-down-up"></i> Tensile Testing</a></li>
                             <li><a class="dropdown-item disabled" href="#"><i class="bi bi-soundwave"></i> Sonic Resonance</a></li>
-                            <li><a class="dropdown-item disabled" href="#"><i class="bi bi-graph-up"></i> FCGR</a></li>
-                            <li><a class="dropdown-item disabled" href="#"><i class="bi bi-arrows-angle-expand"></i> CTOD</a></li>
-                            <li><a class="dropdown-item disabled" href="#"><i class="bi bi-lightning"></i> KIC</a></li>
-                            <li><a class="dropdown-item disabled" href="#"><i class="bi bi-diamond"></i> Vickers Hardness</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('fcgr.index') }}"><i class="bi bi-graph-up"></i> FCGR</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('ctod.index') }}"><i class="bi bi-arrows-angle-expand"></i> CTOD</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('kic.index') }}"><i class="bi bi-lightning"></i> KIC</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('vickers.index') }}"><i class="bi bi-diamond"></i> Vickers Hardness</a></li>
                         </ul>
                     </li>
 
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('certificates.index') }}">
                             <i class="bi bi-journal-text"></i> Certificates
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('reports.index') }}">
+                            <i class="bi bi-file-earmark-check"></i> Reports
+                            {% if pending_reports_count and pending_reports_count > 0 %}
+                            <span class="badge bg-danger">{{ pending_reports_count }}</span>
+                            {% endif %}
                         </a>
                     </li>
 

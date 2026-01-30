@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Report: {{ approval.certificate_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>
+                <i class="bi bi-pen"></i>
+                Sign & Publish Report
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('reports.index') }}">Reports</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('reports.view', id=approval.id) }}">{{ approval.certificate_number }}</a></li>
+                    <li class="breadcrumb-item active">Sign</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-check-circle"></i>
+                        Report Approved - Ready for Signing
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle"></i> About Digital Signing</h5>
+                        <p class="mb-0">
+                            This will create a digitally signed PDF using the company X.509 certificate.
+                            The signed document cannot be modified and provides cryptographic proof of authenticity.
+                        </p>
+                    </div>
+
+                    <table class="table">
+                        <tr>
+                            <th style="width: 200px;">Certificate Number</th>
+                            <td><strong>{{ approval.certificate_number }}</strong></td>
+                        </tr>
+                        <tr>
+                            <th>Test Method</th>
+                            <td>{{ approval.test_record.test_method if approval.test_record else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Specimen ID</th>
+                            <td>{{ approval.test_record.specimen_id if approval.test_record else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Approved By</th>
+                            <td>{{ approval.reviewed_by.full_name if approval.reviewed_by else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Approved On</th>
+                            <td>{{ approval.reviewed_at.strftime('%Y-%m-%d %H:%M') if approval.reviewed_at else '-' }}</td>
+                        </tr>
+                    </table>
+
+                    <hr>
+
+                    <h5><i class="bi bi-pen"></i> Signature Information</h5>
+                    <table class="table table-sm">
+                        <tr>
+                            <th style="width: 200px;">Signed By</th>
+                            <td>{{ current_user.full_name or current_user.username }}</td>
+                        </tr>
+                        <tr>
+                            <th>User ID</th>
+                            <td><code>{{ current_user.user_id }}</code></td>
+                        </tr>
+                        <tr>
+                            <th>Certificate</th>
+                            <td>Durabler AB Company Certificate</td>
+                        </tr>
+                        <tr>
+                            <th>Algorithm</th>
+                            <td>SHA-256 with RSA</td>
+                        </tr>
+                    </table>
+
+                    <hr>
+
+                    <form action="{{ url_for('reports.sign', id=approval.id) }}" method="POST">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="confirmSign" required>
+                            <label class="form-check-label" for="confirmSign">
+                                I confirm that I have reviewed this report and authorize its publication
+                                as an official Durabler test report.
+                            </label>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-pen"></i> Sign & Publish Report
+                            </button>
+                            <a href="{{ url_for('reports.view', id=approval.id) }}" class="btn btn-outline-secondary btn-lg">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="alert alert-warning mt-4">
+                <h5><i class="bi bi-exclamation-triangle"></i> Note</h5>
+                <p class="mb-0">
+                    <strong>Phase 3 Implementation:</strong> Full PDF signing with X.509 certificates will be
+                    implemented in Phase 3. Currently, this creates a placeholder record for the signed PDF.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

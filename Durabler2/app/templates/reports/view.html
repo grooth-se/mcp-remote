@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Report: {{ approval.certificate_number or 'Draft' }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>
+                <i class="bi bi-file-earmark-text"></i>
+                Report: {{ approval.certificate_number or 'Draft' }}
+            </h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('reports.index') }}">Reports</a></li>
+                    <li class="breadcrumb-item active">{{ approval.certificate_number or 'View' }}</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-auto">
+            <span class="badge bg-{{ status_colors.get(approval.status, 'secondary') }} fs-5">
+                {{ status_labels.get(approval.status, approval.status) }}
+            </span>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Test Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Test Information</h5>
+                </div>
+                <div class="card-body">
+                    {% if approval.test_record %}
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Test ID</dt>
+                        <dd class="col-sm-9">{{ approval.test_record.test_id }}</dd>
+
+                        <dt class="col-sm-3">Test Method</dt>
+                        <dd class="col-sm-9">{{ approval.test_record.test_method }}</dd>
+
+                        <dt class="col-sm-3">Specimen ID</dt>
+                        <dd class="col-sm-9">{{ approval.test_record.specimen_id or '-' }}</dd>
+
+                        <dt class="col-sm-3">Material</dt>
+                        <dd class="col-sm-9">{{ approval.test_record.material or '-' }}</dd>
+
+                        <dt class="col-sm-3">Test Date</dt>
+                        <dd class="col-sm-9">{{ approval.test_record.test_date.strftime('%Y-%m-%d') if approval.test_record.test_date else '-' }}</dd>
+
+                        <dt class="col-sm-3">Test Standard</dt>
+                        <dd class="col-sm-9">{{ approval.test_record.test_standard or '-' }}</dd>
+                    </dl>
+                    {% else %}
+                    <p class="text-muted mb-0">Test record not found.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Rejection Comments (if rejected) -->
+            {% if approval.status == 'REJECTED' and approval.review_comments %}
+            <div class="card mb-4 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-x-circle"></i> Rejection Reason</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ approval.review_comments }}</p>
+                    <hr>
+                    <small class="text-muted">
+                        Rejected by {{ approval.reviewed_by.full_name or approval.reviewed_by.username if approval.reviewed_by else '-' }}
+                        on {{ approval.reviewed_at.strftime('%Y-%m-%d %H:%M') if approval.reviewed_at else '-' }}
+                    </small>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Word Report -->
+            {% if approval.word_report_path %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-word"></i> Word Report</h5>
+                </div>
+                <div class="card-body">
+                    <p><code>{{ approval.word_report_path }}</code></p>
+                    <a href="#" class="btn btn-outline-primary btn-sm disabled">
+                        <i class="bi bi-download"></i> Download Word Report
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Signed PDF -->
+            {% if approval.status == 'PUBLISHED' %}
+            <div class="card mb-4 border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-pdf"></i> Signed PDF</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">File Path</dt>
+                        <dd class="col-sm-9"><code>{{ approval.signed_pdf_path }}</code></dd>
+
+                        <dt class="col-sm-3">Signed</dt>
+                        <dd class="col-sm-9">{{ approval.signature_timestamp.strftime('%Y-%m-%d %H:%M:%S') if approval.signature_timestamp else '-' }}</dd>
+
+                        <dt class="col-sm-3">SHA-256 Hash</dt>
+                        <dd class="col-sm-9"><code class="small">{{ approval.pdf_hash[:32] }}...</code></dd>
+                    </dl>
+                    <hr>
+                    <a href="{{ url_for('reports.download', id=approval.id) }}" class="btn btn-success">
+                        <i class="bi bi-download"></i> Download Signed PDF
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    {% if approval.can_submit and current_user.can_submit %}
+                    <form action="{{ url_for('reports.submit', id=approval.id) }}" method="POST">
+                        <button type="submit" class="btn btn-primary w-100"
+                                onclick="return confirm('Submit this report for approval?')">
+                            <i class="bi bi-send"></i> Submit for Approval
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if approval.can_review and current_user.can_approve %}
+                    <a href="{{ url_for('reports.review', id=approval.id) }}" class="btn btn-warning">
+                        <i class="bi bi-check-square"></i> Review Report
+                    </a>
+                    {% endif %}
+
+                    {% if approval.status == 'APPROVED' and current_user.can_approve %}
+                    <a href="{{ url_for('reports.sign', id=approval.id) }}" class="btn btn-success">
+                        <i class="bi bi-pen"></i> Sign & Publish
+                    </a>
+                    {% endif %}
+
+                    {% if approval.can_download_signed %}
+                    <a href="{{ url_for('reports.download', id=approval.id) }}" class="btn btn-success">
+                        <i class="bi bi-file-pdf"></i> Download Signed PDF
+                    </a>
+                    {% endif %}
+
+                    <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Reports
+                    </a>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-3">
+                            <strong>Created</strong><br>
+                            <small class="text-muted">
+                                {{ approval.created_at.strftime('%Y-%m-%d %H:%M') if approval.created_at else '-' }}
+                                {% if approval.created_by %}
+                                by {{ approval.created_by.full_name or approval.created_by.username }}
+                                {% endif %}
+                            </small>
+                        </li>
+                        {% if approval.submitted_at %}
+                        <li class="mb-3">
+                            <strong>Submitted</strong><br>
+                            <small class="text-muted">
+                                {{ approval.submitted_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% if approval.submitted_by %}
+                                by {{ approval.submitted_by.full_name or approval.submitted_by.username }}
+                                {% endif %}
+                            </small>
+                        </li>
+                        {% endif %}
+                        {% if approval.reviewed_at %}
+                        <li class="mb-3">
+                            <strong>{{ 'Approved' if approval.status in ['APPROVED', 'PUBLISHED'] else 'Rejected' }}</strong><br>
+                            <small class="text-muted">
+                                {{ approval.reviewed_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% if approval.reviewed_by %}
+                                by {{ approval.reviewed_by.full_name or approval.reviewed_by.username }}
+                                {% endif %}
+                            </small>
+                        </li>
+                        {% endif %}
+                        {% if approval.signature_timestamp %}
+                        <li class="mb-3">
+                            <strong>Published</strong><br>
+                            <small class="text-muted">
+                                {{ approval.signature_timestamp.strftime('%Y-%m-%d %H:%M') }}
+                            </small>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
