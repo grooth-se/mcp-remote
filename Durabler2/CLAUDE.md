@@ -63,11 +63,13 @@ This file provides guidance to Claude Code when working with code in this reposi
 | CSS Framework | Bootstrap 5 | Responsive design |
 | Database | PostgreSQL (prod) / SQLite (dev) | Multi-user support |
 | ORM | SQLAlchemy 2.x | Database abstraction |
-| Authentication | Flask-Login | Session management |
+| Authentication | Flask-Login | Session management, app credentials |
 | Forms | Flask-WTF | Form validation |
 | Plotting | Plotly.js (interactive) or Matplotlib (static) | Web-compatible charts |
 | File Upload | Flask file handling | CSV/Excel upload via browser |
-| Reports | python-docx / ReportLab | PDF/Word generation |
+| Reports | python-docx | Word document generation |
+| PDF Conversion | docx2pdf or LibreOffice | Word to PDF conversion |
+| PDF Signing | endesive | X.509 cryptographic signatures |
 | Data Processing | NumPy, SciPy, Pandas | Unchanged from desktop |
 | WSGI Server | gunicorn (Linux) / waitress (Windows) | Production deployment |
 
@@ -143,9 +145,17 @@ Durabler2/
 │   │   ├── mts_csv_parser.py
 │   │   └── mts_xml_parser.py
 │   │
-│   ├── reporting/              # Report generators (unchanged)
-│   │   ├── word_report.py
-│   │   └── [test]_word_report.py
+│   ├── reporting/              # Report generators
+│   │   ├── word_report.py      # Tensile report (from scratch)
+│   │   ├── sonic_word_report.py
+│   │   ├── fcgr_word_report.py
+│   │   ├── ctod_word_report.py
+│   │   ├── kic_word_report.py
+│   │   └── vickers_word_report.py
+│   │
+│   ├── signing/                # PDF signing utilities
+│   │   ├── __init__.py
+│   │   └── pdf_signer.py       # X.509 PDF signing
 │   │
 │   └── models/                 # Data models (unchanged)
 │       ├── specimen.py
@@ -154,10 +164,16 @@ Durabler2/
 ├── migrations/                 # Database migrations
 ├── uploads/                    # Uploaded test data files
 ├── reports/                    # Generated reports
+│   ├── drafts/                 # Word documents (editable)
+│   ├── signed/                 # Signed PDFs (immutable)
+│   │   └── YYYY/               # Organized by year
+│   └── archive/                # Superseded versions
 ├── templates/                  # Report templates (Word/PDF)
 ├── tests/                      # Test suite
 └── instance/                   # Instance config (not in git)
-    └── durabler.db             # SQLite database (dev)
+    ├── durabler.db             # SQLite database (dev)
+    └── certificates/           # Signing certificates
+        └── durabler_signing.p12  # Company X.509 certificate
 ```
 
 ---
@@ -173,7 +189,7 @@ Durabler2/
 /tensile/new                → Start new test (upload CSV, enter specimen)
 /tensile/<id>               → View test details
 /tensile/<id>/analyze       → Run analysis
-/tensile/<id>/report        → Generate/download report
+/tensile/<id>/report        → Generate Word report
 
 /sonic/                     → Sonic resonance tests
 /fcgr/                      → FCGR tests
@@ -181,11 +197,23 @@ Durabler2/
 /kic/                       → KIC tests
 /vickers/                   → Vickers tests
 
-/certificates/              → Certificate register
+/certificates/              → Certificate register (with status & action links)
 /certificates/search        → Search certificates
+/certificates/<cert_num>    → View certificate + approval history
+
+/reports/                   → All reports with approval status
+/reports/pending            → Reports awaiting approval (approvers)
+/reports/<id>/submit        → Submit for approval
+/reports/<id>/review        → Review report (approvers)
+/reports/<id>/approve       → Approve and sign (approvers)
+/reports/<id>/reject        → Reject with comments (approvers)
+/reports/<id>/download      → Download signed PDF
 
 /admin/                     → Admin panel
-/admin/users                → User management
+/admin/users                → User management (CRUD)
+/admin/users/new            → Create new user
+/admin/users/<id>/edit      → Edit user permissions
+/admin/certificate          → Manage company signing certificate
 /admin/calibration          → Calibration records
 /admin/audit-log            → View audit trail
 ```
@@ -413,8 +441,258 @@ pip install -r requirements.txt
 1. **User Authentication**: All users must log in before accessing data
 2. **Audit Trail**: Log user, IP address, timestamp for all actions
 3. **Session Timeout**: Auto-logout after inactivity
-4. **Role-Based Access**: operator, reviewer, admin roles
+4. **Role-Based Access**: operator, engineer, approver, admin roles
 5. **Data Integrity**: Never delete, only mark as superseded
+6. **Report Approval**: All reports must be approved before publishing
+7. **Digital Signatures**: Signed PDFs with company X.509 certificate
+
+---
+
+## Report Approval Workflow
+
+### Overview
+
+Test reports follow an approval workflow before being published as signed PDFs. The certificate register shows approval status with links to continue the process.
+
+### Workflow States
+
+```
+┌─────────┐    Submit    ┌─────────────────┐    Approve    ┌──────────┐    Sign    ┌────────────┐
+│  DRAFT  │ ──────────►  │ PENDING_REVIEW  │ ────────────► │ APPROVED │ ────────► │ PUBLISHED  │
+└─────────┘              └─────────────────┘               └──────────┘           └────────────┘
+     ▲                          │                                                       │
+     │         Reject           │                                                       ▼
+     └──────────────────────────┘                                               ┌────────────┐
+                                                                                │ Signed PDF │
+                                                                                │ in Register│
+                                                                                └────────────┘
+```
+
+**States:**
+| Status | Description | Who can act |
+|--------|-------------|-------------|
+| DRAFT | Report created, can be edited | Test Engineer |
+| PENDING_REVIEW | Submitted for approval (locked) | Approver |
+| APPROVED | Approved, ready for signing | System (auto) |
+| PUBLISHED | Signed PDF generated and stored | Read-only |
+| REJECTED | Returned with comments | Test Engineer |
+
+### User Roles and Permissions
+
+| Role | User ID Format | Permissions |
+|------|----------------|-------------|
+| **Operator** | DUR-OPR-xxx | Create tests, view own data |
+| **Test Engineer** | DUR-ENG-xxx | Create/edit reports, submit for approval |
+| **Approver** | DUR-APR-xxx | Review, approve/reject, sign reports |
+| **Admin** | DUR-ADM-xxx | User management, all permissions |
+
+### Authentication
+
+- **App-specific credentials**: Separate username/password for the application
+- **User ID**: Unique identifier (e.g., DUR-ENG-001) for audit trail
+- **Password**: Hashed with werkzeug security (bcrypt)
+- **Session**: Flask-Login with configurable timeout
+
+### Digital Signature
+
+- **Single company certificate**: One X.509 certificate for all signatures
+- **Certificate location**: `instance/certificates/durabler_signing.p12`
+- **Signature type**: Hybrid (visual + cryptographic)
+  - Visual: Approver name, date, "Approved" stamp in PDF
+  - Cryptographic: PDF signed with company certificate (SHA-256)
+- **Library**: `endesive` for PDF signing
+
+### Certificate Register Integration
+
+The certificate register list includes approval status with action links:
+
+| Column | Description |
+|--------|-------------|
+| Certificate # | Certificate number (e.g., DUR-2025-1065) |
+| Test Type | TENSILE, FCGR, CTOD, KIC, VICKERS, SONIC |
+| Specimen ID | Specimen identifier |
+| Test Date | Date of test |
+| **Status** | DRAFT, PENDING, APPROVED, PUBLISHED |
+| **Action** | Link to continue workflow (role-dependent) |
+
+**Action links by status and role:**
+- DRAFT + Engineer → "Edit" / "Submit for Approval"
+- PENDING + Approver → "Review" / "Approve" / "Reject"
+- APPROVED + System → Auto-generates signed PDF
+- PUBLISHED + Any → "Download PDF" / "View"
+
+### Database Models
+
+```python
+# Enhanced User model
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String(20), unique=True)  # DUR-ENG-001
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256))
+    full_name = db.Column(db.String(120))  # For signature display
+    role = db.Column(db.String(20), default='operator')
+    can_approve = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Report approval tracking
+class ReportApproval(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id'))
+    certificate_number = db.Column(db.String(50))
+    status = db.Column(db.String(20), default='DRAFT')
+
+    # Submission
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    submitted_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    submitted_at = db.Column(db.DateTime)
+
+    # Approval
+    reviewed_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    reviewed_at = db.Column(db.DateTime)
+    review_comments = db.Column(db.Text)  # For rejections
+
+    # Signed PDF
+    word_report_path = db.Column(db.String(255))  # Draft Word document
+    signed_pdf_path = db.Column(db.String(255))   # Final signed PDF
+    pdf_hash = db.Column(db.String(64))           # SHA-256 for integrity
+    signature_timestamp = db.Column(db.DateTime)
+
+    # Relationships
+    test_record = db.relationship('TestRecord', backref='approval')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    submitted_by = db.relationship('User', foreign_keys=[submitted_by_id])
+    reviewed_by = db.relationship('User', foreign_keys=[reviewed_by_id])
+```
+
+### URL Routes (Approval)
+
+```
+# Approval workflow routes
+/reports/                     → List all reports with status
+/reports/pending              → List reports pending approval (approvers only)
+/reports/<id>/submit          → Submit report for approval
+/reports/<id>/review          → Review report (approvers only)
+/reports/<id>/approve         → Approve report (approvers only)
+/reports/<id>/reject          → Reject with comments (approvers only)
+/reports/<id>/download        → Download signed PDF (published only)
+
+# Certificate register (enhanced)
+/certificates/                → List with status column and action links
+/certificates/<cert_num>      → View certificate details + approval history
+
+# Admin routes
+/admin/users                  → User management (CRUD)
+/admin/users/new              → Create new user
+/admin/users/<id>/edit        → Edit user
+/admin/certificate            → Manage company signing certificate
+```
+
+### PDF Signing Implementation
+
+```python
+# utils/signing/pdf_signer.py
+from pathlib import Path
+from datetime import datetime
+import hashlib
+from endesive import pdf
+
+class PDFSigner:
+    """Sign PDFs with company X.509 certificate."""
+
+    def __init__(self, certificate_path: Path, password: str):
+        self.certificate_path = certificate_path
+        self.password = password
+
+    def sign_pdf(self, input_path: Path, output_path: Path,
+                 approver_name: str) -> dict:
+        """
+        Sign PDF with visual and cryptographic signature.
+
+        Returns dict with signed_path, hash, timestamp.
+        """
+        # Load certificate
+        with open(self.certificate_path, 'rb') as f:
+            p12_data = f.read()
+
+        # Read input PDF
+        with open(input_path, 'rb') as f:
+            pdf_data = f.read()
+
+        # Create signature
+        timestamp = datetime.utcnow()
+        signed_data = pdf.cms.sign(
+            datau=pdf_data,
+            udct={
+                'sigflags': 3,
+                'name': f'Approved by: {approver_name}',
+                'contact': 'Durabler AB',
+                'location': 'Kristinehamn, Sweden',
+                'reason': 'Test Report Approval',
+                'signingdate': timestamp.strftime('%Y%m%d%H%M%S+00\'00\''),
+            },
+            key=p12_data,
+            cert=p12_data,
+            othercerts=[],
+            algomd='sha256',
+            password=self.password.encode()
+        )
+
+        # Write signed PDF
+        with open(output_path, 'wb') as f:
+            f.write(pdf_data)
+            f.write(signed_data)
+
+        # Calculate hash for integrity verification
+        with open(output_path, 'rb') as f:
+            pdf_hash = hashlib.sha256(f.read()).hexdigest()
+
+        return {
+            'signed_path': output_path,
+            'hash': pdf_hash,
+            'timestamp': timestamp
+        }
+```
+
+### Signed PDF Storage
+
+```
+reports/
+├── drafts/                    # Word documents (editable)
+│   └── TENSILE_DUR-2025-1065_draft.docx
+├── signed/                    # Signed PDFs (immutable)
+│   └── 2025/
+│       └── DUR-2025-1065_signed.pdf
+└── archive/                   # Superseded versions
+```
+
+### Implementation Phases
+
+**Phase 1: User Management**
+1. Enhance User model with roles and user_id
+2. Create user admin interface (CRUD)
+3. Implement role-based access control decorators
+4. Add login/logout with app credentials
+
+**Phase 2: Approval Workflow**
+1. Create ReportApproval model
+2. Add status tracking to test records
+3. Implement submit/approve/reject routes
+4. Update certificate register with status column
+
+**Phase 3: PDF Signing**
+1. Set up company X.509 certificate
+2. Implement PDFSigner utility
+3. Convert Word reports to PDF (python-docx → pdf)
+4. Add cryptographic signature on approval
+
+**Phase 4: Certificate Register Integration**
+1. Add action links based on status and user role
+2. Implement signed PDF download
+3. Add approval history view
+4. Secure PDF storage with access control
 
 ---
 
