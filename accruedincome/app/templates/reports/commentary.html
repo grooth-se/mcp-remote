@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Monthly Commentary{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-chat-square-text"></i> Monthly Report Commentary</h2>
+        <p class="text-muted">Generate analysis and commentary for monthly management presentation</p>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="bi bi-sliders"></i> Select Periods for Analysis</h5>
+            </div>
+            <div class="card-body">
+                {% if closing_dates %}
+                <form method="POST" action="{{ url_for('reports.commentary_generate') }}">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Current Period</strong> <span class="text-danger">*</span></label>
+                                <select name="current_date" class="form-select" required>
+                                    {% for date in closing_dates %}
+                                    <option value="{{ date }}" {% if date == default_current %}selected{% endif %}>
+                                        {{ date }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Previous Month</strong> <span class="text-danger">*</span></label>
+                                <select name="previous_date" class="form-select" required>
+                                    {% for date in closing_dates %}
+                                    <option value="{{ date }}" {% if date == default_previous %}selected{% endif %}>
+                                        {{ date }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Year End (YTD base)</strong></label>
+                                <select name="year_end_date" class="form-select">
+                                    <option value="">-- None --</option>
+                                    {% for date in closing_dates %}
+                                    <option value="{{ date }}" {% if date == default_year_end %}selected{% endif %}>
+                                        {{ date }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-dark btn-lg">
+                            <i class="bi bi-play-circle"></i> Generate Commentary
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    No calculation data available. Please run calculations first.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> About Monthly Commentary
+            </div>
+            <div class="card-body">
+                <p>The commentary generator analyzes your project data and creates:</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul>
+                            <li>Month-over-month performance analysis</li>
+                            <li>Year-to-date summary</li>
+                            <li>Revenue and margin trends</li>
+                            <li>Order book changes</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul>
+                            <li>New and completed projects</li>
+                            <li>Top revenue movers (increases/decreases)</li>
+                            <li>Significant margin changes</li>
+                            <li>Risk and contingency overview</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

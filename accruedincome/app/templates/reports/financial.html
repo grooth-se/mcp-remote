@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Financial Reports{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-file-earmark-spreadsheet"></i> Financial Reports</h2>
+        <p class="text-muted">Generate P&L and Balance Sheet from verification register (verlista)</p>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Report Parameters</h5>
+            </div>
+            <div class="card-body">
+                {% if sessions %}
+                <form method="POST" action="{{ url_for('reports.financial_generate') }}">
+                    <div class="mb-3">
+                        <label class="form-label">Select Upload Session (contains verlista.xlsx)</label>
+                        <select name="session_id" class="form-select" required>
+                            {% for s in sessions %}
+                            <option value="{{ s.session_id }}">
+                                {{ s.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% if s.closing_date %} - Closing: {{ s.closing_date }}{% endif %}
+                                [{{ s.status }}]
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">P&L Period</div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Start Date</label>
+                                        <input type="date" name="start_date" class="form-control"
+                                               value="{{ (now - timedelta(days=30)).strftime('%Y-%m-%d') if now else '' }}" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">End Date</label>
+                                        <input type="date" name="end_date" class="form-control"
+                                               value="{{ now.strftime('%Y-%m-%d') if now else '' }}" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">Balance Sheet Date</div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Closing Date</label>
+                                        <input type="date" name="closing_date" class="form-control"
+                                               value="{{ now.strftime('%Y-%m-%d') if now else '' }}" required>
+                                    </div>
+                                    <p class="text-muted small">
+                                        Balance Sheet will be cumulative to this date
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-info btn-lg">
+                            <i class="bi bi-play-circle"></i> Generate Financial Reports
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    No upload sessions found. Please upload files first to generate financial reports.
+                </div>
+                <a href="{{ url_for('upload.index') }}" class="btn btn-primary">
+                    <i class="bi bi-upload"></i> Upload Files
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> About Financial Reports
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Profit & Loss Statement</h6>
+                        <ul>
+                            <li>Generated from verlista.xlsx transactions</li>
+                            <li>Revenue: Accounts 3000-3999</li>
+                            <li>Expenses: Accounts 4000-6999</li>
+                            <li>Period-based (start to end date)</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Balance Sheet</h6>
+                        <ul>
+                            <li>Cumulative to closing date</li>
+                            <li>Assets: Accounts 1xxx</li>
+                            <li>Liabilities: Accounts 2xxx</li>
+                            <li>Equity calculated as balancing figure</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

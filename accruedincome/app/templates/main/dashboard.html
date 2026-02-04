@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
+        <hr>
+    </div>
+</div>
+
+{% if stats %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h5>Latest Closing: {{ stats.closing_date }}</h5>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Projects</h6>
+                <h3 class="card-title">{{ stats.project_count }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card positive">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total Accrued Income</h6>
+                <h3 class="card-title text-success">{{ "{:,.0f}".format(stats.total_accrued) }} SEK</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total Contingency</h6>
+                <h3 class="card-title text-warning">{{ "{:,.0f}".format(stats.total_contingency) }} SEK</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Net Accrued</h6>
+                <h3 class="card-title">{{ "{:,.0f}".format(stats.total_accrued - stats.total_contingency) }} SEK</h3>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> No calculations stored yet.
+    <a href="{{ url_for('upload.index') }}">Upload files</a> to get started.
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-calendar3"></i> Recent Closing Dates
+            </div>
+            <div class="card-body">
+                {% if closing_dates %}
+                <ul class="list-group list-group-flush">
+                    {% for date in closing_dates %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ date }}
+                        <a href="{{ url_for('reports.index', closing_date=date) }}"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No closing dates available.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clock-history"></i> Recent Upload Sessions
+            </div>
+            <div class="card-body">
+                {% if recent_sessions %}
+                <ul class="list-group list-group-flush">
+                    {% for session in recent_sessions %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>
+                            {{ session.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            <span class="badge bg-{{ 'success' if session.status == 'stored' else 'warning' if session.status == 'calculated' else 'info' }}">
+                                {{ session.status }}
+                            </span>
+                        </span>
+                        {% if session.status == 'validated' %}
+                        <a href="{{ url_for('calculation.index') }}"
+                           class="btn btn-sm btn-success">
+                            <i class="bi bi-play"></i> Calculate
+                        </a>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No upload sessions yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-lightning"></i> Quick Actions
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2 d-md-flex">
+                    <a href="{{ url_for('upload.index') }}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-upload"></i> Upload New Files
+                    </a>
+                    <a href="{{ url_for('calculation.index') }}" class="btn btn-success btn-lg">
+                        <i class="bi bi-play-circle"></i> Run Calculation
+                    </a>
+                    <a href="{{ url_for('reports.index') }}" class="btn btn-info btn-lg">
+                        <i class="bi bi-file-earmark-text"></i> View Reports
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

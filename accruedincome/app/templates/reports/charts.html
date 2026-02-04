@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Progress Charts{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-graph-up"></i> Project Progress Charts</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <form method="GET" action="{{ url_for('reports.charts') }}">
+            <label class="form-label">Select Closing Date</label>
+            <select name="closing_date" class="form-select" onchange="this.form.submit()">
+                {% for date in closing_dates %}
+                <option value="{{ date }}" {% if date == selected_date %}selected{% endif %}>
+                    {{ date }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    <div class="col-md-4 d-flex align-items-end">
+        <form method="POST" action="{{ url_for('reports.regenerate_charts') }}">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-arrow-clockwise"></i> Regenerate All Charts
+            </button>
+        </form>
+    </div>
+    <div class="col-md-4 d-flex align-items-end justify-content-end">
+        <span class="text-muted">{{ projects|length }} projects</span>
+    </div>
+</div>
+
+{% if projects %}
+<div class="row">
+    {% for p in projects %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <strong>{{ p.project_number }}</strong>
+                {% if p.project_name %} - {{ p.project_name[:30] }}{% endif %}
+            </div>
+            <div class="card-body">
+                <img src="{{ url_for('reports.chart_image', project_number=p.project_number) }}"
+                     class="img-fluid" alt="Chart for {{ p.project_number }}"
+                     onerror="this.parentElement.innerHTML='<div class=\'alert alert-secondary\'>Chart will be generated on first view</div>'">
+            </div>
+            <div class="card-footer text-muted">
+                <small>
+                    Completion: {{ "{:.1%}".format(p.completion_cur1 or 0) }} |
+                    Accrued: {{ "{:,.0f}".format(p.accrued_income_cur or 0) }} SEK |
+                    GM: {{ "{:.1%}".format(p.profit_margin_cur or 0) }}
+                </small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Select a closing date to view charts.
+</div>
+{% endif %}
+{% endblock %}

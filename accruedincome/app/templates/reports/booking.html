@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Booking Differences{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-calculator"></i> Booking Differences: {{ closing_date }}</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h6>Total Accrued Income</h6>
+                <h3>{{ "{:,.0f}".format(total_accrued) }} SEK</h3>
+                <small>Credit: 1790 Accrued Income</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning">
+            <div class="card-body">
+                <h6>Total Contingency</h6>
+                <h3>{{ "{:,.0f}".format(total_contingency) }} SEK</h3>
+                <small>Credit: 2990 Contingency Reserve</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h6>Net Booking</h6>
+                <h3>{{ "{:,.0f}".format(net_booking) }} SEK</h3>
+                <small>Debit: 3XXX Project Revenue</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-journal-text"></i> Journal Entry Summary
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <thead class="table-dark">
+                <tr>
+                    <th>Account</th>
+                    <th>Description</th>
+                    <th class="text-end">Debit</th>
+                    <th class="text-end">Credit</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1790</td>
+                    <td>Accrued Income (Upplupna intakter)</td>
+                    <td class="text-end">{{ "{:,.0f}".format(total_accrued) }}</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>3XXX</td>
+                    <td>Project Revenue</td>
+                    <td></td>
+                    <td class="text-end">{{ "{:,.0f}".format(total_accrued) }}</td>
+                </tr>
+                <tr class="table-warning">
+                    <td>7XXX</td>
+                    <td>Contingency Expense</td>
+                    <td class="text-end">{{ "{:,.0f}".format(total_contingency) }}</td>
+                    <td></td>
+                </tr>
+                <tr class="table-warning">
+                    <td>2990</td>
+                    <td>Contingency Reserve</td>
+                    <td></td>
+                    <td class="text-end">{{ "{:,.0f}".format(total_contingency) }}</td>
+                </tr>
+            </tbody>
+            <tfoot class="table-secondary">
+                <tr>
+                    <th colspan="2">Total</th>
+                    <th class="text-end">{{ "{:,.0f}".format(total_accrued + total_contingency) }}</th>
+                    <th class="text-end">{{ "{:,.0f}".format(total_accrued + total_contingency) }}</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-list-ul"></i> Project Details
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Project</th>
+                        <th class="text-end">Accrued Income</th>
+                        <th class="text-end">Contingency</th>
+                        <th class="text-end">Net</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projects %}
+                    {% if (p.accrued_income_cur or 0) != 0 or (p.contingency_cur or 0) != 0 %}
+                    <tr>
+                        <td><code>{{ p.project_number }}</code></td>
+                        <td class="text-end">{{ "{:,.0f}".format(p.accrued_income_cur or 0) }}</td>
+                        <td class="text-end">{{ "{:,.0f}".format(p.contingency_cur or 0) }}</td>
+                        <td class="text-end">{{ "{:,.0f}".format((p.accrued_income_cur or 0) - (p.contingency_cur or 0)) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('reports.index', closing_date=closing_date) }}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Back to Reports
+    </a>
+</div>
+{% endblock %}

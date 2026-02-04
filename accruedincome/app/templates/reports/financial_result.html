@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Financial Statements{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-file-earmark-spreadsheet"></i> Financial Statements</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- P&L Statement -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-cash-stack"></i>
+                    Profit & Loss Statement
+                </h5>
+                <small>{{ pnl_data.start_date }} to {{ pnl_data.end_date }}</small>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tbody>
+                        {% for line in pnl_data.lines %}
+                        <tr class="{% if line.bold %}table-secondary{% endif %}">
+                            <td style="padding-left: {{ line.level * 20 }}px">
+                                {% if line.bold %}<strong>{% endif %}
+                                {{ line.line }}
+                                {% if line.bold %}</strong>{% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if line.amount is not none %}
+                                {% if line.bold %}<strong>{% endif %}
+                                {{ "{:,.0f}".format(line.amount) }}
+                                {% if line.bold %}</strong>{% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <small class="text-muted">Revenue</small>
+                        <h6>{{ "{:,.0f}".format(pnl_data.summary.total_revenue) }}</h6>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Expenses</small>
+                        <h6>{{ "{:,.0f}".format(pnl_data.summary.total_expenses) }}</h6>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Net Profit</small>
+                        <h6 class="{% if pnl_data.summary.net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ "{:,.0f}".format(pnl_data.summary.net_profit) }}
+                        </h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Balance Sheet -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-bank"></i>
+                    Balance Sheet
+                </h5>
+                <small>As at {{ bs_data.closing_date }}</small>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tbody>
+                        {% for line in bs_data.asset_lines %}
+                        <tr class="{% if line.bold %}table-secondary{% endif %}">
+                            <td style="padding-left: {{ line.level * 20 }}px">
+                                {% if line.bold %}<strong>{% endif %}
+                                {{ line.line }}
+                                {% if line.bold %}</strong>{% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if line.amount is not none %}
+                                {% if line.bold %}<strong>{% endif %}
+                                {{ "{:,.0f}".format(line.amount) }}
+                                {% if line.bold %}</strong>{% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <hr>
+                <table class="table table-sm">
+                    <tbody>
+                        {% for line in bs_data.liability_lines %}
+                        <tr class="{% if line.bold %}table-secondary{% endif %}">
+                            <td style="padding-left: {{ line.level * 20 }}px">
+                                {% if line.bold %}<strong>{% endif %}
+                                {{ line.line }}
+                                {% if line.bold %}</strong>{% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if line.amount is not none %}
+                                {% if line.bold %}<strong>{% endif %}
+                                {{ "{:,.0f}".format(line.amount) }}
+                                {% if line.bold %}</strong>{% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <small class="text-muted">Assets</small>
+                        <h6>{{ "{:,.0f}".format(bs_data.summary.total_assets) }}</h6>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Liabilities</small>
+                        <h6>{{ "{:,.0f}".format(bs_data.summary.total_liabilities) }}</h6>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Equity</small>
+                        <h6>{{ "{:,.0f}".format(bs_data.summary.total_equity) }}</h6>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="bi bi-download"></i> Export financial statements to Excel
+                </span>
+                <form method="POST" action="{{ url_for('reports.export_financial') }}" style="display:inline;">
+                    <input type="hidden" name="session_id" value="{{ session_id }}">
+                    <input type="hidden" name="start_date" value="{{ start_date }}">
+                    <input type="hidden" name="end_date" value="{{ end_date }}">
+                    <input type="hidden" name="closing_date" value="{{ closing_date }}">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('reports.financial') }}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Back to Financial Reports
+    </a>
+    <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-table"></i> Project Reports
+    </a>
+</div>
+{% endblock %}

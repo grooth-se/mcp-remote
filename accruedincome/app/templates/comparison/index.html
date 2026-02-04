@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Period Comparison{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-arrow-left-right"></i> Period Comparison</h2>
+        <p class="text-muted">Compare accrued income and project metrics between two periods</p>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-calendar-range"></i> Select Comparison Periods</h5>
+            </div>
+            <div class="card-body">
+                {% if closing_dates %}
+                <form method="POST" action="{{ url_for('comparison.run') }}">
+                    <div class="mb-3">
+                        <label class="form-label">Current Period</label>
+                        <select name="current_date" class="form-select form-select-lg">
+                            {% for date in closing_dates %}
+                            <option value="{{ date }}" {% if date == current_date %}selected{% endif %}>
+                                {{ date }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Previous Period</label>
+                        <select name="previous_date" class="form-select form-select-lg">
+                            {% for date in closing_dates %}
+                            <option value="{{ date }}" {% if date == previous_date %}selected{% endif %}>
+                                {{ date }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-play-circle"></i> Generate Comparison
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    No closing dates available. Please run a calculation first.
+                </div>
+                <a href="{{ url_for('calculation.index') }}" class="btn btn-primary">
+                    Go to Calculation
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

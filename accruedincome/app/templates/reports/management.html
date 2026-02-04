@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Management Reports{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-briefcase"></i> Management Reports</h2>
+        <p class="text-muted">Generate Report1, Report2, Report3 style management reports</p>
+        <hr>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Report Parameters</h5>
+            </div>
+            <div class="card-body">
+                {% if closing_dates %}
+                <form method="POST" action="{{ url_for('reports.management_generate') }}">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Current Period</strong> <span class="text-danger">*</span></label>
+                                <select name="current_date" class="form-select" required>
+                                    {% for date in closing_dates %}
+                                    <option value="{{ date }}" {% if loop.first %}selected{% endif %}>
+                                        {{ date }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Latest calculation period</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Previous Month</strong></label>
+                                <select name="previous_date" class="form-select">
+                                    <option value="">-- None --</option>
+                                    {% for date in closing_dates %}
+                                    <option value="{{ date }}" {% if loop.index == 2 %}selected{% endif %}>
+                                        {{ date }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">For period changes</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label"><strong>End of Last Year</strong></label>
+                                <select name="year_end_date" class="form-select">
+                                    <option value="">-- None --</option>
+                                    {% for date in closing_dates %}
+                                    <option value="{{ date }}">
+                                        {{ date }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">For YTD calculations</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-play-circle"></i> Generate Reports
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    No calculation data available. Please run a calculation first and store the results.
+                </div>
+                <a href="{{ url_for('calculation.index') }}" class="btn btn-primary">
+                    <i class="bi bi-calculator"></i> Go to Calculation
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> About Management Reports
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Report 1 - Revenue/COGS/GM</h6>
+                        <ul>
+                            <li>Current period performance</li>
+                            <li>Year to date totals</li>
+                            <li>Project to date cumulative</li>
+                            <li>Values in SEK'000</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Report 2 - Project Valuation</h6>
+                        <ul>
+                            <li>Total contract value</li>
+                            <li>Percentage of completion</li>
+                            <li>Contingency provisions</li>
+                            <li>Period-over-period changes</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Report 3 - Order Book</h6>
+                        <ul>
+                            <li>Opening/Ending balance</li>
+                            <li>Order intake</li>
+                            <li>Revenue recognition</li>
+                            <li>Delivery timeline</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

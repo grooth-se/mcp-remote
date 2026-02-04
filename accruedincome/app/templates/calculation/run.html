@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Run Calculation{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-play-circle"></i> Run Accrued Income Calculation</h5>
+            </div>
+            <div class="card-body">
+                {% if sessions %}
+                <p>Select an upload session to calculate:</p>
+
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Upload Date</th>
+                            <th>Status</th>
+                            <th>Closing Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for session in sessions %}
+                        <tr>
+                            <td>{{ session.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if session.status == 'stored' else 'info' if session.status == 'calculated' else 'primary' }}">
+                                    {{ session.status }}
+                                </span>
+                            </td>
+                            <td>{{ session.closing_date or '-' }}</td>
+                            <td>
+                                {% if session.status in ['validated', 'uploaded'] %}
+                                <button class="btn btn-success btn-sm"
+                                        onclick="runCalculation('{{ session.session_id }}')">
+                                    <i class="bi bi-play"></i> Calculate
+                                </button>
+                                {% elif session.status == 'calculated' %}
+                                <form method="POST" action="{{ url_for('calculation.store') }}" style="display:inline;">
+                                    <input type="hidden" name="session_id" value="{{ session.session_id }}">
+                                    <button type="submit" class="btn btn-primary btn-sm">
+                                        <i class="bi bi-database"></i> Store to DB
+                                    </button>
+                                </form>
+                                {% elif session.status == 'stored' %}
+                                <a href="{{ url_for('reports.index', closing_date=session.closing_date) }}"
+                                   class="btn btn-info btn-sm">
+                                    <i class="bi bi-eye"></i> View Report
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <!-- Calculation Result Area -->
+                <div id="calcSpinner" style="display:none;" class="text-center my-4">
+                    <div class="spinner-border text-success" role="status">
+                        <span class="visually-hidden">Calculating...</span>
+                    </div>
+                    <p class="mt-2">Running calculation... This may take a moment.</p>
+                </div>
+
+                <div id="calcResult"></div>
+
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    No validated upload sessions available.
+                    <a href="{{ url_for('upload.index') }}">Upload files first</a>.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function runCalculation(sessionId) {
+    const resultDiv = document.getElementById('calcResult');
+    const spinner = document.getElementById('calcSpinner');
+
+    spinner.style.display = 'block';
+    resultDiv.innerHTML = '';
+
+    fetch('{{ url_for("calculation.run") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'session_id=' + sessionId
+    })
+    .then(response => response.json())
+    .then(data => {
+        spinner.style.display = 'none';
+        if (data.status === 'success') {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h5><i class="bi bi-check-circle"></i> Calculation Complete!</h5>
+                    <hr>
+                    <p><strong>Closing Date:</strong> ${data.closing_date}</p>
+                    <p><strong>Projects:</strong> ${data.project_count}</p>
+                    <p><strong>Total Accrued Income:</strong> ${formatCurrency(data.total_accrued)}</p>
+                    <p><strong>Total Contingency:</strong> ${formatCurrency(data.total_contingency)}</p>
+                    <hr>
+                    <form method="POST" action="{{ url_for('calculation.store') }}">
+                        <input type="hidden" name="session_id" value="${sessionId}">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-database"></i> Store Results to Database
+                        </button>
+                    </form>
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h5><i class="bi bi-x-circle"></i> Calculation Failed</h5>
+                    <p>${data.message}</p>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        spinner.style.display = 'none';
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <h5><i class="bi bi-x-circle"></i> Error</h5>
+                <p>${error.message}</p>
+            </div>
+        `;
+    });
+}
+
+function formatCurrency(value) {
+    return new Intl.NumberFormat('sv-SE', {
+        style: 'currency',
+        currency: 'SEK',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(value);
+}
+</script>
+{% endblock %}

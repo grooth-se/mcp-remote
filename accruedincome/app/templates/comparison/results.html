@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Comparison Results{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-arrow-left-right"></i> Comparison: {{ current_date }} vs {{ previous_date }}</h2>
+        <hr>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                Current Period: {{ current_date }}
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <h6 class="text-muted">Projects</h6>
+                        <h4>{{ result.summary_curr.project_count }}</h4>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-muted">Total Accrued</h6>
+                        <h4 class="text-success">{{ "{:,.0f}".format(result.summary_curr.total_accrued) }}</h4>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <h6 class="text-muted">Total Revenue</h6>
+                        <p>{{ "{:,.0f}".format(result.summary_curr.total_revenue) }}</p>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-muted">Gross Margin</h6>
+                        <p>{{ "{:,.0f}".format(result.summary_curr.total_gross_margin) }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                Previous Period: {{ previous_date }}
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <h6 class="text-muted">Projects</h6>
+                        <h4>{{ result.summary_prev.project_count }}</h4>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-muted">Total Accrued</h6>
+                        <h4>{{ "{:,.0f}".format(result.summary_prev.total_accrued) }}</h4>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <h6 class="text-muted">Total Revenue</h6>
+                        <p>{{ "{:,.0f}".format(result.summary_prev.total_revenue) }}</p>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-muted">Gross Margin</h6>
+                        <p>{{ "{:,.0f}".format(result.summary_prev.total_gross_margin) }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Change Summary -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-graph-up-arrow"></i> Period-over-Period Changes
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    {% set delta_revenue = result.summary_curr.total_revenue - result.summary_prev.total_revenue %}
+                    {% set delta_margin = result.summary_curr.total_gross_margin - result.summary_prev.total_gross_margin %}
+                    {% set delta_accrued = result.summary_curr.total_accrued - result.summary_prev.total_accrued %}
+
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Revenue Change</h6>
+                        <h3 class="{% if delta_revenue >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if delta_revenue >= 0 %}+{% endif %}{{ "{:,.0f}".format(delta_revenue) }}
+                        </h3>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Margin Change</h6>
+                        <h3 class="{% if delta_margin >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if delta_margin >= 0 %}+{% endif %}{{ "{:,.0f}".format(delta_margin) }}
+                        </h3>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Accrued Change</h6>
+                        <h3 class="{% if delta_accrued >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if delta_accrued >= 0 %}+{% endif %}{{ "{:,.0f}".format(delta_accrued) }}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Project Details -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-table"></i> Project-Level Changes</span>
+        <a href="{{ url_for('comparison.export', current_date=current_date, previous_date=previous_date) }}"
+           class="btn btn-success btn-sm">
+            <i class="bi bi-download"></i> Export to Excel
+        </a>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Project</th>
+                        <th class="text-end">Revenue (Curr)</th>
+                        <th class="text-end">Revenue (Prev)</th>
+                        <th class="text-end">Delta</th>
+                        <th class="text-end">Accrued (Curr)</th>
+                        <th class="text-end">Accrued (Prev)</th>
+                        <th class="text-end">Delta</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in result.detail.to_dict('records') %}
+                    <tr>
+                        <td><code>{{ row.project_number }}</code></td>
+                        <td class="text-end">{{ "{:,.0f}".format(row.total_income_curr or 0) }}</td>
+                        <td class="text-end">{{ "{:,.0f}".format(row.total_income_prev or 0) }}</td>
+                        <td class="text-end {% if (row.delta_revenue or 0) >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ "{:+,.0f}".format(row.delta_revenue or 0) }}
+                        </td>
+                        <td class="text-end">{{ "{:,.0f}".format(row.accrued_income_curr or 0) }}</td>
+                        <td class="text-end">{{ "{:,.0f}".format(row.accrued_income_prev or 0) }}</td>
+                        <td class="text-end {% if (row.delta_accrued or 0) >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ "{:+,.0f}".format(row.delta_accrued or 0) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('comparison.index') }}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> New Comparison
+    </a>
+</div>
+{% endblock %}

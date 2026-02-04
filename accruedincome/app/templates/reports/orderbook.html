@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Order Book Report{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-journal-text"></i> Order Book Report: {{ closing_date }}</h2>
+        <p class="text-muted">Projects with remaining contract values</p>
+        <hr>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted">Total Remaining Income</h6>
+                <h3 class="text-success">{{ "{:,.0f}".format(totals.total_remaining_income) }} SEK</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted">Total Remaining Cost</h6>
+                <h3 class="text-danger">{{ "{:,.0f}".format(totals.total_remaining_cost) }} SEK</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        Active Projects ({{ projects|length }})
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Project</th>
+                        <th>Customer</th>
+                        <th class="text-end">Remaining Income</th>
+                        <th class="text-end">Remaining Cost</th>
+                        <th class="text-end">Remaining Margin</th>
+                        <th class="text-end">Completion %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projects %}
+                    {% set margin = (p.remaining_income or 0) - (p.remaining_cost or 0) %}
+                    <tr>
+                        <td><code>{{ p.project_number }}</code></td>
+                        <td>{{ p.customer_name or p.project_name or '-' }}</td>
+                        <td class="text-end">{{ "{:,.0f}".format(p.remaining_income or 0) }}</td>
+                        <td class="text-end">{{ "{:,.0f}".format(p.remaining_cost or 0) }}</td>
+                        <td class="text-end {% if margin < 0 %}text-danger{% else %}text-success{% endif %}">
+                            {{ "{:,.0f}".format(margin) }}
+                        </td>
+                        <td class="text-end">
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar" role="progressbar"
+                                     style="width: {{ (p.completion_cur1 or 0) * 100 }}%">
+                                    {{ "{:.0%}".format(p.completion_cur1 or 0) }}
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('reports.index', closing_date=closing_date) }}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Back to Reports
+    </a>
+</div>
+{% endblock %}
