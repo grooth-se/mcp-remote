@@ -65,7 +65,7 @@ async function main() {
   program
     .name('mcp-remote')
     .description('Connect to a remote MCP server over HTTP or SSE transport')
-    .version('1.1.0')
+    .version('2.0.1')
     .argument('<server-url>', 'URL of the remote MCP server (e.g., https://example.com/mcp)')
     .option('-H, --header <header...>', 'Add custom header (format: "Name: Value")')
     .option('--allow-http', 'Allow insecure HTTP connections (not recommended)')
