@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}{{ grade.designation }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('materials.index') }}">Materials</a></li>
+        <li class="breadcrumb-item active">{{ grade.designation }}</li>
+    </ol>
+</nav>
+
+<div class="row mb-3">
+    <div class="col">
+        <h2>
+            {{ grade.designation }}
+            {% if grade.is_standard %}
+            <span class="badge bg-secondary">Standard</span>
+            {% else %}
+            <span class="badge bg-primary">Subseatec</span>
+            {% endif %}
+        </h2>
+        {% if grade.description %}
+        <p class="text-muted">{{ grade.description }}</p>
+        {% endif %}
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('materials.edit', id=grade.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+        <a href="{{ url_for('materials.export', id=grade.id) }}" class="btn btn-outline-success">
+            <i class="bi bi-download"></i> Export
+        </a>
+        <form method="post" action="{{ url_for('materials.delete', id=grade.id) }}" class="d-inline" onsubmit="return confirm('Delete this steel grade and all its data?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Properties Section -->
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-list-ul"></i> Material Properties</span>
+                <a href="{{ url_for('materials.properties', id=grade.id) }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus"></i> Manage Properties
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if properties %}
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Units</th>
+                            <th>Value / Data</th>
+                            <th>Evaluate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prop in properties %}
+                        <tr>
+                            <td class="fw-bold">{{ prop.display_name }}</td>
+                            <td><span class="badge bg-secondary">{{ prop.property_type }}</span></td>
+                            <td>{{ prop.units or '-' }}</td>
+                            <td>
+                                {% if prop.property_type == 'constant' %}
+                                    {{ prop.data_dict.get('value', '-') }}
+                                {% elif prop.property_type == 'curve' %}
+                                    <small class="text-muted">{{ prop.data_dict.get('temperature', [])|length }} points</small>
+                                {% elif prop.property_type == 'polynomial' %}
+                                    <small class="text-muted">{{ prop.data_dict.get('coefficients', [])|length }} coefficients</small>
+                                {% elif prop.property_type == 'equation' %}
+                                    <code class="small">{{ prop.data_dict.get('equation', '-') }}</code>
+                                {% else %}
+                                    <small class="text-muted">{{ prop.property_type }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if prop.is_temperature_dependent %}
+                                <form method="post" action="{{ url_for('materials.evaluate_property', id=grade.id) }}" class="d-flex gap-1">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="property_id" value="{{ prop.id }}">
+                                    <input type="number" name="temperature" class="form-control form-control-sm" style="width: 80px" placeholder="T" step="any">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Evaluate">
+                                        <i class="bi bi-calculator"></i>
+                                    </button>
+                                </form>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <p>No properties defined yet</p>
+                    <a href="{{ url_for('materials.properties', id=grade.id) }}" class="btn btn-sm btn-primary">
+                        Add Properties
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase Diagram Section -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-graph-up"></i> Phase Diagram</span>
+                <a href="{{ url_for('materials.phase_diagram', id=grade.id) }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+            </div>
+            <div class="card-body">
+                {% if diagrams %}
+                    {% set diagram = diagrams[0] %}
+                    <p><strong>Type:</strong> {{ diagram.diagram_type }}</p>
+
+                    <h6>Transformation Temperatures</h6>
+                    <table class="table table-sm">
+                        {% set temps = diagram.temps_dict %}
+                        {% if temps.get('Ac1') %}<tr><td>Ac1</td><td>{{ temps.Ac1 }} °C</td></tr>{% endif %}
+                        {% if temps.get('Ac3') %}<tr><td>Ac3</td><td>{{ temps.Ac3 }} °C</td></tr>{% endif %}
+                        {% if temps.get('Ms') %}<tr><td>Ms</td><td>{{ temps.Ms }} °C</td></tr>{% endif %}
+                        {% if temps.get('Mf') %}<tr><td>Mf</td><td>{{ temps.Mf }} °C</td></tr>{% endif %}
+                        {% if temps.get('Bs') %}<tr><td>Bs</td><td>{{ temps.Bs }} °C</td></tr>{% endif %}
+                        {% if temps.get('Bf') %}<tr><td>Bf</td><td>{{ temps.Bf }} °C</td></tr>{% endif %}
+                    </table>
+
+                    {% if diagram.has_image %}
+                    <div class="mt-3">
+                        <img src="{{ url_for('materials.phase_diagram_image', id=grade.id) }}" class="img-fluid rounded" alt="Phase Diagram">
+                    </div>
+                    {% endif %}
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-graph-up fs-1"></i>
+                    <p>No phase diagram data</p>
+                    <a href="{{ url_for('materials.phase_diagram', id=grade.id) }}" class="btn btn-sm btn-primary">
+                        Add Diagram
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

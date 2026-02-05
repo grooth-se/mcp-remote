@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Phase Diagram - {{ grade.designation }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('materials.index') }}">Materials</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('materials.view', id=grade.id) }}">{{ grade.designation }}</a></li>
+        <li class="breadcrumb-item active">Phase Diagram</li>
+    </ol>
+</nav>
+
+<h2>Phase Diagram for {{ grade.designation }}</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-graph-up"></i> Transformation Data
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.diagram_type.label(class="form-label") }}
+                        {{ form.diagram_type(class="form-select") }}
+                        <div class="form-text">
+                            <strong>CCT:</strong> Continuous Cooling Transformation<br>
+                            <strong>TTT:</strong> Time-Temperature-Transformation
+                        </div>
+                    </div>
+
+                    <h6 class="mt-4">Transformation Temperatures</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.ac1.label(class="form-label") }}
+                            {{ form.ac1(class="form-control", step="0.1") }}
+                            <div class="form-text">Austenite start</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.ac3.label(class="form-label") }}
+                            {{ form.ac3(class="form-control", step="0.1") }}
+                            <div class="form-text">Austenite finish</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.ms.label(class="form-label") }}
+                            {{ form.ms(class="form-control", step="0.1") }}
+                            <div class="form-text">Martensite start</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.mf.label(class="form-label") }}
+                            {{ form.mf(class="form-control", step="0.1") }}
+                            <div class="form-text">Martensite finish</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.bs.label(class="form-label") }}
+                            {{ form.bs(class="form-control", step="0.1") }}
+                            <div class="form-text">Bainite start</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.bf.label(class="form-label") }}
+                            {{ form.bf(class="form-control", step="0.1") }}
+                            <div class="form-text">Bainite finish</div>
+                        </div>
+                    </div>
+
+                    <h6 class="mt-4">Curves Data (Optional)</h6>
+                    <div class="mb-3">
+                        {{ form.curves_data.label(class="form-label") }}
+                        {{ form.curves_data(class="form-control font-monospace") }}
+                        <div class="form-text">Digitized transformation curves in JSON format</div>
+                    </div>
+
+                    <h6 class="mt-4">Source Image</h6>
+                    <div class="mb-3">
+                        {{ form.source_image.label(class="form-label") }}
+                        {{ form.source_image(class="form-control") }}
+                        <div class="form-text">Upload original diagram image (PNG/JPG)</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('materials.view', id=grade.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview existing diagram -->
+    <div class="col-md-6">
+        {% if existing %}
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-eye"></i> Current Diagram</span>
+                <form method="post" action="{{ url_for('materials.delete_phase_diagram', id=grade.id) }}" class="d-inline" onsubmit="return confirm('Delete this phase diagram?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                </form>
+            </div>
+            <div class="card-body">
+                <p><strong>Type:</strong> {{ existing.diagram_type }}</p>
+
+                <h6>Stored Temperatures</h6>
+                <table class="table table-sm">
+                    {% set temps = existing.temps_dict %}
+                    {% if temps.get('Ac1') %}<tr><td>Ac1</td><td>{{ temps.Ac1 }} °C</td></tr>{% endif %}
+                    {% if temps.get('Ac3') %}<tr><td>Ac3</td><td>{{ temps.Ac3 }} °C</td></tr>{% endif %}
+                    {% if temps.get('Ms') %}<tr><td>Ms</td><td>{{ temps.Ms }} °C</td></tr>{% endif %}
+                    {% if temps.get('Mf') %}<tr><td>Mf</td><td>{{ temps.Mf }} °C</td></tr>{% endif %}
+                    {% if temps.get('Bs') %}<tr><td>Bs</td><td>{{ temps.Bs }} °C</td></tr>{% endif %}
+                    {% if temps.get('Bf') %}<tr><td>Bf</td><td>{{ temps.Bf }} °C</td></tr>{% endif %}
+                </table>
+
+                {% if existing.has_image %}
+                <h6>Source Image</h6>
+                <img src="{{ url_for('materials.phase_diagram_image', id=grade.id) }}" class="img-fluid rounded" alt="Phase Diagram">
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-graph-up fs-1"></i>
+                <p class="mt-3">No phase diagram data yet</p>
+                <p>Fill out the form to add transformation data</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

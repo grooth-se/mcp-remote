@@ -20,7 +20,19 @@ def create_app(config_name='default'):
         Configured Flask application instance
     """
     app = Flask(__name__)
-    app.config.from_object(config[config_name])
+    config_obj = config[config_name]
+    app.config.from_object(config_obj)
+
+    # Configure PostgreSQL binds for materials database (Phase 2)
+    # Falls back to SQLite in development if PostgreSQL not configured
+    postgres_password = os.environ.get('POSTGRES_PASSWORD', '')
+    if postgres_password:
+        postgres_uri = config_obj().POSTGRES_URI
+        app.config['SQLALCHEMY_BINDS'] = {'materials': postgres_uri}
+    else:
+        # Fallback to SQLite for development without PostgreSQL
+        materials_db = os.path.join(app.instance_path, 'materials.db')
+        app.config['SQLALCHEMY_BINDS'] = {'materials': f'sqlite:///{materials_db}'}
 
     # Ensure folders exist
     os.makedirs(app.instance_path, exist_ok=True)
@@ -44,9 +56,11 @@ def create_app(config_name='default'):
     # Register blueprints
     from .main import main_bp
     from .auth import auth_bp
+    from .materials import materials_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(materials_bp, url_prefix='/materials')
 
     # Create database tables
     with app.app_context():

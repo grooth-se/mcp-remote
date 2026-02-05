@@ -28,8 +28,8 @@ class Config:
             return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         return f"postgresql://{self.POSTGRES_USER}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
-    # Bind multiple databases (Phase 2 will populate this)
-    SQLALCHEMY_BINDS = {}
+    # Bind multiple databases - set dynamically in app factory
+    SQLALCHEMY_BINDS = None
 
     # Session
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hour

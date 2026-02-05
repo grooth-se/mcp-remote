@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Import Materials{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('materials.index') }}">Materials</a></li>
+        <li class="breadcrumb-item active">Import</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-upload"></i> Import from Excel
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.file.label(class="form-label") }}
+                        {{ form.file(class="form-control" + (" is-invalid" if form.file.errors else "")) }}
+                        {% for error in form.file.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.data_source.label(class="form-label") }}
+                        {{ form.data_source(class="form-select") }}
+                        <div class="form-text">
+                            All imported grades will be assigned this data source
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('materials.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Import Format
+            </div>
+            <div class="card-body">
+                <p>The Excel file should contain three sheets:</p>
+
+                <h6>Sheet 1: Steel Grades</h6>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr><th>designation</th><th>description</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>AISI 4340</td><td>High-strength steel</td></tr>
+                    </tbody>
+                </table>
+
+                <h6>Sheet 2: Properties</h6>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr><th>designation</th><th>property_name</th><th>property_type</th><th>units</th><th>dependencies</th><th>data</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>AISI 4340</td>
+                            <td>density</td>
+                            <td>constant</td>
+                            <td>kg/m³</td>
+                            <td></td>
+                            <td>{"value": 7850}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h6>Sheet 3: Phase Diagrams</h6>
+                <table class="table table-sm table-bordered">
+                    <thead class="table-light">
+                        <tr><th>designation</th><th>diagram_type</th><th>Ac1</th><th>Ac3</th><th>Ms</th><th>Mf</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>AISI 4340</td><td>CCT</td><td>724</td><td>780</td><td>320</td><td>180</td></tr>
+                    </tbody>
+                </table>
+
+                <a href="{{ url_for('materials.download_template') }}" class="btn btn-outline-primary mt-3">
+                    <i class="bi bi-download"></i> Download Template
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

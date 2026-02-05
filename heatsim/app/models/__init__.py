@@ -5,10 +5,28 @@ from .user import (
     ROLES, ROLE_LABELS,
     admin_required
 )
+from .material import (
+    SteelGrade,
+    MaterialProperty,
+    PhaseDiagram,
+    PROPERTY_TYPE_CONSTANT, PROPERTY_TYPE_CURVE, PROPERTY_TYPE_TABLE,
+    PROPERTY_TYPE_POLYNOMIAL, PROPERTY_TYPE_EQUATION, PROPERTY_TYPES,
+    DATA_SOURCE_STANDARD, DATA_SOURCE_SUBSEATEC, DATA_SOURCES,
+    DIAGRAM_TYPE_CCT, DIAGRAM_TYPE_TTT, DIAGRAM_TYPES,
+)
 
 __all__ = [
+    # User models
     'User',
     'ROLE_ENGINEER', 'ROLE_ADMIN',
     'ROLES', 'ROLE_LABELS',
     'admin_required',
+    # Material models (PostgreSQL)
+    'SteelGrade',
+    'MaterialProperty',
+    'PhaseDiagram',
+    'PROPERTY_TYPE_CONSTANT', 'PROPERTY_TYPE_CURVE', 'PROPERTY_TYPE_TABLE',
+    'PROPERTY_TYPE_POLYNOMIAL', 'PROPERTY_TYPE_EQUATION', 'PROPERTY_TYPES',
+    'DATA_SOURCE_STANDARD', 'DATA_SOURCE_SUBSEATEC', 'DATA_SOURCES',
+    'DIAGRAM_TYPE_CCT', 'DIAGRAM_TYPE_TTT', 'DIAGRAM_TYPES',
 ]

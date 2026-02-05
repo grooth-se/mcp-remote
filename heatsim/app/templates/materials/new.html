@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}New Steel Grade{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('materials.index') }}">Materials</a></li>
+        <li class="breadcrumb-item active">New Steel Grade</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-plus-lg"></i> Create New Steel Grade
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.designation.label(class="form-label") }}
+                        {{ form.designation(class="form-control" + (" is-invalid" if form.designation.errors else "")) }}
+                        {% for error in form.designation.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.data_source.label(class="form-label") }}
+                        {{ form.data_source(class="form-select") }}
+                        <div class="form-text">
+                            <strong>Standard:</strong> Literature values (ASM, NIST, etc.)<br>
+                            <strong>Subseatec:</strong> In-house measured data
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.description.label(class="form-label") }}
+                        {{ form.description(class="form-control") }}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('materials.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

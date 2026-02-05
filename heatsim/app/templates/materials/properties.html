@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Properties - {{ grade.designation }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('materials.index') }}">Materials</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('materials.view', id=grade.id) }}">{{ grade.designation }}</a></li>
+        <li class="breadcrumb-item active">Properties</li>
+    </ol>
+</nav>
+
+<h2>Properties for {{ grade.designation }}</h2>
+
+<div class="row">
+    <!-- Existing Properties -->
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-list-ul"></i> Existing Properties
+            </div>
+            <div class="card-body p-0">
+                {% if properties %}
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Units</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prop in properties %}
+                        <tr>
+                            <td>{{ prop.display_name }}</td>
+                            <td><span class="badge bg-secondary">{{ prop.property_type }}</span></td>
+                            <td>{{ prop.units or '-' }}</td>
+                            <td class="text-end">
+                                <form method="post" action="{{ url_for('materials.delete_property', id=grade.id, prop_id=prop.id) }}" class="d-inline" onsubmit="return confirm('Delete this property?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    No properties defined yet
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Property Form -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-plus-lg"></i> Add / Update Property
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.property_name.label(class="form-label") }}
+                        {{ form.property_name(class="form-select", id="property_name") }}
+                    </div>
+
+                    <div class="mb-3" id="custom_name_group" style="display: none;">
+                        {{ form.custom_name.label(class="form-label") }}
+                        {{ form.custom_name(class="form-control") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.property_type.label(class="form-label") }}
+                        {{ form.property_type(class="form-select", id="property_type") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.units.label(class="form-label") }}
+                        {{ form.units(class="form-control") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.dependencies.label(class="form-label") }}
+                        {{ form.dependencies(class="form-control") }}
+                        <div class="form-text">Leave empty for constant properties</div>
+                    </div>
+
+                    <!-- Constant Value -->
+                    <div id="constant_fields" class="property-type-fields">
+                        <div class="mb-3">
+                            {{ form.constant_value.label(class="form-label") }}
+                            {{ form.constant_value(class="form-control") }}
+                        </div>
+                    </div>
+
+                    <!-- Curve Data -->
+                    <div id="curve_fields" class="property-type-fields" style="display: none;">
+                        <div class="mb-3">
+                            {{ form.curve_data.label(class="form-label") }}
+                            {{ form.curve_data(class="form-control font-monospace") }}
+                            <div class="form-text">
+                                JSON format: <code>{"temperature": [20, 200, 400], "value": [50, 45, 40]}</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Polynomial -->
+                    <div id="polynomial_fields" class="property-type-fields" style="display: none;">
+                        <div class="mb-3">
+                            {{ form.polynomial_variable.label(class="form-label") }}
+                            {{ form.polynomial_variable(class="form-control") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.polynomial_coefficients.label(class="form-label") }}
+                            {{ form.polynomial_coefficients(class="form-control") }}
+                            <div class="form-text">a0 + a1*x + a2*x² + ...</div>
+                        </div>
+                    </div>
+
+                    <!-- Equation -->
+                    <div id="equation_fields" class="property-type-fields" style="display: none;">
+                        <div class="mb-3">
+                            {{ form.equation.label(class="form-label") }}
+                            {{ form.equation(class="form-control font-monospace") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.equation_variables.label(class="form-label") }}
+                            {{ form.equation_variables(class="form-control font-monospace") }}
+                            <div class="form-text">JSON format: <code>{"T": "temperature"}</code></div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control") }}
+                    </div>
+
+                    {{ form.submit(class="btn btn-primary") }}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const propertyName = document.getElementById('property_name');
+    const customNameGroup = document.getElementById('custom_name_group');
+    const propertyType = document.getElementById('property_type');
+    const typeFields = document.querySelectorAll('.property-type-fields');
+
+    // Show/hide custom name field
+    propertyName.addEventListener('change', function() {
+        customNameGroup.style.display = this.value === 'custom' ? 'block' : 'none';
+    });
+
+    // Show/hide property type fields
+    function updateTypeFields() {
+        const selected = propertyType.value;
+        typeFields.forEach(field => field.style.display = 'none');
+
+        const fieldMap = {
+            'constant': 'constant_fields',
+            'curve': 'curve_fields',
+            'table': 'curve_fields',  // Use same for table (JSON)
+            'polynomial': 'polynomial_fields',
+            'equation': 'equation_fields'
+        };
+
+        const targetId = fieldMap[selected];
+        if (targetId) {
+            document.getElementById(targetId).style.display = 'block';
+        }
+    }
+
+    propertyType.addEventListener('change', updateTypeFields);
+    updateTypeFields();
+});
+</script>
+{% endblock %}
