@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=subseatec_sim
+      - POSTGRES_USER=subseatec
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-subseatec}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+    volumes:
+      - ./data:/app/data
+      - ./instance:/app/instance
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=subseatec_sim
+      - POSTGRES_USER=subseatec
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-subseatec}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
+        <p class="text-muted">Welcome, {{ current_user.username }}. Subseatec Materials Simulation Platform.</p>
+    </div>
+</div>
+
+<!-- Feature Cards -->
+<div class="row g-4 mb-5">
+    <!-- Material Database -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 feature-card">
+            <div class="card-body text-center">
+                <i class="bi bi-database display-4 text-primary mb-2"></i>
+                <h5 class="card-title">Material Database</h5>
+                <p class="card-text text-muted small">Steel grades and thermal properties</p>
+                <span class="badge bg-secondary">Phase 2</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Heat Treatment Simulation -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 feature-card">
+            <div class="card-body text-center">
+                <i class="bi bi-thermometer-half display-4 text-danger mb-2"></i>
+                <h5 class="card-title">Heat Treatment</h5>
+                <p class="card-text text-muted small">Quenching, tempering simulation</p>
+                <span class="badge bg-secondary">Phase 3</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Welding Simulation -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 feature-card">
+            <div class="card-body text-center">
+                <i class="bi bi-lightning display-4 text-warning mb-2"></i>
+                <h5 class="card-title">Welding Simulation</h5>
+                <p class="card-text text-muted small">GTAW, MIG/MAG, SAW, AM</p>
+                <span class="badge bg-secondary">Phase 5</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- COMSOL Integration -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 feature-card">
+            <div class="card-body text-center">
+                <i class="bi bi-cpu display-4 text-info mb-2"></i>
+                <h5 class="card-title">COMSOL Integration</h5>
+                <p class="card-text text-muted small">3D accurate simulations</p>
+                <span class="badge bg-secondary">Phase 4</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visualization -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 feature-card">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up display-4 text-success mb-2"></i>
+                <h5 class="card-title">Visualization</h5>
+                <p class="card-text text-muted small">3D rendering and animations</p>
+                <span class="badge bg-secondary">Phase 7</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Optimization -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 feature-card">
+            <div class="card-body text-center">
+                <i class="bi bi-gear display-4 mb-2" style="color: #6f42c1;"></i>
+                <h5 class="card-title">Optimization</h5>
+                <p class="card-text text-muted small">Parameter sweeps and tuning</p>
+                <span class="badge bg-secondary">Phase 6</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Status -->
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card bg-success bg-opacity-10 border-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-success">System Status</h6>
+                        <h4>Online</h4>
+                    </div>
+                    <i class="bi bi-check-circle display-4 text-success opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info bg-opacity-10 border-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-info">Your Role</h6>
+                        <h4>{{ current_user.role_label }}</h4>
+                    </div>
+                    <i class="bi bi-person-badge display-4 text-info opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning bg-opacity-10 border-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-warning">Current Phase</h6>
+                        <h4>Foundation</h4>
+                    </div>
+                    <i class="bi bi-building display-4 text-warning opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

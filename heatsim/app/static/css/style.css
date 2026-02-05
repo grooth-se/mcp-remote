@@ -1,0 +1,52 @@
+/* Subseatec Materials Simulation Platform - Custom Styles */
+
+/* Compact layout adjustments */
+.navbar {
+    padding: 0.25rem 1rem;
+}
+
+.navbar-brand {
+    font-weight: 600;
+}
+
+.nav-link {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Feature cards */
+.feature-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: default;
+}
+
+.feature-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Status cards */
+.card {
+    border-radius: 0.5rem;
+}
+
+/* Flash messages */
+.alert {
+    border-radius: 0.375rem;
+}
+
+/* Login card */
+.card.shadow {
+    border: none;
+}
+
+/* Footer */
+.footer {
+    margin-top: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .display-4 {
+        font-size: 2rem;
+    }
+}
