@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Setup - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item active">Setup</li>
+    </ol>
+</nav>
+
+<h2>Configure Simulation: {{ sim.name }}</h2>
+<p class="text-muted">
+    {{ sim.steel_grade.designation }} | {{ sim.process_label }} |
+    {{ sim.initial_temperature }}°C → {{ sim.ambient_temperature }}°C
+</p>
+
+<form method="post">
+    {{ geometry_form.hidden_tag() }}
+
+    <div class="row">
+        <!-- Geometry Configuration -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-box"></i> Geometry ({{ sim.geometry_label }})
+                </div>
+                <div class="card-body">
+                    {% if sim.geometry_type == 'cylinder' %}
+                    <div class="mb-3">
+                        <label class="form-label">Radius (mm)</label>
+                        <input type="number" name="radius" class="form-control" step="0.1" min="1" max="1000" value="{{ geometry_form.radius.data or 50 }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Length (mm)</label>
+                        <input type="number" name="length" class="form-control" step="0.1" min="1" max="5000" value="{{ geometry_form.length.data or 100 }}">
+                    </div>
+                    <div class="text-center py-3">
+                        <svg width="100" height="100" viewBox="0 0 100 100">
+                            <ellipse cx="50" cy="80" rx="40" ry="15" fill="none" stroke="#0d6efd" stroke-width="2"/>
+                            <line x1="10" y1="80" x2="10" y2="30" stroke="#0d6efd" stroke-width="2"/>
+                            <line x1="90" y1="80" x2="90" y2="30" stroke="#0d6efd" stroke-width="2"/>
+                            <ellipse cx="50" cy="30" rx="40" ry="15" fill="none" stroke="#0d6efd" stroke-width="2"/>
+                            <text x="50" y="55" text-anchor="middle" font-size="10" fill="#666">R</text>
+                        </svg>
+                    </div>
+
+                    {% elif sim.geometry_type == 'plate' %}
+                    <div class="mb-3">
+                        <label class="form-label">Thickness (mm)</label>
+                        <input type="number" name="thickness" class="form-control" step="0.1" min="1" max="1000" value="{{ geometry_form.thickness.data or 20 }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Width (mm)</label>
+                        <input type="number" name="width" class="form-control" step="0.1" min="1" max="5000" value="{{ geometry_form.width.data or 100 }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Length (mm)</label>
+                        <input type="number" name="length" class="form-control" step="0.1" min="1" max="5000" value="{{ geometry_form.length.data or 100 }}">
+                    </div>
+
+                    {% else %}
+                    <div class="mb-3">
+                        <label class="form-label">Inner Radius (mm)</label>
+                        <input type="number" name="inner_radius" class="form-control" step="0.1" min="1" max="1000" value="{{ geometry_form.inner_radius.data or 20 }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Outer Radius (mm)</label>
+                        <input type="number" name="outer_radius" class="form-control" step="0.1" min="1" max="1000" value="{{ geometry_form.outer_radius.data or 50 }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Length (mm)</label>
+                        <input type="number" name="length" class="form-control" step="0.1" min="1" max="5000" value="{{ geometry_form.length.data or 100 }}">
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Boundary Conditions -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-arrows-angle-contract"></i> Boundary Conditions
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Heat Transfer Coefficient (W/m²K)</label>
+                        <input type="number" name="htc" class="form-control" step="1" min="1" max="50000" value="{{ solver_form.htc.data or default_htc.get(sim.process_type, 1000) }}">
+                        <div class="form-text">
+                            Default for {{ sim.process_label }}: {{ default_htc.get(sim.process_type, 1000) }} W/m²K
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Surface Emissivity</label>
+                        <input type="number" name="emissivity" class="form-control" step="0.01" min="0" max="1" value="{{ solver_form.emissivity.data or 0.85 }}">
+                        <div class="form-text">For radiative heat loss (0.8-0.9 typical for oxidized steel)</div>
+                    </div>
+
+                    <h6 class="mt-4">Process Temperatures</h6>
+                    <table class="table table-sm">
+                        <tr><td>Initial</td><td class="text-end">{{ sim.initial_temperature }}°C</td></tr>
+                        <tr><td>Ambient</td><td class="text-end">{{ sim.ambient_temperature }}°C</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Solver Settings -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-gear"></i> Solver Settings
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Number of Nodes</label>
+                        <input type="number" name="n_nodes" class="form-control" step="2" min="11" max="201" value="{{ solver_form.n_nodes.data or 51 }}">
+                        <div class="form-text">Spatial discretization (odd number recommended)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Time Step (s)</label>
+                        <input type="number" name="dt" class="form-control" step="0.01" min="0.001" max="10" value="{{ solver_form.dt.data or 0.1 }}">
+                        <div class="form-text">Smaller = more accurate but slower</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Maximum Time (s)</label>
+                        <input type="number" name="max_time" class="form-control" step="10" min="10" max="36000" value="{{ solver_form.max_time.data or 600 }}">
+                        <div class="form-text">Simulation stops when near ambient</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save Configuration
+        </button>
+        <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

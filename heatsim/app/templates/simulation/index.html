@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Simulations{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-thermometer-half"></i> Heat Treatment Simulations</h2>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('simulation.new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> New Simulation
+        </a>
+    </div>
+</div>
+
+{% if simulations %}
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>Steel Grade</th>
+                    <th>Process</th>
+                    <th>Geometry</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sim in simulations %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('simulation.view', id=sim.id) }}" class="fw-bold text-decoration-none">
+                            {{ sim.name }}
+                        </a>
+                        {% if sim.description %}
+                        <br><small class="text-muted">{{ sim.description|truncate(40) }}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ sim.steel_grade.designation }}</td>
+                    <td>{{ sim.process_label }}</td>
+                    <td>{{ sim.geometry_label }}</td>
+                    <td>
+                        <span class="badge {{ sim.status_badge_class }}">{{ sim.status }}</span>
+                    </td>
+                    <td>
+                        <small>{{ sim.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-primary" title="View">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            {% if sim.status in ['ready', 'completed', 'failed'] %}
+                            <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-success" title="Run">
+                                    <i class="bi bi-play-fill"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            <form method="post" action="{{ url_for('simulation.delete', id=sim.id) }}" class="d-inline" onsubmit="return confirm('Delete this simulation?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="mt-3 text-muted small">
+    {{ simulations|length }} simulation(s)
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <h5><i class="bi bi-info-circle"></i> No Simulations Yet</h5>
+    <p>Create your first heat treatment simulation to get started.</p>
+    <a href="{{ url_for('simulation.new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> New Simulation
+    </a>
+</div>
+{% endif %}
+{% endblock %}

@@ -57,10 +57,12 @@ def create_app(config_name='default'):
     from .main import main_bp
     from .auth import auth_bp
     from .materials import materials_bp
+    from .simulation import simulation_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(materials_bp, url_prefix='/materials')
+    app.register_blueprint(simulation_bp, url_prefix='/simulation')
 
     # Create database tables
     with app.app_context():

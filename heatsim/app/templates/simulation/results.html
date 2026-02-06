@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}{{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item active">{{ sim.name }}</li>
+    </ol>
+</nav>
+
+<div class="row mb-3">
+    <div class="col">
+        <h2>
+            {{ sim.name }}
+            <span class="badge {{ sim.status_badge_class }}">{{ sim.status }}</span>
+        </h2>
+        {% if sim.description %}
+        <p class="text-muted">{{ sim.description }}</p>
+        {% endif %}
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('simulation.setup', id=sim.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-gear"></i> Configure
+        </a>
+        <a href="{{ url_for('simulation.edit', id=sim.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+        {% if sim.status in ['ready', 'completed', 'failed'] %}
+        <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-play-fill"></i> Run Simulation
+            </button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('simulation.delete', id=sim.id) }}" class="d-inline" onsubmit="return confirm('Delete this simulation?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i>
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if sim.error_message %}
+<div class="alert alert-danger">
+    <strong>Error:</strong> {{ sim.error_message }}
+</div>
+{% endif %}
+
+<!-- Simulation Info -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Steel Grade</h6>
+                <p class="mb-0 fw-bold">{{ sim.steel_grade.designation }}</p>
+                <small class="text-muted">{{ sim.steel_grade.data_source }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Process</h6>
+                <p class="mb-0 fw-bold">{{ sim.process_label }}</p>
+                <small class="text-muted">{{ sim.initial_temperature }}°C → {{ sim.ambient_temperature }}°C</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Geometry</h6>
+                <p class="mb-0 fw-bold">{{ sim.geometry_label }}</p>
+                {% set geom = sim.geometry_dict %}
+                <small class="text-muted">
+                    {% if sim.geometry_type == 'cylinder' %}
+                    R={{ (geom.radius * 1000)|round(1) }}mm
+                    {% elif sim.geometry_type == 'plate' %}
+                    t={{ (geom.thickness * 1000)|round(1) }}mm
+                    {% else %}
+                    Ri={{ (geom.inner_radius * 1000)|round(1) }}mm, Ro={{ (geom.outer_radius * 1000)|round(1) }}mm
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Duration</h6>
+                {% if sim.duration_seconds %}
+                <p class="mb-0 fw-bold">{{ sim.duration_seconds|round(1) }} s</p>
+                <small class="text-muted">Completed {{ sim.completed_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                {% else %}
+                <p class="mb-0 text-muted">Not run yet</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results -->
+{% if results %}
+<h4 class="mb-3"><i class="bi bi-graph-up"></i> Results</h4>
+
+<div class="row">
+    {% for result in results %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                {{ result.result_label }}
+                {% if result.location and result.location != 'all' %}
+                <small class="text-muted">({{ result.location }})</small>
+                {% endif %}
+            </div>
+            <div class="card-body text-center">
+                {% if result.has_plot %}
+                <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
+                {% endif %}
+
+                {% if result.result_type == 'cooling_curve' and result.t_800_500 %}
+                <div class="mt-2">
+                    <span class="badge bg-info">t₈/₅ = {{ result.t_800_500|round(2) }} s</span>
+                </div>
+                {% endif %}
+
+                {% if result.result_type == 'phase_fraction' %}
+                <div class="mt-2">
+                    {% for phase, fraction in result.phases_dict.items() %}
+                    {% if fraction > 0.01 %}
+                    <span class="badge bg-secondary me-1">{{ phase|replace('_', ' ')|title }}: {{ (fraction * 100)|round(1) }}%</span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% elif sim.status == 'ready' %}
+<div class="alert alert-info">
+    <h5><i class="bi bi-play-circle"></i> Ready to Run</h5>
+    <p>The simulation is configured and ready to execute.</p>
+    <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-success">
+            <i class="bi bi-play-fill"></i> Run Simulation
+        </button>
+    </form>
+</div>
+
+{% elif sim.status == 'draft' %}
+<div class="alert alert-warning">
+    <h5><i class="bi bi-gear"></i> Configuration Required</h5>
+    <p>Please configure the simulation geometry and solver settings before running.</p>
+    <a href="{{ url_for('simulation.setup', id=sim.id) }}" class="btn btn-primary">
+        <i class="bi bi-gear"></i> Configure Simulation
+    </a>
+</div>
+
+{% elif sim.status == 'running' %}
+<div class="alert alert-info">
+    <h5><i class="bi bi-hourglass-split"></i> Running...</h5>
+    <p>The simulation is currently running. Please wait...</p>
+</div>
+{% endif %}
+{% endblock %}

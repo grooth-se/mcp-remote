@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}{% if edit_mode %}Edit{% else %}New{% endif %} Simulation{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        {% if edit_mode %}
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item active">Edit</li>
+        {% else %}
+        <li class="breadcrumb-item active">New Simulation</li>
+        {% endif %}
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-{% if edit_mode %}pencil{% else %}plus-lg{% endif %}"></i>
+                {% if edit_mode %}Edit{% else %}Create New{% endif %} Simulation
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "")) }}
+                        {% for error in form.name.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.description.label(class="form-label") }}
+                        {{ form.description(class="form-control") }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.steel_grade_id.label(class="form-label") }}
+                            {{ form.steel_grade_id(class="form-select") }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.process_type.label(class="form-label") }}
+                            {{ form.process_type(class="form-select") }}
+                        </div>
+                    </div>
+
+                    {% if not edit_mode %}
+                    <div class="mb-3">
+                        {{ form.geometry_type.label(class="form-label") }}
+                        {{ form.geometry_type(class="form-select") }}
+                        <div class="form-text">Geometry can be configured in the next step</div>
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.initial_temperature.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.initial_temperature(class="form-control") }}
+                                <span class="input-group-text">°C</span>
+                            </div>
+                            <div class="form-text">Austenitizing temperature</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.ambient_temperature.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.ambient_temperature(class="form-control") }}
+                                <span class="input-group-text">°C</span>
+                            </div>
+                            <div class="form-text">Quench medium temperature</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('simulation.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Tips
+            </div>
+            <div class="card-body">
+                <h6>Steel Grade</h6>
+                <p class="small text-muted">Select a steel grade with thermal properties defined. Use the Materials page to add new grades.</p>
+
+                <h6>Process Type</h6>
+                <p class="small text-muted">
+                    <strong>Water Quench:</strong> Fast cooling (HTC ~3000 W/m²K)<br>
+                    <strong>Oil Quench:</strong> Medium cooling (HTC ~800 W/m²K)<br>
+                    <strong>Air Cool:</strong> Slow cooling (HTC ~50 W/m²K)
+                </p>
+
+                <h6>Initial Temperature</h6>
+                <p class="small text-muted">Typically above Ac3 for full austenitization (800-900°C for most steels).</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
