@@ -364,3 +364,168 @@ def create_heat_treatment_cycle_plot(
     plt.close(fig)
 
     return buf.getvalue()
+
+
+# Colors for 4-point plots: center, 1/3R, 2/3R, surface
+FOUR_POINT_COLORS = {
+    'center': '#000000',      # Black
+    'one_third': '#008080',   # Dark teal (blue-green)
+    'two_thirds': '#404040',  # Dark grey
+    'surface': '#8B0000',     # Dark red
+}
+
+FOUR_POINT_LABELS = {
+    'center': 'Center',
+    'one_third': '1/3 R',
+    'two_thirds': '2/3 R',
+    'surface': 'Surface',
+}
+
+
+def extract_four_point_temperatures(temperatures: np.ndarray) -> dict:
+    """Extract temperatures at center, 1/3R, 2/3R, and surface.
+
+    Parameters
+    ----------
+    temperatures : np.ndarray
+        Temperature field [time, position]
+
+    Returns
+    -------
+    dict
+        Dictionary with keys: center, one_third, two_thirds, surface
+    """
+    n_positions = temperatures.shape[1]
+
+    # Calculate indices for the 4 positions
+    center_idx = 0
+    one_third_idx = n_positions // 3
+    two_thirds_idx = 2 * n_positions // 3
+    surface_idx = n_positions - 1
+
+    return {
+        'center': temperatures[:, center_idx],
+        'one_third': temperatures[:, one_third_idx],
+        'two_thirds': temperatures[:, two_thirds_idx],
+        'surface': temperatures[:, surface_idx],
+    }
+
+
+def create_dTdt_vs_time_plot(
+    times: np.ndarray,
+    temperatures: np.ndarray,
+    title: str = "Temperature Rate vs Time",
+    phase_name: str = "heating"
+) -> bytes:
+    """Generate dT/dt vs time plot for 4 radial positions.
+
+    Parameters
+    ----------
+    times : np.ndarray
+        Time array in seconds
+    temperatures : np.ndarray
+        Temperature field [time, position]
+    title : str
+        Plot title
+    phase_name : str
+        Phase name for labeling (heating/quenching)
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Extract temperatures at 4 positions
+    temps = extract_four_point_temperatures(temperatures)
+
+    # Calculate time derivative
+    dt = np.diff(times)
+    dt[dt == 0] = 1e-6  # Avoid division by zero
+    time_mid = 0.5 * (times[:-1] + times[1:])
+
+    for key in ['center', 'one_third', 'two_thirds', 'surface']:
+        T = temps[key]
+        dTdt = np.diff(T) / dt
+
+        ax.plot(time_mid, dTdt,
+                color=FOUR_POINT_COLORS[key],
+                linewidth=2,
+                label=FOUR_POINT_LABELS[key])
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('dT/dt (°C/s)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='best', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
+
+
+def create_dTdt_vs_temperature_plot(
+    times: np.ndarray,
+    temperatures: np.ndarray,
+    title: str = "Temperature Rate vs Temperature",
+    phase_name: str = "heating"
+) -> bytes:
+    """Generate dT/dt vs temperature plot for 4 radial positions.
+
+    Parameters
+    ----------
+    times : np.ndarray
+        Time array in seconds
+    temperatures : np.ndarray
+        Temperature field [time, position]
+    title : str
+        Plot title
+    phase_name : str
+        Phase name for labeling (heating/quenching)
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Extract temperatures at 4 positions
+    temps = extract_four_point_temperatures(temperatures)
+
+    # Calculate time derivative
+    dt = np.diff(times)
+    dt[dt == 0] = 1e-6  # Avoid division by zero
+
+    for key in ['center', 'one_third', 'two_thirds', 'surface']:
+        T = temps[key]
+        dTdt = np.diff(T) / dt
+        T_mid = 0.5 * (T[:-1] + T[1:])
+
+        ax.plot(T_mid, dTdt,
+                color=FOUR_POINT_COLORS[key],
+                linewidth=2,
+                label=FOUR_POINT_LABELS[key])
+
+    ax.set_xlabel('Temperature (°C)', fontsize=12)
+    ax.set_ylabel('dT/dt (°C/s)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='best', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
+
+    # For quenching, higher temp on left makes more sense
+    if phase_name == 'quenching':
+        ax.invert_xaxis()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()

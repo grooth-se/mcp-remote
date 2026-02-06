@@ -308,6 +308,12 @@ def view(id):
     phases = [r for r in results if r.result_type == 'phase_fraction']
     rates = [r for r in results if r.result_type == 'cooling_rate']
 
+    # dT/dt plots grouped by phase
+    dtdt_time_heating = [r for r in results if r.result_type == 'dTdt_vs_time' and r.phase == 'heating']
+    dtdt_time_quenching = [r for r in results if r.result_type == 'dTdt_vs_time' and r.phase == 'quenching']
+    dtdt_temp_heating = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'heating']
+    dtdt_temp_quenching = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'quenching']
+
     return render_template(
         'simulation/results.html',
         sim=sim,
@@ -315,7 +321,11 @@ def view(id):
         cooling_curves=cooling_curves,
         profiles=profiles,
         phases=phases,
-        rates=rates
+        rates=rates,
+        dtdt_time_heating=dtdt_time_heating,
+        dtdt_time_quenching=dtdt_time_quenching,
+        dtdt_temp_heating=dtdt_temp_heating,
+        dtdt_temp_quenching=dtdt_temp_quenching
     )
 
 
@@ -483,6 +493,46 @@ def run(id):
             title=f'Cooling Rate - {sim.name}'
         )
         db.session.add(rate_result)
+
+        # Generate dT/dt plots for heating and quenching phases
+        if result.phase_results:
+            for phase_result in result.phase_results:
+                if phase_result.phase_name not in ('heating', 'quenching'):
+                    continue
+                if not phase_result.time.size or len(phase_result.time) < 3:
+                    continue
+
+                phase_label = phase_result.phase_name.title()
+
+                # dT/dt vs Time plot
+                dtdt_time_result = SimulationResult(
+                    simulation_id=sim.id,
+                    result_type='dTdt_vs_time',
+                    phase=phase_result.phase_name,
+                    location='all'
+                )
+                dtdt_time_result.plot_image = visualization.create_dTdt_vs_time_plot(
+                    phase_result.time,
+                    phase_result.temperature,
+                    title=f'dT/dt vs Time ({phase_label}) - {sim.name}',
+                    phase_name=phase_result.phase_name
+                )
+                db.session.add(dtdt_time_result)
+
+                # dT/dt vs Temperature plot
+                dtdt_temp_result = SimulationResult(
+                    simulation_id=sim.id,
+                    result_type='dTdt_vs_temp',
+                    phase=phase_result.phase_name,
+                    location='all'
+                )
+                dtdt_temp_result.plot_image = visualization.create_dTdt_vs_temperature_plot(
+                    phase_result.time,
+                    phase_result.temperature,
+                    title=f'dT/dt vs Temperature ({phase_label}) - {sim.name}',
+                    phase_name=phase_result.phase_name
+                )
+                db.session.add(dtdt_temp_result)
 
         sim.status = STATUS_COMPLETED
         sim.completed_at = datetime.utcnow()
