@@ -1,12 +1,17 @@
-"""Forms for simulation setup."""
+"""Forms for heat treatment simulation setup."""
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField, TextAreaField, SelectField, FloatField,
-    IntegerField, SubmitField
+    IntegerField, BooleanField, SubmitField
 )
 from wtforms.validators import DataRequired, Optional, NumberRange, Length
 
-from app.models.simulation import GEOMETRY_TYPES, PROCESS_LABELS
+from app.models.simulation import (
+    GEOMETRY_TYPES,
+    QUENCH_MEDIA, QUENCH_MEDIA_LABELS,
+    AGITATION_LEVELS, AGITATION_LABELS,
+    FURNACE_ATMOSPHERES, FURNACE_ATMOSPHERE_LABELS,
+)
 
 
 class SimulationForm(FlaskForm):
@@ -30,21 +35,6 @@ class SimulationForm(FlaskForm):
         'Geometry',
         choices=[(g, g.title()) for g in GEOMETRY_TYPES],
         default='cylinder'
-    )
-    process_type = SelectField(
-        'Heat Treatment Process',
-        choices=[(k, v) for k, v in PROCESS_LABELS.items()],
-        default='quench_water'
-    )
-    initial_temperature = FloatField(
-        'Initial Temperature (°C)',
-        validators=[DataRequired(), NumberRange(min=20, max=1500)],
-        default=850
-    )
-    ambient_temperature = FloatField(
-        'Ambient/Quench Temperature (°C)',
-        validators=[DataRequired(), NumberRange(min=-50, max=500)],
-        default=25
     )
     submit = SubmitField('Create Simulation')
 
@@ -87,6 +77,170 @@ class GeometryForm(FlaskForm):
     )
 
 
+class HeatingPhaseForm(FlaskForm):
+    """Form for heating (austenitizing) phase configuration."""
+    enabled = BooleanField('Enable Heating Phase', default=True)
+
+    initial_temperature = FloatField(
+        'Initial Temperature (°C)',
+        validators=[Optional(), NumberRange(min=-50, max=500)],
+        default=25.0,
+        render_kw={'placeholder': 'Starting temperature'}
+    )
+
+    target_temperature = FloatField(
+        'Austenitizing Temperature (°C)',
+        validators=[Optional(), NumberRange(min=500, max=1200)],
+        default=850.0,
+        render_kw={'placeholder': 'Target furnace temperature'}
+    )
+
+    hold_time = FloatField(
+        'Hold Time at Temperature (min)',
+        validators=[Optional(), NumberRange(min=0, max=1440)],
+        default=60.0,
+        render_kw={'placeholder': 'Soak time at target temp'}
+    )
+
+    furnace_atmosphere = SelectField(
+        'Furnace Atmosphere',
+        choices=[(a, FURNACE_ATMOSPHERE_LABELS[a]) for a in FURNACE_ATMOSPHERES],
+        default='air'
+    )
+
+    furnace_htc = FloatField(
+        'Furnace HTC (W/m²K)',
+        validators=[Optional(), NumberRange(min=1, max=500)],
+        default=25.0,
+        render_kw={'placeholder': 'Convection coefficient in furnace'}
+    )
+
+    furnace_emissivity = FloatField(
+        'Surface Emissivity',
+        validators=[Optional(), NumberRange(min=0, max=1)],
+        default=0.85
+    )
+
+    use_radiation = BooleanField('Include Radiation Heat Transfer', default=True)
+
+
+class TransferPhaseForm(FlaskForm):
+    """Form for transfer phase (furnace to quench) configuration."""
+    enabled = BooleanField('Enable Transfer Phase', default=True)
+
+    duration = FloatField(
+        'Transfer Time (s)',
+        validators=[Optional(), NumberRange(min=0, max=300)],
+        default=10.0,
+        render_kw={'placeholder': 'Time from furnace to quench'}
+    )
+
+    ambient_temperature = FloatField(
+        'Ambient Temperature (°C)',
+        validators=[Optional(), NumberRange(min=-50, max=100)],
+        default=25.0
+    )
+
+    htc = FloatField(
+        'Air HTC (W/m²K)',
+        validators=[Optional(), NumberRange(min=1, max=100)],
+        default=10.0,
+        render_kw={'placeholder': 'Natural convection in air'}
+    )
+
+    emissivity = FloatField(
+        'Surface Emissivity',
+        validators=[Optional(), NumberRange(min=0, max=1)],
+        default=0.85
+    )
+
+    use_radiation = BooleanField('Include Radiation (significant at high temp)', default=True)
+
+
+class QuenchingPhaseForm(FlaskForm):
+    """Form for quenching phase configuration."""
+    media = SelectField(
+        'Quench Media',
+        choices=[(m, QUENCH_MEDIA_LABELS[m]) for m in QUENCH_MEDIA],
+        default='water'
+    )
+
+    media_temperature = FloatField(
+        'Media Temperature (°C)',
+        validators=[Optional(), NumberRange(min=0, max=200)],
+        default=25.0,
+        render_kw={'placeholder': 'Quench bath temperature'}
+    )
+
+    agitation = SelectField(
+        'Agitation Level',
+        choices=[(a, AGITATION_LABELS[a]) for a in AGITATION_LEVELS],
+        default='moderate'
+    )
+
+    htc_override = FloatField(
+        'Custom HTC (W/m²K)',
+        validators=[Optional(), NumberRange(min=10, max=50000)],
+        render_kw={'placeholder': 'Leave blank to calculate from media/agitation'}
+    )
+
+    duration = FloatField(
+        'Quench Duration (s)',
+        validators=[Optional(), NumberRange(min=10, max=3600)],
+        default=300.0,
+        render_kw={'placeholder': 'Time in quench tank'}
+    )
+
+    emissivity = FloatField(
+        'Surface Emissivity',
+        validators=[Optional(), NumberRange(min=0, max=1)],
+        default=0.3,
+        render_kw={'placeholder': 'Lower due to steam/oil film'}
+    )
+
+    use_radiation = BooleanField('Include Radiation (usually negligible in liquid)', default=False)
+
+
+class TemperingPhaseForm(FlaskForm):
+    """Form for tempering phase configuration."""
+    enabled = BooleanField('Enable Tempering Phase', default=False)
+
+    temperature = FloatField(
+        'Tempering Temperature (°C)',
+        validators=[Optional(), NumberRange(min=100, max=750)],
+        default=550.0,
+        render_kw={'placeholder': 'Tempering furnace temperature'}
+    )
+
+    hold_time = FloatField(
+        'Hold Time (min)',
+        validators=[Optional(), NumberRange(min=1, max=1440)],
+        default=120.0,
+        render_kw={'placeholder': 'Time at tempering temperature'}
+    )
+
+    cooling_method = SelectField(
+        'Cooling After Tempering',
+        choices=[
+            ('air', 'Air Cool'),
+            ('furnace', 'Furnace Cool'),
+        ],
+        default='air'
+    )
+
+    htc = FloatField(
+        'Cooling HTC (W/m²K)',
+        validators=[Optional(), NumberRange(min=1, max=500)],
+        default=25.0
+    )
+
+    emissivity = FloatField(
+        'Surface Emissivity',
+        validators=[Optional(), NumberRange(min=0, max=1)],
+        default=0.85
+    )
+
+
 class SolverForm(FlaskForm):
     """Form for solver configuration."""
     n_nodes = IntegerField(
@@ -100,17 +254,15 @@ class SolverForm(FlaskForm):
         default=0.1
     )
     max_time = FloatField(
-        'Maximum Time (s)',
+        'Maximum Simulation Time (s)',
         validators=[DataRequired(), NumberRange(min=10, max=36000)],
-        default=600
-    )
-    htc = FloatField(
-        'Heat Transfer Coefficient (W/m²K)',
-        validators=[Optional(), NumberRange(min=1, max=50000)]
-    )
-    emissivity = FloatField(
-        'Surface Emissivity',
-        validators=[Optional(), NumberRange(min=0, max=1)],
-        default=0.85
+        default=1800,
+        render_kw={'placeholder': 'Total simulation time limit'}
     )
     submit = SubmitField('Save Configuration')
+
+
+class HeatTreatmentSetupForm(FlaskForm):
+    """Combined form for full heat treatment setup."""
+    # This is used for the combined setup page
+    submit = SubmitField('Save Heat Treatment Configuration')

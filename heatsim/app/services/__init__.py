@@ -3,8 +3,15 @@ from .property_evaluator import PropertyEvaluator
 from .excel_importer import ExcelImporter
 from .seed_data import seed_standard_grades, STANDARD_GRADES
 from .geometry import Cylinder, Plate, Ring, create_geometry
-from .boundary_conditions import BoundaryCondition, InsulatedBoundary, create_quench_bc
-from .heat_solver import HeatSolver, SolverConfig, SolverResult
+from .boundary_conditions import (
+    BoundaryCondition, InsulatedBoundary,
+    create_quench_bc, create_heating_bc, create_transfer_bc,
+    create_tempering_bc, create_cooling_bc
+)
+from .heat_solver import (
+    HeatSolver, MultiPhaseHeatSolver,
+    SolverConfig, SolverResult, PhaseConfig, PhaseResult as SolverPhaseResult
+)
 from .phase_tracker import PhaseTracker, PhaseResult
 from . import visualization
 from . import comsol
@@ -24,10 +31,17 @@ __all__ = [
     'BoundaryCondition',
     'InsulatedBoundary',
     'create_quench_bc',
+    'create_heating_bc',
+    'create_transfer_bc',
+    'create_tempering_bc',
+    'create_cooling_bc',
     # Phase 3 services - Solver
     'HeatSolver',
+    'MultiPhaseHeatSolver',
     'SolverConfig',
     'SolverResult',
+    'PhaseConfig',
+    'SolverPhaseResult',
     # Phase 3 services - Phase transformation
     'PhaseTracker',
     'PhaseResult',

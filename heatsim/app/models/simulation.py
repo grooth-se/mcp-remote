@@ -1,9 +1,10 @@
 """Simulation models for heat treatment simulations.
 
 Uses the 'materials' bind key to store in PostgreSQL alongside material data.
+Supports multi-phase heat treatment: heating, transfer, quenching, tempering.
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 import json
 
 from app.extensions import db
@@ -25,7 +26,59 @@ GEOMETRY_RING = 'ring'
 
 GEOMETRY_TYPES = [GEOMETRY_CYLINDER, GEOMETRY_PLATE, GEOMETRY_RING]
 
-# Process type constants
+# Quench media types
+QUENCH_WATER = 'water'
+QUENCH_OIL = 'oil'
+QUENCH_POLYMER = 'polymer'
+QUENCH_BRINE = 'brine'
+QUENCH_AIR = 'air'
+
+QUENCH_MEDIA = [QUENCH_WATER, QUENCH_OIL, QUENCH_POLYMER, QUENCH_BRINE, QUENCH_AIR]
+
+QUENCH_MEDIA_LABELS = {
+    QUENCH_WATER: 'Water',
+    QUENCH_OIL: 'Oil',
+    QUENCH_POLYMER: 'Polymer',
+    QUENCH_BRINE: 'Brine (Salt Water)',
+    QUENCH_AIR: 'Air',
+}
+
+# Agitation levels
+AGITATION_NONE = 'none'
+AGITATION_MILD = 'mild'
+AGITATION_MODERATE = 'moderate'
+AGITATION_STRONG = 'strong'
+AGITATION_VIOLENT = 'violent'
+
+AGITATION_LEVELS = [AGITATION_NONE, AGITATION_MILD, AGITATION_MODERATE, AGITATION_STRONG, AGITATION_VIOLENT]
+
+AGITATION_LABELS = {
+    AGITATION_NONE: 'None (Still)',
+    AGITATION_MILD: 'Mild',
+    AGITATION_MODERATE: 'Moderate',
+    AGITATION_STRONG: 'Strong',
+    AGITATION_VIOLENT: 'Violent',
+}
+
+# Agitation HTC multipliers
+AGITATION_MULTIPLIERS = {
+    AGITATION_NONE: 1.0,
+    AGITATION_MILD: 1.3,
+    AGITATION_MODERATE: 1.6,
+    AGITATION_STRONG: 2.0,
+    AGITATION_VIOLENT: 2.5,
+}
+
+# Base HTC values for quench media (W/m²K) - still conditions
+BASE_HTC = {
+    QUENCH_WATER: 3000,
+    QUENCH_OIL: 800,
+    QUENCH_POLYMER: 1200,
+    QUENCH_BRINE: 4500,
+    QUENCH_AIR: 25,
+}
+
+# Legacy process types for backwards compatibility
 PROCESS_QUENCH_WATER = 'quench_water'
 PROCESS_QUENCH_OIL = 'quench_oil'
 PROCESS_QUENCH_POLYMER = 'quench_polymer'
@@ -52,7 +105,7 @@ PROCESS_LABELS = {
     PROCESS_CUSTOM: 'Custom',
 }
 
-# Default HTC values for quench media (W/m²K)
+# Legacy default HTC (kept for backwards compatibility)
 DEFAULT_HTC = {
     PROCESS_QUENCH_WATER: 3000,
     PROCESS_QUENCH_OIL: 800,
@@ -64,12 +117,55 @@ DEFAULT_HTC = {
     PROCESS_CUSTOM: 100,
 }
 
+# Furnace atmosphere types
+FURNACE_AIR = 'air'
+FURNACE_INERT = 'inert'
+FURNACE_VACUUM = 'vacuum'
+FURNACE_PROTECTIVE = 'protective'
+
+FURNACE_ATMOSPHERES = [FURNACE_AIR, FURNACE_INERT, FURNACE_VACUUM, FURNACE_PROTECTIVE]
+
+FURNACE_ATMOSPHERE_LABELS = {
+    FURNACE_AIR: 'Air',
+    FURNACE_INERT: 'Inert (N2/Ar)',
+    FURNACE_VACUUM: 'Vacuum',
+    FURNACE_PROTECTIVE: 'Protective Gas',
+}
+
+
+def calculate_quench_htc(media: str, agitation: str, temperature: float = 25.0) -> float:
+    """Calculate effective HTC for quench media with agitation.
+
+    Parameters
+    ----------
+    media : str
+        Quench media type
+    agitation : str
+        Agitation level
+    temperature : float
+        Quench media temperature in Celsius
+
+    Returns
+    -------
+    float
+        Effective heat transfer coefficient (W/m²K)
+    """
+    base = BASE_HTC.get(media, 1000)
+    multiplier = AGITATION_MULTIPLIERS.get(agitation, 1.0)
+
+    # Temperature correction for water (higher temp = lower HTC due to vapor film)
+    if media == QUENCH_WATER and temperature > 40:
+        temp_factor = max(0.5, 1.0 - (temperature - 40) * 0.01)
+        base *= temp_factor
+
+    return base * multiplier
+
 
 class Simulation(db.Model):
     """Heat treatment simulation job.
 
     Stores simulation configuration including geometry, material,
-    process parameters, and boundary conditions.
+    and multi-phase process parameters (heating, transfer, quenching, tempering).
     """
     __tablename__ = 'simulations'
     __bind_key__ = 'materials'
@@ -91,12 +187,16 @@ class Simulation(db.Model):
     geometry_type = db.Column(db.Text, nullable=False, default=GEOMETRY_CYLINDER)
     geometry_config = db.Column(db.Text)  # JSON
 
-    # Process configuration
+    # Legacy process fields (kept for backwards compatibility)
     process_type = db.Column(db.Text, nullable=False, default=PROCESS_QUENCH_WATER)
     initial_temperature = db.Column(db.Float, default=850.0)
     ambient_temperature = db.Column(db.Float, default=25.0)
 
-    # Boundary conditions (JSON)
+    # Multi-phase heat treatment configuration (JSON)
+    # Structure: {heating: {...}, transfer: {...}, quenching: {...}, tempering: {...}}
+    heat_treatment_config = db.Column(db.Text)
+
+    # Boundary conditions (JSON) - legacy, now part of phase configs
     boundary_conditions = db.Column(db.Text)
 
     # Solver settings (JSON)
@@ -157,6 +257,53 @@ class Simulation(db.Model):
         self.solver_config = json.dumps(config)
 
     @property
+    def ht_config(self) -> dict:
+        """Parse heat treatment configuration JSON."""
+        try:
+            return json.loads(self.heat_treatment_config) if self.heat_treatment_config else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def set_ht_config(self, config: dict) -> None:
+        """Set heat treatment configuration from dict."""
+        self.heat_treatment_config = json.dumps(config)
+
+    @property
+    def heating_config(self) -> dict:
+        """Get heating phase configuration."""
+        return self.ht_config.get('heating', {})
+
+    @property
+    def transfer_config(self) -> dict:
+        """Get transfer phase configuration."""
+        return self.ht_config.get('transfer', {})
+
+    @property
+    def quenching_config(self) -> dict:
+        """Get quenching phase configuration."""
+        return self.ht_config.get('quenching', {})
+
+    @property
+    def tempering_config(self) -> dict:
+        """Get tempering phase configuration."""
+        return self.ht_config.get('tempering', {})
+
+    @property
+    def has_heating(self) -> bool:
+        """Check if heating phase is enabled."""
+        return self.heating_config.get('enabled', False)
+
+    @property
+    def has_transfer(self) -> bool:
+        """Check if transfer phase is enabled."""
+        return self.transfer_config.get('enabled', False)
+
+    @property
+    def has_tempering(self) -> bool:
+        """Check if tempering phase is enabled."""
+        return self.tempering_config.get('enabled', False)
+
+    @property
     def duration_seconds(self) -> Optional[float]:
         """Calculate simulation runtime in seconds."""
         if self.started_at and self.completed_at:
@@ -185,6 +332,70 @@ class Simulation(db.Model):
         }
         return classes.get(self.status, 'bg-secondary')
 
+    def get_phases_summary(self) -> List[str]:
+        """Get list of enabled phases for display."""
+        phases = []
+        if self.has_heating:
+            h = self.heating_config
+            phases.append(f"Heating: {h.get('target_temperature', 850)}°C for {h.get('hold_time', 0)}min")
+        if self.has_transfer:
+            t = self.transfer_config
+            phases.append(f"Transfer: {t.get('duration', 0)}s")
+
+        q = self.quenching_config
+        if q:
+            media = QUENCH_MEDIA_LABELS.get(q.get('media', 'water'), 'Water')
+            agitation = AGITATION_LABELS.get(q.get('agitation', 'none'), 'None')
+            phases.append(f"Quench: {media} ({agitation})")
+
+        if self.has_tempering:
+            t = self.tempering_config
+            phases.append(f"Tempering: {t.get('temperature', 550)}°C for {t.get('hold_time', 60)}min")
+
+        return phases
+
+    def create_default_ht_config(self) -> dict:
+        """Create default heat treatment configuration."""
+        return {
+            'heating': {
+                'enabled': True,
+                'initial_temperature': 25.0,
+                'target_temperature': self.initial_temperature or 850.0,
+                'heating_rate': 10.0,  # °C/min (for furnace control, not simulation)
+                'hold_time': 60.0,  # minutes at target temperature
+                'furnace_atmosphere': FURNACE_AIR,
+                'furnace_htc': 25.0,  # W/m²K (convection in furnace)
+                'furnace_emissivity': 0.85,
+                'use_radiation': True,
+            },
+            'transfer': {
+                'enabled': True,
+                'duration': 10.0,  # seconds from furnace to quench
+                'ambient_temperature': 25.0,
+                'htc': 10.0,  # W/m²K (natural convection in air)
+                'emissivity': 0.85,
+                'use_radiation': True,
+            },
+            'quenching': {
+                'enabled': True,
+                'media': QUENCH_WATER,
+                'media_temperature': 25.0,
+                'agitation': AGITATION_MODERATE,
+                'htc_override': None,  # Use calculated if None
+                'duration': 300.0,  # seconds
+                'emissivity': 0.3,  # Lower due to steam/oil film
+                'use_radiation': False,  # Usually negligible in liquid quench
+            },
+            'tempering': {
+                'enabled': False,
+                'temperature': 550.0,
+                'hold_time': 120.0,  # minutes
+                'cooling_method': 'air',  # air, furnace
+                'htc': 25.0,
+                'emissivity': 0.85,
+            },
+        }
+
     def __repr__(self) -> str:
         return f'<Simulation {self.id}: {self.name}>'
 
@@ -201,8 +412,11 @@ class SimulationResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     simulation_id = db.Column(db.Integer, db.ForeignKey('simulations.id'), nullable=False)
 
-    # Result type: 'cooling_curve', 'temperature_profile', 'phase_fraction', 'cooling_rate'
+    # Result type: 'cooling_curve', 'temperature_profile', 'phase_fraction', 'cooling_rate', 'full_cycle'
     result_type = db.Column(db.Text, nullable=False)
+
+    # Phase identifier: 'heating', 'transfer', 'quenching', 'tempering', 'full'
+    phase = db.Column(db.Text)
 
     # Location identifier: 'center', 'surface', 'quarter', 'all'
     location = db.Column(db.Text)
@@ -277,6 +491,8 @@ class SimulationResult(db.Model):
             'temperature_profile': 'Temperature Profile',
             'phase_fraction': 'Phase Fractions',
             'cooling_rate': 'Cooling Rate',
+            'full_cycle': 'Full Heat Treatment Cycle',
+            'heating_curve': 'Heating Curve',
         }
         return labels.get(self.result_type, self.result_type)
 

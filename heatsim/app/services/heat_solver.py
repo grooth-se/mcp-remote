@@ -10,6 +10,12 @@ For Cartesian coordinates (plate):
     rho * Cp * dT/dt = d/dx(k * dT/dx)
 
 Uses implicit Crank-Nicolson scheme for stability with large time steps.
+
+Supports multi-phase heat treatment:
+- Heating: Heat up to austenitizing temperature
+- Transfer: Cool during transfer from furnace to quench
+- Quenching: Rapid cooling in quench media
+- Tempering: Reheat to tempering temperature and cool
 """
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Callable
@@ -18,7 +24,11 @@ from scipy.sparse import diags
 from scipy.sparse.linalg import spsolve
 
 from app.services.geometry import GeometryBase, Cylinder, Plate, Ring
-from app.services.boundary_conditions import BoundaryCondition, InsulatedBoundary
+from app.services.boundary_conditions import (
+    BoundaryCondition, InsulatedBoundary,
+    create_heating_bc, create_transfer_bc, create_quench_bc,
+    create_tempering_bc, create_cooling_bc
+)
 from app.services.property_evaluator import PropertyEvaluator
 
 
@@ -58,6 +68,172 @@ class SolverConfig:
 
 
 @dataclass
+class PhaseConfig:
+    """Configuration for a single heat treatment phase.
+
+    Parameters
+    ----------
+    name : str
+        Phase name (heating, transfer, quenching, tempering, cooling)
+    enabled : bool
+        Whether phase is enabled
+    duration : float
+        Phase duration in seconds
+    target_temperature : float
+        Target/ambient temperature for this phase
+    boundary_condition : BoundaryCondition
+        Boundary condition for this phase
+    end_condition : str
+        How to end phase: 'time', 'temperature', 'equilibrium'
+    end_temperature : float
+        Temperature threshold for 'temperature' end condition
+    """
+    name: str
+    enabled: bool = True
+    duration: float = 600.0
+    target_temperature: float = 25.0
+    boundary_condition: Optional[BoundaryCondition] = None
+    end_condition: str = 'time'  # 'time', 'temperature', 'equilibrium'
+    end_temperature: Optional[float] = None
+
+    @classmethod
+    def from_heating_config(cls, config: dict) -> 'PhaseConfig':
+        """Create heating phase config from dict."""
+        if not config.get('enabled', True):
+            return cls(name='heating', enabled=False)
+
+        target_temp = config.get('target_temperature', 850.0)
+        hold_time = config.get('hold_time', 60.0)  # minutes
+
+        bc = create_heating_bc(
+            target_temperature=target_temp,
+            htc=config.get('furnace_htc', 25.0),
+            emissivity=config.get('furnace_emissivity', 0.85),
+            use_radiation=config.get('use_radiation', True)
+        )
+
+        # Duration: time to heat up + hold time
+        # For heating, we use equilibrium end condition
+        return cls(
+            name='heating',
+            enabled=True,
+            duration=hold_time * 60,  # Convert minutes to seconds
+            target_temperature=target_temp,
+            boundary_condition=bc,
+            end_condition='equilibrium',
+            end_temperature=target_temp - 5  # Within 5°C of target
+        )
+
+    @classmethod
+    def from_transfer_config(cls, config: dict) -> 'PhaseConfig':
+        """Create transfer phase config from dict."""
+        if not config.get('enabled', True):
+            return cls(name='transfer', enabled=False)
+
+        ambient_temp = config.get('ambient_temperature', 25.0)
+        duration = config.get('duration', 10.0)  # seconds
+
+        bc = create_transfer_bc(
+            ambient_temperature=ambient_temp,
+            htc=config.get('htc', 10.0),
+            emissivity=config.get('emissivity', 0.85),
+            use_radiation=config.get('use_radiation', True)
+        )
+
+        return cls(
+            name='transfer',
+            enabled=True,
+            duration=duration,
+            target_temperature=ambient_temp,
+            boundary_condition=bc,
+            end_condition='time'
+        )
+
+    @classmethod
+    def from_quenching_config(cls, config: dict) -> 'PhaseConfig':
+        """Create quenching phase config from dict."""
+        media = config.get('media', 'water')
+        media_temp = config.get('media_temperature', 25.0)
+        duration = config.get('duration', 300.0)  # seconds
+
+        bc = create_quench_bc(
+            media=media,
+            media_temperature=media_temp,
+            agitation=config.get('agitation', 'moderate'),
+            htc_override=config.get('htc_override'),
+            emissivity=config.get('emissivity', 0.3),
+            use_radiation=config.get('use_radiation', False)
+        )
+
+        return cls(
+            name='quenching',
+            enabled=True,
+            duration=duration,
+            target_temperature=media_temp,
+            boundary_condition=bc,
+            end_condition='time'
+        )
+
+    @classmethod
+    def from_tempering_config(cls, config: dict) -> 'PhaseConfig':
+        """Create tempering phase config from dict."""
+        if not config.get('enabled', False):
+            return cls(name='tempering', enabled=False)
+
+        temp = config.get('temperature', 550.0)
+        hold_time = config.get('hold_time', 120.0)  # minutes
+
+        bc = create_tempering_bc(
+            temperature=temp,
+            htc=config.get('htc', 25.0),
+            emissivity=config.get('emissivity', 0.85),
+            cooling_method=config.get('cooling_method', 'air')
+        )
+
+        return cls(
+            name='tempering',
+            enabled=True,
+            duration=hold_time * 60,  # Convert to seconds
+            target_temperature=temp,
+            boundary_condition=bc,
+            end_condition='equilibrium',
+            end_temperature=temp - 5
+        )
+
+
+@dataclass
+class PhaseResult:
+    """Results from a single heat treatment phase.
+
+    Parameters
+    ----------
+    phase_name : str
+        Name of the phase
+    time : np.ndarray
+        Time points in seconds (relative to phase start)
+    absolute_time : np.ndarray
+        Absolute time from simulation start
+    temperature : np.ndarray
+        Temperature field [time, position] in Celsius
+    center_temp : np.ndarray
+        Temperature at center vs time
+    surface_temp : np.ndarray
+        Temperature at surface vs time
+    t8_5 : float, optional
+        Cooling time 800-500°C (if applicable)
+    """
+    phase_name: str
+    time: np.ndarray
+    absolute_time: np.ndarray
+    temperature: np.ndarray
+    center_temp: np.ndarray
+    surface_temp: np.ndarray
+    t8_5: Optional[float] = None
+    start_time: float = 0.0
+    end_time: float = 0.0
+
+
+@dataclass
 class SolverResult:
     """Results from heat transfer simulation.
 
@@ -86,6 +262,7 @@ class SolverResult:
     quarter_temp: Optional[np.ndarray] = None
     t8_5: Optional[float] = None
     cooling_rates: Optional[np.ndarray] = None
+    phase_results: Optional[List[PhaseResult]] = None
 
 
 class HeatSolver:
@@ -161,6 +338,16 @@ class HeatSolver:
         # Update boundary condition emissivity
         if hasattr(self.outer_bc, 'emissivity'):
             self.outer_bc.emissivity = emissivity
+
+    def set_boundary_condition(self, bc: BoundaryCondition):
+        """Update the outer boundary condition.
+
+        Parameters
+        ----------
+        bc : BoundaryCondition
+            New boundary condition
+        """
+        self.outer_bc = bc
 
     def _get_properties_at_temp(self, T: float) -> Tuple[float, float]:
         """Get thermal conductivity and specific heat at temperature.
@@ -275,6 +462,124 @@ class HeatSolver:
             surface_temp=surface_temp,
             quarter_temp=quarter_temp,
             t8_5=t8_5
+        )
+
+    def solve_phase(
+        self,
+        initial_field: np.ndarray,
+        mesh: np.ndarray,
+        phase_config: PhaseConfig,
+        start_time: float = 0.0,
+        progress_callback: Optional[Callable[[float, str], None]] = None
+    ) -> PhaseResult:
+        """Run simulation for a single phase.
+
+        Parameters
+        ----------
+        initial_field : np.ndarray
+            Initial temperature field
+        mesh : np.ndarray
+            Spatial mesh
+        phase_config : PhaseConfig
+            Phase configuration
+        start_time : float
+            Absolute start time
+        progress_callback : callable, optional
+            Callback(progress, phase_name)
+
+        Returns
+        -------
+        PhaseResult
+            Phase simulation results
+        """
+        cfg = self.config
+
+        if not phase_config.enabled:
+            return PhaseResult(
+                phase_name=phase_config.name,
+                time=np.array([0.0]),
+                absolute_time=np.array([start_time]),
+                temperature=initial_field.reshape(1, -1),
+                center_temp=np.array([initial_field[0]]),
+                surface_temp=np.array([initial_field[-1]]),
+                start_time=start_time,
+                end_time=start_time
+            )
+
+        # Update boundary condition for this phase
+        if phase_config.boundary_condition:
+            self.outer_bc = phase_config.boundary_condition
+
+        dr = mesh[1] - mesh[0] if len(mesh) > 1 else mesh[0]
+        n = len(mesh)
+
+        T = initial_field.copy()
+        t = 0.0
+        step = 0
+
+        times = [0.0]
+        temp_history = [T.copy()]
+
+        # Phase-specific termination
+        max_phase_time = phase_config.duration
+
+        while t < max_phase_time:
+            # Check end conditions
+            if phase_config.end_condition == 'equilibrium':
+                # Check if center has reached target
+                if phase_config.end_temperature is not None:
+                    if phase_config.name in ('heating', 'tempering'):
+                        # Heating: end when center reaches target
+                        if T[0] >= phase_config.end_temperature:
+                            # Now we're at temperature, run hold time
+                            break
+                    else:
+                        # Cooling: end when center drops below threshold
+                        if T[0] <= phase_config.end_temperature:
+                            break
+
+            elif phase_config.end_condition == 'temperature':
+                if phase_config.end_temperature is not None:
+                    if T[0] <= phase_config.end_temperature:
+                        break
+
+            # Advance one time step
+            T_new = self._time_step(T, mesh, dr, cfg.dt)
+            T = T_new
+            t += cfg.dt
+            step += 1
+
+            # Store at interval
+            if step % cfg.output_interval == 0:
+                times.append(t)
+                temp_history.append(T.copy())
+
+            # Progress callback
+            if progress_callback:
+                progress_callback(min(t / max_phase_time, 1.0), phase_config.name)
+
+        # Store final state
+        if step % cfg.output_interval != 0:
+            times.append(t)
+            temp_history.append(T.copy())
+
+        times = np.array(times)
+        temp_history = np.array(temp_history)
+        absolute_times = times + start_time
+
+        # Calculate t8/5 for this phase
+        t8_5 = self._calculate_t8_5(times, temp_history[:, 0])
+
+        return PhaseResult(
+            phase_name=phase_config.name,
+            time=times,
+            absolute_time=absolute_times,
+            temperature=temp_history,
+            center_temp=temp_history[:, 0],
+            surface_temp=temp_history[:, -1],
+            t8_5=t8_5,
+            start_time=start_time,
+            end_time=start_time + times[-1]
         )
 
     def _time_step(
@@ -471,3 +776,214 @@ class HeatSolver:
         t_500 = times[idx_500[0]]
 
         return t_500 - t_800
+
+
+class MultiPhaseHeatSolver:
+    """Multi-phase heat treatment solver.
+
+    Orchestrates sequential phases: heating, transfer, quenching, tempering.
+    Each phase has different boundary conditions.
+    """
+
+    def __init__(
+        self,
+        geometry: GeometryBase,
+        config: Optional[SolverConfig] = None
+    ):
+        """Initialize multi-phase solver.
+
+        Parameters
+        ----------
+        geometry : GeometryBase
+            Geometry object (Cylinder, Plate, or Ring)
+        config : SolverConfig, optional
+            Solver configuration
+        """
+        self.geometry = geometry
+        self.config = config or SolverConfig()
+
+        # Create base solver with dummy BC (will be replaced per phase)
+        dummy_bc = BoundaryCondition(htc=100, ambient_temp=25)
+        self.solver = HeatSolver(geometry, dummy_bc, config=self.config)
+
+        # Phase configurations
+        self.phases: List[PhaseConfig] = []
+
+    def set_material(self, k_property, cp_property, density: float, emissivity: float = 0.85):
+        """Set material properties."""
+        self.solver.set_material(k_property, cp_property, density, emissivity)
+
+    def configure_from_ht_config(self, ht_config: dict):
+        """Configure phases from heat treatment config dict.
+
+        Parameters
+        ----------
+        ht_config : dict
+            Heat treatment configuration from Simulation model
+        """
+        self.phases = []
+
+        # Heating phase
+        heating = ht_config.get('heating', {})
+        if heating.get('enabled', False):
+            self.phases.append(PhaseConfig.from_heating_config(heating))
+
+        # Transfer phase
+        transfer = ht_config.get('transfer', {})
+        if transfer.get('enabled', False):
+            self.phases.append(PhaseConfig.from_transfer_config(transfer))
+
+        # Quenching phase (always enabled)
+        quenching = ht_config.get('quenching', {})
+        self.phases.append(PhaseConfig.from_quenching_config(quenching))
+
+        # Tempering phase
+        tempering = ht_config.get('tempering', {})
+        if tempering.get('enabled', False):
+            self.phases.append(PhaseConfig.from_tempering_config(tempering))
+
+            # Add cooling after tempering
+            cooling_bc = create_cooling_bc(
+                ambient_temperature=25.0,
+                htc=tempering.get('htc', 25.0),
+                emissivity=tempering.get('emissivity', 0.85),
+                cooling_method=tempering.get('cooling_method', 'air')
+            )
+            cooling_phase = PhaseConfig(
+                name='cooling',
+                enabled=True,
+                duration=600.0,  # 10 minutes default
+                target_temperature=25.0,
+                boundary_condition=cooling_bc,
+                end_condition='equilibrium',
+                end_temperature=50.0  # Stop when center < 50°C
+            )
+            self.phases.append(cooling_phase)
+
+    def solve(
+        self,
+        initial_temperature: float = 25.0,
+        progress_callback: Optional[Callable[[float, str], None]] = None
+    ) -> SolverResult:
+        """Run multi-phase heat treatment simulation.
+
+        Parameters
+        ----------
+        initial_temperature : float
+            Initial uniform temperature in Celsius
+        progress_callback : callable, optional
+            Callback(progress: 0-1, phase_name: str)
+
+        Returns
+        -------
+        SolverResult
+            Combined results from all phases
+        """
+        cfg = self.config
+
+        # Create spatial mesh
+        mesh = self.geometry.create_mesh(cfg.n_nodes)
+
+        # Initialize temperature field
+        T = np.full(len(mesh), initial_temperature)
+
+        # Storage for combined results
+        all_times = []
+        all_temps = []
+        phase_results = []
+
+        current_time = 0.0
+        total_phases = len(self.phases)
+
+        for i, phase in enumerate(self.phases):
+            if not phase.enabled:
+                continue
+
+            # Calculate phase progress contribution
+            def phase_progress(p, name):
+                overall = (i + p) / total_phases
+                if progress_callback:
+                    progress_callback(overall, name)
+
+            # Run phase simulation
+            result = self.solver.solve_phase(
+                initial_field=T,
+                mesh=mesh,
+                phase_config=phase,
+                start_time=current_time,
+                progress_callback=phase_progress
+            )
+
+            phase_results.append(result)
+
+            # Update state for next phase
+            T = result.temperature[-1, :]
+            current_time = result.end_time
+
+            # Append results (skip first point to avoid duplicates)
+            if len(all_times) == 0:
+                all_times.extend(result.absolute_time.tolist())
+                all_temps.extend(result.temperature.tolist())
+            else:
+                all_times.extend(result.absolute_time[1:].tolist())
+                all_temps.extend(result.temperature[1:].tolist())
+
+        # Convert to arrays
+        times = np.array(all_times)
+        temp_history = np.array(all_temps)
+
+        # Extract curves
+        n = len(mesh)
+        center_temp = temp_history[:, 0]
+        surface_temp = temp_history[:, -1]
+        quarter_idx = n // 4
+        quarter_temp = temp_history[:, quarter_idx] if n > 4 else None
+
+        # Calculate overall t8/5 (from quenching phase if present)
+        t8_5 = None
+        for pr in phase_results:
+            if pr.phase_name == 'quenching' and pr.t8_5 is not None:
+                t8_5 = pr.t8_5
+                break
+
+        # Calculate cooling rates
+        cooling_rates = self._calculate_cooling_rates(times, center_temp)
+
+        return SolverResult(
+            time=times,
+            positions=mesh,
+            temperature=temp_history,
+            center_temp=center_temp,
+            surface_temp=surface_temp,
+            quarter_temp=quarter_temp,
+            t8_5=t8_5,
+            cooling_rates=cooling_rates,
+            phase_results=phase_results
+        )
+
+    def _calculate_cooling_rates(self, times: np.ndarray, temps: np.ndarray) -> np.ndarray:
+        """Calculate cooling rate (dT/dt) at each time point.
+
+        Parameters
+        ----------
+        times : np.ndarray
+            Time array in seconds
+        temps : np.ndarray
+            Temperature array in Celsius
+
+        Returns
+        -------
+        np.ndarray
+            Cooling rate in °C/s (negative = cooling)
+        """
+        if len(times) < 2:
+            return np.zeros_like(times)
+
+        # Use central differences for interior, forward/backward for ends
+        dt = np.gradient(times)
+        dT = np.gradient(temps)
+
+        # Avoid division by zero
+        dt = np.where(dt == 0, 1e-6, dt)
+
+        return dT / dt

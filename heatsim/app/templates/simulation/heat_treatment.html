@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+
+{% block title %}Heat Treatment - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item active">Step 2: Heat Treatment</li>
+    </ol>
+</nav>
+
+<!-- Progress Steps -->
+<div class="d-flex justify-content-center mb-4">
+    <div class="d-flex align-items-center">
+        <span class="badge bg-success rounded-pill me-2"><i class="bi bi-check"></i></span>
+        <span class="text-success">Geometry & Solver</span>
+        <span class="mx-3 text-muted">→</span>
+        <span class="badge bg-primary rounded-pill me-2">2</span>
+        <span class="fw-bold text-primary">Heat Treatment</span>
+        <span class="mx-3 text-muted">→</span>
+        <span class="badge bg-secondary rounded-pill me-2">3</span>
+        <span class="text-muted">Run Simulation</span>
+    </div>
+</div>
+
+<h2>Heat Treatment Configuration: {{ sim.name }}</h2>
+<p class="text-muted">{{ sim.steel_grade.designation }} | {{ sim.geometry_label }}</p>
+
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- Phase 1: Heating -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-thermometer-high text-danger"></i>
+                <strong>Phase 1: Heating (Austenitizing)</strong>
+            </div>
+            <div class="form-check form-switch mb-0">
+                {{ heating_form.enabled(class="form-check-input", id="heating-enabled") }}
+                <label class="form-check-label" for="heating-enabled">Enable</label>
+            </div>
+        </div>
+        <div class="card-body" id="heating-section">
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Initial Temperature (°C)</label>
+                    <input type="number" name="heating-initial_temperature" class="form-control" step="1" min="-50" max="500" value="{{ heating_form.initial_temperature.data or 25 }}">
+                    <div class="form-text">Starting temperature</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Austenitizing Temperature (°C)</label>
+                    <input type="number" name="heating-target_temperature" class="form-control" step="5" min="500" max="1200" value="{{ heating_form.target_temperature.data or 850 }}">
+                    <div class="form-text">Target furnace temperature</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Hold Time (min)</label>
+                    <input type="number" name="heating-hold_time" class="form-control" step="5" min="0" max="1440" value="{{ heating_form.hold_time.data or 60 }}">
+                    <div class="form-text">Soak time at temperature</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Furnace Atmosphere</label>
+                    <select name="heating-furnace_atmosphere" class="form-select">
+                        {% for atm in furnace_atmospheres %}
+                        <option value="{{ atm }}" {% if heating_form.furnace_atmosphere.data == atm %}selected{% endif %}>
+                            {{ furnace_atmosphere_labels[atm] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Furnace HTC (W/m²K)</label>
+                    <input type="number" name="heating-furnace_htc" class="form-control" step="1" min="1" max="500" value="{{ heating_form.furnace_htc.data or 25 }}">
+                    <div class="form-text">Convection in furnace</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Surface Emissivity</label>
+                    <input type="number" name="heating-furnace_emissivity" class="form-control" step="0.05" min="0" max="1" value="{{ heating_form.furnace_emissivity.data or 0.85 }}">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="form-check mt-4">
+                        <input type="checkbox" name="heating-use_radiation" class="form-check-input" id="heating-use_radiation" {% if heating_form.use_radiation.data %}checked{% endif %}>
+                        <label class="form-check-label" for="heating-use_radiation">Include Radiation</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase 2: Transfer -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-arrow-left-right text-warning"></i>
+                <strong>Phase 2: Transfer (Furnace to Quench)</strong>
+            </div>
+            <div class="form-check form-switch mb-0">
+                {{ transfer_form.enabled(class="form-check-input", id="transfer-enabled") }}
+                <label class="form-check-label" for="transfer-enabled">Enable</label>
+            </div>
+        </div>
+        <div class="card-body" id="transfer-section">
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Transfer Time (s)</label>
+                    <input type="number" name="transfer-duration" class="form-control" step="1" min="0" max="300" value="{{ transfer_form.duration.data or 10 }}">
+                    <div class="form-text">Time from furnace to quench</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Ambient Temperature (°C)</label>
+                    <input type="number" name="transfer-ambient_temperature" class="form-control" step="1" min="-50" max="100" value="{{ transfer_form.ambient_temperature.data or 25 }}">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Air HTC (W/m²K)</label>
+                    <input type="number" name="transfer-htc" class="form-control" step="1" min="1" max="100" value="{{ transfer_form.htc.data or 10 }}">
+                    <div class="form-text">Natural convection in air</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Surface Emissivity</label>
+                    <input type="number" name="transfer-emissivity" class="form-control" step="0.05" min="0" max="1" value="{{ transfer_form.emissivity.data or 0.85 }}">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" name="transfer-use_radiation" class="form-check-input" id="transfer-use_radiation" {% if transfer_form.use_radiation.data %}checked{% endif %}>
+                        <label class="form-check-label" for="transfer-use_radiation">Include Radiation (significant at high temp)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase 3: Quenching -->
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-snow text-white"></i>
+            <strong>Phase 3: Quenching (Required)</strong>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Quench Media</label>
+                    <select name="quenching-media" class="form-select" id="quench-media">
+                        {% for media in quench_media %}
+                        <option value="{{ media }}" {% if quenching_form.media.data == media %}selected{% endif %}>
+                            {{ quench_media_labels[media] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Media Temperature (°C)</label>
+                    <input type="number" name="quenching-media_temperature" class="form-control" step="1" min="0" max="200" value="{{ quenching_form.media_temperature.data or 25 }}" id="quench-media-temp">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Agitation Level</label>
+                    <select name="quenching-agitation" class="form-select" id="quench-agitation">
+                        {% for level in agitation_levels %}
+                        <option value="{{ level }}" {% if quenching_form.agitation.data == level %}selected{% endif %}>
+                            {{ agitation_labels[level] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Calculated HTC</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control bg-light" id="calculated-htc" value="{{ effective_htc|round(0)|int }}" readonly>
+                        <span class="input-group-text">W/m²K</span>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Custom HTC Override (W/m²K)</label>
+                    <input type="number" name="quenching-htc_override" class="form-control" step="10" min="10" max="50000" value="{{ quenching_form.htc_override.data or '' }}" placeholder="Leave blank to auto-calculate">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Quench Duration (s)</label>
+                    <input type="number" name="quenching-duration" class="form-control" step="10" min="10" max="3600" value="{{ quenching_form.duration.data or 300 }}">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Surface Emissivity</label>
+                    <input type="number" name="quenching-emissivity" class="form-control" step="0.05" min="0" max="1" value="{{ quenching_form.emissivity.data or 0.3 }}">
+                    <div class="form-text">Lower due to vapor/oil film</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="form-check mt-4">
+                        <input type="checkbox" name="quenching-use_radiation" class="form-check-input" id="quenching-use_radiation" {% if quenching_form.use_radiation.data %}checked{% endif %}>
+                        <label class="form-check-label" for="quenching-use_radiation">Include Radiation</label>
+                        <div class="form-text">Usually negligible in liquid</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase 4: Tempering -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-thermometer-half text-info"></i>
+                <strong>Phase 4: Tempering (Optional)</strong>
+            </div>
+            <div class="form-check form-switch mb-0">
+                {{ tempering_form.enabled(class="form-check-input", id="tempering-enabled") }}
+                <label class="form-check-label" for="tempering-enabled">Enable</label>
+            </div>
+        </div>
+        <div class="card-body" id="tempering-section">
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Tempering Temperature (°C)</label>
+                    <input type="number" name="tempering-temperature" class="form-control" step="10" min="100" max="750" value="{{ tempering_form.temperature.data or 550 }}">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Hold Time (min)</label>
+                    <input type="number" name="tempering-hold_time" class="form-control" step="10" min="1" max="1440" value="{{ tempering_form.hold_time.data or 120 }}">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Cooling Method</label>
+                    <select name="tempering-cooling_method" class="form-select">
+                        <option value="air" {% if tempering_form.cooling_method.data == 'air' %}selected{% endif %}>Air Cool</option>
+                        <option value="furnace" {% if tempering_form.cooling_method.data == 'furnace' %}selected{% endif %}>Furnace Cool</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Cooling HTC (W/m²K)</label>
+                    <input type="number" name="tempering-htc" class="form-control" step="1" min="1" max="500" value="{{ tempering_form.htc.data or 25 }}">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Surface Emissivity</label>
+                    <input type="number" name="tempering-emissivity" class="form-control" step="0.05" min="0" max="1" value="{{ tempering_form.emissivity.data or 0.85 }}">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Card -->
+    <div class="card mb-4 bg-light">
+        <div class="card-header">
+            <i class="bi bi-list-check"></i> Process Summary
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col">
+                    <div class="p-2 border rounded" id="summary-heating">
+                        <small class="text-muted">Heating</small><br>
+                        <strong id="summary-heating-temp">850°C</strong>
+                    </div>
+                </div>
+                <div class="col-auto d-flex align-items-center">→</div>
+                <div class="col">
+                    <div class="p-2 border rounded" id="summary-transfer">
+                        <small class="text-muted">Transfer</small><br>
+                        <strong id="summary-transfer-time">10s</strong>
+                    </div>
+                </div>
+                <div class="col-auto d-flex align-items-center">→</div>
+                <div class="col">
+                    <div class="p-2 border rounded border-primary" id="summary-quench">
+                        <small class="text-muted">Quench</small><br>
+                        <strong id="summary-quench-media">Water</strong>
+                    </div>
+                </div>
+                <div class="col-auto d-flex align-items-center">→</div>
+                <div class="col">
+                    <div class="p-2 border rounded" id="summary-tempering">
+                        <small class="text-muted">Tempering</small><br>
+                        <strong id="summary-tempering-temp">Disabled</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('simulation.setup', id=sim.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+        <button type="submit" class="btn btn-success">
+            <i class="bi bi-check-lg"></i> Save & Ready to Run
+        </button>
+    </div>
+</form>
+
+<script>
+// Update calculated HTC when media/agitation/temp changes
+function updateCalculatedHTC() {
+    const media = document.getElementById('quench-media').value;
+    const agitation = document.getElementById('quench-agitation').value;
+    const temp = document.getElementById('quench-media-temp').value || 25;
+
+    fetch(`{{ url_for('simulation.api_htc', media='MEDIA', agitation='AGIT') }}`
+        .replace('MEDIA', media)
+        .replace('AGIT', agitation)
+        + '?temp=' + temp)
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('calculated-htc').value = Math.round(data.htc);
+    });
+}
+
+document.getElementById('quench-media').addEventListener('change', updateCalculatedHTC);
+document.getElementById('quench-agitation').addEventListener('change', updateCalculatedHTC);
+document.getElementById('quench-media-temp').addEventListener('change', updateCalculatedHTC);
+
+// Toggle section visibility based on enable checkbox
+function toggleSection(checkboxId, sectionId) {
+    const checkbox = document.getElementById(checkboxId);
+    const section = document.getElementById(sectionId);
+    if (checkbox && section) {
+        const inputs = section.querySelectorAll('input, select');
+        const updateState = () => {
+            inputs.forEach(input => {
+                input.disabled = !checkbox.checked;
+            });
+            section.style.opacity = checkbox.checked ? '1' : '0.5';
+        };
+        checkbox.addEventListener('change', updateState);
+        updateState();
+    }
+}
+
+toggleSection('heating-enabled', 'heating-section');
+toggleSection('transfer-enabled', 'transfer-section');
+toggleSection('tempering-enabled', 'tempering-section');
+
+// Update summary
+function updateSummary() {
+    const heatingEnabled = document.getElementById('heating-enabled').checked;
+    const transferEnabled = document.getElementById('transfer-enabled').checked;
+    const temperingEnabled = document.getElementById('tempering-enabled').checked;
+
+    document.getElementById('summary-heating').style.opacity = heatingEnabled ? '1' : '0.4';
+    document.getElementById('summary-transfer').style.opacity = transferEnabled ? '1' : '0.4';
+    document.getElementById('summary-tempering').style.opacity = temperingEnabled ? '1' : '0.4';
+
+    if (heatingEnabled) {
+        const temp = document.querySelector('input[name="heating-target_temperature"]').value;
+        document.getElementById('summary-heating-temp').textContent = temp + '°C';
+    } else {
+        document.getElementById('summary-heating-temp').textContent = 'Disabled';
+    }
+
+    if (transferEnabled) {
+        const time = document.querySelector('input[name="transfer-duration"]').value;
+        document.getElementById('summary-transfer-time').textContent = time + 's';
+    } else {
+        document.getElementById('summary-transfer-time').textContent = 'Disabled';
+    }
+
+    const media = document.getElementById('quench-media');
+    document.getElementById('summary-quench-media').textContent = media.options[media.selectedIndex].text;
+
+    if (temperingEnabled) {
+        const temp = document.querySelector('input[name="tempering-temperature"]').value;
+        document.getElementById('summary-tempering-temp').textContent = temp + '°C';
+    } else {
+        document.getElementById('summary-tempering-temp').textContent = 'Disabled';
+    }
+}
+
+document.getElementById('heating-enabled').addEventListener('change', updateSummary);
+document.getElementById('transfer-enabled').addEventListener('change', updateSummary);
+document.getElementById('tempering-enabled').addEventListener('change', updateSummary);
+document.getElementById('quench-media').addEventListener('change', updateSummary);
+document.querySelectorAll('input[type="number"]').forEach(input => {
+    input.addEventListener('change', updateSummary);
+});
+
+updateSummary();
+</script>
+{% endblock %}

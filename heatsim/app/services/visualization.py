@@ -255,3 +255,112 @@ def create_cooling_rate_plot(
     plt.close(fig)
 
     return buf.getvalue()
+
+
+def create_heat_treatment_cycle_plot(
+    times: np.ndarray,
+    center_temp: np.ndarray,
+    surface_temp: np.ndarray,
+    quarter_temp: Optional[np.ndarray] = None,
+    phase_results: Optional[List] = None,
+    title: str = "Heat Treatment Cycle",
+    transformation_temps: Optional[dict] = None
+) -> bytes:
+    """Generate comprehensive heat treatment cycle plot with phase markers.
+
+    Parameters
+    ----------
+    times : np.ndarray
+        Time array in seconds
+    center_temp : np.ndarray
+        Center temperature vs time
+    surface_temp : np.ndarray
+        Surface temperature vs time
+    quarter_temp : np.ndarray, optional
+        Quarter-thickness temperature vs time
+    phase_results : list, optional
+        List of PhaseResult objects from multi-phase solver
+    title : str
+        Plot title
+    transformation_temps : dict, optional
+        Dict with Ms, Mf, Ac1, Ac3 temperatures
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    # Plot main temperature curves
+    ax.plot(times, center_temp, 'b-', linewidth=2, label='Center')
+    ax.plot(times, surface_temp, 'r-', linewidth=2, label='Surface')
+    if quarter_temp is not None:
+        ax.plot(times, quarter_temp, 'g--', linewidth=1.5, label='Quarter')
+
+    # Add phase region shading if phase results available
+    if phase_results:
+        phase_colors = {
+            'heating': '#FFE4B5',      # Moccasin
+            'transfer': '#E6E6FA',     # Lavender
+            'quenching': '#B0E0E6',    # Powder blue
+            'tempering': '#FFDAB9',    # Peach puff
+            'cooling': '#F5F5DC',      # Beige
+        }
+
+        for pr in phase_results:
+            if pr.time.size < 2:
+                continue
+
+            color = phase_colors.get(pr.phase_name, '#F5F5F5')
+            start = pr.start_time
+            end = pr.end_time
+
+            ax.axvspan(start, end, alpha=0.3, color=color, label=None)
+
+            # Add phase label at top
+            mid = (start + end) / 2
+            y_pos = ax.get_ylim()[1] * 0.95
+            ax.text(mid, y_pos, pr.phase_name.title(),
+                   ha='center', va='top', fontsize=9, fontweight='bold',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7))
+
+    # Add transformation temperature lines
+    if transformation_temps:
+        colors = {'Ms': 'purple', 'Mf': 'magenta', 'Ac1': 'orange', 'Ac3': 'red'}
+        for name, temp in transformation_temps.items():
+            if temp is not None:
+                ax.axhline(y=temp, color=colors.get(name, 'gray'),
+                          linestyle=':', alpha=0.7, linewidth=1.5,
+                          label=f'{name} = {temp}°C')
+
+    # Add t8/5 annotation if both 800 and 500 are in range
+    if transformation_temps and center_temp.max() > 800 and center_temp.min() < 500:
+        idx_800 = np.where(center_temp <= 800)[0]
+        idx_500 = np.where(center_temp <= 500)[0]
+        if len(idx_800) > 0 and len(idx_500) > 0:
+            t_800 = times[idx_800[0]]
+            t_500 = times[idx_500[0]]
+            t8_5 = t_500 - t_800
+
+            # Draw bracket for t8/5
+            ax.annotate('', xy=(t_800, 800), xytext=(t_500, 800),
+                       arrowprops=dict(arrowstyle='<->', color='darkgreen', lw=1.5))
+            ax.text((t_800 + t_500)/2, 810, f't8/5 = {t8_5:.1f}s',
+                   ha='center', va='bottom', fontsize=10, color='darkgreen',
+                   fontweight='bold')
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Temperature (°C)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='upper right', fontsize=9)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()

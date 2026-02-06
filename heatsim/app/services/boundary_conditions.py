@@ -5,6 +5,7 @@ Supports:
 - Radiation: q = epsilon * sigma * (T_surface^4 - T_ambient^4)
 - Combined convection + radiation
 - Insulated (adiabatic) boundaries
+- Multi-phase heat treatment boundary conditions
 """
 from dataclasses import dataclass
 from typing import Optional
@@ -86,6 +87,20 @@ class BoundaryCondition:
 
         return h_eff
 
+    def update_ambient(self, new_ambient: float, new_radiation_ambient: Optional[float] = None):
+        """Update ambient temperature (for phase transitions).
+
+        Parameters
+        ----------
+        new_ambient : float
+            New ambient temperature in Celsius
+        new_radiation_ambient : float, optional
+            New radiation sink temperature
+        """
+        self.ambient_temp = new_ambient
+        if new_radiation_ambient is not None:
+            self.radiation_ambient = new_radiation_ambient
+
 
 @dataclass
 class InsulatedBoundary:
@@ -104,38 +119,188 @@ class InsulatedBoundary:
         return 0.0
 
 
-def create_quench_bc(
-    process_type: str,
-    ambient_temp: float = 25.0,
+def create_heating_bc(
+    target_temperature: float,
+    htc: float = 25.0,
     emissivity: float = 0.85,
-    custom_htc: Optional[float] = None
+    use_radiation: bool = True
 ) -> BoundaryCondition:
-    """Factory function to create boundary condition for quench process.
+    """Create boundary condition for furnace heating phase.
 
     Parameters
     ----------
-    process_type : str
-        Process type from PROCESS_TYPES constants
-    ambient_temp : float
-        Quench medium temperature in Celsius
+    target_temperature : float
+        Furnace/target temperature in Celsius
+    htc : float
+        Convection coefficient in furnace (W/m²K)
     emissivity : float
         Surface emissivity for radiation
-    custom_htc : float, optional
-        Override default HTC value
+    use_radiation : bool
+        Whether to include radiation heat transfer
 
     Returns
     -------
     BoundaryCondition
-        Configured boundary condition
+        Configured boundary condition for heating
     """
-    from app.models.simulation import DEFAULT_HTC
+    return BoundaryCondition(
+        htc=htc,
+        ambient_temp=target_temperature,
+        emissivity=emissivity if use_radiation else 0.0,
+        radiation_ambient=target_temperature
+    )
 
-    htc = custom_htc if custom_htc is not None else DEFAULT_HTC.get(process_type, 100)
+
+def create_transfer_bc(
+    ambient_temperature: float = 25.0,
+    htc: float = 10.0,
+    emissivity: float = 0.85,
+    use_radiation: bool = True
+) -> BoundaryCondition:
+    """Create boundary condition for transfer phase (furnace to quench).
+
+    Parameters
+    ----------
+    ambient_temperature : float
+        Ambient air temperature in Celsius
+    htc : float
+        Natural convection coefficient (W/m²K)
+    emissivity : float
+        Surface emissivity for radiation
+    use_radiation : bool
+        Whether to include radiation (significant at high temps)
+
+    Returns
+    -------
+    BoundaryCondition
+        Configured boundary condition for transfer
+    """
+    return BoundaryCondition(
+        htc=htc,
+        ambient_temp=ambient_temperature,
+        emissivity=emissivity if use_radiation else 0.0,
+        radiation_ambient=ambient_temperature
+    )
+
+
+def create_quench_bc(
+    media: str = 'water',
+    media_temperature: float = 25.0,
+    agitation: str = 'moderate',
+    htc_override: Optional[float] = None,
+    emissivity: float = 0.3,
+    use_radiation: bool = False
+) -> BoundaryCondition:
+    """Create boundary condition for quenching phase.
+
+    Parameters
+    ----------
+    media : str
+        Quench media type (water, oil, polymer, brine, air)
+    media_temperature : float
+        Quench bath temperature in Celsius
+    agitation : str
+        Agitation level (none, mild, moderate, strong, violent)
+    htc_override : float, optional
+        Custom HTC override (ignores media/agitation calculation)
+    emissivity : float
+        Surface emissivity (usually lower due to vapor/film)
+    use_radiation : bool
+        Whether to include radiation (usually negligible in liquid)
+
+    Returns
+    -------
+    BoundaryCondition
+        Configured boundary condition for quenching
+    """
+    from app.models.simulation import calculate_quench_htc
+
+    if htc_override is not None:
+        htc = htc_override
+    else:
+        htc = calculate_quench_htc(media, agitation, media_temperature)
 
     return BoundaryCondition(
         htc=htc,
-        ambient_temp=ambient_temp,
-        emissivity=emissivity
+        ambient_temp=media_temperature,
+        emissivity=emissivity if use_radiation else 0.0,
+        radiation_ambient=media_temperature
+    )
+
+
+def create_tempering_bc(
+    temperature: float = 550.0,
+    htc: float = 25.0,
+    emissivity: float = 0.85,
+    cooling_method: str = 'air'
+) -> BoundaryCondition:
+    """Create boundary condition for tempering phase.
+
+    Parameters
+    ----------
+    temperature : float
+        Tempering furnace temperature in Celsius
+    htc : float
+        Convection coefficient (W/m²K)
+    emissivity : float
+        Surface emissivity for radiation
+    cooling_method : str
+        'air' or 'furnace' - determines if radiation is significant
+
+    Returns
+    -------
+    BoundaryCondition
+        Configured boundary condition for tempering
+    """
+    # In tempering furnace, radiation is significant
+    use_radiation = True
+
+    return BoundaryCondition(
+        htc=htc,
+        ambient_temp=temperature,
+        emissivity=emissivity if use_radiation else 0.0,
+        radiation_ambient=temperature
+    )
+
+
+def create_cooling_bc(
+    ambient_temperature: float = 25.0,
+    htc: float = 25.0,
+    emissivity: float = 0.85,
+    cooling_method: str = 'air'
+) -> BoundaryCondition:
+    """Create boundary condition for cooling after tempering.
+
+    Parameters
+    ----------
+    ambient_temperature : float
+        Ambient temperature in Celsius
+    htc : float
+        Convection coefficient (W/m²K)
+    emissivity : float
+        Surface emissivity for radiation
+    cooling_method : str
+        'air' or 'furnace'
+
+    Returns
+    -------
+    BoundaryCondition
+        Configured boundary condition for cooling
+    """
+    # Air cooling: higher HTC, radiation significant at high temps
+    # Furnace cooling: low HTC, use radiation
+    if cooling_method == 'air':
+        use_radiation = True
+    else:
+        # Furnace cooling - slow cooling with radiation
+        htc = 5.0  # Very low convection
+        use_radiation = True
+
+    return BoundaryCondition(
+        htc=htc,
+        ambient_temp=ambient_temperature,
+        emissivity=emissivity if use_radiation else 0.0,
+        radiation_ambient=ambient_temperature
     )
 
 

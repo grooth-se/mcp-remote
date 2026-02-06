@@ -3,7 +3,7 @@ import os
 from flask import Flask
 from config import config
 
-from .extensions import db, login_manager, migrate
+from .extensions import db, login_manager, migrate, csrf
 
 
 def create_app(config_name='default'):
@@ -47,6 +47,7 @@ def create_app(config_name='default'):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
+    csrf.init_app(app)
 
     # Configure login
     login_manager.login_view = 'auth.login'
