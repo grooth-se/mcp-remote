@@ -408,12 +408,10 @@ def run(id):
         cycle_result.set_time_data(result.time.tolist())
         cycle_result.set_value_data(result.center_temp.tolist())
 
-        # Create comprehensive plot with phase markers
+        # Create comprehensive plot with phase markers (4 radial positions)
         cycle_result.plot_image = visualization.create_heat_treatment_cycle_plot(
             result.time,
-            result.center_temp,
-            result.surface_temp,
-            result.quarter_temp,
+            result.temperature,
             phase_results=result.phase_results,
             title=f'Heat Treatment Cycle - {sim.name}',
             transformation_temps=trans_temps

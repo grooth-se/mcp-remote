@@ -259,9 +259,7 @@ def create_cooling_rate_plot(
 
 def create_heat_treatment_cycle_plot(
     times: np.ndarray,
-    center_temp: np.ndarray,
-    surface_temp: np.ndarray,
-    quarter_temp: Optional[np.ndarray] = None,
+    temperatures: np.ndarray,
     phase_results: Optional[List] = None,
     title: str = "Heat Treatment Cycle",
     transformation_temps: Optional[dict] = None
@@ -272,12 +270,8 @@ def create_heat_treatment_cycle_plot(
     ----------
     times : np.ndarray
         Time array in seconds
-    center_temp : np.ndarray
-        Center temperature vs time
-    surface_temp : np.ndarray
-        Surface temperature vs time
-    quarter_temp : np.ndarray, optional
-        Quarter-thickness temperature vs time
+    temperatures : np.ndarray
+        Temperature field [time, position]
     phase_results : list, optional
         List of PhaseResult objects from multi-phase solver
     title : str
@@ -292,11 +286,18 @@ def create_heat_treatment_cycle_plot(
     """
     fig, ax = plt.subplots(figsize=(12, 7))
 
-    # Plot main temperature curves
-    ax.plot(times, center_temp, 'b-', linewidth=2, label='Center')
-    ax.plot(times, surface_temp, 'r-', linewidth=2, label='Surface')
-    if quarter_temp is not None:
-        ax.plot(times, quarter_temp, 'g--', linewidth=1.5, label='Quarter')
+    # Extract 4 radial positions
+    four_temps = extract_four_point_temperatures(temperatures)
+
+    # Plot temperature curves at 4 radial positions with consistent colors
+    for key in ['center', 'one_third', 'two_thirds', 'surface']:
+        ax.plot(
+            times,
+            four_temps[key],
+            color=FOUR_POINT_COLORS[key],
+            linewidth=2,
+            label=FOUR_POINT_LABELS[key]
+        )
 
     # Add phase region shading if phase results available
     if phase_results:
@@ -335,6 +336,7 @@ def create_heat_treatment_cycle_plot(
                           label=f'{name} = {temp}°C')
 
     # Add t8/5 annotation if both 800 and 500 are in range
+    center_temp = four_temps['center']
     if transformation_temps and center_temp.max() > 800 and center_temp.min() < 500:
         idx_800 = np.where(center_temp <= 800)[0]
         idx_500 = np.where(center_temp <= 500)[0]
