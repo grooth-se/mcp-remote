@@ -3,47 +3,102 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-lg-10 mx-auto">
+    <div class="col-lg-11 mx-auto">
         <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-upload"></i> Upload Monitor G5 Excel Files</h5>
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-upload"></i> Load Monitor G5 Excel Files</span>
+                <a href="{{ url_for('calculation.index') }}" class="btn btn-sm btn-light">
+                    <i class="bi bi-play-fill"></i> Calculate
+                </a>
             </div>
-            <div class="card-body">
-                <p class="text-muted mb-4">
-                    Upload all 11 required Excel files from Monitor G5 ERP.
-                    All files are required before calculation can proceed.
-                </p>
-
+            <div class="card-body py-2">
                 {% if errors %}
-                <div class="alert alert-warning">
-                    <strong>Missing or invalid files:</strong>
-                    <ul class="mb-0">
-                        {% for error in errors %}
-                        <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
+                <div class="alert alert-warning py-1 mb-2">
+                    <strong>Issues:</strong>
+                    {% for error in errors %}<span class="ms-2">{{ error }}</span>{% if not loop.last %},{% endif %}{% endfor %}
                 </div>
                 {% endif %}
 
-                <form method="POST" enctype="multipart/form-data" id="uploadForm">
-                    <div class="row">
-                        {% for file_key, label in required_files.items() %}
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ label }}</label>
-                            <input type="file" class="form-control" name="{{ file_key }}"
-                                   accept=".xlsx,.xls" required>
-                            <small class="text-muted">{{ file_key }}.xlsx</small>
-                        </div>
-                        {% endfor %}
+                <!-- Tab navigation -->
+                <ul class="nav nav-tabs nav-sm mb-2" id="uploadTabs" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active py-1" id="paths-tab" data-bs-toggle="tab" data-bs-target="#paths" type="button">
+                            <i class="bi bi-folder2-open"></i> File Paths
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link py-1" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button">
+                            <i class="bi bi-cloud-upload"></i> Browser Upload
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="uploadTabsContent">
+                    <!-- File Paths Tab -->
+                    <div class="tab-pane fade show active" id="paths" role="tabpanel">
+                        <form method="POST" id="pathsForm">
+                            <input type="hidden" name="use_paths" value="true">
+
+                            <div class="row align-items-end mb-2">
+                                <div class="col-md-8">
+                                    <label class="form-label mb-0">Base Directory</label>
+                                    <input type="text" class="form-control form-control-sm" id="baseDir"
+                                           placeholder="/path/to/monitor/exports">
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-sm btn-outline-secondary w-100" type="button" onclick="applyBaseDir()">
+                                        Apply All
+                                    </button>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-sm btn-primary w-100" id="loadBtn">
+                                        <i class="bi bi-folder-check"></i> Load
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="row g-2">
+                                {% for file_key, label in required_files.items() %}
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text" style="min-width:90px;font-size:0.65rem;" title="{{ label }}">{{ file_key[:12] }}</span>
+                                        <input type="text" class="form-control file-path"
+                                               name="path_{{ file_key }}"
+                                               id="path_{{ file_key }}"
+                                               placeholder="{{ file_key }}.xlsx"
+                                               value="{{ default_paths.get(file_key, '') }}"
+                                               data-filename="{{ file_key }}.xlsx">
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </form>
                     </div>
 
-                    <hr>
-                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn">
-                            <i class="bi bi-cloud-upload"></i> Upload All Files
-                        </button>
+                    <!-- Browser Upload Tab -->
+                    <div class="tab-pane fade" id="upload" role="tabpanel">
+                        <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                            <input type="hidden" name="use_paths" value="false">
+
+                            <div class="row g-2">
+                                {% for file_key, label in required_files.items() %}
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text" style="min-width:90px;font-size:0.65rem;">{{ file_key[:12] }}</span>
+                                        <input type="file" class="form-control" name="{{ file_key }}" accept=".xlsx,.xls">
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="mt-2 text-end">
+                                <button type="submit" class="btn btn-sm btn-primary" id="uploadBtn">
+                                    <i class="bi bi-cloud-upload"></i> Upload All
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>
@@ -52,24 +107,48 @@
 
 {% block scripts %}
 <script>
-document.getElementById('uploadForm').addEventListener('submit', function(e) {
-    const inputs = this.querySelectorAll('input[type="file"]');
+// Apply base directory to all file paths
+function applyBaseDir() {
+    const baseDir = document.getElementById('baseDir').value.trim();
+    if (!baseDir) return;
+    const dir = baseDir.replace(/\/+$/, '');
+    document.querySelectorAll('.file-path').forEach(input => {
+        input.value = dir + '/' + input.dataset.filename;
+        input.classList.remove('is-invalid');
+    });
+}
+
+// Form submission handlers
+document.getElementById('pathsForm').addEventListener('submit', function(e) {
     let allFilled = true;
-    inputs.forEach(input => {
-        if (!input.files.length) {
+    this.querySelectorAll('.file-path').forEach(input => {
+        if (!input.value.trim()) {
             input.classList.add('is-invalid');
             allFilled = false;
         } else {
             input.classList.remove('is-invalid');
-            input.classList.add('is-valid');
         }
     });
     if (!allFilled) {
         e.preventDefault();
-        alert('Please select all required files before uploading.');
     } else {
-        document.getElementById('uploadBtn').innerHTML =
-            '<span class="spinner-border spinner-border-sm"></span> Uploading...';
+        document.getElementById('loadBtn').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        document.getElementById('loadBtn').disabled = true;
+    }
+});
+
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    let allFilled = true;
+    this.querySelectorAll('input[type="file"]').forEach(input => {
+        if (!input.files.length) {
+            input.classList.add('is-invalid');
+            allFilled = false;
+        }
+    });
+    if (!allFilled) {
+        e.preventDefault();
+    } else {
+        document.getElementById('uploadBtn').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         document.getElementById('uploadBtn').disabled = true;
     }
 });

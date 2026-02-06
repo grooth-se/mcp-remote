@@ -2,128 +2,76 @@
 {% block title %}Monthly Commentary - {{ commentary.current_date }}{% endblock %}
 
 {% block head %}
-<style>
-    .slide-card {
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .metric-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 8px;
-        padding: 15px;
-        text-align: center;
-    }
-    .metric-box.positive {
-        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-    }
-    .metric-box.negative {
-        background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
-    }
-    .metric-box h3 {
-        margin: 0;
-        font-size: 1.8rem;
-    }
-    .metric-box small {
-        opacity: 0.9;
-    }
-    .commentary-bullet {
-        font-size: 1.1rem;
-        padding: 8px 0;
-        border-bottom: 1px solid #eee;
-    }
-    .commentary-bullet:last-child {
-        border-bottom: none;
-    }
-    .highlight-card {
-        border-left: 4px solid;
-        background: #f8f9fa;
-    }
-    .highlight-card.increase {
-        border-color: #28a745;
-    }
-    .highlight-card.decrease {
-        border-color: #dc3545;
-    }
-    @media print {
-        .no-print { display: none; }
-        .slide-card { break-inside: avoid; }
-    }
-</style>
+<!-- Styles defined in style.css -->
 {% endblock %}
 
 {% block content %}
 <!-- Header -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h2><i class="bi bi-file-earmark-slides"></i> Monthly Report Commentary</h2>
-                <p class="text-muted mb-0">
-                    Period: <strong>{{ commentary.current_date }}</strong> vs {{ commentary.previous_date }}
-                    {% if commentary.year_end_date %} | YTD base: {{ commentary.year_end_date }}{% endif %}
-                </p>
-            </div>
-            <div class="no-print">
-                <button onclick="window.print()" class="btn btn-outline-secondary">
-                    <i class="bi bi-printer"></i> Print
-                </button>
-            </div>
-        </div>
-        <hr>
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+        <h4 class="mb-0"><i class="bi bi-chat-text"></i> Monthly Commentary</h4>
+        <small class="text-muted">
+            {{ commentary.current_date }} vs {{ commentary.previous_date }}
+            {% if commentary.year_end_date %} | YTD: {{ commentary.year_end_date }}{% endif %}
+        </small>
+    </div>
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-printer"></i> Print
+        </button>
     </div>
 </div>
 
 <!-- Key Metrics Summary -->
-<div class="row mb-4">
-    <div class="col-md-3">
+<div class="row g-2 mb-2">
+    <div class="col-6 col-md-3">
         <div class="metric-box">
             <small>Total Revenue</small>
             <h3>{{ "{:,.0f}".format(commentary.summary.current.revenue / 1000) }}K</h3>
             <small>
                 {% set rev_change = commentary.summary.mom_change.revenue %}
-                {% if rev_change >= 0 %}+{% endif %}{{ "{:,.0f}".format(rev_change / 1000) }}K MoM
+                {% if rev_change >= 0 %}+{% endif %}{{ "{:,.0f}".format(rev_change / 1000) }}K
             </small>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-6 col-md-3">
         <div class="metric-box {% if commentary.summary.mom_change.gross_margin >= 0 %}positive{% else %}negative{% endif %}">
             <small>Gross Margin</small>
             <h3>{{ "{:.1%}".format(commentary.summary.current.gross_margin_pct) }}</h3>
             <small>
                 {% set gm_change = commentary.summary.mom_change.gross_margin_pct * 100 %}
-                {% if gm_change >= 0 %}+{% endif %}{{ "{:.1f}".format(gm_change) }} pp MoM
+                {% if gm_change >= 0 %}+{% endif %}{{ "{:.1f}".format(gm_change) }}pp
             </small>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-6 col-md-3">
         <div class="metric-box">
             <small>Order Book</small>
             <h3>{{ "{:,.0f}".format(commentary.summary.current.orderbook / 1000000) }}M</h3>
             <small>
                 {% set ob_change = commentary.summary.mom_change.orderbook %}
-                {% if ob_change >= 0 %}+{% endif %}{{ "{:,.0f}".format(ob_change / 1000) }}K MoM
+                {% if ob_change >= 0 %}+{% endif %}{{ "{:,.0f}".format(ob_change / 1000) }}K
             </small>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-6 col-md-3">
         <div class="metric-box">
             <small>Accrued Income</small>
             <h3>{{ "{:,.0f}".format(commentary.summary.current.accrued / 1000000) }}M</h3>
-            <small>{{ commentary.summary.current.project_count }} active projects</small>
+            <small>{{ commentary.summary.current.project_count }} projects</small>
         </div>
     </div>
 </div>
 
 <!-- Commentary Sections -->
-<div class="row">
+<div class="row g-2">
     <!-- Revenue Section -->
-    <div class="col-md-6 mb-4">
+    <div class="col-md-6">
         <div class="card slide-card h-100">
-            <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="bi {{ commentary.revenue_section.icon }}"></i> {{ commentary.revenue_section.title }}</h5>
+            <div class="card-header bg-success text-white py-1">
+                <i class="bi {{ commentary.revenue_section.icon }}"></i> {{ commentary.revenue_section.title }}
             </div>
-            <div class="card-body">
+            <div class="card-body py-2">
                 {% for bullet in commentary.revenue_section.bullets %}
                 <div class="commentary-bullet">
                     <i class="bi bi-check-circle text-success"></i> {{ bullet }}
@@ -131,12 +79,12 @@
                 {% endfor %}
 
                 {% if commentary.top_revenue_increases %}
-                <h6 class="mt-3 text-success"><i class="bi bi-arrow-up-circle"></i> Top Revenue Increases</h6>
-                <table class="table table-sm">
+                <small class="d-block mt-2 text-success"><i class="bi bi-arrow-up-circle"></i> Top Increases</small>
+                <table class="table table-sm mb-0">
                     {% for h in commentary.top_revenue_increases[:3] %}
                     <tr>
                         <td><code>{{ h.project_number }}</code></td>
-                        <td>{{ h.project_name[:20] }}</td>
+                        <td>{{ h.project_name[:15] }}</td>
                         <td class="text-end text-success">+{{ "{:,.0f}".format(h.change / 1000) }}K</td>
                     </tr>
                     {% endfor %}
@@ -147,12 +95,12 @@
     </div>
 
     <!-- Margin Section -->
-    <div class="col-md-6 mb-4">
+    <div class="col-md-6">
         <div class="card slide-card h-100">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="bi {{ commentary.margin_section.icon }}"></i> {{ commentary.margin_section.title }}</h5>
+            <div class="card-header bg-info text-white py-1">
+                <i class="bi {{ commentary.margin_section.icon }}"></i> {{ commentary.margin_section.title }}
             </div>
-            <div class="card-body">
+            <div class="card-body py-2">
                 {% for bullet in commentary.margin_section.bullets %}
                 <div class="commentary-bullet">
                     <i class="bi bi-check-circle text-info"></i> {{ bullet }}
@@ -160,14 +108,14 @@
                 {% endfor %}
 
                 {% if commentary.top_margin_changes %}
-                <h6 class="mt-3"><i class="bi bi-arrow-left-right"></i> Significant Margin Changes</h6>
-                <table class="table table-sm">
+                <small class="d-block mt-2"><i class="bi bi-arrow-left-right"></i> Margin Changes</small>
+                <table class="table table-sm mb-0">
                     {% for h in commentary.top_margin_changes[:3] %}
                     <tr>
                         <td><code>{{ h.project_number }}</code></td>
-                        <td>{{ h.project_name[:20] }}</td>
+                        <td>{{ h.project_name[:15] }}</td>
                         <td class="text-end {% if h.change > 0 %}text-success{% else %}text-danger{% endif %}">
-                            {% if h.change > 0 %}+{% endif %}{{ "{:.1f}".format(h.change * 100) }} pp
+                            {% if h.change > 0 %}+{% endif %}{{ "{:.1f}".format(h.change * 100) }}pp
                         </td>
                     </tr>
                     {% endfor %}
@@ -178,31 +126,30 @@
     </div>
 </div>
 
-<div class="row">
+<div class="row g-2 mt-2">
     <!-- Order Book Section -->
-    <div class="col-md-6 mb-4">
+    <div class="col-md-6">
         <div class="card slide-card h-100">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi {{ commentary.orderbook_section.icon }}"></i> {{ commentary.orderbook_section.title }}</h5>
+            <div class="card-header bg-primary text-white py-1">
+                <i class="bi {{ commentary.orderbook_section.icon }}"></i> {{ commentary.orderbook_section.title }}
             </div>
-            <div class="card-body">
+            <div class="card-body py-2">
                 {% for bullet in commentary.orderbook_section.bullets %}
                 <div class="commentary-bullet">
                     <i class="bi bi-check-circle text-primary"></i> {{ bullet }}
                 </div>
                 {% endfor %}
-
-                <div class="row mt-3">
+                <div class="row g-1 mt-2">
                     <div class="col-6">
-                        <div class="text-center p-2 bg-light rounded">
-                            <small class="text-muted">Previous</small>
-                            <h5>{{ "{:,.0f}".format(commentary.summary.previous.orderbook / 1000000) }}M</h5>
+                        <div class="text-center p-1 bg-light rounded">
+                            <small class="text-muted d-block">Previous</small>
+                            <strong>{{ "{:,.0f}".format(commentary.summary.previous.orderbook / 1000000) }}M</strong>
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="text-center p-2 bg-light rounded">
-                            <small class="text-muted">Current</small>
-                            <h5>{{ "{:,.0f}".format(commentary.summary.current.orderbook / 1000000) }}M</h5>
+                        <div class="text-center p-1 bg-light rounded">
+                            <small class="text-muted d-block">Current</small>
+                            <strong>{{ "{:,.0f}".format(commentary.summary.current.orderbook / 1000000) }}M</strong>
                         </div>
                     </div>
                 </div>
@@ -211,12 +158,12 @@
     </div>
 
     <!-- Project Activity Section -->
-    <div class="col-md-6 mb-4">
+    <div class="col-md-6">
         <div class="card slide-card h-100">
-            <div class="card-header bg-warning">
-                <h5 class="mb-0"><i class="bi {{ commentary.project_section.icon }}"></i> {{ commentary.project_section.title }}</h5>
+            <div class="card-header bg-warning py-1">
+                <i class="bi {{ commentary.project_section.icon }}"></i> {{ commentary.project_section.title }}
             </div>
-            <div class="card-body">
+            <div class="card-body py-2">
                 {% for bullet in commentary.project_section.bullets %}
                 <div class="commentary-bullet">
                     <i class="bi bi-check-circle text-warning"></i> {{ bullet }}
@@ -224,12 +171,12 @@
                 {% endfor %}
 
                 {% if commentary.new_projects %}
-                <h6 class="mt-3 text-success"><i class="bi bi-plus-circle"></i> New Projects</h6>
-                <table class="table table-sm">
-                    {% for p in commentary.new_projects[:3] %}
+                <small class="d-block mt-1 text-success"><i class="bi bi-plus-circle"></i> New</small>
+                <table class="table table-sm mb-0">
+                    {% for p in commentary.new_projects[:2] %}
                     <tr>
                         <td><code>{{ p.project_number }}</code></td>
-                        <td>{{ p.project_name[:20] }}</td>
+                        <td>{{ p.project_name[:12] }}</td>
                         <td class="text-end">{{ "{:,.0f}".format(p.revenue / 1000) }}K</td>
                     </tr>
                     {% endfor %}
@@ -237,13 +184,13 @@
                 {% endif %}
 
                 {% if commentary.completed_projects %}
-                <h6 class="mt-3 text-info"><i class="bi bi-check-circle-fill"></i> Completed Projects</h6>
-                <table class="table table-sm">
-                    {% for p in commentary.completed_projects[:3] %}
+                <small class="d-block mt-1 text-info"><i class="bi bi-check-circle-fill"></i> Completed</small>
+                <table class="table table-sm mb-0">
+                    {% for p in commentary.completed_projects[:2] %}
                     <tr>
                         <td><code>{{ p.project_number }}</code></td>
-                        <td>{{ p.project_name[:20] }}</td>
-                        <td class="text-end">{{ "{:.1%}".format(p.margin_pct) }} GM</td>
+                        <td>{{ p.project_name[:12] }}</td>
+                        <td class="text-end">{{ "{:.0%}".format(p.margin_pct) }}</td>
                     </tr>
                     {% endfor %}
                 </table>
@@ -253,33 +200,32 @@
     </div>
 </div>
 
-<!-- Risk Section -->
-<div class="row">
-    <div class="col-md-6 mb-4">
+<!-- Risk Section & Revenue Decreases -->
+<div class="row g-2 mt-2">
+    <div class="col-md-6">
         <div class="card slide-card">
-            <div class="card-header bg-danger text-white">
-                <h5 class="mb-0"><i class="bi {{ commentary.risk_section.icon }}"></i> {{ commentary.risk_section.title }}</h5>
+            <div class="card-header bg-danger text-white py-1">
+                <i class="bi {{ commentary.risk_section.icon }}"></i> {{ commentary.risk_section.title }}
             </div>
-            <div class="card-body">
+            <div class="card-body py-2">
                 {% for bullet in commentary.risk_section.bullets %}
                 <div class="commentary-bullet">
                     <i class="bi bi-exclamation-triangle text-danger"></i> {{ bullet }}
                 </div>
                 {% endfor %}
-
-                <div class="row mt-3">
+                <div class="row g-1 mt-2">
                     <div class="col-6">
-                        <div class="text-center p-2 bg-light rounded">
-                            <small class="text-muted">Contingency</small>
-                            <h5>{{ "{:,.0f}".format(commentary.summary.current.contingency / 1000) }}K</h5>
+                        <div class="text-center p-1 bg-light rounded">
+                            <small class="text-muted d-block">Contingency</small>
+                            <strong>{{ "{:,.0f}".format(commentary.summary.current.contingency / 1000) }}K</strong>
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="text-center p-2 bg-light rounded">
-                            <small class="text-muted">Accrued Change</small>
-                            <h5 class="{% if commentary.summary.mom_change.accrued >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        <div class="text-center p-1 bg-light rounded">
+                            <small class="text-muted d-block">Accrued Chg</small>
+                            <strong class="{% if commentary.summary.mom_change.accrued >= 0 %}text-success{% else %}text-danger{% endif %}">
                                 {% if commentary.summary.mom_change.accrued >= 0 %}+{% endif %}{{ "{:,.0f}".format(commentary.summary.mom_change.accrued / 1000) }}K
-                            </h5>
+                            </strong>
                         </div>
                     </div>
                 </div>
@@ -287,63 +233,53 @@
         </div>
     </div>
 
-    <!-- Revenue Decreases -->
-    <div class="col-md-6 mb-4">
-        {% if commentary.top_revenue_decreases %}
+    {% if commentary.top_revenue_decreases %}
+    <div class="col-md-6">
         <div class="card slide-card">
-            <div class="card-header bg-secondary text-white">
-                <h5 class="mb-0"><i class="bi bi-arrow-down-circle"></i> Revenue Decreases to Monitor</h5>
+            <div class="card-header bg-secondary text-white py-1">
+                <i class="bi bi-arrow-down-circle"></i> Revenue Decreases
             </div>
-            <div class="card-body">
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>Project</th>
-                            <th>Name</th>
-                            <th class="text-end">Change</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for h in commentary.top_revenue_decreases %}
-                        <tr>
-                            <td><code>{{ h.project_number }}</code></td>
-                            <td>{{ h.project_name[:25] }}</td>
-                            <td class="text-end text-danger">{{ "{:,.0f}".format(h.change / 1000) }}K</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
+            <div class="card-body py-2">
+                <table class="table table-sm mb-0">
+                    {% for h in commentary.top_revenue_decreases[:3] %}
+                    <tr>
+                        <td><code>{{ h.project_number }}</code></td>
+                        <td>{{ h.project_name[:15] }}</td>
+                        <td class="text-end text-danger">{{ "{:,.0f}".format(h.change / 1000) }}K</td>
+                    </tr>
+                    {% endfor %}
                 </table>
             </div>
         </div>
-        {% endif %}
     </div>
+    {% endif %}
 </div>
 
 <!-- YTD Summary -->
 {% if commentary.year_end_date %}
-<div class="row">
-    <div class="col-12 mb-4">
+<div class="row g-2 mt-2">
+    <div class="col-12">
         <div class="card slide-card">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Year-to-Date Summary (since {{ commentary.year_end_date }})</h5>
+            <div class="card-header bg-dark text-white py-1">
+                <i class="bi bi-calendar-check"></i> YTD Summary ({{ commentary.year_end_date }})
             </div>
-            <div class="card-body">
+            <div class="card-body py-2">
                 <div class="row text-center">
-                    <div class="col-md-4">
-                        <h6 class="text-muted">YTD Revenue</h6>
-                        <h3 class="{% if commentary.summary.ytd.revenue >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    <div class="col-4">
+                        <small class="text-muted d-block">YTD Revenue</small>
+                        <h5 class="mb-0 {% if commentary.summary.ytd.revenue >= 0 %}text-success{% else %}text-danger{% endif %}">
                             {% if commentary.summary.ytd.revenue >= 0 %}+{% endif %}{{ "{:,.0f}".format(commentary.summary.ytd.revenue / 1000000) }}M
-                        </h3>
+                        </h5>
                     </div>
-                    <div class="col-md-4">
-                        <h6 class="text-muted">YTD Cost</h6>
-                        <h3>{{ "{:,.0f}".format(commentary.summary.ytd.cost / 1000000) }}M</h3>
+                    <div class="col-4">
+                        <small class="text-muted d-block">YTD Cost</small>
+                        <h5 class="mb-0">{{ "{:,.0f}".format(commentary.summary.ytd.cost / 1000000) }}M</h5>
                     </div>
-                    <div class="col-md-4">
-                        <h6 class="text-muted">YTD Gross Margin</h6>
-                        <h3 class="{% if commentary.summary.ytd.gross_margin >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    <div class="col-4">
+                        <small class="text-muted d-block">YTD GM</small>
+                        <h5 class="mb-0 {% if commentary.summary.ytd.gross_margin >= 0 %}text-success{% else %}text-danger{% endif %}">
                             {% if commentary.summary.ytd.gross_margin >= 0 %}+{% endif %}{{ "{:,.0f}".format(commentary.summary.ytd.gross_margin / 1000000) }}M
-                        </h3>
+                        </h5>
                     </div>
                 </div>
             </div>
@@ -353,15 +289,15 @@
 {% endif %}
 
 <!-- Navigation -->
-<div class="mt-4 no-print">
-    <a href="{{ url_for('reports.commentary') }}" class="btn btn-outline-primary">
-        <i class="bi bi-arrow-left"></i> Back to Parameters
+<div class="mt-2 no-print">
+    <a href="{{ url_for('reports.commentary') }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Parameters
     </a>
-    <a href="{{ url_for('reports.management') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-briefcase"></i> Management Reports
+    <a href="{{ url_for('reports.management') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-briefcase-fill"></i> Management
     </a>
-    <a href="{{ url_for('reports.index') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-table"></i> Project Reports
+    <a href="{{ url_for('reports.index') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-table"></i> Projects
     </a>
 </div>
 {% endblock %}

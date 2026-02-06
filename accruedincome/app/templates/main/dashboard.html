@@ -2,133 +2,127 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
-        <hr>
-    </div>
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h4 class="mb-0"><i class="bi bi-speedometer2"></i> Dashboard</h4>
+    {% if stats %}
+    <span class="text-muted">Latest: {{ stats.closing_date }}</span>
+    {% endif %}
 </div>
 
 {% if stats %}
-<div class="row mb-4">
-    <div class="col-12">
-        <h5>Latest Closing: {{ stats.closing_date }}</h5>
-    </div>
-    <div class="col-md-3">
-        <div class="card stat-card">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-2 text-muted">Projects</h6>
-                <h3 class="card-title">{{ stats.project_count }}</h3>
+<div class="row g-2 mb-2">
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100">
+            <div class="card-body py-2">
+                <small class="text-muted">Projects</small>
+                <h4 class="mb-0">{{ stats.project_count }}</h4>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card stat-card positive">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-2 text-muted">Total Accrued Income</h6>
-                <h3 class="card-title text-success">{{ "{:,.0f}".format(stats.total_accrued) }} SEK</h3>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card positive h-100">
+            <div class="card-body py-2">
+                <small class="text-muted">Accrued Income</small>
+                <h4 class="mb-0 text-success">{{ "{:,.0f}".format(stats.total_accrued / 1000) }}K</h4>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card stat-card">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-2 text-muted">Total Contingency</h6>
-                <h3 class="card-title text-warning">{{ "{:,.0f}".format(stats.total_contingency) }} SEK</h3>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100">
+            <div class="card-body py-2">
+                <small class="text-muted">Contingency</small>
+                <h4 class="mb-0 text-warning">{{ "{:,.0f}".format(stats.total_contingency / 1000) }}K</h4>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card stat-card">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-2 text-muted">Net Accrued</h6>
-                <h3 class="card-title">{{ "{:,.0f}".format(stats.total_accrued - stats.total_contingency) }} SEK</h3>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card h-100">
+            <div class="card-body py-2">
+                <small class="text-muted">Net Accrued</small>
+                <h4 class="mb-0">{{ "{:,.0f}".format((stats.total_accrued - stats.total_contingency) / 1000) }}K</h4>
             </div>
         </div>
     </div>
 </div>
 {% else %}
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i> No calculations stored yet.
-    <a href="{{ url_for('upload.index') }}">Upload files</a> to get started.
+<div class="alert alert-info py-1 mb-2">
+    <i class="bi bi-info-circle"></i> No calculations yet. <a href="{{ url_for('upload.index') }}">Upload files</a> to start.
 </div>
 {% endif %}
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-calendar3"></i> Recent Closing Dates
+<div class="row g-2">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header py-1">
+                <i class="bi bi-calendar3"></i> Closing Dates
             </div>
-            <div class="card-body">
+            <div class="card-body py-1">
                 {% if closing_dates %}
-                <ul class="list-group list-group-flush">
+                <div class="list-group list-group-flush">
                     {% for date in closing_dates %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('reports.index', closing_date=date) }}"
+                       class="list-group-item list-group-item-action d-flex justify-content-between py-1 px-2">
                         {{ date }}
-                        <a href="{{ url_for('reports.index', closing_date=date) }}"
-                           class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-eye"></i> View
-                        </a>
-                    </li>
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
                     {% endfor %}
-                </ul>
+                </div>
                 {% else %}
-                <p class="text-muted">No closing dates available.</p>
+                <small class="text-muted">No dates available.</small>
                 {% endif %}
             </div>
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-clock-history"></i> Recent Upload Sessions
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header py-1">
+                <i class="bi bi-clock-history"></i> Upload Sessions
             </div>
-            <div class="card-body">
+            <div class="card-body py-1">
                 {% if recent_sessions %}
-                <ul class="list-group list-group-flush">
+                <div class="list-group list-group-flush">
                     {% for session in recent_sessions %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
                         <span>
-                            {{ session.created_at.strftime('%Y-%m-%d %H:%M') }}
-                            <span class="badge bg-{{ 'success' if session.status == 'stored' else 'warning' if session.status == 'calculated' else 'info' }}">
-                                {{ session.status }}
+                            {{ session.created_at.strftime('%m-%d %H:%M') }}
+                            <span class="badge bg-{{ 'success' if session.status == 'stored' else 'warning' if session.status == 'calculated' else 'secondary' }}">
+                                {{ session.status[:4] }}
                             </span>
                         </span>
                         {% if session.status == 'validated' %}
-                        <a href="{{ url_for('calculation.index') }}"
-                           class="btn btn-sm btn-success">
-                            <i class="bi bi-play"></i> Calculate
+                        <a href="{{ url_for('calculation.index') }}" class="btn btn-sm btn-success py-0">
+                            <i class="bi bi-play-fill"></i>
                         </a>
                         {% endif %}
-                    </li>
+                    </div>
                     {% endfor %}
-                </ul>
+                </div>
                 {% else %}
-                <p class="text-muted">No upload sessions yet.</p>
+                <small class="text-muted">No sessions yet.</small>
                 {% endif %}
             </div>
         </div>
     </div>
-</div>
 
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header py-1">
                 <i class="bi bi-lightning"></i> Quick Actions
             </div>
-            <div class="card-body">
-                <div class="d-grid gap-2 d-md-flex">
-                    <a href="{{ url_for('upload.index') }}" class="btn btn-primary btn-lg">
-                        <i class="bi bi-upload"></i> Upload New Files
+            <div class="card-body py-2">
+                <div class="d-grid gap-1">
+                    <a href="{{ url_for('upload.index') }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-upload"></i> Upload Files
                     </a>
-                    <a href="{{ url_for('calculation.index') }}" class="btn btn-success btn-lg">
-                        <i class="bi bi-play-circle"></i> Run Calculation
+                    <a href="{{ url_for('calculation.index') }}" class="btn btn-sm btn-success">
+                        <i class="bi bi-play-fill"></i> Calculate
                     </a>
-                    <a href="{{ url_for('reports.index') }}" class="btn btn-info btn-lg">
-                        <i class="bi bi-file-earmark-text"></i> View Reports
+                    <a href="{{ url_for('reports.index') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-file-text"></i> Reports
+                    </a>
+                    <a href="{{ url_for('reports.management') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-briefcase-fill"></i> Management
                     </a>
                 </div>
             </div>

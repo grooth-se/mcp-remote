@@ -3,6 +3,7 @@
 import os
 import json
 import uuid
+import shutil
 from flask import (
     render_template, request, flash, redirect,
     url_for, current_app
@@ -29,6 +30,32 @@ REQUIRED_FILES = {
     'Accuredhistory': 'Accrued History'
 }
 
+# Default file paths config file
+DEFAULT_PATHS_FILE = 'file_paths.json'
+
+
+def get_paths_config_file():
+    """Get path to the file paths config file."""
+    instance_path = current_app.instance_path
+    os.makedirs(instance_path, exist_ok=True)
+    return os.path.join(instance_path, DEFAULT_PATHS_FILE)
+
+
+def load_default_paths():
+    """Load default file paths from config."""
+    config_file = get_paths_config_file()
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            return json.load(f)
+    return {}
+
+
+def save_default_paths(paths):
+    """Save default file paths to config."""
+    config_file = get_paths_config_file()
+    with open(config_file, 'w') as f:
+        json.dump(paths, f, indent=2)
+
 
 def allowed_file(filename):
     """Check if file extension is allowed."""
@@ -38,53 +65,132 @@ def allowed_file(filename):
 
 @upload_bp.route('/', methods=['GET', 'POST'])
 def index():
-    """Multi-file upload form."""
+    """File path selection form with persistent defaults."""
+    default_paths = load_default_paths()
+
     if request.method == 'POST':
-        session_id = str(uuid.uuid4())
-        upload_folder = os.path.join(
-            current_app.config['UPLOAD_FOLDER'],
-            session_id
-        )
-        os.makedirs(upload_folder, exist_ok=True)
+        # Check if using file paths or file uploads
+        use_paths = request.form.get('use_paths') == 'true'
 
-        files_saved = {}
-        errors = []
+        if use_paths:
+            # Use file paths from form
+            return handle_path_upload(request.form, default_paths)
+        else:
+            # Use traditional file upload
+            return handle_file_upload(request.files)
 
-        for file_key, label in REQUIRED_FILES.items():
-            if file_key in request.files:
-                file = request.files[file_key]
-                if file.filename and allowed_file(file.filename):
-                    filename = secure_filename(file.filename)
-                    filepath = os.path.join(upload_folder, f'{file_key}.xlsx')
-                    file.save(filepath)
-                    files_saved[file_key] = filepath
-                elif file.filename:
-                    errors.append(f'Invalid file type for {label}')
-                else:
-                    errors.append(f'Missing: {label}')
+    return render_template('upload/index.html',
+                          required_files=REQUIRED_FILES,
+                          default_paths=default_paths)
+
+
+def handle_path_upload(form_data, current_defaults):
+    """Handle upload using file paths."""
+    session_id = str(uuid.uuid4())
+    upload_folder = os.path.join(
+        current_app.config['UPLOAD_FOLDER'],
+        session_id
+    )
+    os.makedirs(upload_folder, exist_ok=True)
+
+    files_saved = {}
+    errors = []
+    new_paths = {}
+
+    for file_key, label in REQUIRED_FILES.items():
+        path = form_data.get(f'path_{file_key}', '').strip()
+        new_paths[file_key] = path
+
+        if not path:
+            errors.append(f'Missing path for: {label}')
+            continue
+
+        if not os.path.exists(path):
+            errors.append(f'File not found: {path}')
+            continue
+
+        if not path.lower().endswith(('.xlsx', '.xls')):
+            errors.append(f'Invalid file type for {label}: {path}')
+            continue
+
+        try:
+            # Copy file to upload folder
+            dest_path = os.path.join(upload_folder, f'{file_key}.xlsx')
+            shutil.copy2(path, dest_path)
+            files_saved[file_key] = dest_path
+        except Exception as e:
+            errors.append(f'Error copying {label}: {str(e)}')
+
+    # Save paths as new defaults (even if some failed)
+    save_default_paths(new_paths)
+
+    # Create session record
+    session = UploadSession(
+        session_id=session_id,
+        files_json=json.dumps(files_saved),
+        validation_errors=json.dumps(errors) if errors else None,
+        status='uploaded' if not errors else 'incomplete'
+    )
+    db.session.add(session)
+    db.session.commit()
+
+    if errors:
+        flash(f'Upload incomplete: {len(errors)} files missing or invalid', 'warning')
+        return render_template('upload/index.html',
+                             required_files=REQUIRED_FILES,
+                             default_paths=new_paths,
+                             errors=errors)
+    else:
+        flash('All files loaded successfully!', 'success')
+        return redirect(url_for('upload.validate', session_id=session_id))
+
+
+def handle_file_upload(files):
+    """Handle traditional file upload."""
+    session_id = str(uuid.uuid4())
+    upload_folder = os.path.join(
+        current_app.config['UPLOAD_FOLDER'],
+        session_id
+    )
+    os.makedirs(upload_folder, exist_ok=True)
+
+    files_saved = {}
+    errors = []
+
+    for file_key, label in REQUIRED_FILES.items():
+        if file_key in files:
+            file = files[file_key]
+            if file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(upload_folder, f'{file_key}.xlsx')
+                file.save(filepath)
+                files_saved[file_key] = filepath
+            elif file.filename:
+                errors.append(f'Invalid file type for {label}')
             else:
                 errors.append(f'Missing: {label}')
-
-        # Create session record
-        session = UploadSession(
-            session_id=session_id,
-            files_json=json.dumps(files_saved),
-            validation_errors=json.dumps(errors) if errors else None,
-            status='uploaded' if not errors else 'incomplete'
-        )
-        db.session.add(session)
-        db.session.commit()
-
-        if errors:
-            flash(f'Upload incomplete: {len(errors)} files missing or invalid', 'warning')
-            return render_template('upload/index.html',
-                                 required_files=REQUIRED_FILES,
-                                 errors=errors)
         else:
-            flash('All files uploaded successfully!', 'success')
-            return redirect(url_for('upload.validate', session_id=session_id))
+            errors.append(f'Missing: {label}')
 
-    return render_template('upload/index.html', required_files=REQUIRED_FILES)
+    # Create session record
+    session = UploadSession(
+        session_id=session_id,
+        files_json=json.dumps(files_saved),
+        validation_errors=json.dumps(errors) if errors else None,
+        status='uploaded' if not errors else 'incomplete'
+    )
+    db.session.add(session)
+    db.session.commit()
+
+    if errors:
+        flash(f'Upload incomplete: {len(errors)} files missing or invalid', 'warning')
+        return render_template('upload/index.html',
+                             required_files=REQUIRED_FILES,
+                             default_paths=load_default_paths(),
+                             errors=errors)
+    else:
+        flash('All files uploaded successfully!', 'success')
+        return redirect(url_for('upload.validate', session_id=session_id))
 
 
 @upload_bp.route('/validate/<session_id>')
@@ -98,7 +204,7 @@ def validate(session_id):
 
     for file_key, filepath in files.items():
         try:
-            df = pd.read_excel(filepath)
+            df = pd.read_excel(filepath, engine='openpyxl')
             validation_results[file_key] = {
                 'status': 'ok',
                 'rows': len(df),
