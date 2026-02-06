@@ -101,17 +101,17 @@
                             <tr>
                                 <td><code>{{ r.project_number }}</code></td>
                                 <td class="text-truncate" style="max-width:100px">{{ r.project_name[:15] }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.current_revenue / 1000) }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.current_cogs / 1000) }}</td>
-                                <td class="text-end {% if r.current_gm < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(r.current_gm / 1000) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.current_revenue ) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.current_cogs ) }}</td>
+                                <td class="text-end {% if r.current_gm < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(r.current_gm ) }}</td>
                                 <td class="text-end">{{ "{:.0%}".format(r.current_gm_pct) if r.current_revenue else '-' }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.ytd_revenue / 1000) }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.ytd_cogs / 1000) }}</td>
-                                <td class="text-end {% if r.ytd_gm < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(r.ytd_gm / 1000) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.ytd_revenue ) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.ytd_cogs ) }}</td>
+                                <td class="text-end {% if r.ytd_gm < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(r.ytd_gm ) }}</td>
                                 <td class="text-end">{{ "{:.0%}".format(r.ytd_gm_pct) if r.ytd_revenue else '-' }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.ptd_revenue / 1000) }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.ptd_cogs / 1000) }}</td>
-                                <td class="text-end {% if r.ptd_gm < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(r.ptd_gm / 1000) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.ptd_revenue ) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.ptd_cogs ) }}</td>
+                                <td class="text-end {% if r.ptd_gm < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(r.ptd_gm ) }}</td>
                                 <td class="text-end">{{ "{:.0%}".format(r.ptd_gm_pct) if r.ptd_revenue else '-' }}</td>
                             </tr>
                             {% endfor %}
@@ -119,17 +119,17 @@
                         <tfoot class="sticky-bottom table-dark">
                             <tr>
                                 <th colspan="2">TOTAL (K)</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.current_revenue / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.current_cogs / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.current_gm / 1000) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.current_revenue ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.current_cogs ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.current_gm ) }}</th>
                                 <th></th>
-                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ytd_revenue / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ytd_cogs / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ytd_gm / 1000) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ytd_revenue ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ytd_cogs ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ytd_gm ) }}</th>
                                 <th></th>
-                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ptd_revenue / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ptd_cogs / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ptd_gm / 1000) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ptd_revenue ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ptd_cogs ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report1_totals.ptd_gm ) }}</th>
                                 <th></th>
                             </tr>
                         </tfoot>
@@ -170,36 +170,36 @@
                             <tr>
                                 <td><code>{{ r.project_number }}</code></td>
                                 <td class="text-truncate" style="max-width:100px">{{ r.project_name[:15] }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.tcv_revenue / 1000) }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.cogs / 1000) }}</td>
-                                <td class="text-end {% if r.gm < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(r.gm / 1000) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.tcv_revenue ) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.cogs ) }}</td>
+                                <td class="text-end {% if r.gm < 0 %}text-danger{% endif %}">{{ "{:,.0f}".format(r.gm ) }}</td>
                                 <td class="text-end">{{ "{:.0%}".format(r.gm_pct) }}</td>
                                 <td class="text-end">{{ "{:.0%}".format(r.poc) }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.contingency / 1000) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.contingency ) }}</td>
                                 <td class="text-end {% if r.delta_revenue > 0 %}text-success{% elif r.delta_revenue < 0 %}text-danger{% endif %}">
-                                    {{ "{:+,.0f}".format(r.delta_revenue / 1000) }}
+                                    {{ "{:+,.0f}".format(r.delta_revenue ) }}
                                 </td>
                                 <td class="text-end {% if r.delta_cogs > 0 %}text-danger{% elif r.delta_cogs < 0 %}text-success{% endif %}">
-                                    {{ "{:+,.0f}".format(r.delta_cogs / 1000) }}
+                                    {{ "{:+,.0f}".format(r.delta_cogs ) }}
                                 </td>
                                 <td class="text-end {% if r.delta_gm > 0 %}text-success{% elif r.delta_gm < 0 %}text-danger{% endif %}">
-                                    {{ "{:+,.0f}".format(r.delta_gm / 1000) }}
+                                    {{ "{:+,.0f}".format(r.delta_gm ) }}
                                 </td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.currency_effect / 1000) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.currency_effect ) }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot class="sticky-bottom table-dark">
                             <tr>
                                 <th colspan="2">TOTAL (K)</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report2_totals.tcv_revenue / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report2_totals.cogs / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report2_totals.gm / 1000) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report2_totals.tcv_revenue ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report2_totals.cogs ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report2_totals.gm ) }}</th>
                                 <th></th><th></th>
-                                <th class="text-end">{{ "{:,.0f}".format(report2_totals.contingency / 1000) }}</th>
-                                <th class="text-end">{{ "{:+,.0f}".format(report2_totals.delta_revenue / 1000) }}</th>
-                                <th class="text-end">{{ "{:+,.0f}".format(report2_totals.delta_cogs / 1000) }}</th>
-                                <th class="text-end">{{ "{:+,.0f}".format(report2_totals.delta_gm / 1000) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report2_totals.contingency ) }}</th>
+                                <th class="text-end">{{ "{:+,.0f}".format(report2_totals.delta_revenue ) }}</th>
+                                <th class="text-end">{{ "{:+,.0f}".format(report2_totals.delta_cogs ) }}</th>
+                                <th class="text-end">{{ "{:+,.0f}".format(report2_totals.delta_gm ) }}</th>
                                 <th></th>
                             </tr>
                         </tfoot>
@@ -233,10 +233,10 @@
                             <tr>
                                 <td><code>{{ r.project_number }}</code></td>
                                 <td class="text-truncate" style="max-width:100px">{{ r.project_name[:15] }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.ob_order_backlog / 1000) }}</td>
-                                <td class="text-end {% if r.order_intake > 0 %}text-success{% endif %}">{{ "{:,.0f}".format(r.order_intake / 1000) }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.revenue / 1000) }}</td>
-                                <td class="text-end">{{ "{:,.0f}".format(r.eb_order_backlog / 1000) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.ob_order_backlog ) }}</td>
+                                <td class="text-end {% if r.order_intake > 0 %}text-success{% endif %}">{{ "{:,.0f}".format(r.order_intake ) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.revenue ) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(r.eb_order_backlog ) }}</td>
                                 <td class="text-end">{{ "{:.0%}".format(r.gm_pct) }}</td>
                                 <td>{{ r.production_start[:7] if r.production_start else '-' }}</td>
                                 <td>{{ r.delivery[:7] if r.delivery else '-' }}</td>
@@ -246,10 +246,10 @@
                         <tfoot class="sticky-bottom table-dark">
                             <tr>
                                 <th colspan="2">TOTAL (K)</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report3_totals.ob_order_backlog / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report3_totals.order_intake / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report3_totals.revenue / 1000) }}</th>
-                                <th class="text-end">{{ "{:,.0f}".format(report3_totals.eb_order_backlog / 1000) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report3_totals.ob_order_backlog ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report3_totals.order_intake ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report3_totals.revenue ) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(report3_totals.eb_order_backlog ) }}</th>
                                 <th colspan="3"></th>
                             </tr>
                         </tfoot>
