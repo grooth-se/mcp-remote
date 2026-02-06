@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Weld Projects{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-lightning"></i> Weld Simulation Projects</h2>
+        <p class="text-muted">Multi-pass welding simulation with COMSOL integration</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('welding.new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> New Project
+        </a>
+    </div>
+</div>
+
+{% if projects %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Name</th>
+                <th>Process</th>
+                <th>Steel Grade</th>
+                <th>Strings</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for project in projects %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('welding.view', id=project.id) }}">
+                        <strong>{{ project.name }}</strong>
+                    </a>
+                    {% if project.description %}
+                    <br><small class="text-muted">{{ project.description[:50] }}{% if project.description|length > 50 %}...{% endif %}</small>
+                    {% endif %}
+                </td>
+                <td>{{ project.process_label }}</td>
+                <td>{{ project.steel_grade.display_name if project.steel_grade else 'Not set' }}</td>
+                <td>
+                    {% if project.status == 'completed' %}
+                    {{ project.completed_strings_count }} / {{ project.total_strings }}
+                    {% else %}
+                    {{ project.total_strings or 0 }}
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge {{ project.status_badge_class }}">
+                        {{ project.status|title }}
+                    </span>
+                </td>
+                <td>{{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'N/A' }}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('welding.view', id=project.id) }}" class="btn btn-outline-primary" title="View">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="{{ url_for('welding.configure', id=project.id) }}" class="btn btn-outline-secondary" title="Configure">
+                            <i class="bi bi-gear"></i>
+                        </a>
+                        {% if project.can_run %}
+                        <a href="{{ url_for('welding.run', id=project.id) }}" class="btn btn-outline-success" title="Run">
+                            <i class="bi bi-play-fill"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    No weld projects yet.
+    <a href="{{ url_for('welding.new') }}">Create your first project</a> to get started.
+</div>
+{% endif %}
+{% endblock %}

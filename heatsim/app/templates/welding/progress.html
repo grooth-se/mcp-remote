@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Simulation Progress - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.view', id=project.id) }}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item active">Progress</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-hourglass-split"></i> Simulation Progress</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Progress Overview -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Overall Progress</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span id="progressMessage">{{ project.progress_message or 'Initializing...' }}</span>
+                        <span id="progressPercent">{{ "%.0f"|format(project.progress_percent) }}%</span>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             id="progressBar"
+                             role="progressbar"
+                             style="width: {{ project.progress_percent }}%">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row text-center">
+                    <div class="col">
+                        <h4 id="currentString">{{ project.current_string }}</h4>
+                        <small class="text-muted">Current String</small>
+                    </div>
+                    <div class="col">
+                        <h4 id="totalStrings">{{ project.total_strings }}</h4>
+                        <small class="text-muted">Total Strings</small>
+                    </div>
+                    <div class="col">
+                        <h4><span class="badge {{ project.status_badge_class }}" id="statusBadge">{{ project.status|title }}</span></h4>
+                        <small class="text-muted">Status</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- String Progress -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">String Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stringsTable">
+                            {% for string in strings %}
+                            <tr id="string-{{ string.id }}">
+                                <td>{{ string.string_number }}</td>
+                                <td>{{ string.display_name }}</td>
+                                <td>
+                                    <span class="badge {{ string.status_badge_class }}" id="status-{{ string.id }}">
+                                        {{ string.status|title }}
+                                    </span>
+                                </td>
+                                <td id="duration-{{ string.id }}">
+                                    {% if string.duration_seconds %}
+                                    {{ "%.1f"|format(string.duration_seconds) }}s
+                                    {% elif string.status == 'running' %}
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Running...</span>
+                                    </div>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Project Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Project</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>{{ project.name }}</strong></p>
+                <table class="table table-sm">
+                    <tr><td>Process</td><td>{{ project.process_label }}</td></tr>
+                    <tr><td>Steel Grade</td><td>{{ project.steel_grade.display_name if project.steel_grade else '-' }}</td></tr>
+                    <tr><td>Started</td><td>{{ project.started_at.strftime('%H:%M:%S') if project.started_at else '-' }}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Status Legend</h5>
+            </div>
+            <div class="card-body">
+                <p><span class="badge bg-secondary">Pending</span> Waiting to start</p>
+                <p><span class="badge bg-warning">Running</span> Currently simulating</p>
+                <p><span class="badge bg-success">Completed</span> Finished successfully</p>
+                <p class="mb-0"><span class="badge bg-danger">Failed</span> Error occurred</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const projectId = {{ project.id }};
+let polling = true;
+
+function updateProgress() {
+    if (!polling) return;
+
+    fetch(`{{ url_for('welding.progress_status', id=project.id) }}`)
+        .then(response => response.json())
+        .then(data => {
+            // Update overall progress
+            document.getElementById('progressPercent').textContent = data.progress_percent.toFixed(0) + '%';
+            document.getElementById('progressBar').style.width = data.progress_percent + '%';
+            document.getElementById('progressMessage').textContent = data.progress_message || '';
+            document.getElementById('currentString').textContent = data.current_string;
+            document.getElementById('totalStrings').textContent = data.total_strings;
+
+            // Update status badge
+            const statusBadge = document.getElementById('statusBadge');
+            statusBadge.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+            statusBadge.className = 'badge bg-' + getStatusColor(data.status);
+
+            // Update strings
+            data.strings.forEach(string => {
+                const statusEl = document.getElementById('status-' + string.id);
+                const durationEl = document.getElementById('duration-' + string.id);
+
+                if (statusEl) {
+                    statusEl.textContent = string.status.charAt(0).toUpperCase() + string.status.slice(1);
+                    statusEl.className = 'badge bg-' + getStatusColor(string.status);
+                }
+
+                if (durationEl) {
+                    if (string.duration !== null && string.duration !== undefined) {
+                        durationEl.textContent = string.duration.toFixed(1) + 's';
+                    } else if (string.status === 'running') {
+                        durationEl.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Running...</span></div>';
+                    }
+                }
+            });
+
+            // Stop polling if completed or failed
+            if (data.status === 'completed' || data.status === 'failed') {
+                polling = false;
+                if (data.status === 'completed') {
+                    document.getElementById('progressBar').classList.remove('progress-bar-animated');
+                    setTimeout(() => {
+                        window.location.href = "{{ url_for('welding.results', id=project.id) }}";
+                    }, 2000);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching progress:', error);
+        });
+}
+
+function getStatusColor(status) {
+    switch (status) {
+        case 'pending': return 'secondary';
+        case 'running': return 'warning';
+        case 'completed': return 'success';
+        case 'failed': return 'danger';
+        case 'configured': return 'info';
+        default: return 'secondary';
+    }
+}
+
+// Poll every 2 seconds
+setInterval(updateProgress, 2000);
+
+// Initial update
+updateProgress();
+</script>
+{% endblock %}

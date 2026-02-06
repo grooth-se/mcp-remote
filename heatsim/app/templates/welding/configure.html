@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Configure Weld Strings - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.view', id=project.id) }}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item active">Configure</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-gear"></i> Configure Weld Strings</h2>
+        <p class="text-muted">Define the weld string sequence for <strong>{{ project.name }}</strong></p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Current Strings -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Weld Strings ({{ strings|length }})</h5>
+                <a href="{{ url_for('welding.string_new', id=project.id) }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg"></i> Add String
+                </a>
+            </div>
+            <div class="card-body">
+                {% if strings %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="stringsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th width="50">#</th>
+                                <th>Name</th>
+                                <th>Layer</th>
+                                <th>Position</th>
+                                <th>Heat Input</th>
+                                <th>Travel Speed</th>
+                                <th>Status</th>
+                                <th width="100">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stringsList">
+                            {% for string in strings %}
+                            <tr data-id="{{ string.id }}">
+                                <td class="handle" style="cursor: move;">
+                                    <i class="bi bi-grip-vertical text-muted"></i>
+                                    <span class="string-number">{{ string.string_number }}</span>
+                                </td>
+                                <td>{{ string.display_name }}</td>
+                                <td>{{ string.layer }}</td>
+                                <td>{{ string.position_in_layer }}</td>
+                                <td>{{ "%.2f"|format(string.effective_heat_input) }} kJ/mm</td>
+                                <td>{{ "%.1f"|format(string.effective_travel_speed) }} mm/s</td>
+                                <td><span class="badge {{ string.status_badge_class }}">{{ string.status|title }}</span></td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('welding.string_edit', id=project.id, sid=string.id) }}" class="btn btn-outline-primary" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <form action="{{ url_for('welding.string_delete', id=project.id, sid=string.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this string?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <form method="POST" id="reorderForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="reorder">
+                    <input type="hidden" name="order_data" id="orderData" value="">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm" id="saveOrderBtn" disabled>
+                        <i class="bi bi-arrow-down-up"></i> Save New Order
+                    </button>
+                </form>
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    No strings defined yet. Add strings manually or use Quick Add below.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Add -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Add Strings</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ quick_form.hidden_tag() }}
+                    <input type="hidden" name="action" value="quick_add">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            {{ quick_form.num_layers.label(class="form-label") }}
+                            {{ quick_form.num_layers(class="form-control") }}
+                        </div>
+                        <div class="col-md-3">
+                            {{ quick_form.strings_per_layer.label(class="form-label") }}
+                            {{ quick_form.strings_per_layer(class="form-control") }}
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                {{ quick_form.use_defaults(class="form-check-input") }}
+                                {{ quick_form.use_defaults.label(class="form-check-label") }}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-secondary">
+                                <i class="bi bi-plus-lg"></i> Quick Add
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Project Summary -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Project Summary</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr><td>Process</td><td><strong>{{ project.process_label }}</strong></td></tr>
+                    <tr><td>Steel Grade</td><td>{{ project.steel_grade.display_name if project.steel_grade else 'Not set' }}</td></tr>
+                    <tr><td>Preheat</td><td>{{ project.preheat_temperature }}°C</td></tr>
+                    <tr><td>Max Interpass</td><td>{{ project.interpass_temperature }}°C</td></tr>
+                    <tr><td>Default Heat Input</td><td>{{ project.default_heat_input }} kJ/mm</td></tr>
+                    <tr><td>Default Travel Speed</td><td>{{ project.default_travel_speed }} mm/s</td></tr>
+                    <tr><td>Total Strings</td><td><strong>{{ strings|length }}</strong></td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Actions</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="mb-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="mark_configured">
+                    <button type="submit" class="btn btn-success w-100" {% if strings|length == 0 %}disabled{% endif %}>
+                        <i class="bi bi-check-lg"></i> Mark as Configured
+                    </button>
+                </form>
+                <p class="small text-muted mb-0">
+                    Mark the project as configured when you're done defining strings.
+                    This enables the Run Simulation option.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const stringsList = document.getElementById('stringsList');
+    if (!stringsList) return;
+
+    const sortable = new Sortable(stringsList, {
+        handle: '.handle',
+        animation: 150,
+        onEnd: function(evt) {
+            // Update visual numbers
+            const rows = stringsList.querySelectorAll('tr');
+            const orderData = [];
+            rows.forEach((row, index) => {
+                const numSpan = row.querySelector('.string-number');
+                if (numSpan) numSpan.textContent = index + 1;
+                orderData.push({
+                    id: parseInt(row.dataset.id),
+                    order: index + 1
+                });
+            });
+
+            // Enable save button and store data
+            document.getElementById('orderData').value = JSON.stringify(orderData);
+            document.getElementById('saveOrderBtn').disabled = false;
+        }
+    });
+});
+</script>
+{% endblock %}

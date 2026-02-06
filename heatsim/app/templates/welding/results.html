@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Results - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.view', id=project.id) }}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item active">Results</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-graph-up"></i> Simulation Results</h2>
+        <p class="text-muted">Results for <strong>{{ project.name }}</strong></p>
+    </div>
+</div>
+
+<!-- Summary Statistics -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Summary Statistics</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>String</th>
+                        <th>Peak Temperature</th>
+                        <th>t8/5</th>
+                        <th>Max Cooling Rate</th>
+                        <th>Dominant Phase</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for string in project.strings.order_by('string_number').all() %}
+                    {% set string_thermal = thermal_cycles|selectattr('string_id', 'equalto', string.id)|first %}
+                    <tr>
+                        <td>{{ string.string_number }}</td>
+                        <td>{{ string.display_name }}</td>
+                        <td>
+                            {% if string_thermal and string_thermal.peak_temperature %}
+                            {{ "%.0f"|format(string_thermal.peak_temperature) }}°C
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>
+                            {% if string_thermal and string_thermal.t_800_500 %}
+                            {{ "%.1f"|format(string_thermal.t_800_500) }}s
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>
+                            {% if string_thermal and string_thermal.cooling_rate_max %}
+                            {{ "%.0f"|format(string_thermal.cooling_rate_max) }}°C/s
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>
+                            {% if string_thermal and string_thermal.phases_dict %}
+                            {% set phases = string_thermal.phases_dict %}
+                            {% set max_phase = phases|dictsort(by='value', reverse=true)|first %}
+                            <span class="badge bg-info">{{ max_phase[0]|title }}</span>
+                            {{ "%.0f"|format(max_phase[1] * 100) }}%
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Plots -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Thermal Cycles (T vs t)</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('welding.plot', id=project.id, plot_type='thermal_cycles') }}"
+                     class="img-fluid" alt="Thermal Cycles" id="thermalCyclesPlot"
+                     onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Cooling Rate (dT/dt vs T)</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('welding.plot', id=project.id, plot_type='cooling_rates') }}"
+                     class="img-fluid" alt="Cooling Rates" id="coolingRatesPlot"
+                     onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Phase Fractions</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('welding.plot', id=project.id, plot_type='phases') }}"
+                     class="img-fluid" alt="Phase Fractions" id="phasesPlot"
+                     onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Summary Table</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('welding.plot', id=project.id, plot_type='summary') }}"
+                     class="img-fluid" alt="Summary Table" id="summaryPlot"
+                     onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Table not available</div>'">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Phase Details -->
+{% if thermal_cycles %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Phase Fraction Details</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th>String</th>
+                        <th>Martensite</th>
+                        <th>Bainite</th>
+                        <th>Ferrite</th>
+                        <th>Pearlite</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in thermal_cycles %}
+                    {% set phases = result.phases_dict %}
+                    <tr>
+                        <td>{{ result.location or 'String ' ~ result.string_id }}</td>
+                        <td>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-danger" style="width: {{ (phases.get('martensite', 0) * 100)|round }}%">
+                                    {{ "%.0f"|format(phases.get('martensite', 0) * 100) }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-primary" style="width: {{ (phases.get('bainite', 0) * 100)|round }}%">
+                                    {{ "%.0f"|format(phases.get('bainite', 0) * 100) }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-success" style="width: {{ (phases.get('ferrite', 0) * 100)|round }}%">
+                                    {{ "%.0f"|format(phases.get('ferrite', 0) * 100) }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-purple" style="width: {{ (phases.get('pearlite', 0) * 100)|round }}%; background-color: #9b59b6;">
+                                    {{ "%.0f"|format(phases.get('pearlite', 0) * 100) }}%
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Animation (if available) -->
+{% set anim_result = results|selectattr('result_type', 'equalto', 'animation')|first %}
+{% if anim_result and anim_result.animation_filename %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Temperature Field Animation</h5>
+    </div>
+    <div class="card-body text-center">
+        <video controls width="100%" style="max-width: 800px;">
+            <source src="{{ url_for('welding.animation', id=project.id) }}" type="video/mp4">
+            Your browser does not support video playback.
+        </video>
+    </div>
+</div>
+{% endif %}
+
+<!-- Navigation -->
+<div class="d-flex gap-2">
+    <a href="{{ url_for('welding.view', id=project.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Project
+    </a>
+    {% if project.can_run %}
+    <a href="{{ url_for('welding.run', id=project.id) }}" class="btn btn-primary">
+        <i class="bi bi-arrow-repeat"></i> Re-run Simulation
+    </a>
+    {% endif %}
+</div>
+{% endblock %}

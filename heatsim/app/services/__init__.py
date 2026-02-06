@@ -7,6 +7,7 @@ from .boundary_conditions import BoundaryCondition, InsulatedBoundary, create_qu
 from .heat_solver import HeatSolver, SolverConfig, SolverResult
 from .phase_tracker import PhaseTracker, PhaseResult
 from . import visualization
+from . import comsol
 
 __all__ = [
     # Phase 2 services
@@ -32,4 +33,6 @@ __all__ = [
     'PhaseResult',
     # Phase 3 services - Visualization
     'visualization',
+    # Phase 4 services - COMSOL integration
+    'comsol',
 ]

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Run Simulation - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.view', id=project.id) }}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item active">Run</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-play-fill"></i> Run Simulation</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Simulation Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.use_mock_solver(class="form-check-input") }}
+                            {{ form.use_mock_solver.label(class="form-check-label") }}
+                            <div class="form-text">
+                                Use mock solver for testing without COMSOL installation.
+                                Results will be synthetic but representative.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.save_intermediate(class="form-check-input") }}
+                            {{ form.save_intermediate.label(class="form-check-label") }}
+                            <div class="form-text">
+                                Save results after each string completes.
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="alert alert-info">
+                        <strong>Note:</strong> The simulation will run synchronously.
+                        Please wait for completion after clicking Start.
+                    </div>
+
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-play-fill"></i> Start Simulation
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Project Summary</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr><td>Name</td><td><strong>{{ project.name }}</strong></td></tr>
+                    <tr><td>Process</td><td>{{ project.process_label }}</td></tr>
+                    <tr><td>Steel Grade</td><td>{{ project.steel_grade.display_name if project.steel_grade else 'Not set' }}</td></tr>
+                    <tr><td>Total Strings</td><td><strong>{{ project.total_strings }}</strong></td></tr>
+                    <tr><td>Status</td><td><span class="badge {{ project.status_badge_class }}">{{ project.status|title }}</span></td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Strings to Simulate</h5>
+            </div>
+            <div class="card-body">
+                <ol class="small mb-0">
+                    {% for string in project.strings.order_by('string_number').all() %}
+                    <li>{{ string.display_name }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

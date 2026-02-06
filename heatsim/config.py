@@ -38,10 +38,15 @@ class Config:
     UPLOAD_FOLDER = basedir / 'data' / 'uploads'
     GEOMETRY_FOLDER = basedir / 'data' / 'geometries'
     RESULTS_FOLDER = basedir / 'data' / 'results'
+    VTK_FOLDER = basedir / 'data' / 'vtk'
+    ANIMATIONS_FOLDER = basedir / 'data' / 'animations'
+    COMSOL_MODELS_FOLDER = basedir / 'data' / 'comsol_models'
 
     # COMSOL (Phase 4)
     COMSOL_PATH = os.environ.get('COMSOL_PATH', '/usr/local/comsol')
     COMSOL_LICENSE_SERVER = os.environ.get('COMSOL_LICENSE', '')
+    COMSOL_TIMEOUT = int(os.environ.get('COMSOL_TIMEOUT', 3600))  # 1 hour default
+    COMSOL_CORES = int(os.environ.get('COMSOL_CORES', 4))  # CPU cores for COMSOL
 
 
 class DevelopmentConfig(Config):

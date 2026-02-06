@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} - Weld Project{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item active">{{ project.name }}</li>
+            </ol>
+        </nav>
+        <h2>
+            <i class="bi bi-lightning"></i> {{ project.name }}
+            <span class="badge {{ project.status_badge_class }} ms-2">{{ project.status|title }}</span>
+        </h2>
+        {% if project.description %}
+        <p class="text-muted">{{ project.description }}</p>
+        {% endif %}
+    </div>
+    <div class="col-auto">
+        <div class="btn-group">
+            <a href="{{ url_for('welding.configure', id=project.id) }}" class="btn btn-outline-primary">
+                <i class="bi bi-gear"></i> Configure
+            </a>
+            {% if project.can_run %}
+            <a href="{{ url_for('welding.run', id=project.id) }}" class="btn btn-success">
+                <i class="bi bi-play-fill"></i> Run
+            </a>
+            {% endif %}
+            {% if project.status == 'running' %}
+            <a href="{{ url_for('welding.progress', id=project.id) }}" class="btn btn-warning">
+                <i class="bi bi-hourglass-split"></i> Progress
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Project Details -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Project Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr><td>Process</td><td><strong>{{ project.process_label }}</strong></td></tr>
+                            <tr><td>Steel Grade</td><td>{{ project.steel_grade.display_name if project.steel_grade else 'Not set' }}</td></tr>
+                            <tr><td>CAD File</td><td>{{ project.cad_filename or 'Not uploaded' }}</td></tr>
+                            <tr><td>Total Strings</td><td><strong>{{ project.total_strings or 0 }}</strong></td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <tr><td>Preheat Temperature</td><td>{{ project.preheat_temperature }}°C</td></tr>
+                            <tr><td>Max Interpass</td><td>{{ project.interpass_temperature }}°C</td></tr>
+                            <tr><td>Default Heat Input</td><td>{{ project.default_heat_input }} kJ/mm</td></tr>
+                            <tr><td>Default Travel Speed</td><td>{{ project.default_travel_speed }} mm/s</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strings Overview -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Weld Strings</h5>
+            </div>
+            <div class="card-body">
+                {% set strings = project.strings.order_by('string_number').all() %}
+                {% if strings %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Layer</th>
+                                <th>Heat Input</th>
+                                <th>Status</th>
+                                {% if project.status == 'completed' %}
+                                <th>Peak T</th>
+                                <th>t8/5</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for string in strings %}
+                            <tr>
+                                <td>{{ string.string_number }}</td>
+                                <td>{{ string.display_name }}</td>
+                                <td>L{{ string.layer }}-P{{ string.position_in_layer }}</td>
+                                <td>{{ "%.2f"|format(string.effective_heat_input) }} kJ/mm</td>
+                                <td><span class="badge {{ string.status_badge_class }}">{{ string.status|title }}</span></td>
+                                {% if project.status == 'completed' %}
+                                {% set string_thermal = thermal_cycles|selectattr('string_id', 'equalto', string.id)|first %}
+                                <td>{{ "%.0f"|format(string_thermal.peak_temperature) if string_thermal and string_thermal.peak_temperature else '-' }}°C</td>
+                                <td>{{ "%.1f"|format(string_thermal.t_800_500) if string_thermal and string_thermal.t_800_500 else '-' }}s</td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">No strings configured.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Results (if completed) -->
+        {% if project.status == 'completed' and thermal_cycles %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Results</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6>Thermal Cycles</h6>
+                                <img src="{{ url_for('welding.plot', id=project.id, plot_type='thermal_cycles') }}"
+                                     class="img-fluid" alt="Thermal Cycles Plot" onerror="this.style.display='none'">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h6>Phase Fractions</h6>
+                                <img src="{{ url_for('welding.plot', id=project.id, plot_type='phases') }}"
+                                     class="img-fluid" alt="Phase Fractions Plot" onerror="this.style.display='none'">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ url_for('welding.results', id=project.id) }}" class="btn btn-primary">
+                        <i class="bi bi-graph-up"></i> View All Results
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <!-- Status Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <span class="badge {{ project.status_badge_class }} fs-6">{{ project.status|title }}</span>
+                </div>
+
+                {% if project.status == 'completed' %}
+                <div class="alert alert-success mb-0">
+                    <i class="bi bi-check-circle"></i>
+                    Simulation completed successfully.
+                    {% if project.duration_seconds %}
+                    <br><small>Duration: {{ "%.1f"|format(project.duration_seconds) }}s</small>
+                    {% endif %}
+                </div>
+                {% elif project.status == 'failed' %}
+                <div class="alert alert-danger mb-0">
+                    <i class="bi bi-x-circle"></i>
+                    Simulation failed.
+                    {% if project.error_message %}
+                    <br><small>{{ project.error_message }}</small>
+                    {% endif %}
+                </div>
+                {% elif project.status == 'running' %}
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-hourglass-split"></i>
+                    Simulation in progress...
+                    <div class="progress mt-2">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             style="width: {{ project.progress_percent }}%">
+                            {{ "%.0f"|format(project.progress_percent) }}%
+                        </div>
+                    </div>
+                    <small class="text-muted">{{ project.progress_message }}</small>
+                </div>
+                {% elif project.status == 'configured' %}
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-check2"></i>
+                    Ready to run simulation.
+                </div>
+                {% else %}
+                <div class="alert alert-secondary mb-0">
+                    <i class="bi bi-pencil"></i>
+                    Draft - configure strings to continue.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Timestamps -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Timeline</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr><td>Created</td><td>{{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else '-' }}</td></tr>
+                    <tr><td>Started</td><td>{{ project.started_at.strftime('%Y-%m-%d %H:%M') if project.started_at else '-' }}</td></tr>
+                    <tr><td>Completed</td><td>{{ project.completed_at.strftime('%Y-%m-%d %H:%M') if project.completed_at else '-' }}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <form action="{{ url_for('welding.duplicate', id=project.id) }}" method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-copy"></i> Duplicate Project
+                        </button>
+                    </form>
+                    <form action="{{ url_for('welding.delete', id=project.id) }}" method="POST"
+                          onsubmit="return confirm('Delete this project and all results?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-danger w-100"
+                                {% if project.status == 'running' %}disabled{% endif %}>
+                            <i class="bi bi-trash"></i> Delete Project
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

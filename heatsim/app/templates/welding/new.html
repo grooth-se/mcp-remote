@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}New Weld Project{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item active">New Project</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-plus-lg"></i> New Weld Project</h2>
+    </div>
+</div>
+
+<form method="POST" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Project Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control") }}
+                        {% if form.name.errors %}
+                        <div class="invalid-feedback d-block">{{ form.name.errors[0] }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.description.label(class="form-label") }}
+                        {{ form.description(class="form-control") }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.steel_grade_id.label(class="form-label") }}
+                            {{ form.steel_grade_id(class="form-select") }}
+                            {% if form.steel_grade_id.errors %}
+                            <div class="invalid-feedback d-block">{{ form.steel_grade_id.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.process_type.label(class="form-label") }}
+                            {{ form.process_type(class="form-select") }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.cad_file.label(class="form-label") }}
+                        {{ form.cad_file(class="form-control") }}
+                        <div class="form-text">Upload STEP, IGES, or STL file with weld string bodies</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Temperature Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.preheat_temperature.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.preheat_temperature(class="form-control") }}
+                                <span class="input-group-text">°C</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.interpass_temperature.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.interpass_temperature(class="form-control") }}
+                                <span class="input-group-text">°C</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.default_solidification_temp.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.default_solidification_temp(class="form-control") }}
+                                <span class="input-group-text">°C</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Default Welding Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.default_heat_input.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.default_heat_input(class="form-control") }}
+                                <span class="input-group-text">kJ/mm</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.default_travel_speed.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.default_travel_speed(class="form-control") }}
+                                <span class="input-group-text">mm/s</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.interpass_time_default.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.interpass_time_default(class="form-control") }}
+                                <span class="input-group-text">s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Workflow</h5>
+                </div>
+                <div class="card-body">
+                    <ol class="small">
+                        <li class="mb-2"><strong>Create Project</strong> - Define basic parameters</li>
+                        <li class="mb-2"><strong>Configure Strings</strong> - Set weld sequence and parameters</li>
+                        <li class="mb-2"><strong>Run Simulation</strong> - Execute COMSOL analysis</li>
+                        <li><strong>View Results</strong> - Thermal cycles, cooling rates, phases</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Typical Values</h5>
+                </div>
+                <div class="card-body small">
+                    <table class="table table-sm">
+                        <tr><td>GTAW Heat Input</td><td>0.5 - 2.0 kJ/mm</td></tr>
+                        <tr><td>MIG/MAG Heat Input</td><td>0.8 - 3.0 kJ/mm</td></tr>
+                        <tr><td>SAW Heat Input</td><td>1.5 - 5.0 kJ/mm</td></tr>
+                        <tr><td>Typical Interpass</td><td>100 - 200°C</td></tr>
+                        <tr><td>Preheat (thick)</td><td>100 - 200°C</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Create Project
+        </button>
+        <a href="{{ url_for('welding.index') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

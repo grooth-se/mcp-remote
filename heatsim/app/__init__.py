@@ -39,6 +39,9 @@ def create_app(config_name='default'):
     os.makedirs(app.config.get('UPLOAD_FOLDER', 'data/uploads'), exist_ok=True)
     os.makedirs(app.config.get('GEOMETRY_FOLDER', 'data/geometries'), exist_ok=True)
     os.makedirs(app.config.get('RESULTS_FOLDER', 'data/results'), exist_ok=True)
+    os.makedirs(app.config.get('VTK_FOLDER', 'data/vtk'), exist_ok=True)
+    os.makedirs(app.config.get('ANIMATIONS_FOLDER', 'data/animations'), exist_ok=True)
+    os.makedirs(app.config.get('COMSOL_MODELS_FOLDER', 'data/comsol_models'), exist_ok=True)
 
     # Initialize extensions
     db.init_app(app)
@@ -58,11 +61,13 @@ def create_app(config_name='default'):
     from .auth import auth_bp
     from .materials import materials_bp
     from .simulation import simulation_bp
+    from .welding import welding_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(materials_bp, url_prefix='/materials')
     app.register_blueprint(simulation_bp, url_prefix='/simulation')
+    app.register_blueprint(welding_bp, url_prefix='/welding')
 
     # Create database tables
     with app.app_context():

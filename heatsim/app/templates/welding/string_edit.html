@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}{% if string %}Edit{% else %}Add{% endif %} Weld String - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.view', id=project.id) }}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.configure', id=project.id) }}">Configure</a></li>
+                <li class="breadcrumb-item active">{% if string %}Edit{% else %}Add{% endif %} String</li>
+            </ol>
+        </nav>
+        <h2>
+            <i class="bi bi-{% if string %}pencil{% else %}plus-lg{% endif %}"></i>
+            {% if string %}Edit{% else %}Add{% endif %} Weld String
+        </h2>
+    </div>
+</div>
+
+<form method="POST">
+    {{ form.hidden_tag() }}
+
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Identity -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">String Identity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.string_number.label(class="form-label") }}
+                            {{ form.string_number(class="form-control") }}
+                            <div class="form-text">Execution order in the sequence</div>
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                            <div class="form-text">Optional descriptive name</div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.body_name.label(class="form-label") }}
+                            {{ form.body_name(class="form-control") }}
+                            <div class="form-text">CAD body identifier (from STEP/IGES file)</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.layer.label(class="form-label") }}
+                            {{ form.layer(class="form-control") }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.position_in_layer.label(class="form-label") }}
+                            {{ form.position_in_layer(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Welding Parameters -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Welding Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.heat_input.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.heat_input(class="form-control") }}
+                                <span class="input-group-text">kJ/mm</span>
+                            </div>
+                            <div class="form-text">Default: {{ project.default_heat_input }} kJ/mm</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.travel_speed.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.travel_speed(class="form-control") }}
+                                <span class="input-group-text">mm/s</span>
+                            </div>
+                            <div class="form-text">Default: {{ project.default_travel_speed }} mm/s</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.interpass_time.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.interpass_time(class="form-control") }}
+                                <span class="input-group-text">s</span>
+                            </div>
+                            <div class="form-text">Default: {{ project.interpass_time_default }} s</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Initial Temperature -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Initial Temperature</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.initial_temp_mode.label(class="form-label") }}
+                            {{ form.initial_temp_mode(class="form-select", id="tempMode") }}
+                        </div>
+                        <div class="col-md-4 mb-3" id="manualTempGroup">
+                            {{ form.initial_temperature.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.initial_temperature(class="form-control") }}
+                                <span class="input-group-text">°C</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.solidification_temp.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.solidification_temp(class="form-control") }}
+                                <span class="input-group-text">°C</span>
+                            </div>
+                            <div class="form-text">Default: {{ project.default_solidification_temp }}°C</div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info small mb-0">
+                        <strong>Mode Explanation:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li><strong>Solidification Temperature</strong> - Start at liquidus/solidus temperature (typical for weld metal)</li>
+                            <li><strong>Calculated</strong> - Estimate from cooling of previous strings</li>
+                            <li><strong>Manual</strong> - Specify exact initial temperature</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulation Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Simulation Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.simulation_duration.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ form.simulation_duration(class="form-control") }}
+                                <span class="input-group-text">s</span>
+                            </div>
+                            <div class="form-text">How long to simulate after this string activates</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Project Defaults</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr><td>Heat Input</td><td>{{ project.default_heat_input }} kJ/mm</td></tr>
+                        <tr><td>Travel Speed</td><td>{{ project.default_travel_speed }} mm/s</td></tr>
+                        <tr><td>Interpass Time</td><td>{{ project.interpass_time_default }} s</td></tr>
+                        <tr><td>Solidification T</td><td>{{ project.default_solidification_temp }}°C</td></tr>
+                        <tr><td>Preheat</td><td>{{ project.preheat_temperature }}°C</td></tr>
+                        <tr><td>Max Interpass</td><td>{{ project.interpass_temperature }}°C</td></tr>
+                    </table>
+                    <p class="small text-muted mb-0">
+                        Leave fields blank to use project defaults.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> {% if string %}Save Changes{% else %}Add String{% endif %}
+        </button>
+        <a href="{{ url_for('welding.configure', id=project.id) }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tempMode = document.getElementById('tempMode');
+    const manualTempGroup = document.getElementById('manualTempGroup');
+
+    function updateManualVisibility() {
+        if (tempMode.value === 'manual') {
+            manualTempGroup.style.display = 'block';
+        } else {
+            manualTempGroup.style.display = 'none';
+        }
+    }
+
+    tempMode.addEventListener('change', updateManualVisibility);
+    updateManualVisibility();
+});
+</script>
+{% endblock %}

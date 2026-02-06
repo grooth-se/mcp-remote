@@ -1,0 +1,569 @@
+"""Routes for welding simulation."""
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+
+from flask import (
+    render_template, redirect, url_for, flash, request, jsonify,
+    current_app, send_file
+)
+from flask_login import login_required, current_user
+
+from app.extensions import db
+from app.models.weld_project import (
+    WeldProject, WeldString, WeldResult,
+    STATUS_DRAFT, STATUS_CONFIGURED, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
+    STRING_PENDING, STRING_COMPLETED,
+    RESULT_THERMAL_CYCLE, RESULT_COOLING_RATE,
+)
+from app.models.material import SteelGrade
+
+from .forms import (
+    WeldProjectForm, WeldStringForm, QuickAddStringsForm, RunSimulationForm
+)
+from . import welding_bp
+
+logger = logging.getLogger(__name__)
+
+
+@welding_bp.route('/')
+@login_required
+def index():
+    """List all weld projects."""
+    projects = WeldProject.query.filter_by(user_id=current_user.id)\
+        .order_by(WeldProject.created_at.desc()).all()
+    return render_template('welding/index.html', projects=projects)
+
+
+@welding_bp.route('/new', methods=['GET', 'POST'])
+@login_required
+def new():
+    """Create a new weld project."""
+    form = WeldProjectForm()
+
+    if form.validate_on_submit():
+        project = WeldProject(
+            name=form.name.data,
+            description=form.description.data,
+            user_id=current_user.id,
+            steel_grade_id=form.steel_grade_id.data if form.steel_grade_id.data != 0 else None,
+            process_type=form.process_type.data,
+            preheat_temperature=form.preheat_temperature.data,
+            interpass_temperature=form.interpass_temperature.data,
+            interpass_time_default=form.interpass_time_default.data,
+            default_heat_input=form.default_heat_input.data,
+            default_travel_speed=form.default_travel_speed.data,
+            default_solidification_temp=form.default_solidification_temp.data,
+            status=STATUS_DRAFT,
+        )
+
+        # Handle CAD file upload
+        if form.cad_file.data:
+            cad_file = form.cad_file.data
+            project.cad_filename = cad_file.filename
+            project.cad_file = cad_file.read()
+
+            # Determine format from extension
+            ext = Path(cad_file.filename).suffix.lower()
+            if ext in ['.stp', '.step']:
+                project.cad_format = 'step'
+            elif ext in ['.igs', '.iges']:
+                project.cad_format = 'iges'
+            elif ext == '.stl':
+                project.cad_format = 'stl'
+
+        db.session.add(project)
+        db.session.commit()
+
+        flash(f'Project "{project.name}" created successfully.', 'success')
+        return redirect(url_for('welding.configure', id=project.id))
+
+    return render_template('welding/new.html', form=form)
+
+
+@welding_bp.route('/<int:id>')
+@login_required
+def view(id):
+    """View weld project details and results."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    # Get all results
+    results = project.results.order_by(WeldResult.created_at.desc()).all()
+
+    # Separate by type
+    thermal_cycles = [r for r in results if r.result_type == RESULT_THERMAL_CYCLE]
+    cooling_rates = [r for r in results if r.result_type == RESULT_COOLING_RATE]
+
+    return render_template(
+        'welding/view.html',
+        project=project,
+        results=results,
+        thermal_cycles=thermal_cycles,
+        cooling_rates=cooling_rates,
+    )
+
+
+@welding_bp.route('/<int:id>/configure', methods=['GET', 'POST'])
+@login_required
+def configure(id):
+    """Configure weld string sequence."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    if project.status == STATUS_RUNNING:
+        flash('Cannot configure while simulation is running.', 'warning')
+        return redirect(url_for('welding.view', id=id))
+
+    quick_form = QuickAddStringsForm()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'quick_add' and quick_form.validate():
+            # Add multiple strings quickly
+            num_layers = quick_form.num_layers.data
+            strings_per_layer = quick_form.strings_per_layer.data
+
+            string_number = project.strings.count() + 1
+            for layer in range(1, num_layers + 1):
+                for pos in range(1, strings_per_layer + 1):
+                    string = WeldString(
+                        project_id=project.id,
+                        string_number=string_number,
+                        layer=layer,
+                        position_in_layer=pos,
+                        name=f'Layer {layer} - String {pos}',
+                        status=STRING_PENDING,
+                    )
+                    db.session.add(string)
+                    string_number += 1
+
+            project.total_strings = project.strings.count()
+            db.session.commit()
+            flash(f'Added {num_layers * strings_per_layer} strings.', 'success')
+
+        elif action == 'reorder':
+            # Handle reordering from JSON data
+            order_data = request.form.get('order_data')
+            if order_data:
+                try:
+                    new_order = json.loads(order_data)
+                    for item in new_order:
+                        string = WeldString.query.get(item['id'])
+                        if string and string.project_id == project.id:
+                            string.string_number = item['order']
+                    db.session.commit()
+                    flash('String order updated.', 'success')
+                except (json.JSONDecodeError, KeyError) as e:
+                    flash(f'Invalid order data: {e}', 'danger')
+
+        elif action == 'mark_configured':
+            if project.strings.count() > 0:
+                project.status = STATUS_CONFIGURED
+                project.total_strings = project.strings.count()
+                db.session.commit()
+                flash('Project configured and ready to run.', 'success')
+                return redirect(url_for('welding.view', id=id))
+            else:
+                flash('Add at least one string before marking as configured.', 'warning')
+
+    strings = project.strings.order_by(WeldString.string_number).all()
+    return render_template(
+        'welding/configure.html',
+        project=project,
+        strings=strings,
+        quick_form=quick_form,
+    )
+
+
+@welding_bp.route('/<int:id>/string/new', methods=['GET', 'POST'])
+@login_required
+def string_new(id):
+    """Add a new string to the project."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    form = WeldStringForm()
+
+    # Set default string number
+    if request.method == 'GET':
+        form.string_number.data = project.strings.count() + 1
+
+    if form.validate_on_submit():
+        string = WeldString(
+            project_id=project.id,
+            string_number=form.string_number.data,
+            name=form.name.data,
+            body_name=form.body_name.data,
+            layer=form.layer.data,
+            position_in_layer=form.position_in_layer.data,
+            heat_input=form.heat_input.data,
+            travel_speed=form.travel_speed.data,
+            interpass_time=form.interpass_time.data,
+            initial_temp_mode=form.initial_temp_mode.data,
+            initial_temperature=form.initial_temperature.data,
+            solidification_temp=form.solidification_temp.data,
+            simulation_duration=form.simulation_duration.data,
+            status=STRING_PENDING,
+        )
+        db.session.add(string)
+        project.total_strings = project.strings.count() + 1
+        db.session.commit()
+
+        flash(f'String "{string.display_name}" added.', 'success')
+        return redirect(url_for('welding.configure', id=id))
+
+    return render_template('welding/string_edit.html', form=form, project=project, string=None)
+
+
+@welding_bp.route('/<int:id>/string/<int:sid>', methods=['GET', 'POST'])
+@login_required
+def string_edit(id, sid):
+    """Edit a weld string."""
+    project = WeldProject.query.get_or_404(id)
+    string = WeldString.query.get_or_404(sid)
+
+    if project.user_id != current_user.id or string.project_id != id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    form = WeldStringForm(obj=string)
+
+    if form.validate_on_submit():
+        form.populate_obj(string)
+        db.session.commit()
+        flash(f'String "{string.display_name}" updated.', 'success')
+        return redirect(url_for('welding.configure', id=id))
+
+    return render_template('welding/string_edit.html', form=form, project=project, string=string)
+
+
+@welding_bp.route('/<int:id>/string/<int:sid>/delete', methods=['POST'])
+@login_required
+def string_delete(id, sid):
+    """Delete a weld string."""
+    project = WeldProject.query.get_or_404(id)
+    string = WeldString.query.get_or_404(sid)
+
+    if project.user_id != current_user.id or string.project_id != id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    if project.status == STATUS_RUNNING:
+        flash('Cannot delete strings while simulation is running.', 'warning')
+        return redirect(url_for('welding.configure', id=id))
+
+    db.session.delete(string)
+
+    # Renumber remaining strings
+    remaining = project.strings.order_by(WeldString.string_number).all()
+    for i, s in enumerate(remaining, 1):
+        s.string_number = i
+
+    project.total_strings = len(remaining)
+    db.session.commit()
+
+    flash('String deleted.', 'success')
+    return redirect(url_for('welding.configure', id=id))
+
+
+@welding_bp.route('/<int:id>/run', methods=['GET', 'POST'])
+@login_required
+def run(id):
+    """Start or view simulation run."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    form = RunSimulationForm()
+
+    if request.method == 'POST' and form.validate():
+        if not project.can_run:
+            flash('Project is not ready to run. Please configure strings first.', 'warning')
+            return redirect(url_for('welding.configure', id=id))
+
+        # Reset any previous run state
+        for string in project.strings.all():
+            string.status = STRING_PENDING
+            string.started_at = None
+            string.completed_at = None
+            string.error_message = None
+
+        # Delete previous results
+        for result in project.results.all():
+            db.session.delete(result)
+
+        db.session.commit()
+
+        # Start simulation
+        use_mock = form.use_mock_solver.data
+        try:
+            _run_simulation(project, use_mock=use_mock)
+            flash('Simulation started.', 'success')
+        except Exception as e:
+            flash(f'Failed to start simulation: {e}', 'danger')
+            logger.exception("Simulation start failed")
+
+        return redirect(url_for('welding.progress', id=id))
+
+    return render_template('welding/run.html', form=form, project=project)
+
+
+def _run_simulation(project: WeldProject, use_mock: bool = False):
+    """Run the simulation (synchronously for now).
+
+    In production, this would be run as a background task.
+    """
+    from app.services.comsol import COMSOLClient, COMSOLNotAvailableError
+    from app.services.comsol.client import MockCOMSOLClient
+    from app.services.comsol.sequential_solver import SequentialSolver, MockSequentialSolver
+    from app.services.comsol.model_builder import WeldModelBuilder
+
+    results_folder = current_app.config.get('RESULTS_FOLDER', 'data/results')
+
+    if use_mock:
+        # Use mock solver for testing
+        client = MockCOMSOLClient()
+        builder = WeldModelBuilder(client)
+        solver = MockSequentialSolver(client, builder, results_folder)
+    else:
+        # Try real COMSOL
+        try:
+            client = COMSOLClient()
+            client.connect()
+            builder = WeldModelBuilder(client)
+            solver = SequentialSolver(client, builder, results_folder)
+        except COMSOLNotAvailableError:
+            # Fall back to mock
+            logger.warning("COMSOL not available, using mock solver")
+            client = MockCOMSOLClient()
+            builder = WeldModelBuilder(client)
+            solver = MockSequentialSolver(client, builder, results_folder)
+
+    try:
+        # Run simulation
+        solver.run_project(project, db_session=db.session)
+    finally:
+        if hasattr(client, 'disconnect'):
+            try:
+                client.disconnect()
+            except Exception:
+                pass
+
+
+@welding_bp.route('/<int:id>/progress')
+@login_required
+def progress(id):
+    """View simulation progress."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    strings = project.strings.order_by(WeldString.string_number).all()
+    return render_template('welding/progress.html', project=project, strings=strings)
+
+
+@welding_bp.route('/<int:id>/progress/status')
+@login_required
+def progress_status(id):
+    """Get current progress status (JSON for AJAX polling)."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    strings_data = []
+    for string in project.strings.order_by(WeldString.string_number).all():
+        strings_data.append({
+            'id': string.id,
+            'number': string.string_number,
+            'name': string.display_name,
+            'status': string.status,
+            'duration': string.duration_seconds,
+        })
+
+    return jsonify({
+        'status': project.status,
+        'current_string': project.current_string,
+        'total_strings': project.total_strings,
+        'progress_percent': project.progress_percent,
+        'progress_message': project.progress_message,
+        'strings': strings_data,
+    })
+
+
+@welding_bp.route('/<int:id>/results')
+@login_required
+def results(id):
+    """View all simulation results."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    all_results = project.results.order_by(WeldResult.string_id, WeldResult.result_type).all()
+
+    # Group by result type
+    thermal_cycles = [r for r in all_results if r.result_type == RESULT_THERMAL_CYCLE]
+    cooling_rates = [r for r in all_results if r.result_type == RESULT_COOLING_RATE]
+
+    return render_template(
+        'welding/results.html',
+        project=project,
+        results=all_results,
+        thermal_cycles=thermal_cycles,
+        cooling_rates=cooling_rates,
+    )
+
+
+@welding_bp.route('/<int:id>/plot/<plot_type>')
+@login_required
+def plot(id, plot_type):
+    """Generate and return a plot image."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    from app.services.comsol.visualization import WeldVisualization
+    viz = WeldVisualization()
+
+    results = project.results.all()
+    img_data = None
+
+    if plot_type == 'thermal_cycles':
+        thermal_results = [r for r in results if r.result_type == RESULT_THERMAL_CYCLE]
+        img_data = viz.create_thermal_cycle_plot(thermal_results, title=f'{project.name} - Thermal Cycles')
+
+    elif plot_type == 'cooling_rates':
+        cooling_results = [r for r in results if r.result_type == RESULT_COOLING_RATE]
+        img_data = viz.create_cct_overlay_plot(cooling_results, title=f'{project.name} - Cooling Rates')
+
+    elif plot_type == 'phases':
+        thermal_results = [r for r in results if r.result_type == RESULT_THERMAL_CYCLE]
+        img_data = viz.create_phase_fraction_plot(thermal_results, title=f'{project.name} - Phase Fractions')
+
+    elif plot_type == 'summary':
+        img_data = viz.create_summary_table_image(project, results)
+
+    if img_data:
+        from io import BytesIO
+        return send_file(BytesIO(img_data), mimetype='image/png')
+
+    return jsonify({'error': 'Plot generation failed'}), 500
+
+
+@welding_bp.route('/<int:id>/animation')
+@login_required
+def animation(id):
+    """Serve the time-lapse animation video."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Find animation result
+    anim_result = project.results.filter_by(result_type='animation').first()
+
+    if anim_result and anim_result.animation_filename:
+        anim_path = Path(anim_result.animation_filename)
+        if anim_path.exists():
+            return send_file(str(anim_path), mimetype='video/mp4')
+
+    return jsonify({'error': 'Animation not available'}), 404
+
+
+@welding_bp.route('/<int:id>/delete', methods=['POST'])
+@login_required
+def delete(id):
+    """Delete a weld project."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    if project.status == STATUS_RUNNING:
+        flash('Cannot delete project while simulation is running.', 'warning')
+        return redirect(url_for('welding.view', id=id))
+
+    name = project.name
+    db.session.delete(project)
+    db.session.commit()
+
+    flash(f'Project "{name}" deleted.', 'success')
+    return redirect(url_for('welding.index'))
+
+
+@welding_bp.route('/<int:id>/duplicate', methods=['POST'])
+@login_required
+def duplicate(id):
+    """Duplicate a weld project."""
+    original = WeldProject.query.get_or_404(id)
+
+    if original.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    # Create copy
+    new_project = WeldProject(
+        name=f"{original.name} (Copy)",
+        description=original.description,
+        user_id=current_user.id,
+        steel_grade_id=original.steel_grade_id,
+        process_type=original.process_type,
+        preheat_temperature=original.preheat_temperature,
+        interpass_temperature=original.interpass_temperature,
+        interpass_time_default=original.interpass_time_default,
+        default_heat_input=original.default_heat_input,
+        default_travel_speed=original.default_travel_speed,
+        default_solidification_temp=original.default_solidification_temp,
+        cad_filename=original.cad_filename,
+        cad_file=original.cad_file,
+        cad_format=original.cad_format,
+        status=STATUS_DRAFT,
+    )
+    db.session.add(new_project)
+    db.session.flush()
+
+    # Copy strings
+    for string in original.strings.all():
+        new_string = WeldString(
+            project_id=new_project.id,
+            string_number=string.string_number,
+            name=string.name,
+            body_name=string.body_name,
+            layer=string.layer,
+            position_in_layer=string.position_in_layer,
+            heat_input=string.heat_input,
+            travel_speed=string.travel_speed,
+            interpass_time=string.interpass_time,
+            initial_temp_mode=string.initial_temp_mode,
+            initial_temperature=string.initial_temperature,
+            solidification_temp=string.solidification_temp,
+            simulation_duration=string.simulation_duration,
+            status=STRING_PENDING,
+        )
+        db.session.add(new_string)
+
+    new_project.total_strings = original.total_strings
+    db.session.commit()
+
+    flash(f'Project duplicated as "{new_project.name}".', 'success')
+    return redirect(url_for('welding.configure', id=new_project.id))
