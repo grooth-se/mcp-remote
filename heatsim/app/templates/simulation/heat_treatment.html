@@ -44,11 +44,12 @@
             </div>
         </div>
         <div class="card-body" id="heating-section">
+            <!-- Basic Parameters -->
             <div class="row">
                 <div class="col-md-3 mb-3">
-                    <label class="form-label">Initial Temperature (°C)</label>
+                    <label class="form-label">Part Initial Temperature (°C)</label>
                     <input type="number" name="heating-initial_temperature" class="form-control" step="1" min="-50" max="500" value="{{ heating_form.initial_temperature.data or 25 }}">
-                    <div class="form-text">Starting temperature</div>
+                    <div class="form-text">Starting part temperature</div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Austenitizing Temperature (°C)</label>
@@ -71,7 +72,72 @@
                     </select>
                 </div>
             </div>
-            <div class="row">
+
+            <!-- Furnace Ramp Settings -->
+            <div class="row border-top pt-3 mt-2">
+                <div class="col-12 mb-2">
+                    <strong><i class="bi bi-graph-up-arrow"></i> Furnace Temperature Control</strong>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" name="heating-cold_furnace" class="form-check-input" id="heating-cold_furnace" {% if heating_form.cold_furnace.data %}checked{% endif %}>
+                        <label class="form-check-label" for="heating-cold_furnace">Cold Furnace Start</label>
+                    </div>
+                    <div class="form-text">Furnace heats up with part</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Furnace Start Temp (°C)</label>
+                    <input type="number" name="heating-furnace_start_temperature" class="form-control" step="1" min="-50" max="500" value="{{ heating_form.furnace_start_temperature.data or 25 }}" id="furnace-start-temp">
+                    <div class="form-text">Initial furnace temperature</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Ramp Rate (°C/min)</label>
+                    <input type="number" name="heating-furnace_ramp_rate" class="form-control" step="0.5" min="0" max="50" value="{{ heating_form.furnace_ramp_rate.data or 5 }}" id="furnace-ramp-rate">
+                    <div class="form-text">Furnace heating rate</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Est. Ramp Time</label>
+                    <input type="text" class="form-control bg-light" id="est-ramp-time" readonly value="-">
+                    <div class="form-text">Time to reach target</div>
+                </div>
+            </div>
+
+            <!-- End Condition Settings -->
+            <div class="row border-top pt-3 mt-2">
+                <div class="col-12 mb-2">
+                    <strong><i class="bi bi-stop-circle"></i> Heating End Criteria</strong>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">End Condition</label>
+                    <select name="heating-end_condition" class="form-select" id="heating-end-condition">
+                        <option value="equilibrium" {% if heating_form.end_condition.data == 'equilibrium' %}selected{% endif %}>Equilibrium (center within 5°C of target)</option>
+                        <option value="rate_threshold" {% if heating_form.end_condition.data == 'rate_threshold' %}selected{% endif %}>Surface Rate Threshold</option>
+                        <option value="center_offset" {% if heating_form.end_condition.data == 'center_offset' %}selected{% endif %}>Center Temperature Offset</option>
+                    </select>
+                    <div class="form-text">When to end heating phase</div>
+                </div>
+                <div class="col-md-4 mb-3" id="rate-threshold-fields">
+                    <label class="form-label">Surface Rate Threshold (°C/hr)</label>
+                    <input type="number" name="heating-rate_threshold" class="form-control" step="0.1" min="0.1" max="10" value="{{ heating_form.rate_threshold.data or 1.0 }}">
+                    <div class="form-text">Trigger when dT/dt &lt; this value</div>
+                </div>
+                <div class="col-md-4 mb-3" id="hold-time-fields">
+                    <label class="form-label">Hold After Trigger (min)</label>
+                    <input type="number" name="heating-hold_time_after_trigger" class="form-control" step="5" min="0" max="240" value="{{ heating_form.hold_time_after_trigger.data or 30 }}">
+                    <div class="form-text">Additional hold time after trigger</div>
+                </div>
+                <div class="col-md-4 mb-3" id="center-offset-fields">
+                    <label class="form-label">Center Offset (°C)</label>
+                    <input type="number" name="heating-center_offset" class="form-control" step="1" min="1" max="50" value="{{ heating_form.center_offset.data or 3 }}">
+                    <div class="form-text">End when center = target - offset</div>
+                </div>
+            </div>
+
+            <!-- Heat Transfer Parameters -->
+            <div class="row border-top pt-3 mt-2">
+                <div class="col-12 mb-2">
+                    <strong><i class="bi bi-thermometer-half"></i> Heat Transfer Parameters</strong>
+                </div>
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Furnace HTC (W/m²K)</label>
                     <input type="number" name="heating-furnace_htc" class="form-control" step="1" min="1" max="500" value="{{ heating_form.furnace_htc.data or 25 }}">
@@ -332,6 +398,73 @@ function toggleSection(checkboxId, sectionId) {
 toggleSection('heating-enabled', 'heating-section');
 toggleSection('transfer-enabled', 'transfer-section');
 toggleSection('tempering-enabled', 'tempering-section');
+
+// Toggle cold furnace fields
+function toggleColdFurnaceFields() {
+    const coldFurnace = document.getElementById('heating-cold_furnace').checked;
+    const startTempField = document.getElementById('furnace-start-temp');
+    const rampRateField = document.getElementById('furnace-ramp-rate');
+
+    startTempField.disabled = !coldFurnace;
+    rampRateField.disabled = !coldFurnace;
+    startTempField.parentElement.style.opacity = coldFurnace ? '1' : '0.5';
+    rampRateField.parentElement.style.opacity = coldFurnace ? '1' : '0.5';
+
+    updateRampTime();
+}
+
+// Calculate estimated ramp time
+function updateRampTime() {
+    const coldFurnace = document.getElementById('heating-cold_furnace').checked;
+    const startTemp = parseFloat(document.getElementById('furnace-start-temp').value) || 25;
+    const targetTemp = parseFloat(document.querySelector('input[name="heating-target_temperature"]').value) || 850;
+    const rampRate = parseFloat(document.getElementById('furnace-ramp-rate').value) || 5;
+
+    let rampTimeText = '-';
+    if (coldFurnace && rampRate > 0) {
+        const rampTimeMin = (targetTemp - startTemp) / rampRate;
+        if (rampTimeMin < 60) {
+            rampTimeText = Math.round(rampTimeMin) + ' min';
+        } else {
+            const hours = Math.floor(rampTimeMin / 60);
+            const mins = Math.round(rampTimeMin % 60);
+            rampTimeText = hours + 'h ' + mins + 'm';
+        }
+    } else if (!coldFurnace) {
+        rampTimeText = 'Hot furnace';
+    }
+    document.getElementById('est-ramp-time').value = rampTimeText;
+}
+
+document.getElementById('heating-cold_furnace').addEventListener('change', toggleColdFurnaceFields);
+document.getElementById('furnace-start-temp').addEventListener('input', updateRampTime);
+document.getElementById('furnace-ramp-rate').addEventListener('input', updateRampTime);
+document.querySelector('input[name="heating-target_temperature"]').addEventListener('input', updateRampTime);
+toggleColdFurnaceFields();
+
+// Toggle end condition fields
+function toggleEndConditionFields() {
+    const endCondition = document.getElementById('heating-end-condition').value;
+    const rateFields = document.getElementById('rate-threshold-fields');
+    const holdFields = document.getElementById('hold-time-fields');
+    const offsetFields = document.getElementById('center-offset-fields');
+
+    // Hide all first
+    rateFields.style.display = 'none';
+    holdFields.style.display = 'none';
+    offsetFields.style.display = 'none';
+
+    // Show relevant fields
+    if (endCondition === 'rate_threshold') {
+        rateFields.style.display = 'block';
+        holdFields.style.display = 'block';
+    } else if (endCondition === 'center_offset') {
+        offsetFields.style.display = 'block';
+    }
+}
+
+document.getElementById('heating-end-condition').addEventListener('change', toggleEndConditionFields);
+toggleEndConditionFields();
 
 // Update summary
 function updateSummary() {

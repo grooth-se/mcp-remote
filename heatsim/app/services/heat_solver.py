@@ -26,7 +26,8 @@ from scipy.sparse.linalg import spsolve
 from app.services.geometry import GeometryBase, Cylinder, Plate, Ring
 from app.services.boundary_conditions import (
     BoundaryCondition, InsulatedBoundary,
-    create_heating_bc, create_transfer_bc, create_quench_bc,
+    create_heating_bc, create_ramping_heating_bc, create_transfer_bc, create_quench_bc,
+    RampingBoundaryCondition,
     create_tempering_bc, create_cooling_bc
 )
 from app.services.property_evaluator import PropertyEvaluator
@@ -84,17 +85,26 @@ class PhaseConfig:
     boundary_condition : BoundaryCondition
         Boundary condition for this phase
     end_condition : str
-        How to end phase: 'time', 'temperature', 'equilibrium'
+        How to end phase: 'time', 'temperature', 'equilibrium', 'rate_threshold', 'center_offset'
     end_temperature : float
-        Temperature threshold for 'temperature' end condition
+        Temperature threshold for 'temperature' or 'center_offset' end condition
+    rate_threshold : float
+        dT/dt threshold in °C/hr for 'rate_threshold' end condition
+    hold_time_after_trigger : float
+        Hold time in seconds after end condition is triggered (for 'rate_threshold')
+    center_offset : float
+        Offset from target for 'center_offset' end condition (°C)
     """
     name: str
     enabled: bool = True
     duration: float = 600.0
     target_temperature: float = 25.0
     boundary_condition: Optional[BoundaryCondition] = None
-    end_condition: str = 'time'  # 'time', 'temperature', 'equilibrium'
+    end_condition: str = 'time'  # 'time', 'temperature', 'equilibrium', 'rate_threshold', 'center_offset'
     end_temperature: Optional[float] = None
+    rate_threshold: float = 1.0  # °C/hr for rate_threshold end condition
+    hold_time_after_trigger: float = 0.0  # seconds
+    center_offset: float = 3.0  # °C below target for center_offset condition
 
     @classmethod
     def from_heating_config(cls, config: dict) -> 'PhaseConfig':
@@ -104,24 +114,60 @@ class PhaseConfig:
 
         target_temp = config.get('target_temperature', 850.0)
         hold_time = config.get('hold_time', 60.0)  # minutes
+        initial_temp = config.get('initial_temperature', 25.0)
 
-        bc = create_heating_bc(
-            target_temperature=target_temp,
-            htc=config.get('furnace_htc', 25.0),
-            emissivity=config.get('furnace_emissivity', 0.85),
-            use_radiation=config.get('use_radiation', True)
-        )
+        # Check if using cold furnace start with ramp
+        cold_furnace = config.get('cold_furnace', False)
+        furnace_start_temp = config.get('furnace_start_temperature', initial_temp)
+        ramp_rate = config.get('furnace_ramp_rate', 0.0)  # °C/min
 
-        # Duration: time to heat up + hold time
-        # For heating, we use equilibrium end condition
+        # Determine end condition
+        end_condition = config.get('end_condition', 'equilibrium')
+        rate_threshold = config.get('rate_threshold', 1.0)  # °C/hr
+        hold_time_after_trigger = config.get('hold_time_after_trigger', 0.0) * 60  # min to sec
+        center_offset = config.get('center_offset', 3.0)  # °C
+
+        # Create appropriate boundary condition
+        if cold_furnace and ramp_rate > 0:
+            bc = create_ramping_heating_bc(
+                target_temperature=target_temp,
+                start_temperature=furnace_start_temp,
+                ramp_rate=ramp_rate,
+                htc=config.get('furnace_htc', 25.0),
+                emissivity=config.get('furnace_emissivity', 0.85),
+                use_radiation=config.get('use_radiation', True)
+            )
+        else:
+            bc = create_heating_bc(
+                target_temperature=target_temp,
+                htc=config.get('furnace_htc', 25.0),
+                emissivity=config.get('furnace_emissivity', 0.85),
+                use_radiation=config.get('use_radiation', True)
+            )
+
+        # Calculate maximum duration based on ramp time + generous heat-up time + hold
+        max_duration = hold_time * 60  # Base hold time in seconds
+        if cold_furnace and ramp_rate > 0:
+            ramp_time = (target_temp - furnace_start_temp) / ramp_rate * 60
+            max_duration += ramp_time + 7200  # Add ramp time + 2hr buffer for part heating
+
+        # Set end temperature based on condition
+        if end_condition == 'center_offset':
+            end_temp = target_temp - center_offset
+        else:
+            end_temp = target_temp - 5  # Default: within 5°C of target
+
         return cls(
             name='heating',
             enabled=True,
-            duration=hold_time * 60,  # Convert minutes to seconds
+            duration=max_duration,
             target_temperature=target_temp,
             boundary_condition=bc,
-            end_condition='equilibrium',
-            end_temperature=target_temp - 5  # Within 5°C of target
+            end_condition=end_condition,
+            end_temperature=end_temp,
+            rate_threshold=rate_threshold,
+            hold_time_after_trigger=hold_time_after_trigger,
+            center_offset=center_offset
         )
 
     @classmethod
@@ -523,7 +569,17 @@ class HeatSolver:
         # Phase-specific termination
         max_phase_time = phase_config.duration
 
+        # Track state for rate_threshold condition
+        rate_trigger_time = None
+        prev_surface_temp = T[-1]
+        rate_check_interval = 60.0  # Check rate every 60 seconds
+        last_rate_check_time = 0.0
+
         while t < max_phase_time:
+            # Update time on ramping boundary condition
+            if isinstance(self.outer_bc, RampingBoundaryCondition):
+                self.outer_bc.set_time(t)
+
             # Check end conditions
             if phase_config.end_condition == 'equilibrium':
                 # Check if center has reached target
@@ -542,6 +598,28 @@ class HeatSolver:
                 if phase_config.end_temperature is not None:
                     if T[0] <= phase_config.end_temperature:
                         break
+
+            elif phase_config.end_condition == 'rate_threshold':
+                # End when surface temperature change rate < threshold
+                # Check periodically to avoid noise
+                if t - last_rate_check_time >= rate_check_interval:
+                    surface_rate = abs(T[-1] - prev_surface_temp) / rate_check_interval * 3600  # °C/hr
+                    prev_surface_temp = T[-1]
+                    last_rate_check_time = t
+
+                    if surface_rate < phase_config.rate_threshold:
+                        if rate_trigger_time is None:
+                            rate_trigger_time = t
+                        # Check if hold time has elapsed
+                        if t - rate_trigger_time >= phase_config.hold_time_after_trigger:
+                            break
+                    else:
+                        rate_trigger_time = None  # Reset if rate goes back up
+
+            elif phase_config.end_condition == 'center_offset':
+                # End when center reaches target - offset
+                if T[0] >= phase_config.target_temperature - phase_config.center_offset:
+                    break
 
             # Advance one time step
             T_new = self._time_step(T, mesh, dr, cfg.dt)

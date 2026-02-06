@@ -185,6 +185,16 @@ def heat_treatment(id):
         heating_form.target_temperature.data = h.get('target_temperature', 850.0)
         heating_form.hold_time.data = h.get('hold_time', 60.0)
         heating_form.furnace_atmosphere.data = h.get('furnace_atmosphere', 'air')
+        # Furnace ramp settings
+        heating_form.cold_furnace.data = h.get('cold_furnace', False)
+        heating_form.furnace_start_temperature.data = h.get('furnace_start_temperature', 25.0)
+        heating_form.furnace_ramp_rate.data = h.get('furnace_ramp_rate', 5.0)
+        # End condition settings
+        heating_form.end_condition.data = h.get('end_condition', 'equilibrium')
+        heating_form.rate_threshold.data = h.get('rate_threshold', 1.0)
+        heating_form.hold_time_after_trigger.data = h.get('hold_time_after_trigger', 30.0)
+        heating_form.center_offset.data = h.get('center_offset', 3.0)
+        # Heat transfer parameters
         heating_form.furnace_htc.data = h.get('furnace_htc', 25.0)
         heating_form.furnace_emissivity.data = h.get('furnace_emissivity', 0.85)
         heating_form.use_radiation.data = h.get('use_radiation', True)
@@ -226,6 +236,16 @@ def heat_treatment(id):
                 'target_temperature': float(request.form.get('heating-target_temperature', 850)),
                 'hold_time': float(request.form.get('heating-hold_time', 60)),
                 'furnace_atmosphere': request.form.get('heating-furnace_atmosphere', 'air'),
+                # Furnace ramp settings
+                'cold_furnace': 'heating-cold_furnace' in request.form,
+                'furnace_start_temperature': float(request.form.get('heating-furnace_start_temperature', 25)),
+                'furnace_ramp_rate': float(request.form.get('heating-furnace_ramp_rate', 5)),
+                # End condition settings
+                'end_condition': request.form.get('heating-end_condition', 'equilibrium'),
+                'rate_threshold': float(request.form.get('heating-rate_threshold', 1.0)),
+                'hold_time_after_trigger': float(request.form.get('heating-hold_time_after_trigger', 30)),
+                'center_offset': float(request.form.get('heating-center_offset', 3)),
+                # Heat transfer parameters
                 'furnace_htc': float(request.form.get('heating-furnace_htc', 25)),
                 'furnace_emissivity': float(request.form.get('heating-furnace_emissivity', 0.85)),
                 'use_radiation': 'heating-use_radiation' in request.form,

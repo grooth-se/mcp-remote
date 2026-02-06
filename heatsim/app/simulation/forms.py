@@ -108,6 +108,56 @@ class HeatingPhaseForm(FlaskForm):
         default='air'
     )
 
+    # Furnace ramp settings
+    cold_furnace = BooleanField('Cold Furnace Start', default=False)
+
+    furnace_start_temperature = FloatField(
+        'Furnace Start Temperature (°C)',
+        validators=[Optional(), NumberRange(min=-50, max=500)],
+        default=25.0,
+        render_kw={'placeholder': 'Initial furnace temperature'}
+    )
+
+    furnace_ramp_rate = FloatField(
+        'Furnace Ramp Rate (°C/min)',
+        validators=[Optional(), NumberRange(min=0, max=50)],
+        default=5.0,
+        render_kw={'placeholder': 'Furnace heating rate'}
+    )
+
+    # End condition settings
+    end_condition = SelectField(
+        'End Condition',
+        choices=[
+            ('equilibrium', 'Equilibrium (center within 5°C)'),
+            ('rate_threshold', 'Surface Rate Threshold'),
+            ('center_offset', 'Center Temperature Offset'),
+        ],
+        default='equilibrium'
+    )
+
+    rate_threshold = FloatField(
+        'Surface Rate Threshold (°C/hr)',
+        validators=[Optional(), NumberRange(min=0.1, max=10)],
+        default=1.0,
+        render_kw={'placeholder': 'Trigger when dT/dt < this'}
+    )
+
+    hold_time_after_trigger = FloatField(
+        'Hold After Trigger (min)',
+        validators=[Optional(), NumberRange(min=0, max=240)],
+        default=30.0,
+        render_kw={'placeholder': 'Additional hold time after trigger'}
+    )
+
+    center_offset = FloatField(
+        'Center Offset (°C)',
+        validators=[Optional(), NumberRange(min=1, max=50)],
+        default=3.0,
+        render_kw={'placeholder': 'End when center = target - offset'}
+    )
+
+    # Heat transfer parameters
     furnace_htc = FloatField(
         'Furnace HTC (W/m²K)',
         validators=[Optional(), NumberRange(min=1, max=500)],
