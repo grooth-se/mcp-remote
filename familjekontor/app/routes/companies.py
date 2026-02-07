@@ -203,6 +203,35 @@ def delete_logo(company_id):
     return redirect(url_for('companies.edit', company_id=company_id))
 
 
+@companies_bp.route('/<int:company_id>/delete', methods=['POST'])
+@login_required
+def delete(company_id):
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('companies.view', company_id=company_id))
+
+    company = db.session.get(Company, company_id)
+    if not company:
+        flash('Företaget hittades inte.', 'danger')
+        return redirect(url_for('companies.index'))
+
+    company.active = False
+    audit = AuditLog(
+        company_id=company.id, user_id=current_user.id,
+        action='delete', entity_type='company', entity_id=company.id,
+        old_values={'name': company.name, 'active': True},
+        new_values={'active': False},
+    )
+    db.session.add(audit)
+    db.session.commit()
+
+    if session.get('active_company_id') == company.id:
+        session.pop('active_company_id', None)
+
+    flash(f'Företaget {company.name} har tagits bort.', 'success')
+    return redirect(url_for('companies.index'))
+
+
 @companies_bp.route('/<int:company_id>/certificate/upload', methods=['POST'])
 @login_required
 def upload_certificate(company_id):

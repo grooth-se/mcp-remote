@@ -30,6 +30,13 @@
         <a href="{{ url_for('dashboard.switch_company', company_id=company.id) }}" class="btn btn-primary">
             <i class="bi bi-check-circle"></i> Välj detta företag
         </a>
+        <form method="POST" action="{{ url_for('companies.delete', company_id=company.id) }}" class="d-inline"
+              onsubmit="return confirm('Är du säker på att du vill ta bort {{ company.name }}?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Ta bort
+            </button>
+        </form>
     </div>
 </div>
 
