@@ -111,8 +111,10 @@ class SIEParser:
                 in_quotes = not in_quotes
             elif char == '{':
                 in_braces = True
+                current += char
             elif char == '}':
                 in_braces = False
+                current += char
             elif char in (' ', '\t') and not in_quotes and not in_braces:
                 if current:
                     tokens.append(current)
