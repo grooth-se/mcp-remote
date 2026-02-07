@@ -472,13 +472,45 @@ def run(id):
         cycle_result.set_time_data(result.time.tolist())
         cycle_result.set_value_data(result.center_temp.tolist())
 
+        # Build furnace/ambient temperature list for plotting
+        furnace_temps = []
+        if result.phase_results:
+            for pr in result.phase_results:
+                if pr.time.size < 2:
+                    continue
+
+                temp = None
+                phase_name = pr.phase_name
+
+                # Get furnace/ambient temperature from ht_config for each phase
+                if phase_name == 'heating':
+                    temp = ht_config.get('heating', {}).get('target_temperature')
+                elif phase_name == 'transfer':
+                    temp = ht_config.get('transfer', {}).get('ambient_temperature')
+                elif phase_name == 'quenching':
+                    temp = ht_config.get('quenching', {}).get('media_temperature')
+                elif phase_name == 'tempering':
+                    temp = ht_config.get('tempering', {}).get('temperature')
+                elif phase_name == 'cooling':
+                    # Cooling after tempering - use ambient temperature
+                    temp = ht_config.get('transfer', {}).get('ambient_temperature', 25.0)
+
+                if temp is not None:
+                    furnace_temps.append({
+                        'start_time': pr.start_time,
+                        'end_time': pr.end_time,
+                        'temperature': temp,
+                        'phase_name': phase_name
+                    })
+
         # Create comprehensive plot with phase markers (4 radial positions)
         cycle_result.plot_image = visualization.create_heat_treatment_cycle_plot(
             result.time,
             result.temperature,
             phase_results=result.phase_results,
             title=f'Heat Treatment Cycle - {sim.name}',
-            transformation_temps=trans_temps
+            transformation_temps=trans_temps,
+            furnace_temps=furnace_temps
         )
         db.session.add(cycle_result)
 

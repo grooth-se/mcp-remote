@@ -263,7 +263,8 @@ def create_heat_treatment_cycle_plot(
     phase_results: Optional[List] = None,
     title: str = "Heat Treatment Cycle",
     transformation_temps: Optional[dict] = None,
-    measured_data: Optional[List[dict]] = None
+    measured_data: Optional[List[dict]] = None,
+    furnace_temps: Optional[List[dict]] = None
 ) -> bytes:
     """Generate comprehensive heat treatment cycle plot with phase markers.
 
@@ -281,6 +282,9 @@ def create_heat_treatment_cycle_plot(
         Dict with Ms, Mf, Ac1, Ac3 temperatures
     measured_data : list, optional
         List of dicts with keys: name, times, temps for TC measurements
+    furnace_temps : list, optional
+        List of dicts with keys: start_time, end_time, temperature, phase_name
+        for furnace/ambient temperature per phase
 
     Returns
     -------
@@ -313,6 +317,37 @@ def create_heat_treatment_cycle_plot(
 
             ax.plot(m_times, m_temps, color=color, linewidth=1.5,
                    label=f'Meas: {name}', alpha=0.9)
+
+    # Plot furnace/ambient temperature as a step function
+    if furnace_temps:
+        # Build step function for furnace temperature
+        furnace_times = []
+        furnace_values = []
+
+        for ft in furnace_temps:
+            start_time = ft.get('start_time', 0)
+            end_time = ft.get('end_time', 0)
+            temp = ft.get('temperature')
+
+            if temp is not None and end_time > start_time:
+                # Add start point
+                furnace_times.append(start_time)
+                furnace_values.append(temp)
+                # Add end point (creates horizontal line)
+                furnace_times.append(end_time)
+                furnace_values.append(temp)
+
+        if furnace_times:
+            ax.plot(
+                furnace_times,
+                furnace_values,
+                color='#FF6B00',  # Orange
+                linewidth=2,
+                linestyle='-.',
+                label='Furnace/Ambient',
+                alpha=0.8,
+                zorder=5
+            )
 
     # Add phase region shading if phase results available
     if phase_results:
