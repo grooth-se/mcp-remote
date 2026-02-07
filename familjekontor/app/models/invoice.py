@@ -40,7 +40,7 @@ class SupplierInvoice(db.Model):
     currency = db.Column(db.String(3), default='SEK')
     status = db.Column(db.String(20), default='pending')  # pending, approved, paid, cancelled
     verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
-    document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=True)
+    document_id = db.Column(db.Integer, db.ForeignKey('documents.id', use_alter=True, name='fk_supplier_invoice_document'), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     company = db.relationship('Company', backref='supplier_invoices')
