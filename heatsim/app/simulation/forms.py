@@ -269,6 +269,38 @@ class TemperingPhaseForm(FlaskForm):
         render_kw={'placeholder': 'Time at tempering temperature'}
     )
 
+    # End condition settings (same as heating phase)
+    end_condition = SelectField(
+        'End Condition',
+        choices=[
+            ('equilibrium', 'Equilibrium (center within 5°C)'),
+            ('rate_threshold', 'Surface Rate Threshold'),
+            ('center_offset', 'Center Temperature Offset'),
+        ],
+        default='equilibrium'
+    )
+
+    rate_threshold = FloatField(
+        'Surface Rate Threshold (°C/hr)',
+        validators=[Optional(), NumberRange(min=0.1, max=10)],
+        default=1.0,
+        render_kw={'placeholder': 'Trigger when dT/dt < this'}
+    )
+
+    hold_time_after_trigger = FloatField(
+        'Hold After Trigger (min)',
+        validators=[Optional(), NumberRange(min=0, max=240)],
+        default=30.0,
+        render_kw={'placeholder': 'Additional hold time after trigger'}
+    )
+
+    center_offset = FloatField(
+        'Center Offset (°C)',
+        validators=[Optional(), NumberRange(min=1, max=50)],
+        default=3.0,
+        render_kw={'placeholder': 'End when center = target - offset'}
+    )
+
     cooling_method = SelectField(
         'Cooling After Tempering',
         choices=[

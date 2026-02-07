@@ -279,14 +279,54 @@
             </div>
         </div>
         <div class="card-body" id="tempering-section">
+            <!-- Basic Parameters -->
             <div class="row">
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Tempering Temperature (°C)</label>
-                    <input type="number" name="tempering-temperature" class="form-control" step="10" min="100" max="750" value="{{ tempering_form.temperature.data or 550 }}">
+                    <input type="number" name="tempering-temperature" class="form-control" step="10" min="100" max="750" value="{{ tempering_form.temperature.data or 550 }}" id="tempering-target-temp">
                 </div>
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Hold Time (min)</label>
                     <input type="number" name="tempering-hold_time" class="form-control" step="10" min="1" max="1440" value="{{ tempering_form.hold_time.data or 120 }}">
+                    <div class="form-text">Soak time at temperature</div>
+                </div>
+            </div>
+
+            <!-- End Condition Settings -->
+            <div class="row border-top pt-3 mt-2">
+                <div class="col-12 mb-2">
+                    <strong><i class="bi bi-stop-circle"></i> Heating End Criteria</strong>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">End Condition</label>
+                    <select name="tempering-end_condition" class="form-select" id="tempering-end-condition">
+                        <option value="equilibrium" {% if tempering_form.end_condition.data == 'equilibrium' %}selected{% endif %}>Equilibrium (center within 5°C of target)</option>
+                        <option value="rate_threshold" {% if tempering_form.end_condition.data == 'rate_threshold' %}selected{% endif %}>Surface Rate Threshold</option>
+                        <option value="center_offset" {% if tempering_form.end_condition.data == 'center_offset' %}selected{% endif %}>Center Temperature Offset</option>
+                    </select>
+                    <div class="form-text">When to end heating phase</div>
+                </div>
+                <div class="col-md-4 mb-3" id="tempering-rate-threshold-fields">
+                    <label class="form-label">Surface Rate Threshold (°C/hr)</label>
+                    <input type="number" name="tempering-rate_threshold" class="form-control" step="0.1" min="0.1" max="10" value="{{ tempering_form.rate_threshold.data or 1.0 }}">
+                    <div class="form-text">Trigger when dT/dt &lt; this value</div>
+                </div>
+                <div class="col-md-4 mb-3" id="tempering-hold-time-fields">
+                    <label class="form-label">Hold After Trigger (min)</label>
+                    <input type="number" name="tempering-hold_time_after_trigger" class="form-control" step="5" min="0" max="240" value="{{ tempering_form.hold_time_after_trigger.data or 30 }}">
+                    <div class="form-text">Additional hold time after trigger</div>
+                </div>
+                <div class="col-md-4 mb-3" id="tempering-center-offset-fields">
+                    <label class="form-label">Center Offset (°C)</label>
+                    <input type="number" name="tempering-center_offset" class="form-control" step="1" min="1" max="50" value="{{ tempering_form.center_offset.data or 3 }}">
+                    <div class="form-text">End when center = target - offset</div>
+                </div>
+            </div>
+
+            <!-- Cooling Parameters -->
+            <div class="row border-top pt-3 mt-2">
+                <div class="col-12 mb-2">
+                    <strong><i class="bi bi-thermometer-snow"></i> Cooling After Tempering</strong>
                 </div>
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Cooling Method</label>
@@ -295,8 +335,6 @@
                         <option value="furnace" {% if tempering_form.cooling_method.data == 'furnace' %}selected{% endif %}>Furnace Cool</option>
                     </select>
                 </div>
-            </div>
-            <div class="row">
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Cooling HTC (W/m²K)</label>
                     <input type="number" name="tempering-htc" class="form-control" step="1" min="1" max="500" value="{{ tempering_form.htc.data or 25 }}">
@@ -465,6 +503,30 @@ function toggleEndConditionFields() {
 
 document.getElementById('heating-end-condition').addEventListener('change', toggleEndConditionFields);
 toggleEndConditionFields();
+
+// Toggle tempering end condition fields
+function toggleTemperingEndConditionFields() {
+    const endCondition = document.getElementById('tempering-end-condition').value;
+    const rateFields = document.getElementById('tempering-rate-threshold-fields');
+    const holdFields = document.getElementById('tempering-hold-time-fields');
+    const offsetFields = document.getElementById('tempering-center-offset-fields');
+
+    // Hide all first
+    rateFields.style.display = 'none';
+    holdFields.style.display = 'none';
+    offsetFields.style.display = 'none';
+
+    // Show relevant fields
+    if (endCondition === 'rate_threshold') {
+        rateFields.style.display = 'block';
+        holdFields.style.display = 'block';
+    } else if (endCondition === 'center_offset') {
+        offsetFields.style.display = 'block';
+    }
+}
+
+document.getElementById('tempering-end-condition').addEventListener('change', toggleTemperingEndConditionFields);
+toggleTemperingEndConditionFields();
 
 // Update summary
 function updateSummary() {

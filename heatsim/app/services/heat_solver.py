@@ -229,6 +229,12 @@ class PhaseConfig:
         temp = config.get('temperature', 550.0)
         hold_time = config.get('hold_time', 120.0)  # minutes
 
+        # End condition settings (same as heating phase)
+        end_condition = config.get('end_condition', 'equilibrium')
+        rate_threshold = config.get('rate_threshold', 1.0)  # °C/hr
+        hold_time_after_trigger = config.get('hold_time_after_trigger', 0.0) * 60  # min to sec
+        center_offset = config.get('center_offset', 3.0)  # °C
+
         bc = create_tempering_bc(
             temperature=temp,
             htc=config.get('htc', 25.0),
@@ -236,14 +242,23 @@ class PhaseConfig:
             cooling_method=config.get('cooling_method', 'air')
         )
 
+        # Set end temperature based on condition
+        if end_condition == 'center_offset':
+            end_temp = temp - center_offset
+        else:
+            end_temp = temp - 5  # Default: within 5°C of target
+
         return cls(
             name='tempering',
             enabled=True,
             duration=hold_time * 60,  # Convert to seconds
             target_temperature=temp,
             boundary_condition=bc,
-            end_condition='equilibrium',
-            end_temperature=temp - 5
+            end_condition=end_condition,
+            end_temperature=end_temp,
+            rate_threshold=rate_threshold,
+            hold_time_after_trigger=hold_time_after_trigger,
+            center_offset=center_offset
         )
 
 

@@ -224,6 +224,11 @@ def heat_treatment(id):
         tempering_form.enabled.data = tp.get('enabled', False)
         tempering_form.temperature.data = tp.get('temperature', 550.0)
         tempering_form.hold_time.data = tp.get('hold_time', 120.0)
+        # End condition settings
+        tempering_form.end_condition.data = tp.get('end_condition', 'equilibrium')
+        tempering_form.rate_threshold.data = tp.get('rate_threshold', 1.0)
+        tempering_form.hold_time_after_trigger.data = tp.get('hold_time_after_trigger', 30.0)
+        tempering_form.center_offset.data = tp.get('center_offset', 3.0)
         tempering_form.cooling_method.data = tp.get('cooling_method', 'air')
         tempering_form.htc.data = tp.get('htc', 25.0)
         tempering_form.emissivity.data = tp.get('emissivity', 0.85)
@@ -273,6 +278,11 @@ def heat_treatment(id):
                 'enabled': 'tempering-enabled' in request.form,
                 'temperature': float(request.form.get('tempering-temperature', 550)),
                 'hold_time': float(request.form.get('tempering-hold_time', 120)),
+                # End condition settings
+                'end_condition': request.form.get('tempering-end_condition', 'equilibrium'),
+                'rate_threshold': float(request.form.get('tempering-rate_threshold', 1.0)),
+                'hold_time_after_trigger': float(request.form.get('tempering-hold_time_after_trigger', 30)),
+                'center_offset': float(request.form.get('tempering-center_offset', 3)),
                 'cooling_method': request.form.get('tempering-cooling_method', 'air'),
                 'htc': float(request.form.get('tempering-htc', 25)),
                 'emissivity': float(request.form.get('tempering-emissivity', 0.85)),
