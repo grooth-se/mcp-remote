@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Configure TC Channels - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item active">Configure TC Channels</li>
+    </ol>
+</nav>
+
+<h2><i class="bi bi-tags"></i> Configure Channel Labels</h2>
+<p class="text-muted">Label each thermocouple channel for easier identification in plots.</p>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-thermometer-half"></i> {{ measured.name }}
+                <span class="badge bg-secondary float-end">{{ measured.num_channels }} channels</span>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="row">
+                        {% for channel in measured.available_channels %}
+                        <div class="col-md-6 mb-3">
+                            <div class="input-group">
+                                <span class="input-group-text">{{ channel }}</span>
+                                <input type="text" name="label_{{ channel }}" class="form-control"
+                                       value="{{ measured.get_channel_label(channel) }}"
+                                       placeholder="e.g., Surface, Furnace, Core">
+                            </div>
+                            {% set stats = measured.statistics.get(channel, {}) %}
+                            <small class="text-muted">
+                                Min: {{ stats.get('min', 0)|round(1) }}°C |
+                                Max: {{ stats.get('max', 0)|round(1) }}°C |
+                                Avg: {{ stats.get('avg', 0)|round(1) }}°C
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Save Labels
+                        </button>
+                        <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Data Info
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted">File:</td>
+                        <td>{{ measured.filename }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Start:</td>
+                        <td>{{ measured.start_time.strftime('%Y-%m-%d %H:%M') if measured.start_time else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">End:</td>
+                        <td>{{ measured.end_time.strftime('%Y-%m-%d %H:%M') if measured.end_time else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Duration:</td>
+                        <td>{{ (measured.duration_seconds / 3600)|round(1) }} hours</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Data points:</td>
+                        <td>{{ measured.num_points }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <i class="bi bi-lightbulb"></i> Label Suggestions
+            </div>
+            <div class="card-body small">
+                <ul class="mb-0">
+                    <li><strong>Surface</strong> - TC on part surface</li>
+                    <li><strong>Furnace</strong> - Furnace atmosphere TC</li>
+                    <li><strong>Core</strong> - TC in part center/core</li>
+                    <li><strong>Quench</strong> - Quench media temperature</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

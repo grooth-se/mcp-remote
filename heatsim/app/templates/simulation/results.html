@@ -27,6 +27,9 @@
         <a href="{{ url_for('simulation.heat_treatment', id=sim.id) }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-thermometer"></i> Heat Treatment
         </a>
+        <a href="{{ url_for('simulation.upload_tc_data', id=sim.id) }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-upload"></i> Upload TC Data
+        </a>
         {% if sim.status in ['ready', 'completed', 'failed'] %}
         <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -129,6 +132,29 @@
         </div>
     </div>
     {% endfor %}
+</div>
+{% endif %}
+
+<!-- Measured Data Comparison -->
+{% if measured_data %}
+<div class="plot-full-width">
+    <div class="card border-primary">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-graph-up"></i> Simulation vs Measured Data
+            <a href="{{ url_for('simulation.upload_tc_data', id=sim.id) }}" class="btn btn-sm btn-light float-end">
+                <i class="bi bi-gear"></i> Manage TC Data
+            </a>
+        </div>
+        <div class="card-body text-center">
+            <img src="{{ url_for('simulation.comparison_plot', id=sim.id) }}" class="img-fluid" alt="Comparison Plot">
+        </div>
+        <div class="card-footer">
+            <small class="text-muted">Measured data:</small>
+            {% for data in measured_data %}
+            <span class="badge bg-secondary me-1">{{ data.name }} ({{ data.num_channels }} ch)</span>
+            {% endfor %}
+        </div>
+    </div>
 </div>
 {% endif %}
 

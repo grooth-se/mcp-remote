@@ -4,7 +4,7 @@ from flask import render_template, redirect, url_for, flash, request, Response
 from flask_login import login_required, current_user
 
 from app.extensions import db
-from app.models import SteelGrade, PhaseDiagram
+from app.models import SteelGrade, PhaseDiagram, MeasuredData
 from app.models.simulation import (
     Simulation, SimulationResult,
     STATUS_DRAFT, STATUS_READY, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
@@ -19,6 +19,7 @@ from app.services import (
     PhaseTracker,
     visualization
 )
+from app.services.tc_data_parser import parse_tc_csv, validate_tc_csv
 
 from . import simulation_bp
 from .forms import (
@@ -334,6 +335,9 @@ def view(id):
     dtdt_temp_heating = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'heating']
     dtdt_temp_quenching = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'quenching']
 
+    # Get measured TC data for comparison
+    measured_data = sim.measured_data.all()
+
     return render_template(
         'simulation/results.html',
         sim=sim,
@@ -345,7 +349,8 @@ def view(id):
         dtdt_time_heating=dtdt_time_heating,
         dtdt_time_quenching=dtdt_time_quenching,
         dtdt_temp_heating=dtdt_temp_heating,
-        dtdt_temp_quenching=dtdt_temp_quenching
+        dtdt_temp_quenching=dtdt_temp_quenching,
+        measured_data=measured_data
     )
 
 
@@ -632,3 +637,173 @@ def api_htc(media, agitation):
     temp = request.args.get('temp', 25, type=float)
     htc = calculate_quench_htc(media, agitation, temp)
     return {'htc': htc}
+
+
+# ============================================================================
+# Measured TC Data Routes
+# ============================================================================
+
+@simulation_bp.route('/<int:id>/upload-tc', methods=['GET', 'POST'])
+@login_required
+def upload_tc_data(id):
+    """Upload measured thermocouple data for comparison."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    if request.method == 'POST':
+        if 'tc_file' not in request.files:
+            flash('No file uploaded.', 'danger')
+            return redirect(request.url)
+
+        file = request.files['tc_file']
+        if file.filename == '':
+            flash('No file selected.', 'danger')
+            return redirect(request.url)
+
+        if not file.filename.endswith('.csv'):
+            flash('Please upload a CSV file.', 'danger')
+            return redirect(request.url)
+
+        try:
+            # Read and parse file
+            content = file.read().decode('utf-8')
+            is_valid, msg = validate_tc_csv(content)
+            if not is_valid:
+                flash(f'Invalid file format: {msg}', 'danger')
+                return redirect(request.url)
+
+            data = parse_tc_csv(content)
+
+            # Create MeasuredData record
+            name = request.form.get('name', file.filename)
+            description = request.form.get('description', '')
+
+            measured = MeasuredData(
+                simulation_id=sim.id,
+                name=name,
+                description=description,
+                filename=file.filename,
+                start_time=data['start_time'],
+                end_time=data['end_time'],
+                duration_seconds=data['duration_seconds'],
+            )
+            measured.times = data['times']
+            measured.channels = data['channels']
+            measured.statistics = data['statistics']
+
+            # Initialize channel labels
+            labels = {ch: ch for ch in data['channels'].keys()}
+            measured.channel_labels_dict = labels
+
+            db.session.add(measured)
+            db.session.commit()
+
+            flash(f'Uploaded {measured.num_channels} channels with {measured.num_points} data points.', 'success')
+            return redirect(url_for('simulation.configure_tc_data', id=sim.id, data_id=measured.id))
+
+        except Exception as e:
+            flash(f'Error parsing file: {str(e)}', 'danger')
+            return redirect(request.url)
+
+    # GET - show upload form
+    existing_data = sim.measured_data.all()
+    return render_template('simulation/upload_tc.html', sim=sim, existing_data=existing_data)
+
+
+@simulation_bp.route('/<int:id>/tc-data/<int:data_id>/configure', methods=['GET', 'POST'])
+@login_required
+def configure_tc_data(id, data_id):
+    """Configure channel labels for uploaded TC data."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    measured = MeasuredData.query.get_or_404(data_id)
+    if measured.simulation_id != sim.id:
+        flash('Data not found.', 'danger')
+        return redirect(url_for('simulation.view', id=id))
+
+    if request.method == 'POST':
+        # Update channel labels
+        labels = {}
+        for channel in measured.available_channels:
+            label = request.form.get(f'label_{channel}', channel)
+            labels[channel] = label
+        measured.channel_labels_dict = labels
+        db.session.commit()
+
+        flash('Channel labels updated.', 'success')
+        return redirect(url_for('simulation.view', id=sim.id))
+
+    return render_template('simulation/configure_tc.html', sim=sim, measured=measured)
+
+
+@simulation_bp.route('/<int:id>/tc-data/<int:data_id>/delete', methods=['POST'])
+@login_required
+def delete_tc_data(id, data_id):
+    """Delete uploaded TC data."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    measured = MeasuredData.query.get_or_404(data_id)
+    if measured.simulation_id != sim.id:
+        flash('Data not found.', 'danger')
+        return redirect(url_for('simulation.view', id=id))
+
+    db.session.delete(measured)
+    db.session.commit()
+    flash('TC data deleted.', 'success')
+    return redirect(url_for('simulation.view', id=sim.id))
+
+
+@simulation_bp.route('/<int:id>/comparison-plot')
+@login_required
+def comparison_plot(id):
+    """Generate comparison plot of simulation vs measured data."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    # Get measured data
+    measured_list = sim.measured_data.all()
+    if not measured_list:
+        return Response('No measured data', status=404)
+
+    # Get simulation results
+    cooling_curve = SimulationResult.query.filter_by(
+        simulation_id=sim.id,
+        result_type='cooling_curve'
+    ).first()
+
+    if not cooling_curve:
+        return Response('No simulation results', status=404)
+
+    # Generate comparison plot
+    import numpy as np
+
+    sim_times = np.array(cooling_curve.get_time_data())
+    sim_temps = np.array(cooling_curve.get_value_data())
+
+    # Prepare measured data
+    measured_data = []
+    for m in measured_list:
+        for channel in m.available_channels:
+            measured_data.append({
+                'name': m.get_channel_label(channel),
+                'times': m.times,
+                'temps': m.channels[channel]
+            })
+
+    # Create comparison plot
+    plot_data = visualization.create_comparison_plot(
+        sim_times, sim_temps,
+        measured_data,
+        title=f'Simulation vs Measured - {sim.name}'
+    )
+
+    return Response(plot_data, mimetype='image/png')

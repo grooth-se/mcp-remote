@@ -531,3 +531,136 @@ def create_dTdt_vs_temperature_plot(
     plt.close(fig)
 
     return buf.getvalue()
+
+
+# TC measurement comparison colors
+TC_COLORS = [
+    '#e41a1c',  # Red
+    '#377eb8',  # Blue
+    '#4daf4a',  # Green
+    '#984ea3',  # Purple
+    '#ff7f00',  # Orange
+    '#a65628',  # Brown
+    '#f781bf',  # Pink
+    '#999999',  # Grey
+]
+
+
+def create_comparison_plot(
+    sim_times: np.ndarray,
+    sim_temps: np.ndarray,
+    measured_data: List[dict],
+    title: str = "Simulation vs Measured"
+) -> bytes:
+    """Generate comparison plot of simulation vs measured TC data.
+
+    Parameters
+    ----------
+    sim_times : np.ndarray
+        Simulation time array in seconds
+    sim_temps : np.ndarray
+        Simulation temperature array (center)
+    measured_data : list
+        List of dicts with keys: name, times, temps
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    # Plot simulation (thick black dashed line)
+    ax.plot(sim_times, sim_temps, 'k--', linewidth=2.5, label='Simulation (Center)', zorder=10)
+
+    # Plot measured data
+    for i, data in enumerate(measured_data):
+        color = TC_COLORS[i % len(TC_COLORS)]
+        times = np.array(data['times'])
+        temps = np.array(data['temps'])
+        name = data.get('name', f'TC{i+1}')
+
+        ax.plot(times, temps, color=color, linewidth=1.5, label=name, alpha=0.8)
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Temperature (°C)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='best', fontsize=9, ncol=2)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
+
+
+def create_multi_comparison_plot(
+    sim_times: np.ndarray,
+    sim_temperatures: np.ndarray,
+    measured_data: List[dict],
+    title: str = "Simulation vs Measured"
+) -> bytes:
+    """Generate comparison plot with multiple simulation positions.
+
+    Parameters
+    ----------
+    sim_times : np.ndarray
+        Simulation time array in seconds
+    sim_temperatures : np.ndarray
+        Simulation temperature field [time, position]
+    measured_data : list
+        List of dicts with keys: name, times, temps
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    # Extract simulation positions
+    sim_four = extract_four_point_temperatures(sim_temperatures)
+
+    # Plot simulation curves (dashed lines)
+    for key in ['center', 'one_third', 'two_thirds', 'surface']:
+        ax.plot(
+            sim_times,
+            sim_four[key],
+            color=FOUR_POINT_COLORS[key],
+            linestyle='--',
+            linewidth=2,
+            label=f'Sim: {FOUR_POINT_LABELS[key]}',
+            alpha=0.7
+        )
+
+    # Plot measured data (solid lines)
+    for i, data in enumerate(measured_data):
+        color = TC_COLORS[i % len(TC_COLORS)]
+        times = np.array(data['times'])
+        temps = np.array(data['temps'])
+        name = data.get('name', f'TC{i+1}')
+
+        ax.plot(times, temps, color=color, linewidth=1.5, label=f'Meas: {name}', alpha=0.9)
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Temperature (°C)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='best', fontsize=8, ncol=2)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
