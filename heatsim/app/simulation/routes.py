@@ -684,7 +684,12 @@ def result_image(id, result_id):
     if result.simulation_id != id or not result.plot_image:
         return '', 404
 
-    return Response(result.plot_image, mimetype='image/png')
+    response = Response(result.plot_image, mimetype='image/png')
+    # Prevent browser caching to ensure fresh plots are displayed
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @simulation_bp.route('/<int:id>/delete', methods=['POST'])
