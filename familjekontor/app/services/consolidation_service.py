@@ -95,16 +95,16 @@ def get_consolidated_pnl(group_id, fy_year):
             consolidated_sections[section_name]['total'] += weighted_total
 
     # Calculate consolidated totals
-    gross_profit = consolidated_sections.get('Nettoomsattning', {}).get('total', 0) - \
-                   consolidated_sections.get('Kostnad salda varor', {}).get('total', 0)
+    gross_profit = consolidated_sections.get('Nettoomsättning', {}).get('total', 0) - \
+                   consolidated_sections.get('Kostnad sålda varor', {}).get('total', 0)
 
     operating_result = gross_profit - (
-        consolidated_sections.get('Ovriga externa kostnader', {}).get('total', 0) +
+        consolidated_sections.get('Övriga externa kostnader', {}).get('total', 0) +
         consolidated_sections.get('Personalkostnader', {}).get('total', 0)
     )
 
     result_before_tax = operating_result + (
-        consolidated_sections.get('Finansiella intakter', {}).get('total', 0) -
+        consolidated_sections.get('Finansiella intäkter', {}).get('total', 0) -
         consolidated_sections.get('Finansiella kostnader', {}).get('total', 0)
     )
 
@@ -157,13 +157,13 @@ def get_consolidated_balance_sheet(group_id, fy_year):
             consolidated_sections[section_name]['total'] += weighted_total
 
     total_assets = (
-        consolidated_sections.get('Anlaggningstillgangar', {}).get('total', 0) +
-        consolidated_sections.get('Omsattningstillgangar', {}).get('total', 0)
+        consolidated_sections.get('Anläggningstillgångar', {}).get('total', 0) +
+        consolidated_sections.get('Omsättningstillgångar', {}).get('total', 0)
     )
 
     total_equity_liabilities = (
         consolidated_sections.get('Eget kapital', {}).get('total', 0) +
-        consolidated_sections.get('Langfristiga skulder', {}).get('total', 0) +
+        consolidated_sections.get('Långfristiga skulder', {}).get('total', 0) +
         consolidated_sections.get('Kortfristiga skulder', {}).get('total', 0)
     )
 
