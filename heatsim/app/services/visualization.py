@@ -726,9 +726,22 @@ def create_measured_tc_plot(
     return buf.getvalue()
 
 
+def filter_outliers_percentile(data: np.ndarray, lower_pct: float = 1, upper_pct: float = 99) -> tuple:
+    """Filter outliers using percentile clipping.
+
+    Returns mask of valid (non-outlier) indices and the percentile bounds.
+    """
+    lower_bound = np.percentile(data, lower_pct)
+    upper_bound = np.percentile(data, upper_pct)
+    mask = (data >= lower_bound) & (data <= upper_bound)
+    return mask, lower_bound, upper_bound
+
+
 def create_measured_dtdt_plot(
     measured_data: List[dict],
-    title: str = "Measured dT/dt vs Time"
+    title: str = "Measured dT/dt vs Time",
+    filter_outliers: bool = True,
+    outlier_percentile: float = 2.0
 ) -> bytes:
     """Generate dT/dt vs Time plot for measured TC data.
 
@@ -738,6 +751,10 @@ def create_measured_dtdt_plot(
         List of dicts with keys: name, times, temps
     title : str
         Plot title
+    filter_outliers : bool
+        If True, filter outliers for better y-axis scaling
+    outlier_percentile : float
+        Percentile for outlier filtering (removes below this and above 100-this)
 
     Returns
     -------
@@ -746,9 +763,12 @@ def create_measured_dtdt_plot(
     """
     fig, ax = plt.subplots(figsize=(12, 7))
 
+    # Collect all dT/dt values to determine common y-axis limits
+    all_dTdt = []
+
     # Plot dT/dt for each channel
+    plot_data = []
     for i, data in enumerate(measured_data):
-        color = TC_COLORS[i % len(TC_COLORS)]
         times = np.array(data['times'])
         temps = np.array(data['temps'])
         name = data.get('name', f'TC{i+1}')
@@ -759,6 +779,23 @@ def create_measured_dtdt_plot(
         dTdt = np.diff(temps) / dt
         time_mid = 0.5 * (times[:-1] + times[1:])
 
+        plot_data.append((time_mid, dTdt, name))
+        all_dTdt.extend(dTdt)
+
+    # Determine y-axis limits based on filtered data
+    all_dTdt = np.array(all_dTdt)
+    if filter_outliers and len(all_dTdt) > 0:
+        _, y_min, y_max = filter_outliers_percentile(all_dTdt, outlier_percentile, 100 - outlier_percentile)
+        # Add some padding
+        y_range = y_max - y_min
+        y_min -= 0.1 * y_range
+        y_max += 0.1 * y_range
+    else:
+        y_min, y_max = None, None
+
+    # Now plot
+    for i, (time_mid, dTdt, name) in enumerate(plot_data):
+        color = TC_COLORS[i % len(TC_COLORS)]
         ax.plot(time_mid, dTdt, color=color, linewidth=1.5, label=name, alpha=0.9)
 
     ax.set_xlabel('Time (s)', fontsize=12)
@@ -767,6 +804,10 @@ def create_measured_dtdt_plot(
     ax.legend(loc='best', fontsize=9, ncol=2)
     ax.grid(True, alpha=0.3)
     ax.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
+
+    # Apply filtered y-axis limits
+    if y_min is not None and y_max is not None:
+        ax.set_ylim(y_min, y_max)
 
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
@@ -778,7 +819,9 @@ def create_measured_dtdt_plot(
 
 def create_measured_dtdt_vs_temp_plot(
     measured_data: List[dict],
-    title: str = "Measured dT/dt vs Temperature"
+    title: str = "Measured dT/dt vs Temperature",
+    filter_outliers: bool = True,
+    outlier_percentile: float = 2.0
 ) -> bytes:
     """Generate dT/dt vs Temperature plot for measured TC data.
 
@@ -788,6 +831,10 @@ def create_measured_dtdt_vs_temp_plot(
         List of dicts with keys: name, times, temps
     title : str
         Plot title
+    filter_outliers : bool
+        If True, filter outliers for better y-axis scaling
+    outlier_percentile : float
+        Percentile for outlier filtering (removes below this and above 100-this)
 
     Returns
     -------
@@ -796,9 +843,12 @@ def create_measured_dtdt_vs_temp_plot(
     """
     fig, ax = plt.subplots(figsize=(12, 7))
 
+    # Collect all dT/dt values to determine common y-axis limits
+    all_dTdt = []
+
     # Plot dT/dt vs T for each channel
+    plot_data = []
     for i, data in enumerate(measured_data):
-        color = TC_COLORS[i % len(TC_COLORS)]
         times = np.array(data['times'])
         temps = np.array(data['temps'])
         name = data.get('name', f'TC{i+1}')
@@ -809,6 +859,23 @@ def create_measured_dtdt_vs_temp_plot(
         dTdt = np.diff(temps) / dt
         temp_mid = 0.5 * (temps[:-1] + temps[1:])
 
+        plot_data.append((temp_mid, dTdt, name))
+        all_dTdt.extend(dTdt)
+
+    # Determine y-axis limits based on filtered data
+    all_dTdt = np.array(all_dTdt)
+    if filter_outliers and len(all_dTdt) > 0:
+        _, y_min, y_max = filter_outliers_percentile(all_dTdt, outlier_percentile, 100 - outlier_percentile)
+        # Add some padding
+        y_range = y_max - y_min
+        y_min -= 0.1 * y_range
+        y_max += 0.1 * y_range
+    else:
+        y_min, y_max = None, None
+
+    # Now plot
+    for i, (temp_mid, dTdt, name) in enumerate(plot_data):
+        color = TC_COLORS[i % len(TC_COLORS)]
         ax.plot(temp_mid, dTdt, color=color, linewidth=1.5, label=name, alpha=0.9)
 
     ax.set_xlabel('Temperature (°C)', fontsize=12)
@@ -817,6 +884,10 @@ def create_measured_dtdt_vs_temp_plot(
     ax.legend(loc='best', fontsize=9, ncol=2)
     ax.grid(True, alpha=0.3)
     ax.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
+
+    # Apply filtered y-axis limits
+    if y_min is not None and y_max is not None:
+        ax.set_ylim(y_min, y_max)
 
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
