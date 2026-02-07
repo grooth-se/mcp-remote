@@ -612,6 +612,10 @@ class HeatSolver:
         rate_check_interval = 60.0  # Check rate every 60 seconds
         last_rate_check_time = 0.0
 
+        # Track if part has approached target from above (for tempering after incomplete quench)
+        initial_center_temp = T[0]
+        has_approached_target = initial_center_temp <= phase_config.target_temperature + 50 if phase_config.target_temperature else True
+
         while t < max_phase_time:
             # Update time on ramping boundary condition
             if isinstance(self.outer_bc, RampingBoundaryCondition):
@@ -622,10 +626,16 @@ class HeatSolver:
                 # Check if center has reached target
                 if phase_config.end_temperature is not None:
                     if phase_config.name in ('heating', 'tempering'):
-                        # Heating: end when center reaches target
-                        if T[0] >= phase_config.end_temperature:
-                            # Now we're at temperature, run hold time
-                            break
+                        # For tempering: if part starts hotter than target, wait until it cools first
+                        if not has_approached_target:
+                            if T[0] <= phase_config.target_temperature + 20:
+                                has_approached_target = True
+
+                        # Only check equilibrium after part has approached target temp
+                        if has_approached_target and T[0] >= phase_config.end_temperature:
+                            # Check if we're actually at equilibrium (surface and center within 10°C)
+                            if abs(T[0] - T[-1]) < 10:
+                                break
                     else:
                         # Cooling: end when center drops below threshold
                         if T[0] <= phase_config.end_temperature:
