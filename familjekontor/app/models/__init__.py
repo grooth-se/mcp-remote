@@ -5,6 +5,7 @@ from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvo
 from app.models.document import Document
 from app.models.audit import AuditLog
 from app.models.tax import VATReport, Deadline, TaxPayment
+from app.models.salary import Employee, SalaryRun, SalaryEntry
 
 __all__ = [
     'User', 'Company',
@@ -12,4 +13,5 @@ __all__ = [
     'Supplier', 'SupplierInvoice', 'Customer', 'CustomerInvoice',
     'Document', 'AuditLog',
     'VATReport', 'Deadline', 'TaxPayment',
+    'Employee', 'SalaryRun', 'SalaryEntry',
 ]

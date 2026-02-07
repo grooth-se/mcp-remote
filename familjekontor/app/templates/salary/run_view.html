@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Löneköring {{ run.period_label|capitalize }} - Familjekontor{% endblock %}
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-wallet2"></i> Löneköring: {{ run.period_label|capitalize }}</h2>
+        <p class="text-muted">{{ company.name }}</p>
+    </div>
+    <div class="col-auto">
+        {% if run.status == 'draft' %}
+        <span class="badge bg-warning text-dark fs-6">Utkast</span>
+        {% elif run.status == 'approved' %}
+        <span class="badge bg-primary fs-6">Godkänd</span>
+        {% elif run.status == 'paid' %}
+        <span class="badge bg-success fs-6">Betald</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Brutto</small>
+                <h5>{{ "{:,.0f}".format(run.total_gross|float) }} kr</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Skatt</small>
+                <h5>{{ "{:,.0f}".format(run.total_tax|float) }} kr</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Netto</small>
+                <h5 class="text-success">{{ "{:,.0f}".format(run.total_net|float) }} kr</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Arb.avg.</small>
+                <h5>{{ "{:,.0f}".format(run.total_employer_contributions|float) }} kr</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Pension</small>
+                <h5>{{ "{:,.0f}".format(run.total_pension|float) }} kr</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Total kostnad</small>
+                <h5 class="text-danger">{{ "{:,.0f}".format((run.total_gross|float + run.total_employer_contributions|float + run.total_pension|float)) }} kr</h5>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Entry table -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Löneposter ({{ run.entries|length }} anställda)</span>
+        {% if run.status == 'draft' %}
+        <form method="POST" action="{{ url_for('salary.run_recalculate', run_id=run.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-repeat"></i> Räkna om alla
+            </button>
+        </form>
+        {% endif %}
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Anställd</th>
+                    <th class="text-end">Brutto</th>
+                    <th class="text-end">Skatt</th>
+                    <th class="text-end">Netto</th>
+                    <th class="text-end">Arb.avg.</th>
+                    <th class="text-end">Pension</th>
+                    <th class="text-end">Sem.skuld</th>
+                    <th>Anm.</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in run.entries %}
+                <tr>
+                    <td>{{ entry.employee.full_name }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(entry.gross_salary|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(entry.tax_deduction|float) }}</td>
+                    <td class="text-end text-success">{{ "{:,.0f}".format(entry.net_salary|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(entry.employer_contributions|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(entry.pension_amount|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(entry.vacation_pay_provision|float) }}</td>
+                    <td>{{ entry.notes or '' }}</td>
+                    <td>
+                        {% if run.status == 'draft' %}
+                        <a href="{{ url_for('salary.entry_edit', run_id=run.id, entry_id=entry.id) }}" class="btn btn-sm btn-outline-secondary">Ändra</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Action buttons -->
+<div class="card mb-4">
+    <div class="card-header">Åtgärder</div>
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2">
+            {% if run.status == 'draft' %}
+            <form method="POST" action="{{ url_for('salary.run_approve', run_id=run.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-success"
+                        onclick="return confirm('Godkänn löneköring och skapa verifikation?')">
+                    <i class="bi bi-check-circle"></i> Godkänn
+                </button>
+            </form>
+            {% endif %}
+
+            {% if run.status == 'approved' %}
+            <form method="POST" action="{{ url_for('salary.run_pay', run_id=run.id) }}" class="d-inline">
+                {{ pay_form.hidden_tag() }}
+                <div class="input-group" style="max-width: 350px;">
+                    {{ pay_form.paid_date(class="form-control", type="date") }}
+                    {{ pay_form.submit(class="btn btn-success") }}
+                </div>
+            </form>
+            {% endif %}
+
+            <a href="{{ url_for('salary.run_slips', run_id=run.id) }}" class="btn btn-outline-primary">
+                <i class="bi bi-file-text"></i> Lönespecifikationer
+            </a>
+            <a href="{{ url_for('salary.run_agi', run_id=run.id) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-text"></i> AGI-underlag
+            </a>
+            <a href="{{ url_for('salary.index') }}" class="btn btn-secondary">Tillbaka</a>
+        </div>
+
+        {% if run.verification %}
+        <div class="mt-3">
+            <small class="text-muted">
+                Verifikation: <a href="{{ url_for('accounting.view_verification', verification_id=run.verification_id) }}">
+                    #{{ run.verification.verification_number }}
+                </a>
+                {% if run.paid_date %} | Betald: {{ run.paid_date }}{% endif %}
+            </small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

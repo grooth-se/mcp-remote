@@ -31,6 +31,7 @@ def create_app(config_name=None):
     from app.routes.reports import reports_bp
     from app.routes.admin import admin_bp
     from app.routes.tax import tax_bp
+    from app.routes.salary import salary_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -41,6 +42,7 @@ def create_app(config_name=None):
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(tax_bp, url_prefix='/tax')
+    app.register_blueprint(salary_bp, url_prefix='/salary')
 
     # Context processor for active company
     @app.context_processor

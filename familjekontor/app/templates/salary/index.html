@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Lön - Familjekontor{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-wallet2"></i> Löneadministration</h2>
+        <p class="text-muted">{{ company.name }}</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body">
+                <h6 class="card-title">Anställda</h6>
+                <h2>{{ employee_count }}</h2>
+                <small>Aktiva</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-info">
+            <div class="card-body">
+                <h6 class="card-title">Lönekörningar</h6>
+                <h2>{{ recent_runs|length }}</h2>
+                <small>Senaste</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body">
+                <h6 class="card-title">Utkast</h6>
+                <h2>{{ recent_runs|selectattr('status', 'equalto', 'draft')|list|length }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body">
+                <h6 class="card-title">Betalda</h6>
+                <h2>{{ recent_runs|selectattr('status', 'equalto', 'paid')|list|length }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Snabbåtgärder</div>
+            <div class="list-group list-group-flush">
+                <a href="{{ url_for('salary.run_new') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-plus-circle"></i> Ny löneköring
+                </a>
+                <a href="{{ url_for('salary.employee_new') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-person-plus"></i> Ny anställd
+                </a>
+                <a href="{{ url_for('salary.employees') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-people"></i> Anställda
+                </a>
+                <a href="{{ url_for('salary.collectum') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-shield-check"></i> Collectum-rapport
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">Senaste lönekörningar</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Period</th>
+                            <th class="text-end">Brutto</th>
+                            <th class="text-end">Netto</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for run in recent_runs %}
+                        <tr>
+                            <td>{{ run.period_label|capitalize }}</td>
+                            <td class="text-end">{{ "{:,.0f}".format(run.total_gross|float) }} kr</td>
+                            <td class="text-end">{{ "{:,.0f}".format(run.total_net|float) }} kr</td>
+                            <td>
+                                {% if run.status == 'draft' %}
+                                <span class="badge bg-warning text-dark">Utkast</span>
+                                {% elif run.status == 'approved' %}
+                                <span class="badge bg-primary">Godkänd</span>
+                                {% elif run.status == 'paid' %}
+                                <span class="badge bg-success">Betald</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('salary.run_view', run_id=run.id) }}" class="btn btn-sm btn-outline-secondary">Visa</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-muted">Inga lönekörningar ännu.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

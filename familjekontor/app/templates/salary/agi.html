@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}AGI-underlag - Familjekontor{% endblock %}
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-file-earmark-text"></i> AGI-underlag (Arbetsgivardeklaration)</h2>
+        <p class="text-muted">{{ company.name }} — {{ agi.period_label|capitalize }}</p>
+    </div>
+    <div class="col-auto no-print">
+        <button onclick="window.print()" class="btn btn-outline-primary">
+            <i class="bi bi-printer"></i> Skriv ut
+        </button>
+        <a href="{{ url_for('salary.run_view', run_id=run.id) }}" class="btn btn-secondary">Tillbaka</a>
+    </div>
+</div>
+
+<div class="card report-card mb-4">
+    <div class="card-header">Individuppgifter</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Personnummer</th>
+                    <th>Namn</th>
+                    <th class="text-end">Kontant bruttolön</th>
+                    <th class="text-end">Avdragen skatt</th>
+                    <th class="text-end">Arbetsgivaravgifter</th>
+                    <th class="text-end">Pension</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in agi.entries %}
+                <tr>
+                    <td>{{ e.personal_number }}</td>
+                    <td>{{ e.full_name }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(e.gross_salary|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(e.tax_deduction|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(e.employer_contributions|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(e.pension_amount|float) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="2">Totalt</td>
+                    <td class="text-end">{{ "{:,.0f}".format(agi.total_gross|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(agi.total_tax|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(agi.total_employer|float) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(run.total_pension|float) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<div class="card report-card">
+    <div class="card-header">Summering (Huvuduppgift)</div>
+    <div class="card-body">
+        <table class="table table-sm" style="max-width: 500px;">
+            <tr>
+                <td>Summa kontant bruttolön (fält 050)</td>
+                <td class="text-end fw-bold">{{ "{:,.0f}".format(agi.total_gross|float) }} kr</td>
+            </tr>
+            <tr>
+                <td>Summa avdragen skatt (fält 060)</td>
+                <td class="text-end fw-bold">{{ "{:,.0f}".format(agi.total_tax|float) }} kr</td>
+            </tr>
+            <tr>
+                <td>Arbetsgivaravgifter (fält 487)</td>
+                <td class="text-end fw-bold">{{ "{:,.0f}".format(agi.total_employer|float) }} kr</td>
+            </tr>
+            <tr class="table-warning">
+                <td>Summa att betala</td>
+                <td class="text-end fw-bold">{{ "{:,.0f}".format(agi.total_tax|float + agi.total_employer|float) }} kr</td>
+            </tr>
+        </table>
+    </div>
+</div>
+{% endblock %}

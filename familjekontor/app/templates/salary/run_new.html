@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Ny löneköring - Familjekontor{% endblock %}
+{% block content %}
+<h2><i class="bi bi-plus-circle"></i> Ny löneköring</h2>
+<p class="text-muted">{{ company.name }}</p>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.period_year.label(class="form-label") }}
+                            {{ form.period_year(class="form-control") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.period_month.label(class="form-label") }}
+                            {{ form.period_month(class="form-select") }}
+                        </div>
+                    </div>
+                    <p class="text-muted small">
+                        En löneköring skapas med löneuppgifter för alla aktiva anställda.
+                        Du kan justera individuella poster efter skapandet.
+                    </p>
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('salary.index') }}" class="btn btn-secondary">Avbryt</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

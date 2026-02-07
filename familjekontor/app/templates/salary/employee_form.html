@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - Familjekontor{% endblock %}
+{% block content %}
+<h2><i class="bi bi-person"></i> {{ title }}</h2>
+<p class="text-muted">{{ company.name }}</p>
+
+<div class="row">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="mb-3">Personuppgifter</h5>
+                            <div class="mb-3">
+                                {{ form.personal_number.label(class="form-label") }}
+                                {{ form.personal_number(class="form-control", placeholder="YYYYMMDD-XXXX") }}
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    {{ form.first_name.label(class="form-label") }}
+                                    {{ form.first_name(class="form-control") }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.last_name.label(class="form-label") }}
+                                    {{ form.last_name(class="form-control") }}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                {{ form.email.label(class="form-label") }}
+                                {{ form.email(class="form-control") }}
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    {{ form.bank_clearing.label(class="form-label") }}
+                                    {{ form.bank_clearing(class="form-control") }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.bank_account.label(class="form-label") }}
+                                    {{ form.bank_account(class="form-control") }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="mb-3">Anställning</h5>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    {{ form.employment_start.label(class="form-label") }}
+                                    {{ form.employment_start(class="form-control", type="date") }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.employment_end.label(class="form-label") }}
+                                    {{ form.employment_end(class="form-control", type="date") }}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                {{ form.monthly_salary.label(class="form-label") }}
+                                {{ form.monthly_salary(class="form-control") }}
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    {{ form.tax_table.label(class="form-label") }}
+                                    {{ form.tax_table(class="form-control") }}
+                                </div>
+                                <div class="col-md-4">
+                                    {{ form.tax_column.label(class="form-label") }}
+                                    {{ form.tax_column(class="form-control") }}
+                                </div>
+                                <div class="col-md-4">
+                                    {{ form.pension_plan.label(class="form-label") }}
+                                    {{ form.pension_plan(class="form-select") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('salary.employees') }}" class="btn btn-secondary">Avbryt</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

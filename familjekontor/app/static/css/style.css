@@ -65,6 +65,21 @@ body {
     h2, h4, h5 {
         margin-top: 0;
     }
+
+    /* Salary slip print styles */
+    .salary-slip {
+        border: 1px solid #dee2e6;
+        box-shadow: none;
+        page-break-inside: avoid;
+    }
+
+    .salary-slip-break {
+        page-break-after: always;
+    }
+
+    .salary-slip-page {
+        margin-bottom: 0;
+    }
 }
 
 /* Badge colors for statuses */

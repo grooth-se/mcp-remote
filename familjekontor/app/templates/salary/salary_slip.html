@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Lönespecifikation - Familjekontor{% endblock %}
+{% block content %}
+<div class="no-print mb-3">
+    <div class="d-flex gap-2">
+        <button onclick="window.print()" class="btn btn-primary">
+            <i class="bi bi-printer"></i> Skriv ut
+        </button>
+        <a href="{{ url_for('salary.run_view', run_id=run.id) }}" class="btn btn-secondary">Tillbaka</a>
+    </div>
+</div>
+
+{% for slip in slips %}
+<div class="salary-slip-page mb-4">
+    <div class="card salary-slip">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h4>{{ slip.company.name }}</h4>
+                    <small class="text-muted">
+                        Org.nr: {{ slip.company.org_number }}<br>
+                        {% if slip.company.address %}{{ slip.company.address }}{% endif %}
+                    </small>
+                </div>
+                <div class="col-md-6 text-end">
+                    <h5>Lönespecifikation</h5>
+                    <strong>{{ slip.period_label|capitalize }}</strong>
+                </div>
+            </div>
+
+            <!-- Employee info -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted" style="width: 140px;">Anställd</td>
+                            <td><strong>{{ slip.employee.full_name }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Personnummer</td>
+                            <td>{{ slip.employee.masked_personal_number }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Salary breakdown -->
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Post</th>
+                        <th class="text-end">Belopp (SEK)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Bruttolön</td>
+                        <td class="text-end">{{ "{:,.2f}".format(slip.gross_salary|float) }}</td>
+                    </tr>
+                    {% if slip.other_additions|float > 0 %}
+                    <tr>
+                        <td>Övriga tillägg</td>
+                        <td class="text-end">{{ "{:,.2f}".format(slip.other_additions|float) }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Skatteavdrag</td>
+                        <td class="text-end text-danger">-{{ "{:,.2f}".format(slip.tax_deduction|float) }}</td>
+                    </tr>
+                    {% if slip.other_deductions|float > 0 %}
+                    <tr>
+                        <td>Övriga avdrag</td>
+                        <td class="text-end text-danger">-{{ "{:,.2f}".format(slip.other_deductions|float) }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr class="table-success fw-bold">
+                        <td>Nettolön (utbetalas)</td>
+                        <td class="text-end">{{ "{:,.2f}".format(slip.net_salary|float) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Employer costs (info) -->
+            <div class="mt-3">
+                <small class="text-muted">
+                    <strong>Arbetsgivarens kostnader:</strong>
+                    Arbetsgivaravgifter {{ "{:,.2f}".format(slip.employer_contributions|float) }} kr |
+                    Pension {{ "{:,.2f}".format(slip.pension_amount|float) }} kr |
+                    Semesterlöneskuld {{ "{:,.2f}".format(slip.vacation_pay_provision|float) }} kr
+                </small>
+            </div>
+
+            {% if slip.notes %}
+            <div class="mt-2">
+                <small class="text-muted"><strong>Anteckning:</strong> {{ slip.notes }}</small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% if not loop.last %}
+<div class="salary-slip-break"></div>
+{% endif %}
+{% endfor %}
+{% endblock %}

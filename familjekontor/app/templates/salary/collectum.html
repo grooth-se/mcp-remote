@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Collectum - Familjekontor{% endblock %}
+{% block content %}
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-shield-check"></i> Collectum-rapport (Pension)</h2>
+        <p class="text-muted">{{ company.name }}</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Välj period</div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.period_year.label(class="form-label") }}
+                            {{ form.period_year(class="form-control") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.period_month.label(class="form-label") }}
+                            {{ form.period_month(class="form-select") }}
+                        </div>
+                    </div>
+                    {{ form.submit(class="btn btn-primary") }}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if collectum %}
+<div class="card report-card mb-4">
+    <div class="card-header d-flex justify-content-between">
+        <span>Pensionsrapport — {{ collectum.period_label|capitalize }}</span>
+        <button onclick="window.print()" class="btn btn-sm btn-outline-primary no-print">
+            <i class="bi bi-printer"></i> Skriv ut
+        </button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Personnummer</th>
+                    <th>Namn</th>
+                    <th>Plan</th>
+                    <th class="text-end">Bruttolön</th>
+                    <th class="text-end">Pensionsbelopp</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in collectum.entries %}
+                <tr>
+                    <td>{{ e.personal_number }}</td>
+                    <td>{{ e.full_name }}</td>
+                    <td><span class="badge bg-info">{{ e.pension_plan }}</span></td>
+                    <td class="text-end">{{ "{:,.0f}".format(e.gross_salary|float) }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(e.pension_amount|float) }}</td>
+                </tr>
+                {% endfor %}
+                {% if not collectum.entries %}
+                <tr><td colspan="5" class="text-muted">Inga anställda med ITP-pension.</td></tr>
+                {% endif %}
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="4">Total pension</td>
+                    <td class="text-end">{{ "{:,.2f}".format(collectum.total_pension|float) }} kr</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
