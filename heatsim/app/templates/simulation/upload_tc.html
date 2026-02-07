@@ -35,6 +35,18 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Process Step</label>
+                        <select name="process_step" class="form-select">
+                            <option value="heating">Heating</option>
+                            <option value="quenching">Quenching</option>
+                            <option value="tempering">Tempering</option>
+                        </select>
+                        <div class="form-text">
+                            Select which process step this data corresponds to
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">TC Logger CSV File</label>
                         <input type="file" name="tc_file" class="form-control" accept=".csv" required>
                         <div class="form-text">
@@ -81,7 +93,8 @@
                     {% for data in existing_data %}
                     <li class="list-group-item d-flex justify-content-between align-items-center py-2">
                         <div>
-                            <strong>{{ data.name }}</strong>
+                            <strong>{{ data.name or 'Unnamed' }}</strong>
+                            <span class="badge bg-{% if data.process_step == 'heating' %}warning text-dark{% elif data.process_step == 'quenching' %}info{% elif data.process_step == 'tempering' %}secondary{% else %}primary{% endif %} ms-1">{{ (data.process_step or 'full')|title }}</span>
                             <small class="text-muted d-block">{{ data.num_channels }} channels, {{ data.num_points }} points</small>
                         </div>
                         <form method="post" action="{{ url_for('simulation.delete_tc_data', id=sim.id, data_id=data.id) }}" class="d-inline" onsubmit="return confirm('Delete this data?');">

@@ -335,8 +335,11 @@ def view(id):
     dtdt_temp_heating = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'heating']
     dtdt_temp_quenching = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'quenching']
 
-    # Get measured TC data for comparison
+    # Get measured TC data for comparison, grouped by process step
     measured_data = sim.measured_data.all()
+    measured_heating = [m for m in measured_data if m.process_step == 'heating']
+    measured_quenching = [m for m in measured_data if m.process_step == 'quenching']
+    measured_tempering = [m for m in measured_data if m.process_step == 'tempering']
 
     return render_template(
         'simulation/results.html',
@@ -350,7 +353,10 @@ def view(id):
         dtdt_time_quenching=dtdt_time_quenching,
         dtdt_temp_heating=dtdt_temp_heating,
         dtdt_temp_quenching=dtdt_temp_quenching,
-        measured_data=measured_data
+        measured_data=measured_data,
+        measured_heating=measured_heating,
+        measured_quenching=measured_quenching,
+        measured_tempering=measured_tempering
     )
 
 
@@ -679,12 +685,14 @@ def upload_tc_data(id):
             # Create MeasuredData record
             name = request.form.get('name', file.filename)
             description = request.form.get('description', '')
+            process_step = request.form.get('process_step', 'full')
 
             measured = MeasuredData(
                 simulation_id=sim.id,
                 name=name,
                 description=description,
                 filename=file.filename,
+                process_step=process_step,
                 start_time=data['start_time'],
                 end_time=data['end_time'],
                 duration_seconds=data['duration_seconds'],
@@ -964,4 +972,82 @@ def measured_dtdt_temp_plot(id):
         title=f'Measured dT/dt vs Temperature - {sim.name}'
     )
 
+    return Response(plot_data, mimetype='image/png')
+
+
+# ============================================================================
+# Process Step Specific Measured Data Plots
+# ============================================================================
+
+def _get_measured_data_for_step(sim, process_step):
+    """Helper to get measured data for a specific process step."""
+    measured_list = [m for m in sim.measured_data.all() if m.process_step == process_step]
+    if not measured_list:
+        return None
+
+    measured_data = []
+    for m in measured_list:
+        for channel in m.available_channels:
+            measured_data.append({
+                'name': m.get_channel_label(channel),
+                'times': m.get_channel_times(channel),
+                'temps': m.channels[channel]
+            })
+    return measured_data
+
+
+@simulation_bp.route('/<int:id>/measured-tc-plot/<step>')
+@login_required
+def measured_tc_plot_step(id, step):
+    """Generate Temperature vs Time plot for measured TC data for a specific process step."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    measured_data = _get_measured_data_for_step(sim, step)
+    if not measured_data:
+        return Response('No measured data', status=404)
+
+    plot_data = visualization.create_measured_tc_plot(
+        measured_data,
+        title=f'Measured T vs Time ({step.title()})'
+    )
+    return Response(plot_data, mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/measured-dtdt-plot/<step>')
+@login_required
+def measured_dtdt_plot_step(id, step):
+    """Generate dT/dt vs Time plot for measured TC data for a specific process step."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    measured_data = _get_measured_data_for_step(sim, step)
+    if not measured_data:
+        return Response('No measured data', status=404)
+
+    plot_data = visualization.create_measured_dtdt_plot(
+        measured_data,
+        title=f'Measured dT/dt vs Time ({step.title()})'
+    )
+    return Response(plot_data, mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/measured-dtdt-temp-plot/<step>')
+@login_required
+def measured_dtdt_temp_plot_step(id, step):
+    """Generate dT/dt vs Temperature plot for measured TC data for a specific process step."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    measured_data = _get_measured_data_for_step(sim, step)
+    if not measured_data:
+        return Response('No measured data', status=404)
+
+    plot_data = visualization.create_measured_dtdt_vs_temp_plot(
+        measured_data,
+        title=f'Measured dT/dt vs Temperature ({step.title()})'
+    )
     return Response(plot_data, mimetype='image/png')

@@ -22,6 +22,7 @@ class MeasuredData(db.Model):
     name = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text)
     filename = db.Column(db.Text)  # Original uploaded filename
+    process_step = db.Column(db.Text, default='full')  # 'full', 'heating', 'quenching', 'tempering'
 
     # Time range
     start_time = db.Column(db.DateTime)
