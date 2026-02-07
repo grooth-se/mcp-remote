@@ -57,15 +57,14 @@
                     <hr>
                     <h6 class="text-muted mb-3">Logotyp</h6>
                     {% if company.logo_path %}
-                    <div class="mb-3 d-flex align-items-center gap-3">
+                    <div class="mb-3 d-flex align-items-center gap-3" id="logoPreview">
                         <img src="{{ url_for('companies.serve_logo', company_id=company.id) }}"
                              alt="Logotyp" style="max-height: 60px; max-width: 100px; object-fit: contain;" class="rounded border">
-                        <form method="POST" action="{{ url_for('companies.delete_logo', company_id=company.id) }}" class="d-inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i> Ta bort logotyp
-                            </button>
-                        </form>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="deleteLogoBtn"
+                                data-url="{{ url_for('companies.delete_logo', company_id=company.id) }}"
+                                data-csrf="{{ csrf_token() }}">
+                            <i class="bi bi-trash"></i> Ta bort logotyp
+                        </button>
                     </div>
                     {% endif %}
                     <div class="mb-3">
@@ -157,5 +156,22 @@ clearBtn.addEventListener('click', () => {
     clearBtn.style.display = 'none';
     document.querySelectorAll('.color-swatch').forEach(b => b.style.outline = '');
 });
+
+const deleteLogoBtn = document.getElementById('deleteLogoBtn');
+if (deleteLogoBtn) {
+    deleteLogoBtn.addEventListener('click', () => {
+        if (!confirm('Ta bort logotypen?')) return;
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = deleteLogoBtn.dataset.url;
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = 'csrf_token';
+        csrf.value = deleteLogoBtn.dataset.csrf;
+        form.appendChild(csrf);
+        document.body.appendChild(form);
+        form.submit();
+    });
+}
 </script>
 {% endblock %}
