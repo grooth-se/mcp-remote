@@ -145,14 +145,14 @@ class HeatingPhaseForm(FlaskForm):
 
     hold_time_after_trigger = FloatField(
         'Hold After Trigger (min)',
-        validators=[Optional(), NumberRange(min=0, max=240)],
+        validators=[Optional(), NumberRange(min=0, max=1440)],
         default=30.0,
         render_kw={'placeholder': 'Additional hold time after trigger'}
     )
 
     center_offset = FloatField(
         'Center Offset (°C)',
-        validators=[Optional(), NumberRange(min=1, max=50)],
+        validators=[Optional(), NumberRange(min=0, max=100)],
         default=3.0,
         render_kw={'placeholder': 'End when center = target - offset'}
     )
@@ -282,21 +282,21 @@ class TemperingPhaseForm(FlaskForm):
 
     rate_threshold = FloatField(
         'Surface Rate Threshold (°C/hr)',
-        validators=[Optional(), NumberRange(min=0.1, max=10)],
+        validators=[Optional(), NumberRange(min=0.1, max=100)],
         default=1.0,
         render_kw={'placeholder': 'Trigger when dT/dt < this'}
     )
 
     hold_time_after_trigger = FloatField(
         'Hold After Trigger (min)',
-        validators=[Optional(), NumberRange(min=0, max=240)],
+        validators=[Optional(), NumberRange(min=0, max=1440)],
         default=30.0,
         render_kw={'placeholder': 'Additional hold time after trigger'}
     )
 
     center_offset = FloatField(
         'Center Offset (°C)',
-        validators=[Optional(), NumberRange(min=1, max=50)],
+        validators=[Optional(), NumberRange(min=0, max=100)],
         default=3.0,
         render_kw={'placeholder': 'End when center = target - offset'}
     )

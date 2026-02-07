@@ -118,17 +118,17 @@
                 </div>
                 <div class="col-md-4 mb-3" id="rate-threshold-fields">
                     <label class="form-label">Surface Rate Threshold (°C/hr)</label>
-                    <input type="number" name="heating-rate_threshold" class="form-control" step="0.1" min="0.1" max="10" value="{{ heating_form.rate_threshold.data or 1.0 }}">
+                    <input type="number" name="heating-rate_threshold" class="form-control" step="0.1" min="0.1" max="100" value="{{ heating_form.rate_threshold.data or 1.0 }}">
                     <div class="form-text">Trigger when dT/dt &lt; this value</div>
                 </div>
                 <div class="col-md-4 mb-3" id="hold-time-fields">
                     <label class="form-label">Hold After Trigger (min)</label>
-                    <input type="number" name="heating-hold_time_after_trigger" class="form-control" step="5" min="0" max="240" value="{{ heating_form.hold_time_after_trigger.data or 30 }}">
+                    <input type="number" name="heating-hold_time_after_trigger" class="form-control" step="5" min="0" max="1440" value="{{ heating_form.hold_time_after_trigger.data or 30 }}">
                     <div class="form-text">Additional hold time after trigger</div>
                 </div>
                 <div class="col-md-4 mb-3" id="center-offset-fields">
                     <label class="form-label">Center Offset (°C)</label>
-                    <input type="number" name="heating-center_offset" class="form-control" step="1" min="1" max="50" value="{{ heating_form.center_offset.data or 3 }}">
+                    <input type="number" name="heating-center_offset" class="form-control" step="1" min="0" max="100" value="{{ heating_form.center_offset.data or 3 }}">
                     <div class="form-text">End when center = target - offset</div>
                 </div>
             </div>
@@ -308,17 +308,17 @@
                 </div>
                 <div class="col-md-4 mb-3" id="tempering-rate-threshold-fields">
                     <label class="form-label">Surface Rate Threshold (°C/hr)</label>
-                    <input type="number" name="tempering-rate_threshold" class="form-control" step="0.1" min="0.1" max="10" value="{{ tempering_form.rate_threshold.data or 1.0 }}">
+                    <input type="number" name="tempering-rate_threshold" class="form-control" step="0.1" min="0.1" max="100" value="{{ tempering_form.rate_threshold.data or 1.0 }}">
                     <div class="form-text">Trigger when dT/dt &lt; this value</div>
                 </div>
                 <div class="col-md-4 mb-3" id="tempering-hold-time-fields">
                     <label class="form-label">Hold After Trigger (min)</label>
-                    <input type="number" name="tempering-hold_time_after_trigger" class="form-control" step="5" min="0" max="240" value="{{ tempering_form.hold_time_after_trigger.data or 30 }}">
+                    <input type="number" name="tempering-hold_time_after_trigger" class="form-control" step="5" min="0" max="1440" value="{{ tempering_form.hold_time_after_trigger.data or 30 }}">
                     <div class="form-text">Additional hold time after trigger</div>
                 </div>
                 <div class="col-md-4 mb-3" id="tempering-center-offset-fields">
                     <label class="form-label">Center Offset (°C)</label>
-                    <input type="number" name="tempering-center_offset" class="form-control" step="1" min="1" max="50" value="{{ tempering_form.center_offset.data or 3 }}">
+                    <input type="number" name="tempering-center_offset" class="form-control" step="1" min="0" max="100" value="{{ tempering_form.center_offset.data or 3 }}">
                     <div class="form-text">End when center = target - offset</div>
                 </div>
             </div>
