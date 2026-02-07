@@ -262,7 +262,8 @@ def create_heat_treatment_cycle_plot(
     temperatures: np.ndarray,
     phase_results: Optional[List] = None,
     title: str = "Heat Treatment Cycle",
-    transformation_temps: Optional[dict] = None
+    transformation_temps: Optional[dict] = None,
+    measured_data: Optional[List[dict]] = None
 ) -> bytes:
     """Generate comprehensive heat treatment cycle plot with phase markers.
 
@@ -278,6 +279,8 @@ def create_heat_treatment_cycle_plot(
         Plot title
     transformation_temps : dict, optional
         Dict with Ms, Mf, Ac1, Ac3 temperatures
+    measured_data : list, optional
+        List of dicts with keys: name, times, temps for TC measurements
 
     Returns
     -------
@@ -289,15 +292,27 @@ def create_heat_treatment_cycle_plot(
     # Extract 4 radial positions
     four_temps = extract_four_point_temperatures(temperatures)
 
-    # Plot temperature curves at 4 radial positions with consistent colors
+    # Plot simulation temperature curves at 4 radial positions
     for key in ['center', 'one_third', 'two_thirds', 'surface']:
         ax.plot(
             times,
             four_temps[key],
             color=FOUR_POINT_COLORS[key],
             linewidth=2,
-            label=FOUR_POINT_LABELS[key]
+            label=f'Sim: {FOUR_POINT_LABELS[key]}',
+            linestyle='--' if measured_data else '-'
         )
+
+    # Overlay measured TC data if available
+    if measured_data:
+        for i, data in enumerate(measured_data):
+            color = TC_COLORS[i % len(TC_COLORS)]
+            m_times = np.array(data['times'])
+            m_temps = np.array(data['temps'])
+            name = data.get('name', f'TC{i+1}')
+
+            ax.plot(m_times, m_temps, color=color, linewidth=1.5,
+                   label=f'Meas: {name}', alpha=0.9)
 
     # Add phase region shading if phase results available
     if phase_results:

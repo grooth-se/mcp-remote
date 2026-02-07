@@ -118,6 +118,9 @@
     <div class="card">
         <div class="card-header">
             <i class="bi bi-graph-up-arrow"></i> {{ result.result_label }}
+            {% if measured_data %}
+            <span class="badge bg-success">+ Measured Data</span>
+            {% endif %}
             {% if result.phase and result.phase != 'full' %}
             <span class="badge bg-secondary">{{ result.phase|title }}</span>
             {% endif %}
@@ -126,35 +129,24 @@
             {% endif %}
         </div>
         <div class="card-body text-center">
-            {% if result.has_plot %}
+            {% if measured_data %}
+            <!-- Show overlay plot with measured data -->
+            <img src="{{ url_for('simulation.cycle_plot_with_tc', id=sim.id) }}" class="img-fluid" alt="Simulation vs Measured">
+            <div class="mt-2">
+                <small class="text-muted">Dashed: Simulation | Solid: Measured TC</small>
+                {% for data in measured_data %}
+                <span class="badge bg-secondary ms-2">{{ data.name }}</span>
+                {% endfor %}
+                <a href="{{ url_for('simulation.upload_tc_data', id=sim.id) }}" class="btn btn-sm btn-outline-primary ms-2">
+                    <i class="bi bi-gear"></i> Manage
+                </a>
+            </div>
+            {% elif result.has_plot %}
             <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
             {% endif %}
         </div>
     </div>
     {% endfor %}
-</div>
-{% endif %}
-
-<!-- Measured Data Comparison -->
-{% if measured_data %}
-<div class="plot-full-width">
-    <div class="card border-primary">
-        <div class="card-header bg-primary text-white">
-            <i class="bi bi-graph-up"></i> Simulation vs Measured Data
-            <a href="{{ url_for('simulation.upload_tc_data', id=sim.id) }}" class="btn btn-sm btn-light float-end">
-                <i class="bi bi-gear"></i> Manage TC Data
-            </a>
-        </div>
-        <div class="card-body text-center">
-            <img src="{{ url_for('simulation.comparison_plot', id=sim.id) }}" class="img-fluid" alt="Comparison Plot">
-        </div>
-        <div class="card-footer">
-            <small class="text-muted">Measured data:</small>
-            {% for data in measured_data %}
-            <span class="badge bg-secondary me-1">{{ data.name }} ({{ data.num_channels }} ch)</span>
-            {% endfor %}
-        </div>
-    </div>
 </div>
 {% endif %}
 

@@ -774,20 +774,27 @@ def comparison_plot(id):
     if not measured_list:
         return Response('No measured data', status=404)
 
-    # Get simulation results
-    cooling_curve = SimulationResult.query.filter_by(
+    # Get simulation results (main cycle plot)
+    cycle_result = SimulationResult.query.filter_by(
         simulation_id=sim.id,
-        result_type='cooling_curve'
+        result_type='full_cycle'
     ).first()
 
-    if not cooling_curve:
+    if not cycle_result:
+        # Fallback to cooling_curve
+        cycle_result = SimulationResult.query.filter_by(
+            simulation_id=sim.id,
+            result_type='cooling_curve'
+        ).first()
+
+    if not cycle_result:
         return Response('No simulation results', status=404)
 
     # Generate comparison plot
     import numpy as np
 
-    sim_times = np.array(cooling_curve.get_time_data())
-    sim_temps = np.array(cooling_curve.get_value_data())
+    sim_times = np.array(cycle_result.time_array)
+    sim_temps = np.array(cycle_result.value_array)
 
     # Prepare measured data
     measured_data = []
@@ -804,6 +811,63 @@ def comparison_plot(id):
         sim_times, sim_temps,
         measured_data,
         title=f'Simulation vs Measured - {sim.name}'
+    )
+
+    return Response(plot_data, mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/cycle-plot-with-tc')
+@login_required
+def cycle_plot_with_tc(id):
+    """Generate main cycle plot with measured TC data overlaid."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    # Get simulation temperature data
+    cycle_result = SimulationResult.query.filter_by(
+        simulation_id=sim.id,
+        result_type='full_cycle'
+    ).first()
+
+    if not cycle_result or not cycle_result.plot_image:
+        return Response('No simulation results', status=404)
+
+    # Check if there's measured data
+    measured_list = sim.measured_data.all()
+    if not measured_list:
+        # Return original plot if no measured data
+        return Response(cycle_result.plot_image, mimetype='image/png')
+
+    # Need to regenerate plot with measured data
+    # Get the temperature field from stored result
+    import numpy as np
+    import json
+
+    # Get time and temperature data
+    times = np.array(cycle_result.time_array)
+
+    # We need the full temperature field - check if it's stored
+    # For now, use stored plot data to extract or regenerate
+    # Since we don't have full temp field stored, create comparison plot instead
+
+    sim_temps = np.array(cycle_result.value_array)
+
+    # Prepare measured data
+    measured_data = []
+    for m in measured_list:
+        for channel in m.available_channels:
+            measured_data.append({
+                'name': m.get_channel_label(channel),
+                'times': m.times,
+                'temps': m.channels[channel]
+            })
+
+    # Create comparison plot
+    plot_data = visualization.create_comparison_plot(
+        times, sim_temps,
+        measured_data,
+        title=f'Temperature vs Time - {sim.name}'
     )
 
     return Response(plot_data, mimetype='image/png')
