@@ -9,17 +9,18 @@ from io import BytesIO
 
 from app.extensions import db
 from app.models import (
-    SteelGrade, MaterialProperty, PhaseDiagram,
+    SteelGrade, MaterialProperty, PhaseDiagram, PhaseProperty,
     PROPERTY_TYPE_CONSTANT, PROPERTY_TYPE_CURVE,
     PROPERTY_TYPE_POLYNOMIAL, PROPERTY_TYPE_EQUATION,
-    DATA_SOURCE_STANDARD
+    DATA_SOURCE_STANDARD,
+    PHASES, PHASE_LABELS,
 )
-from app.services import PropertyEvaluator, ExcelImporter, seed_standard_grades
+from app.services import PropertyEvaluator, PropertyPlotter, ExcelImporter, seed_standard_grades
 
 from . import materials_bp
 from .forms import (
     SteelGradeForm, MaterialPropertyForm, PhaseDiagramForm,
-    ImportForm, PropertyEvaluateForm
+    ImportForm, PropertyEvaluateForm, PhasePropertyForm
 )
 
 
@@ -403,6 +404,161 @@ def delete_phase_diagram(id):
 
 
 # ============================================================================
+# Phase Properties
+# ============================================================================
+
+@materials_bp.route('/<int:id>/phase-properties', methods=['GET', 'POST'])
+@login_required
+def phase_properties(id):
+    """Manage phase-specific properties for a steel grade."""
+    grade = SteelGrade.query.get_or_404(id)
+    form = PhasePropertyForm()
+
+    if form.validate_on_submit():
+        # Check if phase property already exists
+        existing = PhaseProperty.query.filter_by(
+            steel_grade_id=grade.id,
+            phase=form.phase.data
+        ).first()
+
+        # Parse expansion data if temperature-dependent
+        expansion_data = None
+        if form.expansion_type.data == 'temperature_dependent' and form.expansion_data.data:
+            try:
+                expansion_data = json.loads(form.expansion_data.data)
+            except json.JSONDecodeError:
+                flash('Invalid JSON for expansion data.', 'danger')
+                return render_template('materials/phase_properties.html',
+                                      form=form, grade=grade,
+                                      phase_props=grade.phase_properties.all())
+
+        # Convert expansion coefficient from µ/K to 1/K
+        expansion_coeff = None
+        if form.thermal_expansion_coeff.data is not None:
+            expansion_coeff = form.thermal_expansion_coeff.data * 1e-6
+
+        if existing:
+            # Update existing
+            existing.relative_density = form.relative_density.data
+            existing.thermal_expansion_coeff = expansion_coeff
+            existing.expansion_type = form.expansion_type.data
+            if expansion_data:
+                # Convert expansion data values from µ/K to 1/K
+                if 'value' in expansion_data:
+                    expansion_data['value'] = [v * 1e-6 for v in expansion_data['value']]
+                existing.set_expansion_data(expansion_data)
+            existing.reference_temperature = form.reference_temperature.data
+            existing.notes = form.notes.data
+            flash(f'Phase property for {PHASE_LABELS[form.phase.data]} updated.', 'success')
+        else:
+            # Create new
+            pp = PhaseProperty(
+                steel_grade_id=grade.id,
+                phase=form.phase.data,
+                relative_density=form.relative_density.data,
+                thermal_expansion_coeff=expansion_coeff,
+                expansion_type=form.expansion_type.data,
+                reference_temperature=form.reference_temperature.data,
+                notes=form.notes.data
+            )
+            if expansion_data:
+                if 'value' in expansion_data:
+                    expansion_data['value'] = [v * 1e-6 for v in expansion_data['value']]
+                pp.set_expansion_data(expansion_data)
+            db.session.add(pp)
+            flash(f'Phase property for {PHASE_LABELS[form.phase.data]} created.', 'success')
+
+        db.session.commit()
+        return redirect(url_for('materials.phase_properties', id=grade.id))
+
+    existing_props = grade.phase_properties.all()
+    return render_template(
+        'materials/phase_properties.html',
+        form=form,
+        grade=grade,
+        phase_props=existing_props,
+        phase_labels=PHASE_LABELS
+    )
+
+
+@materials_bp.route('/<int:id>/phase-properties/<int:pp_id>/delete', methods=['POST'])
+@login_required
+def delete_phase_property(id, pp_id):
+    """Delete a phase property."""
+    pp = PhaseProperty.query.get_or_404(pp_id)
+    if pp.steel_grade_id != id:
+        flash('Phase property not found.', 'danger')
+        return redirect(url_for('materials.phase_properties', id=id))
+
+    phase_label = pp.phase_label
+    db.session.delete(pp)
+    db.session.commit()
+
+    flash(f'Phase property for {phase_label} deleted.', 'success')
+    return redirect(url_for('materials.phase_properties', id=id))
+
+
+# ============================================================================
+# Property Plots
+# ============================================================================
+
+@materials_bp.route('/<int:id>/property/<int:prop_id>/plot')
+@login_required
+def property_plot(id, prop_id):
+    """Generate and serve a plot of temperature-dependent property."""
+    prop = MaterialProperty.query.get_or_404(prop_id)
+    if prop.steel_grade_id != id:
+        return '', 404
+
+    # Only plot temperature-dependent properties
+    if not prop.is_temperature_dependent and prop.property_type == 'constant':
+        return '', 404
+
+    plotter = PropertyPlotter()
+    image_data = plotter.plot_property(prop)
+
+    response = Response(image_data, mimetype='image/png')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
+@materials_bp.route('/<int:id>/phase-plot/<plot_type>')
+@login_required
+def phase_plot(id, plot_type):
+    """Generate and serve a plot of phase properties.
+
+    Plot types:
+    - density: Bar chart of relative densities
+    - expansion: Bar chart of expansion coefficients
+    - expansion_vs_temp: Line plot of expansion vs temperature
+    """
+    grade = SteelGrade.query.get_or_404(id)
+    phase_props = grade.phase_properties.all()
+
+    if not phase_props:
+        return '', 404
+
+    plotter = PropertyPlotter()
+
+    if plot_type == 'density':
+        image_data = plotter.plot_phase_properties(phase_props, property_type='density')
+    elif plot_type == 'expansion':
+        image_data = plotter.plot_phase_properties(phase_props, property_type='expansion')
+    elif plot_type == 'expansion_vs_temp':
+        image_data = plotter.plot_expansion_vs_temperature(phase_props)
+    else:
+        return '', 404
+
+    response = Response(image_data, mimetype='image/png')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
+# ============================================================================
 # Import/Export
 # ============================================================================
 
@@ -495,7 +651,8 @@ def seed():
         f"Seed complete: {results['grades_created']} grades created, "
         f"{results['grades_skipped']} skipped (already exist), "
         f"{results['properties_created']} properties, "
-        f"{results['diagrams_created']} diagrams"
+        f"{results['diagrams_created']} diagrams, "
+        f"{results.get('phase_properties_created', 0)} phase properties"
     )
     flash(msg, 'success')
     return redirect(url_for('materials.index'))

@@ -229,3 +229,286 @@ def evaluate_property(property_model, **conditions) -> Optional[float]:
     """
     evaluator = PropertyEvaluator(property_model)
     return evaluator.evaluate(**conditions)
+
+
+class PropertyPlotter:
+    """Generate plots for temperature-dependent material properties."""
+
+    def __init__(self):
+        """Initialize plotter with default styling."""
+        self.figure_size = (8, 5)
+        self.dpi = 100
+        self.line_color = '#0d6efd'  # Bootstrap primary blue
+        self.marker_color = '#dc3545'  # Bootstrap danger red
+        self.grid_alpha = 0.3
+
+    def plot_property(self, property_model, temp_range: tuple = None,
+                      n_points: int = 100, show_data_points: bool = True) -> bytes:
+        """Generate a plot of a temperature-dependent property.
+
+        Parameters
+        ----------
+        property_model : MaterialProperty
+            The property to plot
+        temp_range : tuple, optional
+            (min_temp, max_temp) range in °C. Auto-detected if None.
+        n_points : int
+            Number of interpolation points for smooth curve
+        show_data_points : bool
+            Whether to show original data points as markers
+
+        Returns
+        -------
+        bytes
+            PNG image data
+        """
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from io import BytesIO
+
+        evaluator = PropertyEvaluator(property_model)
+        data = evaluator.data
+
+        fig, ax = plt.subplots(figsize=self.figure_size, dpi=self.dpi)
+
+        prop_type = property_model.property_type
+
+        if prop_type == 'constant':
+            # Just show a horizontal line
+            value = data.get('value', 0)
+            temp_range = temp_range or (0, 1000)
+            temps = np.linspace(temp_range[0], temp_range[1], 10)
+            values = [value] * len(temps)
+            ax.axhline(y=value, color=self.line_color, linewidth=2, label='Constant')
+
+        elif prop_type == 'curve':
+            # Get original data points
+            orig_temps = data.get('temperature', [])
+            orig_values = data.get('value', [])
+
+            if not orig_temps or not orig_values:
+                return self._create_empty_plot(ax, fig, "No curve data available")
+
+            # Determine temperature range
+            if temp_range is None:
+                temp_range = (min(orig_temps), max(orig_temps))
+
+            # Generate smooth interpolated curve
+            temps = np.linspace(temp_range[0], temp_range[1], n_points)
+            values = [evaluator.evaluate(temperature=t) for t in temps]
+
+            ax.plot(temps, values, color=self.line_color, linewidth=2, label='Interpolated')
+
+            if show_data_points:
+                ax.scatter(orig_temps, orig_values, color=self.marker_color,
+                          s=50, zorder=5, label='Data points', edgecolors='white')
+
+        elif prop_type == 'polynomial':
+            # Evaluate polynomial over range
+            temp_range = temp_range or (0, 1000)
+            temps = np.linspace(temp_range[0], temp_range[1], n_points)
+            values = [evaluator.evaluate(temperature=t) for t in temps]
+            ax.plot(temps, values, color=self.line_color, linewidth=2, label='Polynomial fit')
+
+        elif prop_type == 'equation':
+            # Evaluate equation over range
+            temp_range = temp_range or (0, 1000)
+            temps = np.linspace(temp_range[0], temp_range[1], n_points)
+            values = []
+            for t in temps:
+                v = evaluator.evaluate(temperature=t)
+                values.append(v if v is not None else np.nan)
+            ax.plot(temps, values, color=self.line_color, linewidth=2, label='Equation')
+
+        else:
+            return self._create_empty_plot(ax, fig, f"Unsupported property type: {prop_type}")
+
+        # Styling
+        ax.set_xlabel('Temperature (°C)', fontsize=11)
+        units = property_model.units or ''
+        ax.set_ylabel(f'{property_model.display_name} ({units})', fontsize=11)
+        ax.set_title(f'{property_model.display_name} vs Temperature', fontsize=12, fontweight='bold')
+        ax.grid(True, alpha=self.grid_alpha)
+        ax.legend(loc='best', framealpha=0.9)
+
+        plt.tight_layout()
+
+        # Save to bytes
+        buf = BytesIO()
+        fig.savefig(buf, format='png', dpi=self.dpi, bbox_inches='tight',
+                   facecolor='white', edgecolor='none')
+        plt.close(fig)
+        buf.seek(0)
+        return buf.read()
+
+    def plot_phase_properties(self, phase_properties: list, property_type: str = 'density') -> bytes:
+        """Generate a bar chart comparing phase properties.
+
+        Parameters
+        ----------
+        phase_properties : list
+            List of PhaseProperty model instances
+        property_type : str
+            'density' or 'expansion' to select which property to plot
+
+        Returns
+        -------
+        bytes
+            PNG image data
+        """
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from io import BytesIO
+
+        fig, ax = plt.subplots(figsize=self.figure_size, dpi=self.dpi)
+
+        if not phase_properties:
+            return self._create_empty_plot(ax, fig, "No phase properties defined")
+
+        # Define colors for each phase
+        phase_colors = {
+            'ferrite': '#4CAF50',      # Green
+            'austenite': '#FF9800',    # Orange
+            'martensite': '#F44336',   # Red
+            'bainite': '#9C27B0',      # Purple
+            'pearlite': '#3F51B5',     # Indigo
+            'cementite': '#607D8B',    # Blue-grey
+        }
+
+        phases = []
+        values = []
+        colors = []
+
+        for pp in phase_properties:
+            if property_type == 'density' and pp.relative_density is not None:
+                phases.append(pp.phase_label)
+                values.append(pp.relative_density)
+                colors.append(phase_colors.get(pp.phase, '#808080'))
+            elif property_type == 'expansion' and pp.thermal_expansion_coeff is not None:
+                phases.append(pp.phase_label)
+                values.append(pp.thermal_expansion_coeff * 1e6)  # Convert to µ/K
+                colors.append(phase_colors.get(pp.phase, '#808080'))
+
+        if not phases:
+            return self._create_empty_plot(ax, fig, f"No {property_type} data available")
+
+        bars = ax.bar(phases, values, color=colors, edgecolor='white', linewidth=1.5)
+
+        # Add value labels on bars
+        for bar, val in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                   f'{val:.4f}' if property_type == 'density' else f'{val:.1f}',
+                   ha='center', va='bottom', fontsize=10)
+
+        # Styling
+        if property_type == 'density':
+            ax.set_ylabel('Relative Density', fontsize=11)
+            ax.set_title('Phase Relative Densities (Reference: Ferrite at 20°C = 1.0)',
+                        fontsize=12, fontweight='bold')
+        else:
+            ax.set_ylabel('Thermal Expansion Coefficient (µm/m·K)', fontsize=11)
+            ax.set_title('Phase Thermal Expansion Coefficients',
+                        fontsize=12, fontweight='bold')
+
+        ax.grid(True, alpha=self.grid_alpha, axis='y')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+
+        buf = BytesIO()
+        fig.savefig(buf, format='png', dpi=self.dpi, bbox_inches='tight',
+                   facecolor='white', edgecolor='none')
+        plt.close(fig)
+        buf.seek(0)
+        return buf.read()
+
+    def plot_expansion_vs_temperature(self, phase_properties: list,
+                                       temp_range: tuple = (0, 900),
+                                       n_points: int = 100) -> bytes:
+        """Plot thermal expansion coefficient vs temperature for all phases.
+
+        Parameters
+        ----------
+        phase_properties : list
+            List of PhaseProperty model instances
+        temp_range : tuple
+            (min_temp, max_temp) in °C
+        n_points : int
+            Number of points for plotting
+
+        Returns
+        -------
+        bytes
+            PNG image data
+        """
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from io import BytesIO
+
+        fig, ax = plt.subplots(figsize=self.figure_size, dpi=self.dpi)
+
+        if not phase_properties:
+            return self._create_empty_plot(ax, fig, "No phase properties defined")
+
+        phase_colors = {
+            'ferrite': '#4CAF50',
+            'austenite': '#FF9800',
+            'martensite': '#F44336',
+            'bainite': '#9C27B0',
+            'pearlite': '#3F51B5',
+            'cementite': '#607D8B',
+        }
+
+        temps = np.linspace(temp_range[0], temp_range[1], n_points)
+
+        has_data = False
+        for pp in phase_properties:
+            if pp.thermal_expansion_coeff is None:
+                continue
+
+            has_data = True
+            values = [pp.get_expansion_at_temperature(t) * 1e6 for t in temps]  # µ/K
+            color = phase_colors.get(pp.phase, '#808080')
+            linestyle = '--' if pp.is_expansion_temperature_dependent else '-'
+
+            ax.plot(temps, values, color=color, linewidth=2,
+                   label=pp.phase_label, linestyle=linestyle)
+
+        if not has_data:
+            return self._create_empty_plot(ax, fig, "No expansion data available")
+
+        ax.set_xlabel('Temperature (°C)', fontsize=11)
+        ax.set_ylabel('Thermal Expansion Coefficient (µm/m·K)', fontsize=11)
+        ax.set_title('Thermal Expansion vs Temperature by Phase', fontsize=12, fontweight='bold')
+        ax.grid(True, alpha=self.grid_alpha)
+        ax.legend(loc='best', framealpha=0.9)
+
+        plt.tight_layout()
+
+        buf = BytesIO()
+        fig.savefig(buf, format='png', dpi=self.dpi, bbox_inches='tight',
+                   facecolor='white', edgecolor='none')
+        plt.close(fig)
+        buf.seek(0)
+        return buf.read()
+
+    def _create_empty_plot(self, ax, fig, message: str) -> bytes:
+        """Create an empty plot with a message."""
+        from io import BytesIO
+        import matplotlib.pyplot as plt
+
+        ax.text(0.5, 0.5, message, ha='center', va='center',
+               fontsize=14, color='gray', transform=ax.transAxes)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis('off')
+
+        buf = BytesIO()
+        fig.savefig(buf, format='png', dpi=self.dpi, bbox_inches='tight',
+                   facecolor='white', edgecolor='none')
+        plt.close(fig)
+        buf.seek(0)
+        return buf.read()

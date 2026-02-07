@@ -273,3 +273,157 @@ class PhaseDiagram(db.Model):
 
     def __repr__(self) -> str:
         return f'<PhaseDiagram {self.diagram_type} for grade_id={self.steel_grade_id}>'
+
+
+# Phase/Structure type constants
+PHASE_FERRITE = 'ferrite'
+PHASE_AUSTENITE = 'austenite'
+PHASE_MARTENSITE = 'martensite'
+PHASE_BAINITE = 'bainite'
+PHASE_PEARLITE = 'pearlite'
+PHASE_CEMENTITE = 'cementite'
+
+PHASES = [
+    PHASE_FERRITE,
+    PHASE_AUSTENITE,
+    PHASE_MARTENSITE,
+    PHASE_BAINITE,
+    PHASE_PEARLITE,
+    PHASE_CEMENTITE,
+]
+
+PHASE_LABELS = {
+    PHASE_FERRITE: 'Ferrite (α)',
+    PHASE_AUSTENITE: 'Austenite (γ)',
+    PHASE_MARTENSITE: 'Martensite',
+    PHASE_BAINITE: 'Bainite',
+    PHASE_PEARLITE: 'Pearlite',
+    PHASE_CEMENTITE: 'Cementite (Fe₃C)',
+}
+
+
+class PhaseProperty(db.Model):
+    """Phase-specific material properties.
+
+    Stores properties that vary by crystallographic phase/structure,
+    such as relative density and thermal expansion coefficients.
+    These are critical for:
+    - Volume change calculations during phase transformations
+    - Residual stress prediction
+    - Dimensional change estimation
+
+    Attributes
+    ----------
+    id : int
+        Primary key
+    steel_grade_id : int
+        Foreign key to steel_grades
+    phase : str
+        Phase/structure type (ferrite, austenite, martensite, etc.)
+    relative_density : float
+        Relative density compared to reference (typically ferrite at 20°C = 1.0)
+    thermal_expansion_coeff : float
+        Mean thermal expansion coefficient (1/K or 1/°C)
+    expansion_type : str
+        Type: "constant" or "temperature_dependent"
+    expansion_data : str
+        JSON data for temperature-dependent expansion
+    reference_temperature : float
+        Reference temperature for density/expansion (°C)
+    notes : str
+        Optional notes
+    created_at : datetime
+        Record creation timestamp
+    """
+    __tablename__ = 'phase_properties'
+    __bind_key__ = 'materials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    steel_grade_id = db.Column(db.Integer, db.ForeignKey('steel_grades.id'), nullable=False)
+    phase = db.Column(db.Text, nullable=False)
+
+    # Relative density (dimensionless, reference = ferrite at 20°C)
+    relative_density = db.Column(db.Float)
+
+    # Thermal expansion coefficient
+    thermal_expansion_coeff = db.Column(db.Float)  # Mean value (1/K)
+    expansion_type = db.Column(db.Text, default='constant')  # constant or temperature_dependent
+    expansion_data = db.Column(db.Text)  # JSON for T-dependent: {"temperature": [], "value": []}
+
+    # Reference conditions
+    reference_temperature = db.Column(db.Float, default=20.0)
+
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationship
+    steel_grade = db.relationship('SteelGrade', backref=db.backref(
+        'phase_properties', lazy='dynamic', cascade='all, delete-orphan'
+    ))
+
+    __table_args__ = (
+        db.UniqueConstraint('steel_grade_id', 'phase', name='uq_grade_phase'),
+        db.Index('ix_phase_properties_steel_grade', 'steel_grade_id'),
+    )
+
+    @property
+    def phase_label(self) -> str:
+        """Human-readable phase name."""
+        return PHASE_LABELS.get(self.phase, self.phase.title())
+
+    @property
+    def expansion_data_dict(self) -> dict:
+        """Parse expansion data JSON to dict."""
+        import json
+        try:
+            return json.loads(self.expansion_data) if self.expansion_data else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def set_expansion_data(self, data: dict) -> None:
+        """Set expansion data from dict."""
+        import json
+        self.expansion_data = json.dumps(data)
+
+    @property
+    def is_expansion_temperature_dependent(self) -> bool:
+        """Check if expansion coefficient is temperature-dependent."""
+        return self.expansion_type == 'temperature_dependent'
+
+    def get_expansion_at_temperature(self, temperature: float) -> Optional[float]:
+        """Get thermal expansion coefficient at given temperature.
+
+        Parameters
+        ----------
+        temperature : float
+            Temperature in °C
+
+        Returns
+        -------
+        float or None
+            Expansion coefficient (1/K), or None if unavailable
+        """
+        if self.expansion_type == 'constant':
+            return self.thermal_expansion_coeff
+
+        # Temperature-dependent interpolation
+        data = self.expansion_data_dict
+        temps = data.get('temperature', [])
+        values = data.get('value', [])
+
+        if not temps or not values or len(temps) != len(values):
+            return self.thermal_expansion_coeff  # Fall back to constant
+
+        import numpy as np
+        from scipy import interpolate
+
+        interp = interpolate.interp1d(
+            temps, values,
+            kind='linear',
+            bounds_error=False,
+            fill_value=(values[0], values[-1])
+        )
+        return float(interp(temperature))
+
+    def __repr__(self) -> str:
+        return f'<PhaseProperty {self.phase} for grade_id={self.steel_grade_id}>'

@@ -11,10 +11,37 @@ Data sources:
 """
 from app.extensions import db
 from app.models import (
-    SteelGrade, MaterialProperty, PhaseDiagram,
+    SteelGrade, MaterialProperty, PhaseDiagram, PhaseProperty,
     PROPERTY_TYPE_CONSTANT, PROPERTY_TYPE_CURVE,
-    DATA_SOURCE_STANDARD, DIAGRAM_TYPE_CCT
+    DATA_SOURCE_STANDARD, DIAGRAM_TYPE_CCT,
+    PHASE_FERRITE, PHASE_AUSTENITE, PHASE_MARTENSITE, PHASE_BAINITE, PHASE_PEARLITE,
 )
+
+
+# Standard phase properties for low-alloy steel (typical values)
+# Source: ASM Metals Handbook, various steel metallurgy references
+STANDARD_PHASE_PROPERTIES = {
+    PHASE_FERRITE: {
+        'relative_density': 1.0000,  # Reference phase
+        'thermal_expansion_coeff': 12.5e-6,  # 1/K (mean value 20-500°C)
+    },
+    PHASE_AUSTENITE: {
+        'relative_density': 0.9800,  # ~2% volume expansion
+        'thermal_expansion_coeff': 20.0e-6,  # Higher expansion (FCC structure)
+    },
+    PHASE_MARTENSITE: {
+        'relative_density': 0.9780,  # ~2.2% volume expansion (depends on C content)
+        'thermal_expansion_coeff': 11.0e-6,  # Similar to ferrite (BCT structure)
+    },
+    PHASE_BAINITE: {
+        'relative_density': 0.9870,  # Between ferrite and martensite
+        'thermal_expansion_coeff': 12.0e-6,
+    },
+    PHASE_PEARLITE: {
+        'relative_density': 0.9980,  # Ferrite + cementite mix
+        'thermal_expansion_coeff': 12.5e-6,
+    },
+}
 
 
 # Standard steel grades with typical thermal properties
@@ -424,6 +451,7 @@ def seed_standard_grades() -> dict:
         'grades_skipped': 0,
         'properties_created': 0,
         'diagrams_created': 0,
+        'phase_properties_created': 0,
         'errors': []
     }
 
@@ -471,6 +499,20 @@ def seed_standard_grades() -> dict:
                 diagram.set_temps(transformation_temps)
                 db.session.add(diagram)
                 results['diagrams_created'] += 1
+
+                # Also add standard phase properties for transformable steels
+                for phase, phase_data in STANDARD_PHASE_PROPERTIES.items():
+                    pp = PhaseProperty(
+                        steel_grade_id=grade.id,
+                        phase=phase,
+                        relative_density=phase_data['relative_density'],
+                        thermal_expansion_coeff=phase_data['thermal_expansion_coeff'],
+                        expansion_type='constant',
+                        reference_temperature=20.0,
+                        notes='Standard literature values for low-alloy steel'
+                    )
+                    db.session.add(pp)
+                    results['phase_properties_created'] += 1
 
         except Exception as e:
             results['errors'].append(f"Error creating {designation}: {str(e)}")

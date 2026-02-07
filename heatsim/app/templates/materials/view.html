@@ -59,7 +59,7 @@
                             <th>Type</th>
                             <th>Units</th>
                             <th>Value / Data</th>
-                            <th>Evaluate</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -83,14 +83,22 @@
                             </td>
                             <td>
                                 {% if prop.is_temperature_dependent %}
-                                <form method="post" action="{{ url_for('materials.evaluate_property', id=grade.id) }}" class="d-flex gap-1">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <input type="hidden" name="property_id" value="{{ prop.id }}">
-                                    <input type="number" name="temperature" class="form-control form-control-sm" style="width: 80px" placeholder="T" step="any">
-                                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Evaluate">
-                                        <i class="bi bi-calculator"></i>
+                                <div class="d-flex gap-1 align-items-center">
+                                    <form method="post" action="{{ url_for('materials.evaluate_property', id=grade.id) }}" class="d-flex gap-1">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <input type="hidden" name="property_id" value="{{ prop.id }}">
+                                        <input type="number" name="temperature" class="form-control form-control-sm" style="width: 70px" placeholder="T" step="any">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary" title="Evaluate">
+                                            <i class="bi bi-calculator"></i>
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-outline-success" title="View Plot"
+                                            data-bs-toggle="modal" data-bs-target="#propPlotModal"
+                                            data-plot-url="{{ url_for('materials.property_plot', id=grade.id, prop_id=prop.id) }}"
+                                            data-prop-name="{{ prop.display_name }}">
+                                        <i class="bi bi-graph-up"></i>
                                     </button>
-                                </form>
+                                </div>
                                 {% else %}
                                 -
                                 {% endif %}
@@ -105,6 +113,56 @@
                     <p>No properties defined yet</p>
                     <a href="{{ url_for('materials.properties', id=grade.id) }}" class="btn btn-sm btn-primary">
                         Add Properties
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Phase Properties Section -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-diagram-3"></i> Phase Properties</span>
+                <a href="{{ url_for('materials.phase_properties', id=grade.id) }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-pencil"></i> Manage
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% set phase_props = grade.phase_properties.all() %}
+                {% if phase_props %}
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Phase</th>
+                            <th>Relative Density</th>
+                            <th>Expansion (µ/K)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pp in phase_props %}
+                        <tr>
+                            <td class="fw-bold">{{ pp.phase_label }}</td>
+                            <td>{{ '%.4f'|format(pp.relative_density) if pp.relative_density else '-' }}</td>
+                            <td>
+                                {% if pp.thermal_expansion_coeff %}
+                                    {{ '%.2f'|format(pp.thermal_expansion_coeff * 1e6) }}
+                                    {% if pp.is_expansion_temperature_dependent %}
+                                    <span class="badge bg-info" title="Temperature-dependent">T</span>
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-center py-3 text-muted">
+                    <i class="bi bi-diagram-3 fs-3"></i>
+                    <p class="mb-1">No phase properties defined</p>
+                    <a href="{{ url_for('materials.phase_properties', id=grade.id) }}" class="btn btn-sm btn-outline-primary">
+                        Add Phase Properties
                     </a>
                 </div>
                 {% endif %}
@@ -155,4 +213,37 @@
         </div>
     </div>
 </div>
+
+<!-- Property Plot Modal -->
+<div class="modal fade" id="propPlotModal" tabindex="-1" aria-labelledby="propPlotModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="propPlotModalLabel">Property Plot</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="propPlotImage" src="" class="img-fluid" alt="Property Plot">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Handle property plot modal
+document.addEventListener('DOMContentLoaded', function() {
+    const plotModal = document.getElementById('propPlotModal');
+    if (plotModal) {
+        plotModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const plotUrl = button.getAttribute('data-plot-url');
+            const propName = button.getAttribute('data-prop-name');
+
+            document.getElementById('propPlotModalLabel').textContent = propName + ' vs Temperature';
+            // Add timestamp to prevent caching
+            document.getElementById('propPlotImage').src = plotUrl + '?t=' + Date.now();
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -1,5 +1,5 @@
 """Application services."""
-from .property_evaluator import PropertyEvaluator
+from .property_evaluator import PropertyEvaluator, PropertyPlotter, evaluate_property
 from .excel_importer import ExcelImporter
 from .seed_data import seed_standard_grades, STANDARD_GRADES
 from .geometry import Cylinder, Plate, Ring, create_geometry
@@ -19,6 +19,8 @@ from . import comsol
 __all__ = [
     # Phase 2 services
     'PropertyEvaluator',
+    'PropertyPlotter',
+    'evaluate_property',
     'ExcelImporter',
     'seed_standard_grades',
     'STANDARD_GRADES',
