@@ -8,9 +8,8 @@ from app.utils.validators import (
 
 
 def test_valid_org_numbers():
-    # These are well-known valid Swedish org numbers
-    assert validate_org_number('5566778899') is False  # not a real checksum
-    assert validate_org_number('556677-8899') is False
+    assert validate_org_number('5566778899') is True
+    assert validate_org_number('556677-8899') is True
 
 
 def test_invalid_org_numbers():
