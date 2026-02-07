@@ -147,12 +147,15 @@
             <span class="badge bg-warning text-dark">Heating</span> T vs Time (Sim)
         </div>
         <div class="card-body text-center">
-            {% set heating_result = dtdt_time_heating[0] if dtdt_time_heating else none %}
-            {% for result in cooling_curves %}
-            {% if result.phase == 'heating' and result.has_plot %}
+            {% if heating_curves %}
+            {% for result in heating_curves %}
+            {% if result.has_plot %}
             <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Heating">
             {% endif %}
             {% endfor %}
+            {% else %}
+            <p class="text-muted my-4">-</p>
+            {% endif %}
         </div>
     </div>
     <!-- Quenching (Simulation) -->
@@ -161,11 +164,15 @@
             <span class="badge bg-info">Quenching</span> T vs Time (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in cooling_curves %}
-            {% if result.phase == 'quenching' and result.has_plot %}
+            {% if quenching_curves %}
+            {% for result in quenching_curves %}
+            {% if result.has_plot %}
             <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Quenching">
             {% endif %}
             {% endfor %}
+            {% else %}
+            <p class="text-muted my-4">-</p>
+            {% endif %}
         </div>
     </div>
     <!-- Tempering (Simulation) -->
@@ -174,11 +181,15 @@
             <span class="badge bg-secondary">Tempering</span> T vs Time (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in cooling_curves %}
-            {% if result.phase == 'tempering' and result.has_plot %}
+            {% if tempering_curves %}
+            {% for result in tempering_curves %}
+            {% if result.has_plot %}
             <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Tempering">
             {% endif %}
             {% endfor %}
+            {% else %}
+            <p class="text-muted my-4">-</p>
+            {% endif %}
         </div>
     </div>
 </div>

@@ -324,10 +324,15 @@ def view(id):
     results = sim.results.all()
 
     # Group results by type
-    cooling_curves = [r for r in results if r.result_type in ('cooling_curve', 'full_cycle')]
+    cooling_curves = [r for r in results if r.result_type in ('cooling_curve', 'full_cycle', 'heating_curve')]
     profiles = [r for r in results if r.result_type == 'temperature_profile']
     phases = [r for r in results if r.result_type == 'phase_fraction']
     rates = [r for r in results if r.result_type == 'cooling_rate']
+
+    # Phase-specific T vs Time results
+    heating_curves = [r for r in results if r.result_type == 'heating_curve' and r.phase == 'heating']
+    quenching_curves = [r for r in results if r.result_type == 'cooling_curve' and r.phase == 'quenching']
+    tempering_curves = [r for r in results if r.result_type in ('cooling_curve', 'heating_curve') and r.phase == 'tempering']
 
     # dT/dt plots grouped by phase
     dtdt_time_heating = [r for r in results if r.result_type == 'dTdt_vs_time' and r.phase == 'heating']
@@ -349,6 +354,9 @@ def view(id):
         profiles=profiles,
         phases=phases,
         rates=rates,
+        heating_curves=heating_curves,
+        quenching_curves=quenching_curves,
+        tempering_curves=tempering_curves,
         dtdt_time_heating=dtdt_time_heating,
         dtdt_time_quenching=dtdt_time_quenching,
         dtdt_temp_heating=dtdt_temp_heating,
@@ -449,7 +457,7 @@ def run(id):
         )
         db.session.add(cycle_result)
 
-        # Store individual phase results
+        # Store individual phase results with T vs Time plots
         if result.phase_results:
             for phase_result in result.phase_results:
                 if not phase_result.time.size or len(phase_result.time) < 2:
@@ -464,6 +472,16 @@ def run(id):
                 )
                 pr.set_time_data(phase_result.absolute_time.tolist())
                 pr.set_value_data(phase_result.center_temp.tolist())
+
+                # Generate T vs Time plot for this phase
+                if phase_result.temperature.size > 0:
+                    pr.plot_image = visualization.create_heat_treatment_cycle_plot(
+                        phase_result.time,
+                        phase_result.temperature,
+                        phase_results=None,
+                        title=f'{phase_result.phase_name.title()} - {sim.name}',
+                        transformation_temps=trans_temps
+                    )
                 db.session.add(pr)
 
         # Store temperature profile result
