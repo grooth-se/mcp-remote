@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - Familjekontor{% endblock %}
+{% block content %}
+<h2>{{ title }}</h2>
+<div class="row"><div class="col-md-6"><div class="card"><div class="card-body">
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-3">{{ form.username.label(class="form-label") }}{{ form.username(class="form-control") }}</div>
+        <div class="mb-3">{{ form.email.label(class="form-label") }}{{ form.email(class="form-control") }}</div>
+        <div class="mb-3">{{ form.password.label(class="form-label") }}{{ form.password(class="form-control") }}<small class="text-muted">Lämna tomt för att behålla nuvarande lösenord.</small></div>
+        <div class="mb-3">{{ form.role.label(class="form-label") }}{{ form.role(class="form-select") }}</div>
+        <div class="d-flex gap-2">{{ form.submit(class="btn btn-primary") }}<a href="{{ url_for('admin.users') }}" class="btn btn-secondary">Avbryt</a></div>
+    </form>
+</div></div></div></div>
+{% endblock %}

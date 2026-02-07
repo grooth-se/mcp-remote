@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Revisionslogg - Familjekontor{% endblock %}
+{% block content %}
+<h2>Revisionslogg</h2>
+<div class="table-responsive">
+    <table class="table table-sm table-hover">
+        <thead><tr><th>Tid</th><th>Användare</th><th>Åtgärd</th><th>Typ</th><th>ID</th><th>Detaljer</th></tr></thead>
+        <tbody>
+            {% for log in logs.items %}
+            <tr>
+                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M') if log.timestamp else '-' }}</td>
+                <td>{{ log.user.username if log.user else '-' }}</td>
+                <td>
+                    {% if log.action == 'create' %}<span class="badge bg-success">Skapa</span>
+                    {% elif log.action == 'update' %}<span class="badge bg-info">Ändra</span>
+                    {% elif log.action == 'delete' %}<span class="badge bg-danger">Ta bort</span>
+                    {% else %}<span class="badge bg-secondary">{{ log.action }}</span>{% endif %}
+                </td>
+                <td>{{ log.entity_type }}</td>
+                <td>{{ log.entity_id }}</td>
+                <td><small>{{ log.new_values or '' }}</small></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-muted">Inga loggposter.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if logs.pages > 1 %}
+<nav>
+    <ul class="pagination pagination-sm">
+        {% for page_num in logs.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if page_num %}
+        <li class="page-item {% if page_num == logs.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('admin.audit_log', page=page_num) }}">{{ page_num }}</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

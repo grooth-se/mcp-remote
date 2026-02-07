@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Kunder - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Kunder</h2>
+    <a href="{{ url_for('invoices.new_customer') }}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Ny kund</a>
+</div>
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead><tr><th>Namn</th><th>Org.nr</th><th>Land</th><th>Ort</th><th>Valuta</th><th>Betvillkor</th></tr></thead>
+        <tbody>
+            {% for c in customers %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td>{{ c.org_number or '-' }}</td>
+                <td>{{ c.country }}</td>
+                <td>{{ c.city or '-' }}</td>
+                <td>{{ c.default_currency }}</td>
+                <td>{{ c.payment_terms }} dagar</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-muted">Inga kunder.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

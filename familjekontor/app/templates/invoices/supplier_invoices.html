@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Leverantörsfakturor - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Leverantörsfakturor</h2>
+    <div class="d-flex gap-2">
+        <div class="btn-group btn-group-sm">
+            <a href="{{ url_for('invoices.supplier_invoices') }}" class="btn btn-outline-secondary {% if not status %}active{% endif %}">Alla</a>
+            <a href="{{ url_for('invoices.supplier_invoices', status='pending') }}" class="btn btn-outline-warning {% if status == 'pending' %}active{% endif %}">Väntande</a>
+            <a href="{{ url_for('invoices.supplier_invoices', status='approved') }}" class="btn btn-outline-info {% if status == 'approved' %}active{% endif %}">Godkända</a>
+            <a href="{{ url_for('invoices.supplier_invoices', status='paid') }}" class="btn btn-outline-success {% if status == 'paid' %}active{% endif %}">Betalda</a>
+        </div>
+        <a href="{{ url_for('invoices.new_supplier_invoice') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Ny</a>
+    </div>
+</div>
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr><th>Leverantör</th><th>Fakturanr</th><th>Datum</th><th>Förfaller</th><th class="text-end">Belopp</th><th>Valuta</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for inv in invoices %}
+            <tr>
+                <td>{{ inv.supplier.name }}</td>
+                <td>{{ inv.invoice_number }}</td>
+                <td>{{ inv.invoice_date }}</td>
+                <td>{{ inv.due_date }}</td>
+                <td class="text-end">{{ "%.2f"|format(inv.total_amount) }}</td>
+                <td>{{ inv.currency }}</td>
+                <td>
+                    {% if inv.status == 'pending' %}<span class="badge bg-warning">Väntande</span>
+                    {% elif inv.status == 'approved' %}<span class="badge bg-info">Godkänd</span>
+                    {% elif inv.status == 'paid' %}<span class="badge bg-success">Betald</span>
+                    {% else %}<span class="badge bg-secondary">{{ inv.status }}</span>{% endif %}
+                </td>
+                <td>
+                    {% if inv.status == 'pending' %}
+                    <form method="POST" action="{{ url_for('invoices.approve_supplier_invoice', invoice_id=inv.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-sm btn-outline-info">Godkänn</button>
+                    </form>
+                    {% elif inv.status == 'approved' %}
+                    <form method="POST" action="{{ url_for('invoices.pay_supplier_invoice', invoice_id=inv.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-sm btn-outline-success">Betala</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-muted">Inga fakturor.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

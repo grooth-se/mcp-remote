@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Familjekontor{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>
+            {% if active_company %}
+                {{ active_company.name }}
+                <small class="text-muted">{{ active_company.company_type }} - {{ active_company.org_number }}</small>
+            {% else %}
+                Välkommen
+            {% endif %}
+        </h2>
+    </div>
+</div>
+
+{% if not active_company %}
+<div class="alert alert-info">
+    <p>Inget företag valt. <a href="{{ url_for('companies.new') }}">Skapa ett nytt företag</a> eller välj ett befintligt i menyn.</p>
+</div>
+{% elif summary %}
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body">
+                <h6 class="card-title">Verifikationer</h6>
+                <h2>{{ summary.verification_count }}</h2>
+                <small>{{ summary.active_fiscal_year.year if summary.active_fiscal_year else '-' }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body">
+                <h6 class="card-title">Obetalda leverantörsfakturor</h6>
+                <h2>{{ summary.pending_supplier_invoices }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-info">
+            <div class="card-body">
+                <h6 class="card-title">Utestående kundfakturor</h6>
+                <h2>{{ summary.unpaid_customer_invoices }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body">
+                <h6 class="card-title">Aktiva konton</h6>
+                <h2>{{ summary.account_count }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if overdue_deadlines %}
+<div class="alert alert-danger mb-4">
+    <strong><i class="bi bi-exclamation-triangle"></i> {{ overdue_deadlines|length }} förfallna skattedeadlines!</strong>
+    <a href="{{ url_for('tax.deadlines_index', status='overdue') }}" class="alert-link">Visa alla</a>
+</div>
+{% endif %}
+
+{% if upcoming_deadlines %}
+<div class="row mb-4">
+    <div class="col">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <i class="bi bi-calendar-check"></i> Kommande skattedeadlines (30 dagar)
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Förfallodatum</th>
+                            <th>Typ</th>
+                            <th>Beskrivning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in upcoming_deadlines[:5] %}
+                        <tr>
+                            <td>{{ d.due_date }}</td>
+                            <td><span class="badge bg-secondary">{{ d.deadline_type }}</span></td>
+                            <td>{{ d.description }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if upcoming_deadlines|length > 5 %}
+                        <tr>
+                            <td colspan="3">
+                                <a href="{{ url_for('tax.deadlines_index') }}">Visa alla {{ upcoming_deadlines|length }} deadlines</a>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Snabbåtgärder</div>
+            <div class="list-group list-group-flush">
+                <a href="{{ url_for('accounting.new_verification') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-plus-circle"></i> Ny verifikation
+                </a>
+                <a href="{{ url_for('invoices.new_supplier_invoice') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-receipt"></i> Ny leverantörsfaktura
+                </a>
+                <a href="{{ url_for('invoices.new_customer_invoice') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-file-earmark-text"></i> Ny kundfaktura
+                </a>
+                <a href="{{ url_for('sie.index') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-upload"></i> Importera SIE
+                </a>
+                <a href="{{ url_for('reports.profit_and_loss') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-bar-chart"></i> Resultaträkning
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">Senaste verifikationer</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Datum</th>
+                            <th>Beskrivning</th>
+                            <th>Typ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ver in recent_verifications %}
+                        <tr>
+                            <td><a href="{{ url_for('accounting.view_verification', verification_id=ver.id) }}">{{ ver.verification_number }}</a></td>
+                            <td>{{ ver.verification_date }}</td>
+                            <td>{{ ver.description }}</td>
+                            <td>{{ ver.verification_type }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-muted">Inga verifikationer ännu.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

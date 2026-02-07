@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Ny verifikation - Familjekontor{% endblock %}
+{% block content %}
+<h2>Ny verifikation <small class="text-muted">{{ fiscal_year.year }}</small></h2>
+<form method="POST" id="verificationForm">
+    {{ form.hidden_tag() }}
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    {{ form.verification_date.label(class="form-label") }}
+                    {{ form.verification_date(class="form-control", type="date") }}
+                </div>
+                <div class="col-md-3">
+                    {{ form.verification_type.label(class="form-label") }}
+                    {{ form.verification_type(class="form-select") }}
+                </div>
+                <div class="col-md-6">
+                    {{ form.description.label(class="form-label") }}
+                    {{ form.description(class="form-control", rows=1) }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            Rader
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()"><i class="bi bi-plus"></i> Lägg till rad</button>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm" id="rowsTable">
+                <thead>
+                    <tr>
+                        <th style="width:40%">Konto</th>
+                        <th style="width:20%">Debet</th>
+                        <th style="width:20%">Kredit</th>
+                        <th style="width:15%">Beskrivning</th>
+                        <th style="width:5%"></th>
+                    </tr>
+                </thead>
+                <tbody id="rowsBody">
+                    <tr class="ver-row" data-index="0">
+                        <td>
+                            <select name="rows-0-account_id" class="form-select form-select-sm">
+                                <option value="">-- Välj konto --</option>
+                                {% for acc in accounts %}
+                                <option value="{{ acc.id }}">{{ acc.account_number }} {{ acc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="number" step="0.01" name="rows-0-debit" class="form-control form-control-sm debit-input" value="0"></td>
+                        <td><input type="number" step="0.01" name="rows-0-credit" class="form-control form-control-sm credit-input" value="0"></td>
+                        <td><input type="text" name="rows-0-description" class="form-control form-control-sm"></td>
+                        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+                    </tr>
+                    <tr class="ver-row" data-index="1">
+                        <td>
+                            <select name="rows-1-account_id" class="form-select form-select-sm">
+                                <option value="">-- Välj konto --</option>
+                                {% for acc in accounts %}
+                                <option value="{{ acc.id }}">{{ acc.account_number }} {{ acc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="number" step="0.01" name="rows-1-debit" class="form-control form-control-sm debit-input" value="0"></td>
+                        <td><input type="number" step="0.01" name="rows-1-credit" class="form-control form-control-sm credit-input" value="0"></td>
+                        <td><input type="text" name="rows-1-description" class="form-control form-control-sm"></td>
+                        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr class="table-light">
+                        <td><strong>Summa</strong></td>
+                        <td><strong id="totalDebit">0.00</strong></td>
+                        <td><strong id="totalCredit">0.00</strong></td>
+                        <td colspan="2">
+                            <span id="balanceStatus" class="badge bg-secondary">-</span>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('accounting.index') }}" class="btn btn-secondary">Avbryt</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/verification_form.js') }}"></script>
+{% endblock %}

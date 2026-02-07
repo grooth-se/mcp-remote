@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}SIE Import/Export - Familjekontor{% endblock %}
+{% block content %}
+<h2>SIE Import/Export</h2>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-upload"></i> Importera SIE4</div>
+            <div class="card-body">
+                <p class="text-muted">Importera konton och verifikationer från en SIE4-fil (t.ex. från Adaro).</p>
+                <form method="POST" action="{{ url_for('sie.import_file') }}" enctype="multipart/form-data">
+                    {{ import_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ import_form.file.label(class="form-label") }}
+                        {{ import_form.file(class="form-control") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ import_form.fiscal_year_id.label(class="form-label") }}
+                        {{ import_form.fiscal_year_id(class="form-select") }}
+                        <small class="text-muted">Välj "Autodetektera" för att använda perioden från SIE-filen.</small>
+                    </div>
+                    {{ import_form.submit(class="btn btn-primary") }}
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-download"></i> Exportera SIE4</div>
+            <div class="card-body">
+                <p class="text-muted">Exportera bokföring som SIE4-fil för revisorer eller backup.</p>
+                <form method="POST" action="{{ url_for('sie.export_file') }}">
+                    {{ export_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ export_form.fiscal_year_id.label(class="form-label") }}
+                        {{ export_form.fiscal_year_id(class="form-select") }}
+                    </div>
+                    {{ export_form.submit(class="btn btn-success") }}
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

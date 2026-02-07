@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}{{ company.name }} - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div class="d-flex align-items-center gap-3">
+        {% if company.logo_path %}
+        <img src="{{ url_for('companies.serve_logo', company_id=company.id) }}"
+             alt="{{ company.name }}"
+             style="max-height: 80px; max-width: 120px; object-fit: contain;"
+             class="rounded"
+             onerror="this.style.display='none'">
+        {% endif %}
+        <div>
+            <h2 class="mb-0">{{ company.name }} <span class="badge bg-secondary">{{ company.company_type }}</span></h2>
+            <p class="text-muted mb-0">Org.nr: {{ company.org_number }}</p>
+            {% if company.street_address or company.city %}
+            <p class="text-muted mb-0">
+                {% if company.street_address %}{{ company.street_address }}, {% endif %}
+                {% if company.postal_code %}{{ company.postal_code }} {% endif %}
+                {% if company.city %}{{ company.city }}{% endif %}
+                {% if company.country and company.country != 'Sverige' %}, {{ company.country }}{% endif %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    <div>
+        <a href="{{ url_for('companies.edit', company_id=company.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil"></i> Redigera
+        </a>
+        <a href="{{ url_for('dashboard.switch_company', company_id=company.id) }}" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Välj detta företag
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-info-circle"></i> Information</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Org.nummer</dt><dd class="col-sm-7">{{ company.org_number }}</dd>
+                    <dt class="col-sm-5">Bolagsform</dt><dd class="col-sm-7">{{ company.company_type }}</dd>
+                    <dt class="col-sm-5">Redovisningsstandard</dt><dd class="col-sm-7">{{ company.accounting_standard }}</dd>
+                    <dt class="col-sm-5">Basvaluta</dt><dd class="col-sm-7">{{ company.base_currency }}</dd>
+                    <dt class="col-sm-5">Momsperiod</dt><dd class="col-sm-7">{{ company.vat_period }}</dd>
+                    <dt class="col-sm-5">Räkenskapsår start</dt><dd class="col-sm-7">Månad {{ company.fiscal_year_start }}</dd>
+                    {% if company.street_address %}
+                    <dt class="col-sm-5">Adress</dt>
+                    <dd class="col-sm-7">
+                        {{ company.street_address }}<br>
+                        {{ company.postal_code }} {{ company.city }}<br>
+                        {{ company.country or 'Sverige' }}
+                    </dd>
+                    {% endif %}
+                    {% if company.theme_color %}
+                    <dt class="col-sm-5">Färgtema</dt>
+                    <dd class="col-sm-7">
+                        <span class="d-inline-block rounded" style="width:20px; height:20px; background-color:{{ company.theme_color }}; vertical-align:middle;"></span>
+                        {{ company.theme_color }}
+                    </dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <span><i class="bi bi-calendar3"></i> Räkenskapsår</span>
+                <a href="{{ url_for('companies.new_fiscal_year', company_id=company.id) }}" class="btn btn-sm btn-outline-primary">Nytt</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>År</th><th>Period</th><th>Status</th></tr></thead>
+                    <tbody>
+                        {% for fy in fiscal_years %}
+                        <tr>
+                            <td>{{ fy.year }}</td>
+                            <td>{{ fy.start_date }} - {{ fy.end_date }}</td>
+                            <td><span class="badge bg-{{ 'success' if fy.status == 'open' else 'secondary' }}">{{ fy.status }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">Inga räkenskapsår.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-folder2-open"></i> Registerdokument</span>
+        <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#uploadForm">
+            <i class="bi bi-upload"></i> Ladda upp
+        </button>
+    </div>
+    <div class="collapse" id="uploadForm">
+        <div class="card-body border-bottom bg-light">
+            <form method="POST" action="{{ url_for('companies.upload_certificate', company_id=company.id) }}" enctype="multipart/form-data">
+                {{ upload_form.hidden_tag() }}
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        {{ upload_form.file.label(class="form-label") }}
+                        {{ upload_form.file(class="form-control form-control-sm") }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ upload_form.description.label(class="form-label") }}
+                        {{ upload_form.description(class="form-control form-control-sm", placeholder="Valfri beskrivning") }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ upload_form.expiry_date.label(class="form-label") }}
+                        {{ upload_form.expiry_date(class="form-control form-control-sm", type="date") }}
+                    </div>
+                    <div class="col-md-2">
+                        {{ upload_form.submit(class="btn btn-sm btn-primary w-100") }}
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Filnamn</th>
+                    <th>Beskrivning</th>
+                    <th>Uppladdad</th>
+                    <th>Utgår</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in documents %}
+                <tr{% if doc.expiry_date and doc.expiry_date < today %} class="table-danger"{% endif %}>
+                    <td>
+                        <a href="{{ url_for('companies.download_certificate', company_id=company.id, doc_id=doc.id) }}" target="_blank">
+                            <i class="bi bi-file-earmark"></i> {{ doc.file_name }}
+                        </a>
+                    </td>
+                    <td>{{ doc.description or '-' }}</td>
+                    <td>{{ doc.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        {% if doc.expiry_date %}
+                            {% if doc.expiry_date < today %}
+                            <span class="text-danger fw-bold">{{ doc.expiry_date }}</span>
+                            {% else %}
+                            {{ doc.expiry_date }}
+                            {% endif %}
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="POST" action="{{ url_for('companies.delete_certificate', company_id=company.id, doc_id=doc.id) }}" class="d-inline"
+                              onsubmit="return confirm('Ta bort detta dokument?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Ta bort">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-muted">Inga dokument uppladdade.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

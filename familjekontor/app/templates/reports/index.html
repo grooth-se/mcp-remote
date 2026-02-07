@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Rapporter - Familjekontor{% endblock %}
+{% block content %}
+<h2>Rapporter</h2>
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body text-center">
+                <h5><i class="bi bi-graph-up"></i></h5>
+                <h5>Resultaträkning</h5>
+                <p class="text-muted">Intäkter och kostnader per period.</p>
+                <a href="{{ url_for('reports.profit_and_loss') }}" class="btn btn-primary">Visa</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body text-center">
+                <h5><i class="bi bi-bank"></i></h5>
+                <h5>Balansräkning</h5>
+                <p class="text-muted">Tillgångar, skulder och eget kapital.</p>
+                <a href="{{ url_for('reports.balance_sheet') }}" class="btn btn-primary">Visa</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-body text-center">
+                <h5><i class="bi bi-journal-bookmark"></i></h5>
+                <h5>Huvudbok</h5>
+                <p class="text-muted">Alla transaktioner per konto.</p>
+                <a href="{{ url_for('reports.general_ledger') }}" class="btn btn-primary">Visa</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

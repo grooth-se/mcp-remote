@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Deadlines - Familjekontor{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-calendar-check"></i> Deadlines</h2>
+        <p class="text-muted">{{ company.name }}</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('tax.deadlines_seed') }}" class="btn btn-outline-primary me-2">
+            <i class="bi bi-calendar-plus"></i> Generera
+        </a>
+        <a href="{{ url_for('tax.deadline_new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Ny deadline
+        </a>
+    </div>
+</div>
+
+<div class="mb-3">
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('tax.deadlines_index', status='all') }}"
+           class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Alla</a>
+        <a href="{{ url_for('tax.deadlines_index', status='pending') }}"
+           class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">Väntande</a>
+        <a href="{{ url_for('tax.deadlines_index', status='overdue') }}"
+           class="btn btn-sm {% if status_filter == 'overdue' %}btn-danger{% else %}btn-outline-danger{% endif %}">Förfallna</a>
+        <a href="{{ url_for('tax.deadlines_index', status='completed') }}"
+           class="btn btn-sm {% if status_filter == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">Klara</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Förfallodatum</th>
+                    <th>Typ</th>
+                    <th>Beskrivning</th>
+                    <th>Period</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in deadlines %}
+                <tr class="{% if d.status == 'overdue' %}table-danger{% elif d.status == 'completed' %}table-success{% endif %}">
+                    <td>{{ d.due_date }}</td>
+                    <td><span class="badge bg-secondary">{{ d.deadline_type }}</span></td>
+                    <td>{{ d.description }}</td>
+                    <td>{{ d.period_label or '-' }}</td>
+                    <td>
+                        {% if d.status == 'completed' %}
+                        <span class="badge bg-success">Klar</span>
+                        {% elif d.status == 'overdue' %}
+                        <span class="badge bg-danger">Förfallen</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">Väntande</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if d.status != 'completed' %}
+                        <form method="POST" action="{{ url_for('tax.deadline_complete', deadline_id=d.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="Markera klar">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-muted">Inga deadlines.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

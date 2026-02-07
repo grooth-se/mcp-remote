@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Verifikation #{{ verification.verification_number }} - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Verifikation #{{ verification.verification_number }}</h2>
+    <a href="{{ url_for('accounting.index') }}" class="btn btn-outline-secondary">Tillbaka</a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Datum</dt><dd class="col-sm-8">{{ verification.verification_date }}</dd>
+                    <dt class="col-sm-4">Beskrivning</dt><dd class="col-sm-8">{{ verification.description }}</dd>
+                    <dt class="col-sm-4">Typ</dt><dd class="col-sm-8">{{ verification.verification_type }}</dd>
+                    <dt class="col-sm-4">Källa</dt><dd class="col-sm-8">{{ verification.source or '-' }}</dd>
+                    <dt class="col-sm-4">Skapad</dt><dd class="col-sm-8">{{ verification.created_at.strftime('%Y-%m-%d %H:%M') if verification.created_at else '-' }}</dd>
+                    <dt class="col-sm-4">Balanserad</dt>
+                    <dd class="col-sm-8">
+                        {% if verification.is_balanced %}
+                        <span class="badge bg-success">Ja</span>
+                        {% else %}
+                        <span class="badge bg-danger">Nej</span>
+                        {% endif %}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Rader</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr><th>Konto</th><th>Kontonamn</th><th>Beskrivning</th><th class="text-end">Debet</th><th class="text-end">Kredit</th></tr>
+            </thead>
+            <tbody>
+                {% for row in verification.rows %}
+                <tr>
+                    <td>{{ row.account.account_number }}</td>
+                    <td>{{ row.account.name }}</td>
+                    <td>{{ row.description or '' }}</td>
+                    <td class="text-end">{{ "%.2f"|format(row.debit) if row.debit else '' }}</td>
+                    <td class="text-end">{{ "%.2f"|format(row.credit) if row.credit else '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="table-light">
+                    <td colspan="3"><strong>Summa</strong></td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(verification.total_debit) }}</strong></td>
+                    <td class="text-end"><strong>{{ "%.2f"|format(verification.total_credit) }}</strong></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endblock %}

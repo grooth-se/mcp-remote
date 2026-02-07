@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Leverantörer - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Leverantörer</h2>
+    <a href="{{ url_for('invoices.new_supplier') }}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Ny leverantör</a>
+</div>
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead><tr><th>Namn</th><th>Org.nr</th><th>Standardkonto</th><th>Betvillkor</th><th>Bankgiro</th></tr></thead>
+        <tbody>
+            {% for s in suppliers %}
+            <tr>
+                <td>{{ s.name }}</td>
+                <td>{{ s.org_number or '-' }}</td>
+                <td>{{ s.default_account or '-' }}</td>
+                <td>{{ s.payment_terms }} dagar</td>
+                <td>{{ s.bankgiro or s.plusgiro or '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-muted">Inga leverantörer.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

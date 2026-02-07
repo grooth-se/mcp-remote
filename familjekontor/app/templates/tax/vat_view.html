@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Momsrapport - Familjekontor{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-file-earmark-text"></i> Momsrapport</h2>
+        <p class="text-muted">{{ report.company.name }} | {{ report.period_start }} - {{ report.period_end }}</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('tax.vat_export', report_id=report.id) }}" class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-excel"></i> Exportera Excel
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between">
+                <span>Momsdeklaration</span>
+                {% if report.status == 'filed' %}
+                <span class="badge bg-success">Inlämnad</span>
+                {% elif report.status == 'final' %}
+                <span class="badge bg-primary">Klar</span>
+                {% else %}
+                <span class="badge bg-warning text-dark">Utkast</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <td>Utgående moms 25% (konto 2610)</td>
+                            <td class="text-end">{{ "%.2f"|format(report.output_vat_25) }} kr</td>
+                        </tr>
+                        <tr>
+                            <td>Utgående moms 12% (konto 2620)</td>
+                            <td class="text-end">{{ "%.2f"|format(report.output_vat_12) }} kr</td>
+                        </tr>
+                        <tr>
+                            <td>Utgående moms 6% (konto 2630)</td>
+                            <td class="text-end">{{ "%.2f"|format(report.output_vat_6) }} kr</td>
+                        </tr>
+                        <tr class="table-info">
+                            <td><strong>Summa utgående moms</strong></td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(report.output_vat_25 + report.output_vat_12 + report.output_vat_6) }} kr</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Ingående moms (konto 2640/2641/2645)</td>
+                            <td class="text-end">{{ "%.2f"|format(report.input_vat) }} kr</td>
+                        </tr>
+                        <tr class="table-warning fw-bold">
+                            <td>Moms att betala</td>
+                            <td class="text-end">{{ "%.2f"|format(report.vat_to_pay) }} kr</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if report.status == 'draft' %}
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('tax.vat_finalize', report_id=report.id) }}">
+                    {{ finalize_form.hidden_tag() }}
+                    <p>Markera rapporten som inlämnad till Skatteverket.</p>
+                    {{ finalize_form.submit(class="btn btn-success") }}
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Information</div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item"><strong>Period:</strong> {{ report.period_type }}</li>
+                <li class="list-group-item"><strong>Skapad:</strong> {{ report.created_at.strftime('%Y-%m-%d %H:%M') }}</li>
+                {% if report.creator %}
+                <li class="list-group-item"><strong>Skapad av:</strong> {{ report.creator.username }}</li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('tax.vat_index') }}" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Tillbaka</a>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+docker-compose.override.yml
+
+# Uploads and generated files
+data/uploads/*
+data/generated/*
+data/backups/*
+data/archive/*
+!data/uploads/.gitkeep
+!data/generated/.gitkeep
+!data/backups/.gitkeep
+!data/archive/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# Flask
+instance/
+
+# Migrations
+migrations/versions/*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Råbalans - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Råbalans</h2>
+    <form class="d-flex" method="GET">
+        <select name="fiscal_year_id" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for fy in fiscal_years %}
+            <option value="{{ fy.id }}" {% if fy.id == current_fy_id %}selected{% endif %}>
+                {{ fy.year }} ({{ fy.start_date }} - {{ fy.end_date }})
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+<div class="table-responsive">
+    <table class="table table-sm table-hover">
+        <thead>
+            <tr><th>Konto</th><th>Namn</th><th class="text-end">Debet</th><th class="text-end">Kredit</th><th class="text-end">Saldo</th></tr>
+        </thead>
+        <tbody>
+            {% set ns = namespace(total_debit=0, total_credit=0) %}
+            {% for item in balance %}
+            <tr>
+                <td>{{ item.account_number }}</td>
+                <td>{{ item.account_name }}</td>
+                <td class="text-end">{{ "%.2f"|format(item.total_debit) }}</td>
+                <td class="text-end">{{ "%.2f"|format(item.total_credit) }}</td>
+                <td class="text-end">{{ "%.2f"|format(item.balance) }}</td>
+            </tr>
+            {% set ns.total_debit = ns.total_debit + item.total_debit %}
+            {% set ns.total_credit = ns.total_credit + item.total_credit %}
+            {% else %}
+            <tr><td colspan="5" class="text-muted">Inga poster.</td></tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="table-light">
+                <td colspan="2"><strong>Summa</strong></td>
+                <td class="text-end"><strong>{{ "%.2f"|format(ns.total_debit) }}</strong></td>
+                <td class="text-end"><strong>{{ "%.2f"|format(ns.total_credit) }}</strong></td>
+                <td class="text-end"><strong>{{ "%.2f"|format(ns.total_debit - ns.total_credit) }}</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endblock %}

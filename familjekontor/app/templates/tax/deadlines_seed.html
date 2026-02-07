@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Generera deadlines - Familjekontor{% endblock %}
+{% block content %}
+<h2><i class="bi bi-calendar-plus"></i> Generera deadlines</h2>
+<p class="text-muted">{{ company.name }}</p>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <p>Generera automatiska skattedeadlines baserat på företagstyp ({{ company.company_type }}) och momsperiod ({{ company.vat_period }}).</p>
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.year.label(class="form-label") }}
+                        {{ form.year(class="form-control") }}
+                    </div>
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('tax.deadlines_index') }}" class="btn btn-secondary">Avbryt</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

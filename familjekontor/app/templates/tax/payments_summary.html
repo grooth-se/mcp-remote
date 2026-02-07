@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Betalningssammanställning - Familjekontor{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-pie-chart"></i> Betalningssammanställning {{ year }}</h2>
+        <p class="text-muted">{{ company.name }}</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('tax.payments_index', year=year) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Tillbaka
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Typ</th>
+                            <th class="text-end">Antal</th>
+                            <th class="text-end">Totalt belopp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for type_key, data in summary.items() if type_key != '_grand_total' %}
+                        <tr>
+                            <td>
+                                {% if type_key == 'vat' %}Moms
+                                {% elif type_key == 'employer_tax' %}Arbetsgivaravgifter
+                                {% elif type_key == 'corporate_tax' %}Bolagsskatt
+                                {% elif type_key == 'preliminary_tax' %}Preliminär skatt
+                                {% else %}{{ type_key }}{% endif %}
+                            </td>
+                            <td class="text-end">{{ data.count }}</td>
+                            <td class="text-end">{{ "%.2f"|format(data.total) }} kr</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">Inga betalningar för {{ year }}.</td></tr>
+                        {% endfor %}
+                        {% if summary.get('_grand_total') %}
+                        <tr class="table-info fw-bold">
+                            <td>Totalt</td>
+                            <td></td>
+                            <td class="text-end">{{ "%.2f"|format(summary['_grand_total']) }} kr</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
