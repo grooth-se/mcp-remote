@@ -737,11 +737,46 @@ def filter_outliers_percentile(data: np.ndarray, lower_pct: float = 1, upper_pct
     return mask, lower_bound, upper_bound
 
 
+def moving_average(data: np.ndarray, window_size: int = 10) -> np.ndarray:
+    """Apply moving average smoothing to data.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Input data array
+    window_size : int
+        Number of points to average over
+
+    Returns
+    -------
+    np.ndarray
+        Smoothed data (same length as input, edges handled with smaller windows)
+    """
+    if window_size < 2:
+        return data
+
+    # Use convolution for efficient moving average
+    kernel = np.ones(window_size) / window_size
+    # 'same' mode keeps output same length as input
+    smoothed = np.convolve(data, kernel, mode='same')
+
+    # Fix edge effects by using smaller windows at edges
+    half_window = window_size // 2
+    for i in range(half_window):
+        # Left edge
+        smoothed[i] = np.mean(data[:i + half_window + 1])
+        # Right edge
+        smoothed[-(i + 1)] = np.mean(data[-(i + half_window + 1):])
+
+    return smoothed
+
+
 def create_measured_dtdt_plot(
     measured_data: List[dict],
     title: str = "Measured dT/dt vs Time",
     filter_outliers: bool = True,
-    outlier_percentile: float = 2.0
+    outlier_percentile: float = 2.0,
+    smooth_window: int = 20
 ) -> bytes:
     """Generate dT/dt vs Time plot for measured TC data.
 
@@ -755,6 +790,8 @@ def create_measured_dtdt_plot(
         If True, filter outliers for better y-axis scaling
     outlier_percentile : float
         Percentile for outlier filtering (removes below this and above 100-this)
+    smooth_window : int
+        Window size for moving average smoothing (0 to disable)
 
     Returns
     -------
@@ -779,6 +816,10 @@ def create_measured_dtdt_plot(
         dTdt = np.diff(temps) / dt
         time_mid = 0.5 * (times[:-1] + times[1:])
 
+        # Apply moving average smoothing
+        if smooth_window > 1:
+            dTdt = moving_average(dTdt, smooth_window)
+
         plot_data.append((time_mid, dTdt, name))
         all_dTdt.extend(dTdt)
 
@@ -800,7 +841,7 @@ def create_measured_dtdt_plot(
 
     ax.set_xlabel('Time (s)', fontsize=12)
     ax.set_ylabel('dT/dt (°C/s)', fontsize=12)
-    ax.set_title(title, fontsize=14)
+    ax.set_title(title + f' (smoothed, window={smooth_window})', fontsize=14)
     ax.legend(loc='best', fontsize=9, ncol=2)
     ax.grid(True, alpha=0.3)
     ax.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
@@ -821,7 +862,8 @@ def create_measured_dtdt_vs_temp_plot(
     measured_data: List[dict],
     title: str = "Measured dT/dt vs Temperature",
     filter_outliers: bool = True,
-    outlier_percentile: float = 2.0
+    outlier_percentile: float = 2.0,
+    smooth_window: int = 20
 ) -> bytes:
     """Generate dT/dt vs Temperature plot for measured TC data.
 
@@ -835,6 +877,8 @@ def create_measured_dtdt_vs_temp_plot(
         If True, filter outliers for better y-axis scaling
     outlier_percentile : float
         Percentile for outlier filtering (removes below this and above 100-this)
+    smooth_window : int
+        Window size for moving average smoothing (0 to disable)
 
     Returns
     -------
@@ -859,6 +903,11 @@ def create_measured_dtdt_vs_temp_plot(
         dTdt = np.diff(temps) / dt
         temp_mid = 0.5 * (temps[:-1] + temps[1:])
 
+        # Apply moving average smoothing
+        if smooth_window > 1:
+            dTdt = moving_average(dTdt, smooth_window)
+            temp_mid = moving_average(temp_mid, smooth_window)
+
         plot_data.append((temp_mid, dTdt, name))
         all_dTdt.extend(dTdt)
 
@@ -880,7 +929,7 @@ def create_measured_dtdt_vs_temp_plot(
 
     ax.set_xlabel('Temperature (°C)', fontsize=12)
     ax.set_ylabel('dT/dt (°C/s)', fontsize=12)
-    ax.set_title(title, fontsize=14)
+    ax.set_title(title + f' (smoothed, window={smooth_window})', fontsize=14)
     ax.legend(loc='best', fontsize=9, ncol=2)
     ax.grid(True, alpha=0.3)
     ax.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
