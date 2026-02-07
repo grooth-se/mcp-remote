@@ -235,6 +235,10 @@ def heat_treatment(id):
         tempering_form.enabled.data = tp.get('enabled', False)
         tempering_form.temperature.data = tp.get('temperature', 550.0)
         tempering_form.hold_time.data = tp.get('hold_time', 120.0)
+        # Furnace ramp settings
+        tempering_form.cold_furnace.data = tp.get('cold_furnace', False)
+        tempering_form.furnace_start_temperature.data = tp.get('furnace_start_temperature', 25.0)
+        tempering_form.furnace_ramp_rate.data = tp.get('furnace_ramp_rate', 5.0)
         # End condition settings
         tempering_form.end_condition.data = tp.get('end_condition', 'equilibrium')
         tempering_form.rate_threshold.data = tp.get('rate_threshold', 1.0)
@@ -289,6 +293,10 @@ def heat_treatment(id):
                 'enabled': 'tempering-enabled' in request.form,
                 'temperature': float(request.form.get('tempering-temperature', 550)),
                 'hold_time': float(request.form.get('tempering-hold_time', 120)),
+                # Furnace ramp settings
+                'cold_furnace': 'tempering-cold_furnace' in request.form,
+                'furnace_start_temperature': float(request.form.get('tempering-furnace_start_temperature', 25)),
+                'furnace_ramp_rate': float(request.form.get('tempering-furnace_ramp_rate', 5)),
                 # End condition settings
                 'end_condition': request.form.get('tempering-end_condition', 'equilibrium'),
                 'rate_threshold': float(request.form.get('tempering-rate_threshold', 1.0)),
@@ -472,7 +480,7 @@ def run(id):
         cycle_result.set_time_data(result.time.tolist())
         cycle_result.set_value_data(result.center_temp.tolist())
 
-        # Build furnace/ambient temperature list for plotting
+        # Build furnace/ambient temperature list for plotting (with ramp info)
         furnace_temps = []
         if result.phase_results:
             for pr in result.phase_results:
@@ -481,16 +489,27 @@ def run(id):
 
                 temp = None
                 phase_name = pr.phase_name
+                cold_furnace = False
+                furnace_start_temp = None
+                ramp_rate = 0
 
                 # Get furnace/ambient temperature from ht_config for each phase
                 if phase_name == 'heating':
-                    temp = ht_config.get('heating', {}).get('target_temperature')
+                    heating_cfg = ht_config.get('heating', {})
+                    temp = heating_cfg.get('target_temperature')
+                    cold_furnace = heating_cfg.get('cold_furnace', False)
+                    furnace_start_temp = heating_cfg.get('furnace_start_temperature', 25.0)
+                    ramp_rate = heating_cfg.get('furnace_ramp_rate', 0)
                 elif phase_name == 'transfer':
                     temp = ht_config.get('transfer', {}).get('ambient_temperature')
                 elif phase_name == 'quenching':
                     temp = ht_config.get('quenching', {}).get('media_temperature')
                 elif phase_name == 'tempering':
-                    temp = ht_config.get('tempering', {}).get('temperature')
+                    tempering_cfg = ht_config.get('tempering', {})
+                    temp = tempering_cfg.get('temperature')
+                    cold_furnace = tempering_cfg.get('cold_furnace', False)
+                    furnace_start_temp = tempering_cfg.get('furnace_start_temperature', 25.0)
+                    ramp_rate = tempering_cfg.get('furnace_ramp_rate', 0)
                 elif phase_name == 'cooling':
                     # Cooling after tempering - use ambient temperature
                     temp = ht_config.get('transfer', {}).get('ambient_temperature', 25.0)
@@ -500,7 +519,10 @@ def run(id):
                         'start_time': pr.start_time,
                         'end_time': pr.end_time,
                         'temperature': temp,
-                        'phase_name': phase_name
+                        'phase_name': phase_name,
+                        'cold_furnace': cold_furnace,
+                        'furnace_start_temperature': furnace_start_temp if furnace_start_temp else temp,
+                        'furnace_ramp_rate': ramp_rate
                     })
 
         # Create comprehensive plot with phase markers (4 radial positions)

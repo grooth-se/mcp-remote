@@ -269,6 +269,23 @@ class TemperingPhaseForm(FlaskForm):
         render_kw={'placeholder': 'Time at tempering temperature'}
     )
 
+    # Furnace ramp settings (cold furnace start)
+    cold_furnace = BooleanField('Cold Furnace Start', default=False)
+
+    furnace_start_temperature = FloatField(
+        'Furnace Start Temperature (°C)',
+        validators=[Optional(), NumberRange(min=-50, max=500)],
+        default=25.0,
+        render_kw={'placeholder': 'Initial furnace temperature'}
+    )
+
+    furnace_ramp_rate = FloatField(
+        'Furnace Ramp Rate (°C/min)',
+        validators=[Optional(), NumberRange(min=0, max=50)],
+        default=5.0,
+        render_kw={'placeholder': 'Furnace heating rate'}
+    )
+
     # End condition settings (same as heating phase)
     end_condition = SelectField(
         'End Condition',

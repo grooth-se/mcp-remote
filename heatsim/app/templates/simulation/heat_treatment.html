@@ -292,6 +292,35 @@
                 </div>
             </div>
 
+            <!-- Furnace Ramp Settings -->
+            <div class="row border-top pt-3 mt-2">
+                <div class="col-12 mb-2">
+                    <strong><i class="bi bi-graph-up-arrow"></i> Furnace Temperature Control</strong>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="form-check">
+                        <input type="checkbox" name="tempering-cold_furnace" class="form-check-input" id="tempering-cold_furnace" {% if tempering_form.cold_furnace.data %}checked{% endif %}>
+                        <label class="form-check-label" for="tempering-cold_furnace">Cold Furnace Start</label>
+                    </div>
+                    <div class="form-text">Furnace heats up with part</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Furnace Start Temp (°C)</label>
+                    <input type="number" name="tempering-furnace_start_temperature" class="form-control" step="1" min="-50" max="500" value="{{ tempering_form.furnace_start_temperature.data or 25 }}" id="tempering-furnace-start-temp">
+                    <div class="form-text">Initial furnace temperature</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Ramp Rate (°C/min)</label>
+                    <input type="number" name="tempering-furnace_ramp_rate" class="form-control" step="0.5" min="0" max="50" value="{{ tempering_form.furnace_ramp_rate.data or 5 }}" id="tempering-furnace-ramp-rate">
+                    <div class="form-text">Furnace heating rate</div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Est. Ramp Time</label>
+                    <input type="text" class="form-control bg-light" id="tempering-est-ramp-time" readonly value="-">
+                    <div class="form-text">Time to reach target</div>
+                </div>
+            </div>
+
             <!-- End Condition Settings -->
             <div class="row border-top pt-3 mt-2">
                 <div class="col-12 mb-2">
@@ -479,6 +508,49 @@ document.getElementById('furnace-start-temp').addEventListener('input', updateRa
 document.getElementById('furnace-ramp-rate').addEventListener('input', updateRampTime);
 document.querySelector('input[name="heating-target_temperature"]').addEventListener('input', updateRampTime);
 toggleColdFurnaceFields();
+
+// Toggle tempering cold furnace fields
+function toggleTemperingColdFurnaceFields() {
+    const coldFurnace = document.getElementById('tempering-cold_furnace').checked;
+    const startTempField = document.getElementById('tempering-furnace-start-temp');
+    const rampRateField = document.getElementById('tempering-furnace-ramp-rate');
+
+    startTempField.disabled = !coldFurnace;
+    rampRateField.disabled = !coldFurnace;
+    startTempField.parentElement.style.opacity = coldFurnace ? '1' : '0.5';
+    rampRateField.parentElement.style.opacity = coldFurnace ? '1' : '0.5';
+
+    updateTemperingRampTime();
+}
+
+// Calculate estimated ramp time for tempering
+function updateTemperingRampTime() {
+    const coldFurnace = document.getElementById('tempering-cold_furnace').checked;
+    const startTemp = parseFloat(document.getElementById('tempering-furnace-start-temp').value) || 25;
+    const targetTemp = parseFloat(document.getElementById('tempering-target-temp').value) || 550;
+    const rampRate = parseFloat(document.getElementById('tempering-furnace-ramp-rate').value) || 5;
+
+    let rampTimeText = '-';
+    if (coldFurnace && rampRate > 0) {
+        const rampTimeMin = (targetTemp - startTemp) / rampRate;
+        if (rampTimeMin < 60) {
+            rampTimeText = Math.round(rampTimeMin) + ' min';
+        } else {
+            const hours = Math.floor(rampTimeMin / 60);
+            const mins = Math.round(rampTimeMin % 60);
+            rampTimeText = hours + 'h ' + mins + 'm';
+        }
+    } else if (!coldFurnace) {
+        rampTimeText = 'Hot furnace';
+    }
+    document.getElementById('tempering-est-ramp-time').value = rampTimeText;
+}
+
+document.getElementById('tempering-cold_furnace').addEventListener('change', toggleTemperingColdFurnaceFields);
+document.getElementById('tempering-furnace-start-temp').addEventListener('input', updateTemperingRampTime);
+document.getElementById('tempering-furnace-ramp-rate').addEventListener('input', updateTemperingRampTime);
+document.getElementById('tempering-target-temp').addEventListener('input', updateTemperingRampTime);
+toggleTemperingColdFurnaceFields();
 
 // Toggle end condition fields
 function toggleEndConditionFields() {

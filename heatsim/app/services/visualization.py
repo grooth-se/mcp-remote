@@ -318,34 +318,54 @@ def create_heat_treatment_cycle_plot(
             ax.plot(m_times, m_temps, color=color, linewidth=1.5,
                    label=f'Meas: {name}', alpha=0.9)
 
-    # Plot furnace/ambient temperature as a step function
+    # Plot furnace/ambient temperature (with ramping support)
     if furnace_temps:
-        # Build step function for furnace temperature
+        # Build furnace temperature profile (may include ramps)
         furnace_times = []
         furnace_values = []
 
         for ft in furnace_temps:
             start_time = ft.get('start_time', 0)
             end_time = ft.get('end_time', 0)
-            temp = ft.get('temperature')
+            target_temp = ft.get('temperature')
 
-            if temp is not None and end_time > start_time:
-                # Add start point
-                furnace_times.append(start_time)
-                furnace_values.append(temp)
-                # Add end point (creates horizontal line)
-                furnace_times.append(end_time)
-                furnace_values.append(temp)
+            # Check if this phase has ramping (cold furnace start)
+            cold_furnace = ft.get('cold_furnace', False)
+            start_temp = ft.get('furnace_start_temperature', target_temp)
+            ramp_rate = ft.get('furnace_ramp_rate', 0)  # °C/min
+
+            if target_temp is not None and end_time > start_time:
+                if cold_furnace and ramp_rate > 0 and start_temp != target_temp:
+                    # Calculate ramp time
+                    ramp_time_sec = abs(target_temp - start_temp) / ramp_rate * 60
+                    ramp_end_time = min(start_time + ramp_time_sec, end_time)
+
+                    # Add ramp: start point
+                    furnace_times.append(start_time)
+                    furnace_values.append(start_temp)
+                    # Add ramp: end of ramp
+                    furnace_times.append(ramp_end_time)
+                    furnace_values.append(target_temp)
+                    # Add hold at target until end
+                    if ramp_end_time < end_time:
+                        furnace_times.append(end_time)
+                        furnace_values.append(target_temp)
+                else:
+                    # Constant temperature (hot furnace or quench)
+                    furnace_times.append(start_time)
+                    furnace_values.append(target_temp)
+                    furnace_times.append(end_time)
+                    furnace_values.append(target_temp)
 
         if furnace_times:
             ax.plot(
                 furnace_times,
                 furnace_values,
                 color='#FF6B00',  # Orange
-                linewidth=2,
+                linewidth=2.5,
                 linestyle='-.',
                 label='Furnace/Ambient',
-                alpha=0.8,
+                alpha=0.85,
                 zorder=5
             )
 

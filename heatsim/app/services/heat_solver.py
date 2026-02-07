@@ -229,18 +229,40 @@ class PhaseConfig:
         temp = config.get('temperature', 550.0)
         hold_time = config.get('hold_time', 120.0)  # minutes
 
+        # Check if using cold furnace start with ramp
+        cold_furnace = config.get('cold_furnace', False)
+        furnace_start_temp = config.get('furnace_start_temperature', 25.0)
+        ramp_rate = config.get('furnace_ramp_rate', 0.0)  # °C/min
+
         # End condition settings (same as heating phase)
         end_condition = config.get('end_condition', 'equilibrium')
         rate_threshold = config.get('rate_threshold', 1.0)  # °C/hr
         hold_time_after_trigger = config.get('hold_time_after_trigger', 0.0) * 60  # min to sec
         center_offset = config.get('center_offset', 3.0)  # °C
 
-        bc = create_tempering_bc(
-            temperature=temp,
-            htc=config.get('htc', 25.0),
-            emissivity=config.get('emissivity', 0.85),
-            cooling_method=config.get('cooling_method', 'air')
-        )
+        # Create appropriate boundary condition
+        if cold_furnace and ramp_rate > 0:
+            bc = create_ramping_heating_bc(
+                target_temperature=temp,
+                start_temperature=furnace_start_temp,
+                ramp_rate=ramp_rate,
+                htc=config.get('htc', 25.0),
+                emissivity=config.get('emissivity', 0.85),
+                use_radiation=True
+            )
+        else:
+            bc = create_tempering_bc(
+                temperature=temp,
+                htc=config.get('htc', 25.0),
+                emissivity=config.get('emissivity', 0.85),
+                cooling_method=config.get('cooling_method', 'air')
+            )
+
+        # Calculate maximum duration based on ramp time + generous heat-up time + hold
+        max_duration = hold_time * 60  # Base hold time in seconds
+        if cold_furnace and ramp_rate > 0:
+            ramp_time = (temp - furnace_start_temp) / ramp_rate * 60
+            max_duration += ramp_time + 7200  # Add ramp time + 2hr buffer for part heating
 
         # Set end temperature based on condition
         if end_condition == 'center_offset':
@@ -251,7 +273,7 @@ class PhaseConfig:
         return cls(
             name='tempering',
             enabled=True,
-            duration=hold_time * 60,  # Convert to seconds
+            duration=max_duration,
             target_temperature=temp,
             boundary_condition=bc,
             end_condition=end_condition,
