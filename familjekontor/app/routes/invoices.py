@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, send_file
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice
+from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice, InvoiceLineItem
 from app.models.audit import AuditLog
-from app.forms.invoice import SupplierForm, SupplierInvoiceForm, CustomerForm, CustomerInvoiceForm
+from app.forms.invoice import (SupplierForm, SupplierInvoiceForm, CustomerForm,
+                                CustomerInvoiceForm, InvoiceLineItemForm)
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -253,3 +254,97 @@ def mark_customer_invoice_paid(invoice_id):
         db.session.commit()
         flash('Fakturan har markerats som betald.', 'success')
     return redirect(url_for('invoices.customer_invoices'))
+
+
+# === Customer Invoice Detail + Line Items (Phase 4F) ===
+
+@invoices_bp.route('/customer-invoices/<int:invoice_id>')
+@login_required
+def customer_invoice_detail(invoice_id):
+    company_id = session.get('active_company_id')
+    invoice = db.session.get(CustomerInvoice, invoice_id)
+    if not invoice or invoice.company_id != company_id:
+        flash('Faktura hittades inte.', 'danger')
+        return redirect(url_for('invoices.customer_invoices'))
+
+    form = InvoiceLineItemForm()
+    return render_template('invoices/customer_invoice_detail.html',
+                           invoice=invoice, form=form)
+
+
+@invoices_bp.route('/customer-invoices/<int:invoice_id>/add-line', methods=['POST'])
+@login_required
+def add_line_item(invoice_id):
+    company_id = session.get('active_company_id')
+    invoice = db.session.get(CustomerInvoice, invoice_id)
+    if not invoice or invoice.company_id != company_id:
+        return redirect(url_for('invoices.customer_invoices'))
+
+    form = InvoiceLineItemForm()
+    if form.validate_on_submit():
+        from app.services.invoice_pdf_service import add_line_item as svc_add_line
+        svc_add_line(
+            invoice_id=invoice_id,
+            description=form.description.data,
+            quantity=form.quantity.data,
+            unit_price=form.unit_price.data,
+            vat_rate=int(form.vat_rate.data),
+            unit=form.unit.data,
+        )
+        flash('Rad har lagts till.', 'success')
+
+    return redirect(url_for('invoices.customer_invoice_detail', invoice_id=invoice_id))
+
+
+@invoices_bp.route('/customer-invoices/<int:invoice_id>/lines/<int:line_id>/delete', methods=['POST'])
+@login_required
+def delete_line_item(invoice_id, line_id):
+    from app.services.invoice_pdf_service import remove_line_item
+    remove_line_item(line_id)
+    flash('Rad har tagits bort.', 'success')
+    return redirect(url_for('invoices.customer_invoice_detail', invoice_id=invoice_id))
+
+
+@invoices_bp.route('/customer-invoices/<int:invoice_id>/preview')
+@login_required
+def preview_invoice_pdf(invoice_id):
+    from app.services.invoice_pdf_service import generate_invoice_pdf, get_invoice_pdf_path
+
+    path = get_invoice_pdf_path(invoice_id)
+    if not path:
+        # Generate it first
+        result = generate_invoice_pdf(invoice_id)
+        if isinstance(result, str) and result.endswith('.pdf'):
+            path = result
+        else:
+            # weasyprint not available, return HTML
+            return result
+
+    import os
+    if path and os.path.exists(path):
+        return send_file(path, mimetype='application/pdf')
+    else:
+        flash('Kunde inte generera PDF.', 'danger')
+        return redirect(url_for('invoices.customer_invoice_detail', invoice_id=invoice_id))
+
+
+@invoices_bp.route('/customer-invoices/<int:invoice_id>/pdf')
+@login_required
+def download_invoice_pdf(invoice_id):
+    from app.services.invoice_pdf_service import generate_invoice_pdf, get_invoice_pdf_path
+
+    path = get_invoice_pdf_path(invoice_id)
+    if not path:
+        result = generate_invoice_pdf(invoice_id)
+        if isinstance(result, str) and result.endswith('.pdf'):
+            path = result
+
+    import os
+    if path and os.path.exists(path):
+        invoice = db.session.get(CustomerInvoice, invoice_id)
+        return send_file(path, as_attachment=True,
+                         download_name=f'{invoice.invoice_number}.pdf',
+                         mimetype='application/pdf')
+    else:
+        flash('Kunde inte generera PDF.', 'danger')
+        return redirect(url_for('invoices.customer_invoice_detail', invoice_id=invoice_id))

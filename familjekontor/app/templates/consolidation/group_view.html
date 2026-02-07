@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ group.name }} - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-diagram-3"></i> {{ group.name }}</h2>
+    <a href="{{ url_for('consolidation.index') }}" class="btn btn-outline-secondary">Tillbaka</a>
+</div>
+
+{% if group.description %}
+<p class="text-muted">{{ group.description }}</p>
+{% endif %}
+
+<div class="row">
+    {# Members #}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <span>Medlemsforetag</span>
+                <span class="badge bg-primary">{{ group.members|length }}</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr><th>Foretag</th><th>Agarandel</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for member in group.members %}
+                        <tr>
+                            <td>{{ member.company.name }}</td>
+                            <td>{{ member.ownership_pct }}%</td>
+                            <td>
+                                <form method="post" action="{{ url_for('consolidation.remove_member', group_id=group.id, company_id=member.company_id) }}"
+                                      class="d-inline" onsubmit="return confirm('Ta bort?')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" class="text-muted">Inga medlemmar.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if add_form and add_form.company_id.choices %}
+            <div class="card-footer">
+                <form method="post" action="{{ url_for('consolidation.add_member', group_id=group.id) }}" class="row g-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="col">
+                        {{ add_form.company_id(class="form-select form-select-sm") }}
+                    </div>
+                    <div class="col-3">
+                        {{ add_form.ownership_pct(class="form-control form-control-sm", placeholder="%") }}
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-sm btn-primary">Lagg till</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Report generator #}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">Generera koncernrapport</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('consolidation.report', group_id=group.id) }}">
+                    {{ report_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ report_form.fiscal_year_year.label(class="form-label") }}
+                        {{ report_form.fiscal_year_year(class="form-select") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ report_form.report_type.label(class="form-label") }}
+                        {{ report_form.report_type(class="form-select") }}
+                    </div>
+                    {{ report_form.submit(class="btn btn-primary") }}
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">Elimineringar</div>
+            <div class="card-body">
+                {% if show_eliminations is defined and eliminations %}
+                <table class="table table-sm mb-2">
+                    <thead>
+                        <tr><th>Fran</th><th>Till</th><th>Konto</th><th class="text-end">Belopp</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for e in eliminations %}
+                        <tr>
+                            <td>{{ e.from_company.name }}</td>
+                            <td>{{ e.to_company.name }}</td>
+                            <td>{{ e.account_number }}</td>
+                            <td class="text-end">{{ "{:,.2f}".format(e.amount|float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+                <a href="{{ url_for('consolidation.new_elimination', group_id=group.id) }}"
+                   class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-circle"></i> Ny eliminering
+                </a>
+                <a href="{{ url_for('consolidation.eliminations', group_id=group.id) }}"
+                   class="btn btn-sm btn-outline-secondary">
+                    Visa alla
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

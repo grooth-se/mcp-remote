@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Importera banktransaktioner - Familjekontor{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-upload"></i> Importera banktransaktioner</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.bank_account_id.label(class="form-label") }}
+                        {{ form.bank_account_id(class="form-select") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.bank_format.label(class="form-label") }}
+                        {{ form.bank_format(class="form-select") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.file.label(class="form-label") }}
+                        {{ form.file(class="form-control") }}
+                        <div class="form-text">CSV-fil med semikolon-separerade kolumner.</div>
+                    </div>
+                    {{ form.submit(class="btn btn-primary") }}
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {% if result %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Importresultat</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-6">Importerade</dt><dd class="col-6"><span class="badge bg-success">{{ result.imported_count }}</span></dd>
+                    <dt class="col-6">Redan importerade</dt><dd class="col-6"><span class="badge bg-secondary">{{ result.skipped_count }}</span></dd>
+                    {% if result.errors %}
+                    <dt class="col-6">Fel</dt><dd class="col-6"><span class="badge bg-danger">{{ result.errors|length }}</span></dd>
+                    {% endif %}
+                </dl>
+                {% if result.imported_count > 0 %}
+                <hr>
+                <a href="{{ url_for('bank.reconciliation') }}" class="btn btn-outline-primary btn-sm">
+                    Ga till avstamning
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

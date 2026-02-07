@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Faktura {{ invoice.invoice_number }} - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-file-earmark-text"></i> {{ invoice.invoice_number }}</h2>
+    <div>
+        <a href="{{ url_for('invoices.preview_invoice_pdf', invoice_id=invoice.id) }}"
+           class="btn btn-outline-primary" target="_blank">
+            <i class="bi bi-eye"></i> Forhandsgranska PDF
+        </a>
+        <a href="{{ url_for('invoices.download_invoice_pdf', invoice_id=invoice.id) }}"
+           class="btn btn-outline-success">
+            <i class="bi bi-download"></i> Ladda ner PDF
+        </a>
+        <a href="{{ url_for('invoices.customer_invoices') }}" class="btn btn-outline-secondary">Tillbaka</a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Fakturauppgifter</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Kund</dt><dd class="col-7">{{ invoice.customer.name }}</dd>
+                    <dt class="col-5">Fakturanummer</dt><dd class="col-7">{{ invoice.invoice_number }}</dd>
+                    <dt class="col-5">Fakturadatum</dt><dd class="col-7">{{ invoice.invoice_date }}</dd>
+                    <dt class="col-5">Forfallodatum</dt><dd class="col-7">{{ invoice.due_date }}</dd>
+                    <dt class="col-5">Valuta</dt><dd class="col-7">{{ invoice.currency }}</dd>
+                    <dt class="col-5">Momstyp</dt><dd class="col-7">{{ invoice.vat_type or '-' }}</dd>
+                    <dt class="col-5">Status</dt>
+                    <dd class="col-7">
+                        <span class="badge bg-{% if invoice.status == 'paid' %}success{% elif invoice.status == 'sent' %}primary{% elif invoice.status == 'overdue' %}danger{% else %}secondary{% endif %}">
+                            {{ invoice.status }}
+                        </span>
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Belopp</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-6">Exkl. moms</dt>
+                    <dd class="col-6 text-end">{{ "{:,.2f}".format(invoice.amount_excl_vat|float) if invoice.amount_excl_vat else '0.00' }} {{ invoice.currency }}</dd>
+                    <dt class="col-6">Moms</dt>
+                    <dd class="col-6 text-end">{{ "{:,.2f}".format(invoice.vat_amount|float) if invoice.vat_amount else '0.00' }} {{ invoice.currency }}</dd>
+                    <dt class="col-6 fs-5">Totalt</dt>
+                    <dd class="col-6 text-end fs-5 fw-bold">{{ "{:,.2f}".format(invoice.total_amount|float) if invoice.total_amount else '0.00' }} {{ invoice.currency }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Line items #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between">
+        <span>Fakturarader</span>
+        <span class="badge bg-primary">{{ invoice.line_items|length }} rader</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>#</th><th>Beskrivning</th><th class="text-end">Antal</th>
+                    <th>Enhet</th><th class="text-end">Apris</th>
+                    <th class="text-end">Moms %</th><th class="text-end">Belopp</th>
+                    <th class="text-end">Moms</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in invoice.line_items %}
+                <tr>
+                    <td>{{ item.line_number }}</td>
+                    <td>{{ item.description }}</td>
+                    <td class="text-end">{{ item.quantity }}</td>
+                    <td>{{ item.unit }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(item.unit_price|float) }}</td>
+                    <td class="text-end">{{ item.vat_rate }}%</td>
+                    <td class="text-end">{{ "{:,.2f}".format(item.amount|float) }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(item.vat_amount|float) }}</td>
+                    <td>
+                        <form method="post"
+                              action="{{ url_for('invoices.delete_line_item', invoice_id=invoice.id, line_id=item.id) }}"
+                              class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-outline-danger" title="Ta bort"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="9" class="text-muted">Inga rader annu.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Add line item form #}
+{% if invoice.status == 'draft' %}
+<div class="card">
+    <div class="card-header">Lagg till rad</div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('invoices.add_line_item', invoice_id=invoice.id) }}">
+            {{ form.hidden_tag() }}
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    {{ form.description.label(class="form-label") }}
+                    {{ form.description(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-1">
+                    {{ form.quantity.label(class="form-label") }}
+                    {{ form.quantity(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-1">
+                    {{ form.unit.label(class="form-label") }}
+                    {{ form.unit(class="form-select form-select-sm") }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.unit_price.label(class="form-label") }}
+                    {{ form.unit_price(class="form-control form-control-sm") }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.vat_rate.label(class="form-label") }}
+                    {{ form.vat_rate(class="form-select form-select-sm") }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.submit(class="btn btn-sm btn-primary w-100") }}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

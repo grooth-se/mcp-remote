@@ -96,8 +96,34 @@ class CustomerInvoice(db.Model):
     paid_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
+    # Phase 4F: PDF invoicing fields
+    invoice_prefix = db.Column(db.String(20), nullable=True)
+    pdf_generated = db.Column(db.Boolean, default=False)
+    pdf_path = db.Column(db.String(500), nullable=True)
+
     company = db.relationship('Company', backref='customer_invoices')
     verification = db.relationship('Verification')
+    line_items = db.relationship('InvoiceLineItem', backref='customer_invoice',
+                                 order_by='InvoiceLineItem.line_number',
+                                 cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<CustomerInvoice {self.invoice_number}>'
+
+
+class InvoiceLineItem(db.Model):
+    __tablename__ = 'invoice_line_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    customer_invoice_id = db.Column(db.Integer, db.ForeignKey('customer_invoices.id'), nullable=False)
+    line_number = db.Column(db.Integer, nullable=False)
+    description = db.Column(db.String(500), nullable=False)
+    quantity = db.Column(db.Numeric(10, 2), default=1)
+    unit = db.Column(db.String(20), default='st')
+    unit_price = db.Column(db.Numeric(15, 2), nullable=False)
+    vat_rate = db.Column(db.Numeric(5, 2), default=25)
+    amount = db.Column(db.Numeric(15, 2))  # quantity * unit_price
+    vat_amount = db.Column(db.Numeric(15, 2))  # amount * vat_rate / 100
+
+    def __repr__(self):
+        return f'<InvoiceLineItem {self.line_number} {self.description}>'

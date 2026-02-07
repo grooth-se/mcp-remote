@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Prognos - Familjekontor{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-graph-up"></i> Prognos {{ fy.year if fy else '' }}</h2>
+
+{% if forecast %}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted">Snitt intakter/man</h6>
+                <h3>{{ "{:,.0f}".format(forecast.avg_revenue) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted">Snitt kostnader/man</h6>
+                <h3>{{ "{:,.0f}".format(forecast.avg_expenses) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="text-muted">Snitt resultat/man</h6>
+                <h3>{{ "{:,.0f}".format(forecast.avg_revenue - forecast.avg_expenses) }} kr</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <canvas id="forecastChart" height="300"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Manadsdata</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Manad</th>
+                    <th class="text-end">Utfall</th>
+                    <th class="text-end">Prognos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i in range(12) %}
+                <tr class="{% if i >= forecast.current_month %}table-light{% endif %}">
+                    <td>{{ forecast.labels[i] }}</td>
+                    <td class="text-end">
+                        {% if forecast.actual[i] is not none %}
+                        {{ "{:,.0f}".format(forecast.actual[i]) }} kr
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="text-end">
+                        {% if forecast.forecast[i] is not none %}
+                        <em>{{ "{:,.0f}".format(forecast.forecast[i]) }} kr</em>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">Ingen data tillganglig for prognos.</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if forecast %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script>
+const ctx = document.getElementById('forecastChart');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: {{ forecast.labels | tojson }},
+        datasets: [
+            {
+                label: 'Utfall',
+                data: {{ forecast.actual | tojson }},
+                borderColor: 'rgba(25, 135, 84, 1)',
+                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                fill: true,
+                tension: 0.3,
+                spanGaps: false,
+            },
+            {
+                label: 'Prognos',
+                data: {{ forecast.forecast | tojson }},
+                borderColor: 'rgba(108, 117, 125, 1)',
+                borderDash: [5, 5],
+                fill: false,
+                tension: 0.3,
+                spanGaps: false,
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            title: { display: true, text: 'Resultat: Utfall & Prognos' }
+        },
+        scales: {
+            y: {
+                ticks: {
+                    callback: function(value) {
+                        return value.toLocaleString('sv-SE') + ' kr';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

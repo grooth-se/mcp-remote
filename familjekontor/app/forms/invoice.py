@@ -72,3 +72,23 @@ class CustomerInvoiceForm(FlaskForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.currency.choices = currency_choices()
+
+
+class InvoiceLineItemForm(FlaskForm):
+    description = StringField('Beskrivning', validators=[DataRequired(), Length(max=500)])
+    quantity = DecimalField('Antal', places=2, default=1, validators=[DataRequired()])
+    unit = SelectField('Enhet', choices=[
+        ('st', 'st'),
+        ('tim', 'tim'),
+        ('m', 'm'),
+        ('kg', 'kg'),
+        ('l', 'l'),
+    ], default='st')
+    unit_price = DecimalField('Apris', places=2, validators=[DataRequired()])
+    vat_rate = SelectField('Moms %', choices=[
+        ('25', '25%'),
+        ('12', '12%'),
+        ('6', '6%'),
+        ('0', '0%'),
+    ], default='25')
+    submit = SubmitField('Lagg till rad')

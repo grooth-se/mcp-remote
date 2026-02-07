@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Bankkonton - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-bank"></i> Bankkonton</h2>
+    <a href="{{ url_for('bank.new_account') }}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Nytt bankkonto</a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Bank</th><th>Kontonummer</th><th>Clearing</th>
+                    <th>IBAN</th><th>Bokf.konto</th><th class="text-end">Saldo</th><th>Status</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for acc in accounts %}
+                <tr>
+                    <td>{{ acc.bank_name }}</td>
+                    <td>{{ acc.account_number }}</td>
+                    <td>{{ acc.clearing_number or '-' }}</td>
+                    <td>{{ acc.iban or '-' }}</td>
+                    <td>{{ acc.ledger_account }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(acc.balance|float) }} kr</td>
+                    <td>
+                        <span class="badge bg-{% if acc.active %}success{% else %}secondary{% endif %}">
+                            {{ 'Aktiv' if acc.active else 'Inaktiv' }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('bank.edit_account', account_id=acc.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-muted">Inga bankkonton.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

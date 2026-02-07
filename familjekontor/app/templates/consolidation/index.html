@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Koncernrapporter - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-diagram-3"></i> Koncerngrupper</h2>
+    <a href="{{ url_for('consolidation.new_group') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Ny koncerngrupp
+    </a>
+</div>
+
+<div class="row">
+    {% for group in groups %}
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-header">
+                <strong>{{ group.name }}</strong>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{{ group.description or '' }}</p>
+                <dl class="row mb-0">
+                    <dt class="col-6">Moderforetag</dt>
+                    <dd class="col-6">{{ group.parent_company.name }}</dd>
+                    <dt class="col-6">Medlemmar</dt>
+                    <dd class="col-6">{{ group.members|length }}</dd>
+                </dl>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('consolidation.view_group', group_id=group.id) }}" class="btn btn-sm btn-primary">
+                    Visa
+                </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col">
+        <div class="alert alert-info">Inga koncerngrupper skapade annu.</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

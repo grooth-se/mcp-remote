@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Faktura {{ invoice.invoice_number }}</title>
+    <style>
+        @page { size: A4; margin: 20mm 15mm; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 10pt; color: #333; line-height: 1.4; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .company-info { }
+        .company-name { font-size: 16pt; font-weight: bold; margin-bottom: 4px; }
+        .company-details { font-size: 8pt; color: #666; }
+        .invoice-title { font-size: 20pt; font-weight: bold; text-align: right; color: #333; }
+        .invoice-meta { text-align: right; margin-top: 8px; }
+        .invoice-meta dt { display: inline; font-weight: bold; }
+        .invoice-meta dd { display: inline; margin-left: 4px; margin-right: 12px; }
+        .customer-block { background-color: #f8f9fa; padding: 12px 16px; border-radius: 4px; margin-bottom: 20px; }
+        .customer-name { font-weight: bold; font-size: 11pt; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th { background-color: #495057; color: white; padding: 8px 10px; text-align: left; font-size: 9pt; }
+        td { padding: 6px 10px; border-bottom: 1px solid #dee2e6; }
+        .text-end { text-align: right; }
+        .totals-table { width: 300px; margin-left: auto; margin-top: 16px; }
+        .totals-table td { border-bottom: none; padding: 4px 10px; }
+        .totals-table .total-row td { font-weight: bold; font-size: 12pt; border-top: 2px solid #333; padding-top: 8px; }
+        .vat-breakdown { margin-top: 12px; font-size: 9pt; }
+        .payment-info { margin-top: 30px; padding: 12px 16px; background-color: #f8f9fa; border-radius: 4px; }
+        .payment-info h4 { font-size: 10pt; font-weight: bold; margin-bottom: 6px; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 8pt; color: #999; border-top: 1px solid #ddd; padding-top: 6px; }
+        .logo { max-height: 50px; max-width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-info">
+            {% if company.logo_path %}
+            <img src="{{ url_for('static', filename=company.logo_path, _external=True) }}" class="logo" alt="">
+            {% endif %}
+            <div class="company-name">{{ company.name }}</div>
+            <div class="company-details">
+                {{ company.street_address or '' }}<br>
+                {{ company.postal_code or '' }} {{ company.city or '' }}<br>
+                Org.nr: {{ company.org_number }}
+            </div>
+        </div>
+        <div>
+            <div class="invoice-title">FAKTURA</div>
+            <div class="invoice-meta">
+                <dl>
+                    <dt>Fakturanr:</dt><dd>{{ invoice.invoice_number }}</dd><br>
+                    <dt>Fakturadatum:</dt><dd>{{ invoice.invoice_date }}</dd><br>
+                    <dt>Forfallodatum:</dt><dd>{{ invoice.due_date }}</dd><br>
+                    <dt>Valuta:</dt><dd>{{ invoice.currency }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="customer-block">
+        <div class="customer-name">{{ customer.name }}</div>
+        {% if customer.address %}{{ customer.address }}<br>{% endif %}
+        {% if customer.postal_code or customer.city %}{{ customer.postal_code or '' }} {{ customer.city or '' }}<br>{% endif %}
+        {% if customer.org_number %}Org.nr: {{ customer.org_number }}{% endif %}
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width:5%">#</th>
+                <th style="width:40%">Beskrivning</th>
+                <th class="text-end" style="width:10%">Antal</th>
+                <th style="width:8%">Enhet</th>
+                <th class="text-end" style="width:15%">Apris</th>
+                <th class="text-end" style="width:7%">Moms</th>
+                <th class="text-end" style="width:15%">Belopp</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.line_number }}</td>
+                <td>{{ item.description }}</td>
+                <td class="text-end">{{ item.quantity }}</td>
+                <td>{{ item.unit }}</td>
+                <td class="text-end">{{ "{:,.2f}".format(item.unit_price|float) }}</td>
+                <td class="text-end">{{ item.vat_rate }}%</td>
+                <td class="text-end">{{ "{:,.2f}".format(item.amount|float) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="totals-table">
+        <tr>
+            <td>Summa exkl. moms</td>
+            <td class="text-end">{{ "{:,.2f}".format(invoice.amount_excl_vat|float) if invoice.amount_excl_vat else '0.00' }}</td>
+        </tr>
+        {% for rate, data in vat_breakdown.items() %}
+        <tr>
+            <td>Moms {{ rate }}%</td>
+            <td class="text-end">{{ "{:,.2f}".format(data.vat) }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row">
+            <td>Att betala</td>
+            <td class="text-end">{{ "{:,.2f}".format(invoice.total_amount|float) if invoice.total_amount else '0.00' }} {{ invoice.currency }}</td>
+        </tr>
+    </table>
+
+    <div class="payment-info">
+        <h4>Betalningsinformation</h4>
+        <p>
+            Forfallodatum: <strong>{{ invoice.due_date }}</strong><br>
+            {% if company.org_number %}
+            OCR/Referens: {{ invoice.invoice_number }}<br>
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="footer">
+        {{ company.name }} | Org.nr: {{ company.org_number }}
+        {% if company.street_address %} | {{ company.street_address }}, {{ company.postal_code or '' }} {{ company.city or '' }}{% endif %}
+    </div>
+</body>
+</html>

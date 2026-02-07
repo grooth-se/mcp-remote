@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Matcha transaktion - Familjekontor{% endblock %}
+{% block content %}
+<h2 class="mb-4">Manuell matchning</h2>
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="card mb-4">
+            <div class="card-header">Banktransaktion</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Datum</dt><dd class="col-7">{{ txn.transaction_date }}</dd>
+                    <dt class="col-5">Beskrivning</dt><dd class="col-7">{{ txn.description }}</dd>
+                    <dt class="col-5">Belopp</dt>
+                    <dd class="col-7 fw-bold {% if txn.amount < 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ "{:,.2f}".format(txn.amount|float) }} kr
+                    </dd>
+                    <dt class="col-5">Referens</dt><dd class="col-7">{{ txn.reference or '-' }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header">Valj verifikation att matcha med</div>
+            <div class="card-body">
+                <form method="post">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.verification_id.label(class="form-label") }}
+                        {{ form.verification_id(class="form-select") }}
+                    </div>
+                    {{ form.submit(class="btn btn-primary") }}
+                    <a href="{{ url_for('bank.reconciliation') }}" class="btn btn-outline-secondary">Avbryt</a>
+                </form>
+            </div>
+        </div>
+
+        {% if candidates %}
+        <div class="card mt-3">
+            <div class="card-header">Kandidater (sorterade efter beloppslikhet)</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr><th>#</th><th>Datum</th><th class="text-end">Belopp</th><th>Beskrivning</th><th>Match</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for c in candidates[:10] %}
+                        <tr class="{% if c.exact_match %}table-success{% endif %}">
+                            <td>{{ c.verification.verification_number }}</td>
+                            <td>{{ c.verification.verification_date }}</td>
+                            <td class="text-end">{{ "{:,.2f}".format(c.amount) }} kr</td>
+                            <td>{{ c.verification.description or '' }}</td>
+                            <td>{% if c.exact_match %}<span class="badge bg-success">Exakt</span>{% else %}{{ "{:,.2f}".format(c.diff) }} kr diff{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

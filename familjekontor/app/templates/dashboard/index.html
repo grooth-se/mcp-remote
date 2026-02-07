@@ -8,18 +8,106 @@
                 {{ active_company.name }}
                 <small class="text-muted">{{ active_company.company_type }} - {{ active_company.org_number }}</small>
             {% else %}
-                Välkommen
+                Valkommen
             {% endif %}
         </h2>
     </div>
 </div>
 
 {% if not active_company %}
-<div class="alert alert-info">
-    <p>Inget företag valt. <a href="{{ url_for('companies.new') }}">Skapa ett nytt företag</a> eller välj ett befintligt i menyn.</p>
+{# Multi-company overview #}
+{% if multi_company %}
+<div class="row mb-4">
+    {% for item in multi_company %}
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>{{ item.company.name }}</strong>
+                <span class="badge bg-secondary">{{ item.company.company_type }}</span>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-7">Verifikationer</dt><dd class="col-5">{{ item.verification_count }}</dd>
+                    <dt class="col-7">Obetalda lev.fakt.</dt><dd class="col-5">{{ item.pending_supplier }}</dd>
+                    <dt class="col-7">Utstaende kundfakt.</dt><dd class="col-5">{{ item.unpaid_customer }}</dd>
+                    <dt class="col-7">Rakenskapsar</dt>
+                    <dd class="col-5">{{ item.fiscal_year.year if item.fiscal_year else '-' }}</dd>
+                </dl>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('dashboard.switch_company', company_id=item.company.id) }}"
+                   class="btn btn-sm btn-primary">Byt till</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
 </div>
+{% else %}
+<div class="alert alert-info">
+    <p>Inget foretag valt. <a href="{{ url_for('companies.new') }}">Skapa ett nytt foretag</a> eller valj ett befintligt i menyn.</p>
+</div>
+{% endif %}
+
 {% elif summary %}
 
+{# KPI Cards #}
+{% if kpi_data %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body">
+                <h6 class="card-title">Intakter YTD</h6>
+                <h3>{{ "{:,.0f}".format(kpi_data.revenue) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-{% if kpi_data.mom_change >= 0 %}info{% else %}warning{% endif %}">
+            <div class="card-body">
+                <h6 class="card-title">Forandring MoM</h6>
+                <h3>{{ kpi_data.mom_change }}%</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-danger">
+            <div class="card-body">
+                <h6 class="card-title">Burn rate/man</h6>
+                <h3>{{ "{:,.0f}".format(kpi_data.burn_rate) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body">
+                <h6 class="card-title">Runway</h6>
+                <h3>{% if kpi_data.runway is not none %}{{ kpi_data.runway }} man{% else %}-{% endif %}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Fiscal Year Progress #}
+{% if fy_progress %}
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="text-muted">Rakenskapsar {{ summary.active_fiscal_year.year }}</small>
+                    <small class="text-muted">{{ fy_progress.days_remaining }} dagar kvar</small>
+                </div>
+                <div class="progress" style="height: 8px;">
+                    <div class="progress-bar" role="progressbar" style="width: {{ fy_progress.progress_pct }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Summary Cards (existing) #}
 <div class="row mb-4">
     <div class="col-md-3">
         <div class="card text-bg-primary">
@@ -33,7 +121,7 @@
     <div class="col-md-3">
         <div class="card text-bg-warning">
             <div class="card-body">
-                <h6 class="card-title">Obetalda leverantörsfakturor</h6>
+                <h6 class="card-title">Obetalda leverantorsfakturor</h6>
                 <h2>{{ summary.pending_supplier_invoices }}</h2>
             </div>
         </div>
@@ -41,7 +129,7 @@
     <div class="col-md-3">
         <div class="card text-bg-info">
             <div class="card-body">
-                <h6 class="card-title">Utestående kundfakturor</h6>
+                <h6 class="card-title">Utstaende kundfakturor</h6>
                 <h2>{{ summary.unpaid_customer_invoices }}</h2>
             </div>
         </div>
@@ -58,10 +146,83 @@
 
 {% if overdue_deadlines %}
 <div class="alert alert-danger mb-4">
-    <strong><i class="bi bi-exclamation-triangle"></i> {{ overdue_deadlines|length }} förfallna skattedeadlines!</strong>
+    <strong><i class="bi bi-exclamation-triangle"></i> {{ overdue_deadlines|length }} forfallna skattedeadlines!</strong>
     <a href="{{ url_for('tax.deadlines_index', status='overdue') }}" class="alert-link">Visa alla</a>
 </div>
 {% endif %}
+
+{# Charts Row #}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <canvas id="revenueExpenseChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <canvas id="cashFlowChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Invoice Aging + Salary Overview #}
+<div class="row mb-4">
+    {% if aging_data %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-clock-history"></i> Fakturaalderanalys</div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col">
+                        <div class="fs-5 fw-bold text-success">{{ "{:,.0f}".format(aging_data.current) }}</div>
+                        <small class="text-muted">Ej forfallt</small>
+                    </div>
+                    <div class="col">
+                        <div class="fs-5 fw-bold text-warning">{{ "{:,.0f}".format(aging_data['1_30']) }}</div>
+                        <small class="text-muted">1-30 dagar</small>
+                    </div>
+                    <div class="col">
+                        <div class="fs-5 fw-bold text-orange">{{ "{:,.0f}".format(aging_data['31_60']) }}</div>
+                        <small class="text-muted">31-60 dagar</small>
+                    </div>
+                    <div class="col">
+                        <div class="fs-5 fw-bold text-danger">{{ "{:,.0f}".format(aging_data['61_90']) }}</div>
+                        <small class="text-muted">61-90 dagar</small>
+                    </div>
+                    <div class="col">
+                        <div class="fs-5 fw-bold text-danger">{{ "{:,.0f}".format(aging_data['90_plus']) }}</div>
+                        <small class="text-muted">90+ dagar</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if salary_overview %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-wallet2"></i> Senaste lonekoring</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-6">Period</dt><dd class="col-6">{{ salary_overview.period }}</dd>
+                    <dt class="col-6">Status</dt>
+                    <dd class="col-6">
+                        <span class="badge bg-{% if salary_overview.status == 'paid' %}success{% elif salary_overview.status == 'approved' %}primary{% else %}secondary{% endif %}">
+                            {{ salary_overview.status }}
+                        </span>
+                    </dd>
+                    <dt class="col-6">Bruttoloner</dt><dd class="col-6">{{ "{:,.0f}".format(salary_overview.total_gross) }} kr</dd>
+                    <dt class="col-6">Anstallda</dt><dd class="col-6">{{ salary_overview.employee_count }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
 
 {% if upcoming_deadlines %}
 <div class="row mb-4">
@@ -74,7 +235,7 @@
                 <table class="table table-sm mb-0">
                     <thead>
                         <tr>
-                            <th>Förfallodatum</th>
+                            <th>Forfallodatum</th>
                             <th>Typ</th>
                             <th>Beskrivning</th>
                         </tr>
@@ -105,13 +266,13 @@
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card">
-            <div class="card-header">Snabbåtgärder</div>
+            <div class="card-header">Snabbatgarder</div>
             <div class="list-group list-group-flush">
                 <a href="{{ url_for('accounting.new_verification') }}" class="list-group-item list-group-item-action">
                     <i class="bi bi-plus-circle"></i> Ny verifikation
                 </a>
                 <a href="{{ url_for('invoices.new_supplier_invoice') }}" class="list-group-item list-group-item-action">
-                    <i class="bi bi-receipt"></i> Ny leverantörsfaktura
+                    <i class="bi bi-receipt"></i> Ny leverantorsfaktura
                 </a>
                 <a href="{{ url_for('invoices.new_customer_invoice') }}" class="list-group-item list-group-item-action">
                     <i class="bi bi-file-earmark-text"></i> Ny kundfaktura
@@ -120,7 +281,7 @@
                     <i class="bi bi-upload"></i> Importera SIE
                 </a>
                 <a href="{{ url_for('reports.profit_and_loss') }}" class="list-group-item list-group-item-action">
-                    <i class="bi bi-bar-chart"></i> Resultaträkning
+                    <i class="bi bi-bar-chart"></i> Resultatrakning
                 </a>
             </div>
         </div>
@@ -147,7 +308,7 @@
                             <td>{{ ver.verification_type }}</td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="4" class="text-muted">Inga verifikationer ännu.</td></tr>
+                        <tr><td colspan="4" class="text-muted">Inga verifikationer annu.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -155,5 +316,12 @@
         </div>
     </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if active_company and summary %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script src="{{ url_for('static', filename='js/dashboard_charts.js') }}"></script>
 {% endif %}
 {% endblock %}

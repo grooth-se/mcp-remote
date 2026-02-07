@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.file_name }} - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-file-earmark"></i> {{ doc.file_name }}</h2>
+    <div>
+        <a href="{{ url_for('documents.download', doc_id=doc.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-download"></i> Ladda ner
+        </a>
+        <a href="{{ url_for('documents.index') }}" class="btn btn-outline-secondary">Tillbaka</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">Metadata</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Typ</dt><dd class="col-7"><span class="badge bg-secondary">{{ doc.document_type or '-' }}</span></dd>
+                    <dt class="col-5">MIME</dt><dd class="col-7"><small>{{ doc.mime_type or '-' }}</small></dd>
+                    <dt class="col-5">Beskrivning</dt><dd class="col-7">{{ doc.description or '-' }}</dd>
+                    <dt class="col-5">Utgar</dt><dd class="col-7">{{ doc.expiry_date or '-' }}</dd>
+                    <dt class="col-5">Uppladdad</dt><dd class="col-7">{{ doc.created_at.strftime('%Y-%m-%d %H:%M') if doc.created_at else '-' }}</dd>
+                    <dt class="col-5">Av</dt><dd class="col-7">{{ doc.uploader.username if doc.uploader else '-' }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        {# Linked entities #}
+        <div class="card mb-3">
+            <div class="card-header">Kopplingar</div>
+            <div class="card-body">
+                {% if doc.verification_id %}
+                <p><span class="badge bg-info">Verifikation #{{ doc.verification.verification_number if doc.verification else doc.verification_id }}</span></p>
+                {% endif %}
+                {% if doc.invoice_id %}
+                <p><span class="badge bg-warning">Leverantorsfaktura #{{ doc.invoice_id }}</span></p>
+                {% endif %}
+                {% if doc.customer_invoice_id %}
+                <p><span class="badge bg-primary">Kundfaktura #{{ doc.customer_invoice_id }}</span></p>
+                {% endif %}
+
+                {% if doc.verification_id or doc.invoice_id or doc.customer_invoice_id %}
+                <form method="post" action="{{ url_for('documents.detach', doc_id=doc.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-warning">Ta bort koppling</button>
+                </form>
+                {% else %}
+                <p class="text-muted">Inga kopplingar</p>
+                {# Attach to verification #}
+                <form method="post" action="{{ url_for('documents.attach_verification', doc_id=doc.id) }}" class="mb-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="input-group input-group-sm">
+                        <input type="number" name="verification_id" class="form-control" placeholder="Verifikation ID">
+                        <button class="btn btn-outline-info" type="submit">Koppla ver.</button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Delete #}
+        <form method="post" action="{{ url_for('documents.delete', doc_id=doc.id) }}"
+              onsubmit="return confirm('Ta bort detta dokument?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Ta bort</button>
+        </form>
+    </div>
+    <div class="col-md-8">
+        {# Inline preview #}
+        <div class="card">
+            <div class="card-header">Forhandsvisning</div>
+            <div class="card-body p-0">
+                {% if doc.mime_type and 'pdf' in doc.mime_type %}
+                <iframe src="{{ url_for('documents.preview', doc_id=doc.id) }}"
+                        style="width:100%; height:600px; border:0;"></iframe>
+                {% elif doc.mime_type and 'image' in doc.mime_type %}
+                <img src="{{ url_for('documents.preview', doc_id=doc.id) }}"
+                     class="img-fluid" alt="{{ doc.file_name }}">
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-file-earmark fs-1"></i>
+                    <p>Forhandsvisning ej tillganglig for denna filtyp.</p>
+                    <a href="{{ url_for('documents.download', doc_id=doc.id) }}" class="btn btn-primary">
+                        <i class="bi bi-download"></i> Ladda ner
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

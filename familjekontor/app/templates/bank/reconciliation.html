@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Bankavstamning - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-check2-square"></i> Bankavstamning</h2>
+    <form method="post" action="{{ url_for('bank.auto_match') }}" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-success"><i class="bi bi-lightning"></i> Auto-matcha</button>
+    </form>
+</div>
+
+{# Summary #}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-2">
+                <div class="fs-4 fw-bold">{{ summary.total }}</div>
+                <small class="text-muted">Totalt</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-success">
+            <div class="card-body py-2">
+                <div class="fs-4 fw-bold text-success">{{ summary.matched }}</div>
+                <small class="text-muted">Matchade</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-warning">
+            <div class="card-body py-2">
+                <div class="fs-4 fw-bold text-warning">{{ summary.unmatched }}</div>
+                <small class="text-muted">Omatchade</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-2">
+                <div class="fs-4 fw-bold">{{ summary.ignored }}</div>
+                <small class="text-muted">Ignorerade</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Filter tabs #}
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link {% if status_filter == 'unmatched' %}active{% endif %}"
+           href="{{ url_for('bank.reconciliation', status='unmatched') }}">Omatchade</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if status_filter == 'matched' %}active{% endif %}"
+           href="{{ url_for('bank.reconciliation', status='matched') }}">Matchade</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if status_filter == 'ignored' %}active{% endif %}"
+           href="{{ url_for('bank.reconciliation', status='ignored') }}">Ignorerade</a>
+    </li>
+</ul>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Datum</th><th>Beskrivning</th><th class="text-end">Belopp</th>
+                    <th>Status</th><th>Matchad verifikation</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for txn in transactions %}
+                <tr>
+                    <td>{{ txn.transaction_date }}</td>
+                    <td>{{ txn.description }}</td>
+                    <td class="text-end {% if txn.amount < 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ "{:,.2f}".format(txn.amount|float) }} kr
+                    </td>
+                    <td>
+                        <span class="badge bg-{% if txn.status == 'matched' %}success{% elif txn.status == 'ignored' %}secondary{% else %}warning{% endif %}">
+                            {{ txn.status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if txn.matched_verification %}
+                        #{{ txn.matched_verification.verification_number }} - {{ txn.matched_verification.description or '' }}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if txn.status == 'unmatched' %}
+                        <a href="{{ url_for('bank.match_transaction', txn_id=txn.id) }}" class="btn btn-sm btn-outline-primary" title="Matcha">
+                            <i class="bi bi-link-45deg"></i>
+                        </a>
+                        <form method="post" action="{{ url_for('bank.ignore_transaction', txn_id=txn.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-outline-secondary" title="Ignorera"><i class="bi bi-eye-slash"></i></button>
+                        </form>
+                        {% elif txn.status == 'matched' %}
+                        <form method="post" action="{{ url_for('bank.unmatch_transaction', txn_id=txn.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-outline-danger" title="Ta bort matchning"><i class="bi bi-x-circle"></i></button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-muted">Inga transaktioner.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

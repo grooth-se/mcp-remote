@@ -121,3 +121,18 @@ body {
 .card-body[style*="overflow-y"] .table {
     margin-bottom: 0;
 }
+
+/* Document drag-and-drop zone */
+.drop-zone {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 40px;
+    text-align: center;
+    transition: border-color 0.2s, background-color 0.2s;
+    cursor: pointer;
+}
+
+.drop-zone.dragover {
+    border-color: #0d6efd;
+    background-color: #f0f7ff;
+}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Budget & Prognos - Familjekontor{% endblock %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-calculator"></i> Budget & Prognos</h2>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <a href="{{ url_for('budget.grid', fiscal_year_id=active_fy.id if active_fy else '') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-grid-3x3 fs-1 text-primary"></i>
+                <h5 class="mt-2">Budgeteditor</h5>
+                <p class="text-muted">Redigera budget per konto och manad</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('budget.variance', fiscal_year_id=active_fy.id if active_fy else '') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-bar-chart-line fs-1 text-warning"></i>
+                <h5 class="mt-2">Avvikelseanalys</h5>
+                <p class="text-muted">Budget vs utfall</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('budget.forecast', fiscal_year_id=active_fy.id if active_fy else '') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up fs-1 text-success"></i>
+                <h5 class="mt-2">Prognos</h5>
+                <p class="text-muted">Utfall + projektion</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('budget.copy') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-files fs-1 text-info"></i>
+                <h5 class="mt-2">Kopiera budget</h5>
+                <p class="text-muted">Fran foregaende ar</p>
+            </div>
+        </a>
+    </div>
+</div>
+
+{% if show_copy is defined and show_copy %}
+<div class="card">
+    <div class="card-header">Kopiera budget</div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('budget.copy') }}">
+            {{ copy_form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-4">
+                    {{ copy_form.source_fiscal_year_id.label(class="form-label") }}
+                    {{ copy_form.source_fiscal_year_id(class="form-select") }}
+                </div>
+                <div class="col-md-4">
+                    {{ copy_form.target_fiscal_year_id.label(class="form-label") }}
+                    {{ copy_form.target_fiscal_year_id(class="form-select") }}
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    {{ copy_form.submit(class="btn btn-primary") }}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

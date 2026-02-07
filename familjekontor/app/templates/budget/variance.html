@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Avvikelseanalys - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-bar-chart-line"></i> Avvikelseanalys {{ fy.year if fy else '' }}</h2>
+    <a href="{{ url_for('budget.variance_excel', fiscal_year_id=fy.id if fy else '') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-file-earmark-excel"></i> Exportera Excel
+    </a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Konto</th><th>Namn</th>
+                    <th class="text-end">Budget</th>
+                    <th class="text-end">Utfall</th>
+                    <th class="text-end">Avvikelse</th>
+                    <th class="text-end">%</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in variance %}
+                {% if item.budget_total != 0 or item.actual_total != 0 %}
+                <tr>
+                    <td><strong>{{ item.number }}</strong></td>
+                    <td>{{ item.name }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(item.budget_total) }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(item.actual_total) }}</td>
+                    <td class="text-end {% if item.variance_total > 0 %}text-danger{% elif item.variance_total < 0 %}text-success{% endif %}">
+                        {{ "{:,.0f}".format(item.variance_total) }}
+                    </td>
+                    <td class="text-end {% if item.variance_pct > 10 %}text-danger{% elif item.variance_pct < -10 %}text-success{% endif %}">
+                        {{ item.variance_pct }}%
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="mt-2">
+    <small class="text-muted">
+        <span class="text-danger">Rod</span> = over budget,
+        <span class="text-success">Gron</span> = under budget
+    </small>
+</div>
+{% endblock %}

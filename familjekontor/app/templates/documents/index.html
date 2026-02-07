@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Dokument - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-folder2-open"></i> Dokument</h2>
+    <a href="{{ url_for('documents.upload') }}" class="btn btn-primary"><i class="bi bi-upload"></i> Ladda upp</a>
+</div>
+
+{# Filter bar #}
+<div class="card mb-4">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-auto">
+                {{ form.doc_type(class="form-select form-select-sm", style="width:auto") }}
+            </div>
+            <div class="col-auto">
+                {{ form.search(class="form-control form-control-sm", placeholder="Sok...", style="width:200px") }}
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Filtrera</button>
+                <a href="{{ url_for('documents.index') }}" class="btn btn-sm btn-outline-secondary">Nollstall</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th></th><th>Filnamn</th><th>Typ</th><th>Beskrivning</th>
+                    <th>Kopplad till</th><th>Uppladdad</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in pagination.items %}
+                <tr>
+                    <td>
+                        {% if doc.mime_type and 'pdf' in doc.mime_type %}
+                        <i class="bi bi-file-earmark-pdf text-danger"></i>
+                        {% elif doc.mime_type and 'image' in doc.mime_type %}
+                        <i class="bi bi-file-earmark-image text-success"></i>
+                        {% elif doc.mime_type and 'spreadsheet' in doc.mime_type or doc.mime_type and 'excel' in doc.mime_type %}
+                        <i class="bi bi-file-earmark-excel text-success"></i>
+                        {% elif doc.mime_type and 'word' in doc.mime_type %}
+                        <i class="bi bi-file-earmark-word text-primary"></i>
+                        {% else %}
+                        <i class="bi bi-file-earmark text-secondary"></i>
+                        {% endif %}
+                    </td>
+                    <td><a href="{{ url_for('documents.view', doc_id=doc.id) }}">{{ doc.file_name }}</a></td>
+                    <td><span class="badge bg-secondary">{{ doc.document_type or '-' }}</span></td>
+                    <td>{{ doc.description or '-' }}</td>
+                    <td>
+                        {% if doc.verification_id %}
+                        <span class="badge bg-info">Ver #{{ doc.verification.verification_number if doc.verification else doc.verification_id }}</span>
+                        {% elif doc.invoice_id %}
+                        <span class="badge bg-warning">Lev.fakt</span>
+                        {% elif doc.customer_invoice_id %}
+                        <span class="badge bg-primary">Kundfakt</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ doc.created_at.strftime('%Y-%m-%d') if doc.created_at else '-' }}</td>
+                    <td>
+                        <a href="{{ url_for('documents.download', doc_id=doc.id) }}" class="btn btn-sm btn-outline-secondary" title="Ladda ner">
+                            <i class="bi bi-download"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-muted">Inga dokument.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Pagination #}
+{% if pagination.pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm">
+        {% for p in pagination.iter_pages() %}
+        {% if p %}
+        <li class="page-item {% if p == pagination.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('documents.index', page=p, doc_type=doc_type, search=search) }}">{{ p }}</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

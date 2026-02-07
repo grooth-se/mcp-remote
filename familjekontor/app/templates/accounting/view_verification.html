@@ -58,4 +58,19 @@
         </table>
     </div>
 </div>
+
+{# Attached documents #}
+{% if verification.documents %}
+<div class="card mt-4">
+    <div class="card-header"><i class="bi bi-paperclip"></i> Bifogade dokument</div>
+    <div class="list-group list-group-flush">
+        {% for doc in verification.documents %}
+        <a href="{{ url_for('documents.view', doc_id=doc.id) }}" class="list-group-item list-group-item-action">
+            <i class="bi bi-file-earmark"></i> {{ doc.file_name }}
+            <span class="badge bg-secondary">{{ doc.document_type or '' }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}

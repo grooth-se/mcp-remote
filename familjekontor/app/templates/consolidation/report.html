@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Koncernrapport - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-diagram-3"></i> Koncernrapport: {{ group.name }}</h2>
+    <div>
+        {% if report %}
+        <a href="{{ url_for('consolidation.report_excel', group_id=group.id,
+                    year=form.fiscal_year_year.data, type=report.report_type) }}"
+           class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-excel"></i> Exportera Excel
+        </a>
+        {% endif %}
+        <a href="{{ url_for('consolidation.view_group', group_id=group.id) }}" class="btn btn-outline-secondary">Tillbaka</a>
+    </div>
+</div>
+
+{# Report form #}
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="post" class="row g-2 align-items-end">
+            {{ form.hidden_tag() }}
+            <div class="col-auto">
+                {{ form.fiscal_year_year.label(class="form-label") }}
+                {{ form.fiscal_year_year(class="form-select") }}
+            </div>
+            <div class="col-auto">
+                {{ form.report_type.label(class="form-label") }}
+                {{ form.report_type(class="form-select") }}
+            </div>
+            <div class="col-auto">
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if report %}
+<div class="card report-card">
+    <div class="card-body">
+        {% if report.report_type == 'pnl' %}
+        <h4>Koncern Resultatrakning</h4>
+
+        <table class="table table-sm">
+            <thead>
+                <tr><th>Avsnitt</th><th class="text-end">Koncerntotal</th></tr>
+            </thead>
+            <tbody>
+                {% for section_name, section in report.sections.items() %}
+                <tr>
+                    <td>{{ section_name }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(section.total) }} kr</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="table-light">
+                    <td><strong>Rorelseresultat</strong></td>
+                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.operating_result) }} kr</strong></td>
+                </tr>
+                <tr class="table-light">
+                    <td><strong>Resultat fore skatt</strong></td>
+                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.result_before_tax) }} kr</strong></td>
+                </tr>
+                {% if report.elimination_total %}
+                <tr>
+                    <td>Koncernelimeringar</td>
+                    <td class="text-end text-danger">-{{ "{:,.0f}".format(report.elimination_total) }} kr</td>
+                </tr>
+                <tr class="table-warning">
+                    <td><strong>Justerat resultat</strong></td>
+                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.adjusted_result) }} kr</strong></td>
+                </tr>
+                {% endif %}
+            </tfoot>
+        </table>
+
+        {% else %}
+        <h4>Koncern Balansrakning</h4>
+
+        <table class="table table-sm">
+            <thead>
+                <tr><th>Avsnitt</th><th class="text-end">Koncerntotal</th></tr>
+            </thead>
+            <tbody>
+                {% for section_name, section in report.sections.items() %}
+                <tr>
+                    <td>{{ section_name }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(section.total) }} kr</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="table-light">
+                    <td><strong>Summa tillgangar</strong></td>
+                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.total_assets) }} kr</strong></td>
+                </tr>
+                <tr class="table-light">
+                    <td><strong>Summa EK + skulder</strong></td>
+                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.total_equity_liabilities) }} kr</strong></td>
+                </tr>
+            </tfoot>
+        </table>
+        {% endif %}
+
+        {# Per-company breakdown #}
+        <h5 class="mt-4">Per foretag</h5>
+        <table class="table table-sm">
+            <thead>
+                <tr><th>Foretag</th><th>Agarandel</th></tr>
+            </thead>
+            <tbody>
+                {% for m in report.members %}
+                <tr>
+                    <td>{{ m.company.name }}</td>
+                    <td>{{ m.ownership_pct }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
