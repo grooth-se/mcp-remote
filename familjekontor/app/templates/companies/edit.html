@@ -86,14 +86,19 @@
                         </div>
                         {{ form.theme_color.label(class="form-label") }}
                         <div class="d-flex align-items-center gap-2">
-                            {{ form.theme_color(class="form-control", style="max-width:120px;", id="themeColorInput", placeholder="#3B82F6") }}
+                            <input type="text" class="form-control" style="max-width:120px;"
+                                   id="themeColorInput" name="theme_color"
+                                   value="{{ form.theme_color.data or '' }}"
+                                   placeholder="#3B82F6" maxlength="7">
+                            <input type="color" id="colorPicker"
+                                   value="{{ company.theme_color or '#3B82F6' }}"
+                                   style="width:40px; height:32px; padding:0; border:1px solid #dee2e6; cursor:pointer;"
+                                   title="Välj valfri färg">
                             <span id="colorPreview" class="d-inline-block rounded border"
                                   style="width:32px; height:32px; background-color:{{ company.theme_color or '#ffffff' }};"></span>
-                            {% if company.theme_color %}
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="clearColor">Rensa</button>
-                            {% endif %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="clearColor"{% if not company.theme_color %} style="display:none;"{% endif %}>Rensa</button>
                         </div>
-                        <div class="form-text">Välj en färg ovan eller ange en hex-kod (t.ex. #3B82F6).</div>
+                        <div class="form-text">Välj en färg ovan, använd färgväljaren, eller ange en hex-kod (t.ex. #3B82F6).</div>
                     </div>
 
                     <div class="d-flex gap-2 mt-4">
@@ -109,32 +114,47 @@
 
 {% block scripts %}
 <script>
-document.querySelectorAll('.color-swatch').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const color = btn.dataset.color;
-        document.getElementById('themeColorInput').value = color;
-        document.getElementById('colorPreview').style.backgroundColor = color;
-        document.querySelectorAll('.color-swatch').forEach(b => b.style.outline = '');
-        btn.style.outline = '3px solid #000';
-        btn.style.outlineOffset = '2px';
+const input = document.getElementById('themeColorInput');
+const preview = document.getElementById('colorPreview');
+const picker = document.getElementById('colorPicker');
+const clearBtn = document.getElementById('clearColor');
+
+function setColor(color) {
+    input.value = color;
+    preview.style.backgroundColor = color;
+    picker.value = color;
+    clearBtn.style.display = '';
+    document.querySelectorAll('.color-swatch').forEach(b => {
+        if (b.dataset.color === color) {
+            b.style.outline = '3px solid #000';
+            b.style.outlineOffset = '2px';
+        } else {
+            b.style.outline = '';
+        }
     });
+}
+
+document.querySelectorAll('.color-swatch').forEach(btn => {
+    btn.addEventListener('click', () => setColor(btn.dataset.color));
 });
 
-const input = document.getElementById('themeColorInput');
+picker.addEventListener('input', () => setColor(picker.value));
+
 input.addEventListener('input', () => {
     const val = input.value;
     if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-        document.getElementById('colorPreview').style.backgroundColor = val;
+        preview.style.backgroundColor = val;
+        picker.value = val;
+        clearBtn.style.display = '';
     }
 });
 
-const clearBtn = document.getElementById('clearColor');
-if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-        input.value = '';
-        document.getElementById('colorPreview').style.backgroundColor = '#ffffff';
-        document.querySelectorAll('.color-swatch').forEach(b => b.style.outline = '');
-    });
-}
+clearBtn.addEventListener('click', () => {
+    input.value = '';
+    preview.style.backgroundColor = '#ffffff';
+    picker.value = '#3B82F6';
+    clearBtn.style.display = 'none';
+    document.querySelectorAll('.color-swatch').forEach(b => b.style.outline = '');
+});
 </script>
 {% endblock %}
