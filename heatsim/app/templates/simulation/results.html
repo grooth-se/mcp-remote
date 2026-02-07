@@ -276,13 +276,20 @@
             {% endif %}
         </div>
     </div>
-    <!-- Tempering (Simulation) - placeholder -->
+    <!-- Tempering (Simulation) -->
     <div class="card">
         <div class="card-header">
             <span class="badge bg-secondary">Tempering</span> dT/dt vs Time (Sim)
         </div>
         <div class="card-body text-center">
+            {% for result in dtdt_time_tempering %}
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="dT/dt Tempering">
+            {% endif %}
+            {% endfor %}
+            {% if not dtdt_time_tempering %}
             <p class="text-muted my-4">-</p>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -369,13 +376,20 @@
             {% endif %}
         </div>
     </div>
-    <!-- Tempering (Simulation) - placeholder -->
+    <!-- Tempering (Simulation) -->
     <div class="card">
         <div class="card-header">
             <span class="badge bg-secondary">Tempering</span> dT/dt vs Temp (Sim)
         </div>
         <div class="card-body text-center">
+            {% for result in dtdt_temp_tempering %}
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="dT/dt vs T Tempering">
+            {% endif %}
+            {% endfor %}
+            {% if not dtdt_temp_tempering %}
             <p class="text-muted my-4">-</p>
+            {% endif %}
         </div>
     </div>
 </div>

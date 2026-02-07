@@ -337,8 +337,10 @@ def view(id):
     # dT/dt plots grouped by phase
     dtdt_time_heating = [r for r in results if r.result_type == 'dTdt_vs_time' and r.phase == 'heating']
     dtdt_time_quenching = [r for r in results if r.result_type == 'dTdt_vs_time' and r.phase == 'quenching']
+    dtdt_time_tempering = [r for r in results if r.result_type == 'dTdt_vs_time' and r.phase == 'tempering']
     dtdt_temp_heating = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'heating']
     dtdt_temp_quenching = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'quenching']
+    dtdt_temp_tempering = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'tempering']
 
     # Get measured TC data for comparison, grouped by process step
     measured_data = sim.measured_data.all()
@@ -359,8 +361,10 @@ def view(id):
         tempering_curves=tempering_curves,
         dtdt_time_heating=dtdt_time_heating,
         dtdt_time_quenching=dtdt_time_quenching,
+        dtdt_time_tempering=dtdt_time_tempering,
         dtdt_temp_heating=dtdt_temp_heating,
         dtdt_temp_quenching=dtdt_temp_quenching,
+        dtdt_temp_tempering=dtdt_temp_tempering,
         measured_data=measured_data,
         measured_heating=measured_heating,
         measured_quenching=measured_quenching,
@@ -544,7 +548,7 @@ def run(id):
         # Generate dT/dt plots for heating and quenching phases
         if result.phase_results:
             for phase_result in result.phase_results:
-                if phase_result.phase_name not in ('heating', 'quenching'):
+                if phase_result.phase_name not in ('heating', 'quenching', 'tempering'):
                     continue
                 if not phase_result.time.size or len(phase_result.time) < 3:
                     continue
