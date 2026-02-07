@@ -43,7 +43,8 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Radius (mm)</label>
-                            <input type="number" name="radius" class="form-control" step="0.1" min="1" max="1000" value="{{ geometry_form.radius.data or 50 }}">
+                            <input type="number" name="radius" class="form-control" step="0.1" min="1" max="1500" value="{{ geometry_form.radius.data or 50 }}">
+                            <div class="form-text">Supports up to 1200mm diameter</div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Length (mm)</label>
@@ -68,7 +69,7 @@
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Thickness (mm)</label>
-                            <input type="number" name="thickness" class="form-control" step="0.1" min="1" max="1000" value="{{ geometry_form.thickness.data or 20 }}">
+                            <input type="number" name="thickness" class="form-control" step="0.1" min="1" max="1500" value="{{ geometry_form.thickness.data or 20 }}">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Width (mm)</label>
@@ -93,11 +94,11 @@
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Inner Radius (mm)</label>
-                            <input type="number" name="inner_radius" class="form-control" step="0.1" min="1" max="1000" value="{{ geometry_form.inner_radius.data or 20 }}">
+                            <input type="number" name="inner_radius" class="form-control" step="0.1" min="1" max="1500" value="{{ geometry_form.inner_radius.data or 20 }}">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Outer Radius (mm)</label>
-                            <input type="number" name="outer_radius" class="form-control" step="0.1" min="1" max="1000" value="{{ geometry_form.outer_radius.data or 50 }}">
+                            <input type="number" name="outer_radius" class="form-control" step="0.1" min="1" max="1500" value="{{ geometry_form.outer_radius.data or 50 }}">
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Length (mm)</label>
@@ -135,15 +136,25 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Time Step (s)</label>
-                        <input type="number" name="dt" class="form-control" step="0.01" min="0.001" max="10" value="{{ solver_form.dt.data or 0.1 }}">
-                        <div class="form-text">Smaller = more accurate but slower</div>
+                        <label class="form-label">Maximum Time (s)</label>
+                        <input type="number" name="max_time" class="form-control" step="60" min="10" max="180000" value="{{ solver_form.max_time.data or 1800 }}" id="max-time-input">
+                        <div class="form-text">Total simulation time limit (up to 50 hours for large parts)</div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Maximum Time (s)</label>
-                        <input type="number" name="max_time" class="form-control" step="10" min="10" max="36000" value="{{ solver_form.max_time.data or 1800 }}">
-                        <div class="form-text">Total simulation time limit (30 min default)</div>
+                        <div class="form-check">
+                            <input type="checkbox" name="auto_dt" class="form-check-input" id="auto-dt-checkbox" {% if solver_form.auto_dt.data %}checked{% endif %}>
+                            <label class="form-check-label" for="auto-dt-checkbox">
+                                Auto-calculate time step (~20,000 steps)
+                            </label>
+                        </div>
+                        <div class="form-text">Automatically sets dt = max_time / 20,000</div>
+                    </div>
+
+                    <div class="mb-3" id="dt-input-group">
+                        <label class="form-label">Time Step (s)</label>
+                        <input type="number" name="dt" class="form-control" step="0.1" min="0.001" max="60" value="{{ solver_form.dt.data or 0.1 }}" id="dt-input">
+                        <div class="form-text">Calculated: <span id="calculated-dt">-</span> s | Estimated steps: <span id="estimated-steps">-</span></div>
                     </div>
 
                     <div class="alert alert-info mt-3 mb-0">
@@ -152,6 +163,41 @@
                         <small>Uses implicit finite differences for stability with temperature-dependent properties.</small>
                     </div>
                 </div>
+                <script>
+                function updateDtCalculation() {
+                    const maxTime = parseFloat(document.getElementById('max-time-input').value) || 1800;
+                    const autoDt = document.getElementById('auto-dt-checkbox').checked;
+                    const dtInput = document.getElementById('dt-input');
+                    const dtInputGroup = document.getElementById('dt-input-group');
+
+                    const calculatedDt = Math.max(0.1, maxTime / 20000);
+                    document.getElementById('calculated-dt').textContent = calculatedDt.toFixed(2);
+
+                    if (autoDt) {
+                        dtInput.value = calculatedDt.toFixed(2);
+                        dtInput.disabled = true;
+                        dtInputGroup.style.opacity = '0.6';
+                    } else {
+                        dtInput.disabled = false;
+                        dtInputGroup.style.opacity = '1';
+                    }
+
+                    const dt = parseFloat(dtInput.value) || 0.1;
+                    const steps = Math.ceil(maxTime / dt);
+                    document.getElementById('estimated-steps').textContent = steps.toLocaleString();
+                }
+
+                document.getElementById('max-time-input').addEventListener('input', updateDtCalculation);
+                document.getElementById('auto-dt-checkbox').addEventListener('change', updateDtCalculation);
+                document.getElementById('dt-input').addEventListener('input', function() {
+                    const maxTime = parseFloat(document.getElementById('max-time-input').value) || 1800;
+                    const dt = parseFloat(this.value) || 0.1;
+                    const steps = Math.ceil(maxTime / dt);
+                    document.getElementById('estimated-steps').textContent = steps.toLocaleString();
+                });
+
+                updateDtCalculation();
+                </script>
             </div>
         </div>
     </div>

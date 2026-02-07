@@ -112,6 +112,7 @@ def setup(id):
         solver_form.n_nodes.data = solver.get('n_nodes', 51)
         solver_form.dt.data = solver.get('dt', 0.1)
         solver_form.max_time.data = solver.get('max_time', 1800)
+        solver_form.auto_dt.data = solver.get('auto_dt', True)
 
     if request.method == 'POST':
         # Update geometry (convert mm to m)
@@ -137,10 +138,20 @@ def setup(id):
         sim.set_geometry(geom_config)
 
         # Update solver config
+        max_time = float(request.form.get('max_time', 1800))
+        auto_dt = 'auto_dt' in request.form
+
+        # Calculate dt if auto mode is enabled (limit to ~20,000 time steps)
+        if auto_dt:
+            dt = max(0.1, max_time / 20000)
+        else:
+            dt = float(request.form.get('dt', 0.1))
+
         solver_config = {
             'n_nodes': int(request.form.get('n_nodes', 51)),
-            'dt': float(request.form.get('dt', 0.1)),
-            'max_time': float(request.form.get('max_time', 1800))
+            'dt': dt,
+            'max_time': max_time,
+            'auto_dt': auto_dt
         }
         sim.set_solver_config(solver_config)
 

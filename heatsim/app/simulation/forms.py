@@ -41,16 +41,16 @@ class SimulationForm(FlaskForm):
 
 class GeometryForm(FlaskForm):
     """Form for geometry configuration."""
-    # Cylinder
+    # Cylinder - supports up to 1200mm diameter (600mm radius)
     radius = FloatField(
         'Radius (mm)',
-        validators=[Optional(), NumberRange(min=1, max=1000)],
+        validators=[Optional(), NumberRange(min=1, max=1500)],
         default=50
     )
     # Plate
     thickness = FloatField(
         'Thickness (mm)',
-        validators=[Optional(), NumberRange(min=1, max=1000)],
+        validators=[Optional(), NumberRange(min=1, max=1500)],
         default=20
     )
     # Common
@@ -64,15 +64,15 @@ class GeometryForm(FlaskForm):
         validators=[Optional(), NumberRange(min=1, max=5000)],
         default=100
     )
-    # Ring
+    # Ring - supports large rings up to 1200mm outer diameter
     inner_radius = FloatField(
         'Inner Radius (mm)',
-        validators=[Optional(), NumberRange(min=1, max=1000)],
+        validators=[Optional(), NumberRange(min=1, max=1500)],
         default=20
     )
     outer_radius = FloatField(
         'Outer Radius (mm)',
-        validators=[Optional(), NumberRange(min=1, max=1000)],
+        validators=[Optional(), NumberRange(min=1, max=1500)],
         default=50
     )
 
@@ -332,14 +332,19 @@ class SolverForm(FlaskForm):
     )
     dt = FloatField(
         'Time Step (s)',
-        validators=[DataRequired(), NumberRange(min=0.001, max=10)],
+        validators=[Optional(), NumberRange(min=0.001, max=60)],
         default=0.1
+    )
+    auto_dt = BooleanField(
+        'Auto-calculate time step',
+        default=True,
+        description='Calculate dt to limit simulation to ~20,000 time steps'
     )
     max_time = FloatField(
         'Maximum Simulation Time (s)',
-        validators=[DataRequired(), NumberRange(min=10, max=36000)],
+        validators=[DataRequired(), NumberRange(min=10, max=180000)],
         default=1800,
-        render_kw={'placeholder': 'Total simulation time limit'}
+        render_kw={'placeholder': 'Total simulation time limit (up to 50 hours)'}
     )
     submit = SubmitField('Save Configuration')
 
