@@ -32,9 +32,11 @@ class MeasuredData(db.Model):
     channel_labels = db.Column(db.Text)
 
     # Data storage (JSON arrays)
-    # times: seconds from start
+    # times: seconds from start (reference channel, for backwards compatibility)
+    # channel_times: {TC1: [times], TC2: [times], ...} - per-channel times
     # channels: {TC1: [temps], TC2: [temps], ...}
     times_json = db.Column(db.Text)
+    channel_times_json = db.Column(db.Text)
     channels_json = db.Column(db.Text)
 
     # Statistics per channel (JSON: {TC1: {min, max, avg}, ...})
@@ -81,6 +83,30 @@ class MeasuredData(db.Model):
     def channels(self, channels: Dict[str, List[float]]):
         """Set channel data from dict."""
         self.channels_json = json.dumps(channels)
+
+    @property
+    def channel_times(self) -> Dict[str, List[float]]:
+        """Get per-channel times as dict."""
+        if self.channel_times_json:
+            return json.loads(self.channel_times_json)
+        # Fallback to unified times for all channels
+        if self.times_json:
+            unified_times = json.loads(self.times_json)
+            return {ch: unified_times for ch in self.channels.keys()}
+        return {}
+
+    @channel_times.setter
+    def channel_times(self, channel_times: Dict[str, List[float]]):
+        """Set per-channel times from dict."""
+        self.channel_times_json = json.dumps(channel_times)
+
+    def get_channel_times(self, channel: str) -> List[float]:
+        """Get times array for a specific channel."""
+        ct = self.channel_times
+        if channel in ct:
+            return ct[channel]
+        # Fallback to unified times
+        return self.times
 
     @property
     def statistics(self) -> Dict[str, Dict[str, float]]:

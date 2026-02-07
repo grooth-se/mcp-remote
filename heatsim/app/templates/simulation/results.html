@@ -111,16 +111,13 @@
 {% if results %}
 <h4><i class="bi bi-graph-up"></i> Results</h4>
 
-<!-- Full Cycle Plot -->
+<!-- Full Cycle Plot (Simulation) -->
 {% if cooling_curves %}
 <div class="plot-full-width">
     {% for result in cooling_curves %}
     <div class="card">
         <div class="card-header">
-            <i class="bi bi-graph-up-arrow"></i> {{ result.result_label }}
-            {% if measured_data %}
-            <span class="badge bg-success">+ Measured Data</span>
-            {% endif %}
+            <i class="bi bi-graph-up-arrow"></i> {{ result.result_label }} (Simulation)
             {% if result.phase and result.phase != 'full' %}
             <span class="badge bg-secondary">{{ result.phase|title }}</span>
             {% endif %}
@@ -129,24 +126,54 @@
             {% endif %}
         </div>
         <div class="card-body text-center">
-            {% if measured_data %}
-            <!-- Show overlay plot with measured data -->
-            <img src="{{ url_for('simulation.cycle_plot_with_tc', id=sim.id) }}" class="img-fluid" alt="Simulation vs Measured">
-            <div class="mt-2">
-                <small class="text-muted">Dashed: Simulation | Solid: Measured TC</small>
-                {% for data in measured_data %}
-                <span class="badge bg-secondary ms-2">{{ data.name }}</span>
-                {% endfor %}
-                <a href="{{ url_for('simulation.upload_tc_data', id=sim.id) }}" class="btn btn-sm btn-outline-primary ms-2">
-                    <i class="bi bi-gear"></i> Manage
-                </a>
-            </div>
-            {% elif result.has_plot %}
+            {% if result.has_plot %}
             <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
             {% endif %}
         </div>
     </div>
     {% endfor %}
+</div>
+{% endif %}
+
+<!-- Measured TC Data -->
+{% if measured_data %}
+<h4 class="mt-4"><i class="bi bi-thermometer-half"></i> Measured TC Data</h4>
+<div class="plot-full-width">
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-graph-up-arrow"></i> Temperature vs Time (Measured)
+            {% for data in measured_data %}
+            <span class="badge bg-secondary ms-1">{{ data.name }}</span>
+            {% endfor %}
+            <a href="{{ url_for('simulation.upload_tc_data', id=sim.id) }}" class="btn btn-sm btn-outline-primary float-end">
+                <i class="bi bi-gear"></i> Manage
+            </a>
+        </div>
+        <div class="card-body text-center">
+            <img src="{{ url_for('simulation.measured_tc_plot', id=sim.id) }}" class="img-fluid" alt="Measured TC Data">
+        </div>
+    </div>
+</div>
+
+<!-- Measured dT/dt Plots -->
+<h5><i class="bi bi-activity"></i> Measured Rates</h5>
+<div class="plot-grid">
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-activity"></i> dT/dt vs Time (Measured)
+        </div>
+        <div class="card-body text-center">
+            <img src="{{ url_for('simulation.measured_dtdt_plot', id=sim.id) }}" class="img-fluid" alt="Measured dT/dt vs Time">
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-graph-down"></i> dT/dt vs Temperature (Measured)
+        </div>
+        <div class="card-body text-center">
+            <img src="{{ url_for('simulation.measured_dtdt_temp_plot', id=sim.id) }}" class="img-fluid" alt="Measured dT/dt vs Temp">
+        </div>
+    </div>
 </div>
 {% endif %}
 

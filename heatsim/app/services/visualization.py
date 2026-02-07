@@ -679,3 +679,148 @@ def create_multi_comparison_plot(
     plt.close(fig)
 
     return buf.getvalue()
+
+
+def create_measured_tc_plot(
+    measured_data: List[dict],
+    title: str = "Measured Temperature vs Time"
+) -> bytes:
+    """Generate Temperature vs Time plot for measured TC data only.
+
+    Parameters
+    ----------
+    measured_data : list
+        List of dicts with keys: name, times, temps
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    # Plot measured data
+    for i, data in enumerate(measured_data):
+        color = TC_COLORS[i % len(TC_COLORS)]
+        times = np.array(data['times'])
+        temps = np.array(data['temps'])
+        name = data.get('name', f'TC{i+1}')
+
+        ax.plot(times, temps, color=color, linewidth=1.5, label=name, alpha=0.9)
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Temperature (°C)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='best', fontsize=9, ncol=2)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
+
+
+def create_measured_dtdt_plot(
+    measured_data: List[dict],
+    title: str = "Measured dT/dt vs Time"
+) -> bytes:
+    """Generate dT/dt vs Time plot for measured TC data.
+
+    Parameters
+    ----------
+    measured_data : list
+        List of dicts with keys: name, times, temps
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    # Plot dT/dt for each channel
+    for i, data in enumerate(measured_data):
+        color = TC_COLORS[i % len(TC_COLORS)]
+        times = np.array(data['times'])
+        temps = np.array(data['temps'])
+        name = data.get('name', f'TC{i+1}')
+
+        # Calculate dT/dt
+        dt = np.diff(times)
+        dt[dt == 0] = 1e-6  # Avoid division by zero
+        dTdt = np.diff(temps) / dt
+        time_mid = 0.5 * (times[:-1] + times[1:])
+
+        ax.plot(time_mid, dTdt, color=color, linewidth=1.5, label=name, alpha=0.9)
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('dT/dt (°C/s)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='best', fontsize=9, ncol=2)
+    ax.grid(True, alpha=0.3)
+    ax.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
+
+
+def create_measured_dtdt_vs_temp_plot(
+    measured_data: List[dict],
+    title: str = "Measured dT/dt vs Temperature"
+) -> bytes:
+    """Generate dT/dt vs Temperature plot for measured TC data.
+
+    Parameters
+    ----------
+    measured_data : list
+        List of dicts with keys: name, times, temps
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    # Plot dT/dt vs T for each channel
+    for i, data in enumerate(measured_data):
+        color = TC_COLORS[i % len(TC_COLORS)]
+        times = np.array(data['times'])
+        temps = np.array(data['temps'])
+        name = data.get('name', f'TC{i+1}')
+
+        # Calculate dT/dt
+        dt = np.diff(times)
+        dt[dt == 0] = 1e-6  # Avoid division by zero
+        dTdt = np.diff(temps) / dt
+        temp_mid = 0.5 * (temps[:-1] + temps[1:])
+
+        ax.plot(temp_mid, dTdt, color=color, linewidth=1.5, label=name, alpha=0.9)
+
+    ax.set_xlabel('Temperature (°C)', fontsize=12)
+    ax.set_ylabel('dT/dt (°C/s)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='best', fontsize=9, ncol=2)
+    ax.grid(True, alpha=0.3)
+    ax.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()

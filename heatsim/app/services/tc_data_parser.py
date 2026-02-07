@@ -80,18 +80,14 @@ def parse_tc_csv(file_content: str) -> Dict:
     end_time = max(all_times)
     duration_seconds = (end_time - start_time).total_seconds()
 
-    # Build unified time array (use first channel as reference)
-    # and interpolate other channels to match
-    reference_channel = list(channel_data.keys())[0]
-    reference_data = channel_data[reference_channel]
-
-    times = [(d[0] - start_time).total_seconds() for d in reference_data]
-
-    # Extract temperature arrays per channel
+    # Extract temperature arrays and times per channel
     channels: Dict[str, List[float]] = {}
+    channel_times: Dict[str, List[float]] = {}
     statistics: Dict[str, Dict[str, float]] = {}
 
     for sensor, data in channel_data.items():
+        # Each channel gets its own times array (seconds from global start)
+        channel_times[sensor] = [(d[0] - start_time).total_seconds() for d in data]
         temps = [d[1] for d in data]
         channels[sensor] = temps
 
@@ -103,12 +99,17 @@ def parse_tc_csv(file_content: str) -> Dict:
             'count': len(temps)
         }
 
+    # For backwards compatibility, also provide unified times from first channel
+    reference_channel = list(channel_data.keys())[0]
+    times = channel_times[reference_channel]
+
     return {
         'start_time': start_time,
         'end_time': end_time,
         'duration_seconds': duration_seconds,
         'times': times,
         'channels': channels,
+        'channel_times': channel_times,  # Per-channel times
         'statistics': statistics
     }
 

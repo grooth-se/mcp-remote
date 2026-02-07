@@ -691,6 +691,7 @@ def upload_tc_data(id):
             )
             measured.times = data['times']
             measured.channels = data['channels']
+            measured.channel_times = data.get('channel_times', {})
             measured.statistics = data['statistics']
 
             # Initialize channel labels
@@ -868,6 +869,99 @@ def cycle_plot_with_tc(id):
         times, sim_temps,
         measured_data,
         title=f'Temperature vs Time - {sim.name}'
+    )
+
+    return Response(plot_data, mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/measured-tc-plot')
+@login_required
+def measured_tc_plot(id):
+    """Generate Temperature vs Time plot for measured TC data only."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    measured_list = sim.measured_data.all()
+    if not measured_list:
+        return Response('No measured data', status=404)
+
+    # Prepare measured data with per-channel times
+    measured_data = []
+    for m in measured_list:
+        for channel in m.available_channels:
+            measured_data.append({
+                'name': m.get_channel_label(channel),
+                'times': m.get_channel_times(channel),
+                'temps': m.channels[channel]
+            })
+
+    # Create plot for measured data only
+    plot_data = visualization.create_measured_tc_plot(
+        measured_data,
+        title=f'Measured Temperature vs Time - {sim.name}'
+    )
+
+    return Response(plot_data, mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/measured-dtdt-plot')
+@login_required
+def measured_dtdt_plot(id):
+    """Generate dT/dt vs Time plot for measured TC data."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    measured_list = sim.measured_data.all()
+    if not measured_list:
+        return Response('No measured data', status=404)
+
+    # Prepare measured data with per-channel times
+    measured_data = []
+    for m in measured_list:
+        for channel in m.available_channels:
+            measured_data.append({
+                'name': m.get_channel_label(channel),
+                'times': m.get_channel_times(channel),
+                'temps': m.channels[channel]
+            })
+
+    # Create dT/dt plot for measured data
+    plot_data = visualization.create_measured_dtdt_plot(
+        measured_data,
+        title=f'Measured dT/dt vs Time - {sim.name}'
+    )
+
+    return Response(plot_data, mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/measured-dtdt-temp-plot')
+@login_required
+def measured_dtdt_temp_plot(id):
+    """Generate dT/dt vs Temperature plot for measured TC data."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    measured_list = sim.measured_data.all()
+    if not measured_list:
+        return Response('No measured data', status=404)
+
+    # Prepare measured data with per-channel times
+    measured_data = []
+    for m in measured_list:
+        for channel in m.available_channels:
+            measured_data.append({
+                'name': m.get_channel_label(channel),
+                'times': m.get_channel_times(channel),
+                'temps': m.channels[channel]
+            })
+
+    # Create dT/dt vs Temperature plot for measured data
+    plot_data = visualization.create_measured_dtdt_vs_temp_plot(
+        measured_data,
+        title=f'Measured dT/dt vs Temperature - {sim.name}'
     )
 
     return Response(plot_data, mimetype='image/png')
