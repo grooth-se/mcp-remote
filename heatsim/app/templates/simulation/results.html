@@ -3,32 +3,29 @@
 {% block title %}{{ sim.name }}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-3">
+<nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
         <li class="breadcrumb-item active">{{ sim.name }}</li>
     </ol>
 </nav>
 
-<div class="row mb-3">
-    <div class="col">
-        <h2>
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+        <h2 class="mb-0">
             {{ sim.name }}
             <span class="badge {{ sim.status_badge_class }}">{{ sim.status }}</span>
         </h2>
         {% if sim.description %}
-        <p class="text-muted">{{ sim.description }}</p>
+        <small class="text-muted">{{ sim.description }}</small>
         {% endif %}
     </div>
-    <div class="col-auto">
+    <div>
         <a href="{{ url_for('simulation.setup', id=sim.id) }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-box"></i> Geometry
         </a>
         <a href="{{ url_for('simulation.heat_treatment', id=sim.id) }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-thermometer"></i> Heat Treatment
-        </a>
-        <a href="{{ url_for('simulation.edit', id=sim.id) }}" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-pencil"></i> Edit
         </a>
         {% if sim.status in ['ready', 'completed', 'failed'] %}
         <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline">
@@ -48,250 +45,221 @@
 </div>
 
 {% if sim.error_message %}
-<div class="alert alert-danger">
+<div class="alert alert-danger py-1">
     <strong>Error:</strong> {{ sim.error_message }}
 </div>
 {% endif %}
 
-<!-- Simulation Info -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <h6 class="text-muted mb-1">Steel Grade</h6>
-                <p class="mb-0 fw-bold">{{ sim.steel_grade.designation }}</p>
-                <small class="text-muted">{{ sim.steel_grade.data_source }}</small>
-            </div>
+<!-- Simulation Info - Compact Row -->
+<div class="sim-info-row">
+    <div class="card">
+        <div class="card-body">
+            <h6 class="text-muted">Steel Grade</h6>
+            <p class="fw-bold">{{ sim.steel_grade.designation }}</p>
+            <small class="text-muted">{{ sim.steel_grade.data_source }}</small>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <h6 class="text-muted mb-1">Geometry</h6>
-                <p class="mb-0 fw-bold">{{ sim.geometry_label }}</p>
-                {% set geom = sim.geometry_dict %}
-                <small class="text-muted">
-                    {% if sim.geometry_type == 'cylinder' %}
-                    R={{ (geom.radius * 1000)|round(1) }}mm
-                    {% elif sim.geometry_type == 'plate' %}
-                    t={{ (geom.thickness * 1000)|round(1) }}mm
-                    {% else %}
-                    Ri={{ (geom.inner_radius * 1000)|round(1) }}, Ro={{ (geom.outer_radius * 1000)|round(1) }}mm
-                    {% endif %}
-                </small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <h6 class="text-muted mb-1">Heat Treatment</h6>
-                {% set phase_summary = sim.get_phases_summary() %}
-                {% if phase_summary %}
-                    {% for p in phase_summary[:2] %}
-                    <small class="d-block">{{ p }}</small>
-                    {% endfor %}
-                    {% if phase_summary|length > 2 %}
-                    <small class="text-muted">+{{ phase_summary|length - 2 }} more...</small>
-                    {% endif %}
+    <div class="card">
+        <div class="card-body">
+            <h6 class="text-muted">Geometry</h6>
+            <p class="fw-bold">{{ sim.geometry_label }}</p>
+            {% set geom = sim.geometry_dict %}
+            <small class="text-muted">
+                {% if sim.geometry_type == 'cylinder' %}
+                R={{ (geom.radius * 1000)|round(1) }}mm
+                {% elif sim.geometry_type == 'plate' %}
+                t={{ (geom.thickness * 1000)|round(1) }}mm
                 {% else %}
-                <p class="mb-0 text-muted">Not configured</p>
+                Ri={{ (geom.inner_radius * 1000)|round(1) }}, Ro={{ (geom.outer_radius * 1000)|round(1) }}mm
                 {% endif %}
-            </div>
+            </small>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <h6 class="text-muted mb-1">Duration</h6>
-                {% if sim.duration_seconds %}
-                <p class="mb-0 fw-bold">{{ sim.duration_seconds|round(1) }} s</p>
-                <small class="text-muted">Completed {{ sim.completed_at.strftime('%Y-%m-%d %H:%M') }}</small>
-                {% else %}
-                <p class="mb-0 text-muted">Not run yet</p>
+    <div class="card">
+        <div class="card-body">
+            <h6 class="text-muted">Heat Treatment</h6>
+            {% set phase_summary = sim.get_phases_summary() %}
+            {% if phase_summary %}
+                {% for p in phase_summary[:2] %}
+                <small class="d-block">{{ p }}</small>
+                {% endfor %}
+                {% if phase_summary|length > 2 %}
+                <small class="text-muted">+{{ phase_summary|length - 2 }} more...</small>
                 {% endif %}
-            </div>
+            {% else %}
+            <p class="text-muted mb-0">Not configured</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <h6 class="text-muted">Duration</h6>
+            {% if sim.duration_seconds %}
+            <p class="fw-bold">{{ sim.duration_seconds|round(1) }} s</p>
+            <small class="text-muted">{{ sim.completed_at.strftime('%Y-%m-%d %H:%M') }}</small>
+            {% else %}
+            <p class="text-muted mb-0">Not run yet</p>
+            {% endif %}
         </div>
     </div>
 </div>
 
 <!-- Results -->
 {% if results %}
-<h4 class="mb-3"><i class="bi bi-graph-up"></i> Results</h4>
+<h4><i class="bi bi-graph-up"></i> Results</h4>
 
-<!-- Full Cycle Plot (if available) -->
+<!-- Full Cycle Plot -->
 {% if cooling_curves %}
-<div class="row mb-4">
+<div class="plot-full-width">
     {% for result in cooling_curves %}
-    <div class="col-12 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-graph-up-arrow"></i>
-                {{ result.result_label }}
-                {% if result.phase and result.phase != 'full' %}
-                <span class="badge bg-secondary">{{ result.phase|title }}</span>
-                {% endif %}
-            </div>
-            <div class="card-body text-center">
-                {% if result.has_plot %}
-                <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}" style="max-height: 400px;">
-                {% endif %}
-
-                {% if result.t_800_500 %}
-                <div class="mt-3">
-                    <span class="badge bg-info fs-6">t₈/₅ = {{ result.t_800_500|round(2) }} s</span>
-                    <small class="text-muted ms-2">(cooling time from 800°C to 500°C)</small>
-                </div>
-                {% endif %}
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-graph-up-arrow"></i> {{ result.result_label }}
+            {% if result.phase and result.phase != 'full' %}
+            <span class="badge bg-secondary">{{ result.phase|title }}</span>
+            {% endif %}
+            {% if result.t_800_500 %}
+            <span class="badge bg-info float-end">t₈/₅ = {{ result.t_800_500|round(2) }} s</span>
+            {% endif %}
+        </div>
+        <div class="card-body text-center">
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
+            {% endif %}
         </div>
     </div>
     {% endfor %}
 </div>
 {% endif %}
 
-<!-- dT/dt vs Time Plots -->
+<!-- dT/dt vs Time Plots - 3 columns -->
 {% if dtdt_time_heating or dtdt_time_quenching %}
-<h5 class="mb-3 mt-4"><i class="bi bi-activity"></i> Cooling/Heating Rates vs Time</h5>
-<div class="row mb-4">
+<h5><i class="bi bi-activity"></i> Rates vs Time</h5>
+<div class="plot-grid">
     {% for result in dtdt_time_heating %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-thermometer-high"></i> {{ result.result_label }}
-                <span class="badge bg-warning text-dark">Heating</span>
-            </div>
-            <div class="card-body text-center">
-                {% if result.has_plot %}
-                <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
-                {% endif %}
-            </div>
+    <div class="card">
+        <div class="card-header">
+            {{ result.result_label }}
+            <span class="badge bg-warning text-dark">Heating</span>
+        </div>
+        <div class="card-body text-center">
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" alt="{{ result.result_label }}">
+            {% endif %}
         </div>
     </div>
     {% endfor %}
-
     {% for result in dtdt_time_quenching %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-thermometer-low"></i> {{ result.result_label }}
-                <span class="badge bg-info">Quenching</span>
-            </div>
-            <div class="card-body text-center">
-                {% if result.has_plot %}
-                <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
-                {% endif %}
-            </div>
+    <div class="card">
+        <div class="card-header">
+            {{ result.result_label }}
+            <span class="badge bg-info">Quenching</span>
+        </div>
+        <div class="card-body text-center">
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" alt="{{ result.result_label }}">
+            {% endif %}
         </div>
     </div>
     {% endfor %}
 </div>
 {% endif %}
 
-<!-- dT/dt vs Temperature Plots -->
+<!-- dT/dt vs Temperature Plots - 3 columns -->
 {% if dtdt_temp_heating or dtdt_temp_quenching %}
-<h5 class="mb-3 mt-4"><i class="bi bi-graph-down"></i> Cooling/Heating Rates vs Temperature</h5>
-<div class="row mb-4">
+<h5><i class="bi bi-graph-down"></i> Rates vs Temperature</h5>
+<div class="plot-grid">
     {% for result in dtdt_temp_heating %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-thermometer-high"></i> {{ result.result_label }}
-                <span class="badge bg-warning text-dark">Heating</span>
-            </div>
-            <div class="card-body text-center">
-                {% if result.has_plot %}
-                <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
-                {% endif %}
-            </div>
+    <div class="card">
+        <div class="card-header">
+            {{ result.result_label }}
+            <span class="badge bg-warning text-dark">Heating</span>
+        </div>
+        <div class="card-body text-center">
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" alt="{{ result.result_label }}">
+            {% endif %}
         </div>
     </div>
     {% endfor %}
-
     {% for result in dtdt_temp_quenching %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-thermometer-low"></i> {{ result.result_label }}
-                <span class="badge bg-info">Quenching</span>
-            </div>
-            <div class="card-body text-center">
-                {% if result.has_plot %}
-                <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
-                {% endif %}
-            </div>
+    <div class="card">
+        <div class="card-header">
+            {{ result.result_label }}
+            <span class="badge bg-info">Quenching</span>
+        </div>
+        <div class="card-body text-center">
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" alt="{{ result.result_label }}">
+            {% endif %}
         </div>
     </div>
     {% endfor %}
 </div>
 {% endif %}
 
-<!-- Other Results -->
-<div class="row">
+<!-- Other Results - 3 columns -->
+{% if profiles or rates or phases %}
+<h5><i class="bi bi-bar-chart"></i> Additional Results</h5>
+<div class="plot-grid">
     {% for result in profiles %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-rulers"></i> {{ result.result_label }}
-            </div>
-            <div class="card-body text-center">
-                {% if result.has_plot %}
-                <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
-                {% endif %}
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-rulers"></i> {{ result.result_label }}
+        </div>
+        <div class="card-body text-center">
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" alt="{{ result.result_label }}">
+            {% endif %}
         </div>
     </div>
     {% endfor %}
 
     {% for result in rates %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-speedometer2"></i> {{ result.result_label }}
-            </div>
-            <div class="card-body text-center">
-                {% if result.has_plot %}
-                <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
-                {% endif %}
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-speedometer2"></i> {{ result.result_label }}
+        </div>
+        <div class="card-body text-center">
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" alt="{{ result.result_label }}">
+            {% endif %}
         </div>
     </div>
     {% endfor %}
 
     {% for result in phases %}
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-pie-chart"></i> {{ result.result_label }}
-            </div>
-            <div class="card-body text-center">
-                {% if result.has_plot %}
-                <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="{{ result.result_label }}">
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-pie-chart"></i> {{ result.result_label }}
+        </div>
+        <div class="card-body text-center">
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" alt="{{ result.result_label }}">
+            {% endif %}
+            <div class="mt-1">
+                {% for phase, fraction in result.phases_dict.items() %}
+                {% if fraction > 0.01 %}
+                <span class="badge
+                    {% if 'martensite' in phase %}bg-danger
+                    {% elif 'bainite' in phase %}bg-warning text-dark
+                    {% elif 'ferrite' in phase %}bg-success
+                    {% elif 'pearlite' in phase %}bg-primary
+                    {% else %}bg-secondary{% endif %}
+                    me-1">{{ phase|replace('_', ' ')|title }}: {{ (fraction * 100)|round(1) }}%</span>
                 {% endif %}
-
-                <div class="mt-2">
-                    {% for phase, fraction in result.phases_dict.items() %}
-                    {% if fraction > 0.01 %}
-                    <span class="badge
-                        {% if 'martensite' in phase %}bg-danger
-                        {% elif 'bainite' in phase %}bg-warning text-dark
-                        {% elif 'ferrite' in phase %}bg-success
-                        {% elif 'pearlite' in phase %}bg-primary
-                        {% else %}bg-secondary{% endif %}
-                        me-1">{{ phase|replace('_', ' ')|title }}: {{ (fraction * 100)|round(1) }}%</span>
-                    {% endif %}
-                    {% endfor %}
-                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
     {% endfor %}
 </div>
+{% endif %}
 
 {% elif sim.status == 'ready' %}
 <div class="alert alert-info">
     <h5><i class="bi bi-play-circle"></i> Ready to Run</h5>
-    <p>The simulation is configured and ready to execute.</p>
+    <p class="mb-2">The simulation is configured and ready to execute.</p>
     <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-success">
@@ -303,7 +271,7 @@
 {% elif sim.status == 'draft' %}
 <div class="alert alert-warning">
     <h5><i class="bi bi-gear"></i> Configuration Required</h5>
-    <p>Please configure the simulation geometry and heat treatment parameters before running.</p>
+    <p class="mb-2">Please configure the simulation geometry and heat treatment parameters.</p>
     <a href="{{ url_for('simulation.setup', id=sim.id) }}" class="btn btn-primary">
         <i class="bi bi-gear"></i> Configure Simulation
     </a>
@@ -312,8 +280,8 @@
 {% elif sim.status == 'running' %}
 <div class="alert alert-info">
     <h5><i class="bi bi-hourglass-split"></i> Running...</h5>
-    <p>The simulation is currently running. Please wait...</p>
-    <div class="progress">
+    <p class="mb-2">The simulation is currently running. Please wait...</p>
+    <div class="progress" style="height: 8px;">
         <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 50%"></div>
     </div>
 </div>

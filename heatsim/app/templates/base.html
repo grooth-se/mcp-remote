@@ -19,7 +19,8 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">
-                <i class="bi bi-thermometer-half"></i> Subseatec Simulation
+                <img src="{{ url_for('static', filename='img/logo-white.png') }}" alt="Subseatec" height="28">
+                Materials Simulation
             </a>
 
             {% if current_user.is_authenticated %}
@@ -92,9 +93,9 @@
     </main>
 
     <!-- Footer -->
-    <footer class="footer mt-auto py-2 bg-light">
+    <footer class="footer mt-auto py-2">
         <div class="container text-center">
-            <small class="text-muted">Subseatec Materials Simulation Platform</small>
+            <small>Subseatec Materials Simulation Platform</small>
         </div>
     </footer>
 
