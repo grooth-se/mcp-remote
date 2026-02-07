@@ -43,38 +43,43 @@ def import_file():
     fy_choices = [(0, 'Autodetektera')] + [(fy.id, f'{fy.year}') for fy in fiscal_years]
     import_form.fiscal_year_id.choices = fy_choices
 
-    if import_form.validate_on_submit():
-        file = import_form.file.data
-        try:
-            file_content = file.read()
-            sie_data = read_sie_file(file_content=file_content)
+    if not import_form.validate_on_submit():
+        for field, errors in import_form.errors.items():
+            for error in errors:
+                flash(f'Formulärfel ({field}): {error}', 'danger')
+        return redirect(url_for('sie.index'))
 
-            fiscal_year_id = import_form.fiscal_year_id.data
-            if fiscal_year_id == 0:
-                fiscal_year_id = None
+    file = import_form.file.data
+    try:
+        file_content = file.read()
+        sie_data = read_sie_file(file_content=file_content)
 
-            stats = import_sie(company_id, sie_data, fiscal_year_id)
+        fiscal_year_id = import_form.fiscal_year_id.data
+        if fiscal_year_id == 0:
+            fiscal_year_id = None
 
-            msg_parts = []
-            if stats['accounts_created']:
-                msg_parts.append(f"{stats['accounts_created']} konton skapade")
-            if stats['accounts_existing']:
-                msg_parts.append(f"{stats['accounts_existing']} konton fanns redan")
-            if stats['verifications_created']:
-                msg_parts.append(f"{stats['verifications_created']} verifikationer importerade")
-            if stats['rows_created']:
-                msg_parts.append(f"{stats['rows_created']} rader importerade")
-            if stats['errors']:
-                msg_parts.append(f"{len(stats['errors'])} fel")
+        stats = import_sie(company_id, sie_data, fiscal_year_id)
 
-            flash('SIE-import klar: ' + ', '.join(msg_parts), 'success')
+        msg_parts = []
+        if stats['accounts_created']:
+            msg_parts.append(f"{stats['accounts_created']} konton skapade")
+        if stats['accounts_existing']:
+            msg_parts.append(f"{stats['accounts_existing']} konton fanns redan")
+        if stats['verifications_created']:
+            msg_parts.append(f"{stats['verifications_created']} verifikationer importerade")
+        if stats['rows_created']:
+            msg_parts.append(f"{stats['rows_created']} rader importerade")
+        if stats['errors']:
+            msg_parts.append(f"{len(stats['errors'])} fel")
 
-            if stats['errors']:
-                for err in stats['errors'][:10]:
-                    flash(f'Varning: {err}', 'warning')
+        flash('SIE-import klar: ' + ', '.join(msg_parts), 'success')
 
-        except Exception as e:
-            flash(f'Fel vid import: {str(e)}', 'danger')
+        if stats['errors']:
+            for err in stats['errors'][:10]:
+                flash(f'Varning: {err}', 'warning')
+
+    except Exception as e:
+        flash(f'Fel vid import: {str(e)}', 'danger')
 
     return redirect(url_for('sie.index'))
 
