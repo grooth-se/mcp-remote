@@ -5,6 +5,13 @@ document.addEventListener('DOMContentLoaded', function() {
     var stagingArea = document.getElementById('stagingArea');
     if (!dropZone || !stagingArea) return;
 
+    // Prevent browser from opening files dropped anywhere on the page
+    ['dragenter', 'dragover', 'drop'].forEach(function(event) {
+        window.addEventListener(event, function(e) {
+            e.preventDefault();
+        });
+    });
+
     var csrfToken = document.getElementById('csrfToken')?.value
         || document.querySelector('input[name="csrf_token"]')?.value || '';
     var fileCounter = 0;
