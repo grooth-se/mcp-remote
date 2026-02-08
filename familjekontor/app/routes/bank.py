@@ -26,7 +26,7 @@ def _get_active_context():
 def index():
     company_id, company, active_fy = _get_active_context()
     if not company_id:
-        flash('Valj ett foretag forst.', 'warning')
+        flash('Välj ett företag först.', 'warning')
         return redirect(url_for('companies.index'))
 
     summary = bank_service.get_reconciliation_summary(company_id)
@@ -118,7 +118,7 @@ def import_csv():
             flash(f'Importerade {result["imported_count"]} transaktioner, '
                   f'{result["skipped_count"]} redan importerade.', 'success')
         else:
-            flash('Inga transaktioner kunde tolkas fran filen.', 'warning')
+            flash('Inga transaktioner kunde tolkas från filen.', 'warning')
 
     return render_template('bank/import.html', form=form, result=result)
 
@@ -128,7 +128,7 @@ def import_csv():
 def auto_match():
     company_id, company, active_fy = _get_active_context()
     if not company_id or not active_fy:
-        flash('Valj ett foretag med aktivt rakenskapsar.', 'warning')
+        flash('Välj ett företag med aktivt räkenskapsår.', 'warning')
         return redirect(url_for('bank.index'))
 
     matched = bank_service.auto_match_transactions(company_id, active_fy.id)

@@ -18,7 +18,7 @@
             <div class="card-body">
                 <p class="text-muted">{{ group.description or '' }}</p>
                 <dl class="row mb-0">
-                    <dt class="col-6">Moderforetag</dt>
+                    <dt class="col-6">Moderföretag</dt>
                     <dd class="col-6">{{ group.parent_company.name }}</dd>
                     <dt class="col-6">Medlemmar</dt>
                     <dd class="col-6">{{ group.members|length }}</dd>
@@ -33,7 +33,7 @@
     </div>
     {% else %}
     <div class="col">
-        <div class="alert alert-info">Inga koncerngrupper skapade annu.</div>
+        <div class="alert alert-info">Inga koncerngrupper skapade ännu.</div>
     </div>
     {% endfor %}
 </div>

@@ -8,7 +8,7 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
-                <h6 class="text-muted">Snitt intakter/man</h6>
+                <h6 class="text-muted">Snitt intäkter/mån</h6>
                 <h3>{{ "{:,.0f}".format(forecast.avg_revenue) }} kr</h3>
             </div>
         </div>
@@ -16,7 +16,7 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
-                <h6 class="text-muted">Snitt kostnader/man</h6>
+                <h6 class="text-muted">Snitt kostnader/mån</h6>
                 <h3>{{ "{:,.0f}".format(forecast.avg_expenses) }} kr</h3>
             </div>
         </div>
@@ -24,7 +24,7 @@
     <div class="col-md-4">
         <div class="card">
             <div class="card-body text-center">
-                <h6 class="text-muted">Snitt resultat/man</h6>
+                <h6 class="text-muted">Snitt resultat/mån</h6>
                 <h3>{{ "{:,.0f}".format(forecast.avg_revenue - forecast.avg_expenses) }} kr</h3>
             </div>
         </div>
@@ -38,12 +38,12 @@
 </div>
 
 <div class="card">
-    <div class="card-header">Manadsdata</div>
+    <div class="card-header">Månadsdata</div>
     <div class="table-responsive">
         <table class="table table-sm mb-0">
             <thead>
                 <tr>
-                    <th>Manad</th>
+                    <th>Månad</th>
                     <th class="text-end">Utfall</th>
                     <th class="text-end">Prognos</th>
                 </tr>
@@ -69,7 +69,7 @@
     </div>
 </div>
 {% else %}
-<div class="alert alert-info">Ingen data tillganglig for prognos.</div>
+<div class="alert alert-info">Ingen data tillgänglig för prognos.</div>
 {% endif %}
 {% endblock %}
 

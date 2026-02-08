@@ -39,7 +39,7 @@
 <div class="card report-card">
     <div class="card-body">
         {% if report.report_type == 'pnl' %}
-        <h4>Koncern Resultatrakning</h4>
+        <h4>Koncern Resultaträkning</h4>
 
         <table class="table table-sm">
             <thead>
@@ -55,16 +55,16 @@
             </tbody>
             <tfoot>
                 <tr class="table-light">
-                    <td><strong>Rorelseresultat</strong></td>
+                    <td><strong>Rörelseresultat</strong></td>
                     <td class="text-end"><strong>{{ "{:,.0f}".format(report.operating_result) }} kr</strong></td>
                 </tr>
                 <tr class="table-light">
-                    <td><strong>Resultat fore skatt</strong></td>
+                    <td><strong>Resultat före skatt</strong></td>
                     <td class="text-end"><strong>{{ "{:,.0f}".format(report.result_before_tax) }} kr</strong></td>
                 </tr>
                 {% if report.elimination_total %}
                 <tr>
-                    <td>Koncernelimeringar</td>
+                    <td>Koncernelimineringar</td>
                     <td class="text-end text-danger">-{{ "{:,.0f}".format(report.elimination_total) }} kr</td>
                 </tr>
                 <tr class="table-warning">
@@ -76,7 +76,7 @@
         </table>
 
         {% else %}
-        <h4>Koncern Balansrakning</h4>
+        <h4>Koncern Balansräkning</h4>
 
         <table class="table table-sm">
             <thead>
@@ -92,7 +92,7 @@
             </tbody>
             <tfoot>
                 <tr class="table-light">
-                    <td><strong>Summa tillgangar</strong></td>
+                    <td><strong>Summa tillgångar</strong></td>
                     <td class="text-end"><strong>{{ "{:,.0f}".format(report.total_assets) }} kr</strong></td>
                 </tr>
                 <tr class="table-light">
@@ -104,10 +104,10 @@
         {% endif %}
 
         {# Per-company breakdown #}
-        <h5 class="mt-4">Per foretag</h5>
+        <h5 class="mt-4">Per företag</h5>
         <table class="table table-sm">
             <thead>
-                <tr><th>Foretag</th><th>Agarandel</th></tr>
+                <tr><th>Företag</th><th>Ägarandel</th></tr>
             </thead>
             <tbody>
                 {% for m in report.members %}

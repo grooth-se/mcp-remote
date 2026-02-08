@@ -8,7 +8,7 @@
                 {{ active_company.name }}
                 <small class="text-muted">{{ active_company.company_type }} - {{ active_company.org_number }}</small>
             {% else %}
-                Valkommen
+                Välkommen
             {% endif %}
         </h2>
     </div>
@@ -29,8 +29,8 @@
                 <dl class="row mb-0">
                     <dt class="col-7">Verifikationer</dt><dd class="col-5">{{ item.verification_count }}</dd>
                     <dt class="col-7">Obetalda lev.fakt.</dt><dd class="col-5">{{ item.pending_supplier }}</dd>
-                    <dt class="col-7">Utstaende kundfakt.</dt><dd class="col-5">{{ item.unpaid_customer }}</dd>
-                    <dt class="col-7">Rakenskapsar</dt>
+                    <dt class="col-7">Utestående kundfakt.</dt><dd class="col-5">{{ item.unpaid_customer }}</dd>
+                    <dt class="col-7">Räkenskapsår</dt>
                     <dd class="col-5">{{ item.fiscal_year.year if item.fiscal_year else '-' }}</dd>
                 </dl>
             </div>
@@ -44,7 +44,7 @@
 </div>
 {% else %}
 <div class="alert alert-info">
-    <p>Inget foretag valt. <a href="{{ url_for('companies.new') }}">Skapa ett nytt foretag</a> eller valj ett befintligt i menyn.</p>
+    <p>Inget företag valt. <a href="{{ url_for('companies.new') }}">Skapa ett nytt företag</a> eller välj ett befintligt i menyn.</p>
 </div>
 {% endif %}
 
@@ -56,7 +56,7 @@
     <div class="col-md-3">
         <div class="card text-bg-success">
             <div class="card-body">
-                <h6 class="card-title">Intakter YTD</h6>
+                <h6 class="card-title">Intäkter YTD</h6>
                 <h3>{{ "{:,.0f}".format(kpi_data.revenue) }} kr</h3>
             </div>
         </div>
@@ -64,7 +64,7 @@
     <div class="col-md-3">
         <div class="card text-bg-{% if kpi_data.mom_change >= 0 %}info{% else %}warning{% endif %}">
             <div class="card-body">
-                <h6 class="card-title">Forandring MoM</h6>
+                <h6 class="card-title">Förändring MoM</h6>
                 <h3>{{ kpi_data.mom_change }}%</h3>
             </div>
         </div>
@@ -72,7 +72,7 @@
     <div class="col-md-3">
         <div class="card text-bg-danger">
             <div class="card-body">
-                <h6 class="card-title">Burn rate/man</h6>
+                <h6 class="card-title">Burn rate/mån</h6>
                 <h3>{{ "{:,.0f}".format(kpi_data.burn_rate) }} kr</h3>
             </div>
         </div>
@@ -81,7 +81,7 @@
         <div class="card text-bg-primary">
             <div class="card-body">
                 <h6 class="card-title">Runway</h6>
-                <h3>{% if kpi_data.runway is not none %}{{ kpi_data.runway }} man{% else %}-{% endif %}</h3>
+                <h3>{% if kpi_data.runway is not none %}{{ kpi_data.runway }} mån{% else %}-{% endif %}</h3>
             </div>
         </div>
     </div>
@@ -95,7 +95,7 @@
         <div class="card">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <small class="text-muted">Rakenskapsar {{ summary.active_fiscal_year.year }}</small>
+                    <small class="text-muted">Räkenskapsår {{ summary.active_fiscal_year.year }}</small>
                     <small class="text-muted">{{ fy_progress.days_remaining }} dagar kvar</small>
                 </div>
                 <div class="progress" style="height: 8px;">
@@ -121,7 +121,7 @@
     <div class="col-md-3">
         <div class="card text-bg-warning">
             <div class="card-body">
-                <h6 class="card-title">Obetalda leverantorsfakturor</h6>
+                <h6 class="card-title">Obetalda leverantörsfakturor</h6>
                 <h2>{{ summary.pending_supplier_invoices }}</h2>
             </div>
         </div>
@@ -129,7 +129,7 @@
     <div class="col-md-3">
         <div class="card text-bg-info">
             <div class="card-body">
-                <h6 class="card-title">Utstaende kundfakturor</h6>
+                <h6 class="card-title">Utestående kundfakturor</h6>
                 <h2>{{ summary.unpaid_customer_invoices }}</h2>
             </div>
         </div>
@@ -146,7 +146,7 @@
 
 {% if overdue_deadlines %}
 <div class="alert alert-danger mb-4">
-    <strong><i class="bi bi-exclamation-triangle"></i> {{ overdue_deadlines|length }} forfallna skattedeadlines!</strong>
+    <strong><i class="bi bi-exclamation-triangle"></i> {{ overdue_deadlines|length }} förfallna skattedeadlines!</strong>
     <a href="{{ url_for('tax.deadlines_index', status='overdue') }}" class="alert-link">Visa alla</a>
 </div>
 {% endif %}
@@ -174,12 +174,12 @@
     {% if aging_data %}
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header"><i class="bi bi-clock-history"></i> Fakturaalderanalys</div>
+            <div class="card-header"><i class="bi bi-clock-history"></i> Fakturaåldersanalys</div>
             <div class="card-body">
                 <div class="row text-center">
                     <div class="col">
                         <div class="fs-5 fw-bold text-success">{{ "{:,.0f}".format(aging_data.current) }}</div>
-                        <small class="text-muted">Ej forfallt</small>
+                        <small class="text-muted">Ej förfallt</small>
                     </div>
                     <div class="col">
                         <div class="fs-5 fw-bold text-warning">{{ "{:,.0f}".format(aging_data['1_30']) }}</div>
@@ -205,7 +205,7 @@
     {% if salary_overview %}
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header"><i class="bi bi-wallet2"></i> Senaste lonekoring</div>
+            <div class="card-header"><i class="bi bi-wallet2"></i> Senaste lönekörning</div>
             <div class="card-body">
                 <dl class="row mb-0">
                     <dt class="col-6">Period</dt><dd class="col-6">{{ salary_overview.period }}</dd>
@@ -215,8 +215,8 @@
                             {{ salary_overview.status }}
                         </span>
                     </dd>
-                    <dt class="col-6">Bruttoloner</dt><dd class="col-6">{{ "{:,.0f}".format(salary_overview.total_gross) }} kr</dd>
-                    <dt class="col-6">Anstallda</dt><dd class="col-6">{{ salary_overview.employee_count }}</dd>
+                    <dt class="col-6">Bruttolöner</dt><dd class="col-6">{{ "{:,.0f}".format(salary_overview.total_gross) }} kr</dd>
+                    <dt class="col-6">Anställda</dt><dd class="col-6">{{ salary_overview.employee_count }}</dd>
                 </dl>
             </div>
         </div>
@@ -235,7 +235,7 @@
                 <table class="table table-sm mb-0">
                     <thead>
                         <tr>
-                            <th>Forfallodatum</th>
+                            <th>Förfallodatum</th>
                             <th>Typ</th>
                             <th>Beskrivning</th>
                         </tr>
@@ -266,13 +266,13 @@
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card">
-            <div class="card-header">Snabbatgarder</div>
+            <div class="card-header">Snabbåtgärder</div>
             <div class="list-group list-group-flush">
                 <a href="{{ url_for('accounting.new_verification') }}" class="list-group-item list-group-item-action">
                     <i class="bi bi-plus-circle"></i> Ny verifikation
                 </a>
                 <a href="{{ url_for('invoices.new_supplier_invoice') }}" class="list-group-item list-group-item-action">
-                    <i class="bi bi-receipt"></i> Ny leverantorsfaktura
+                    <i class="bi bi-receipt"></i> Ny leverantörsfaktura
                 </a>
                 <a href="{{ url_for('invoices.new_customer_invoice') }}" class="list-group-item list-group-item-action">
                     <i class="bi bi-file-earmark-text"></i> Ny kundfaktura
@@ -281,7 +281,7 @@
                     <i class="bi bi-upload"></i> Importera SIE
                 </a>
                 <a href="{{ url_for('reports.profit_and_loss') }}" class="list-group-item list-group-item-action">
-                    <i class="bi bi-bar-chart"></i> Resultatrakning
+                    <i class="bi bi-bar-chart"></i> Resultaträkning
                 </a>
             </div>
         </div>
@@ -308,7 +308,7 @@
                             <td>{{ ver.verification_type }}</td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="4" class="text-muted">Inga verifikationer annu.</td></tr>
+                        <tr><td colspan="4" class="text-muted">Inga verifikationer ännu.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

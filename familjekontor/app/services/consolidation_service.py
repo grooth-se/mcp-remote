@@ -212,7 +212,7 @@ def export_consolidated_report(group_id, fy_year, report_type):
 
     ws.append([f'Koncernrapport: {data["group"].name}'])
     ws['A1'].font = Font(bold=True, size=14)
-    ws.append([f'Rakenskapsar {fy_year}'])
+    ws.append([f'Räkenskapsår {fy_year}'])
     ws.append([])
 
     if report_type == 'pnl':
@@ -225,14 +225,14 @@ def export_consolidated_report(group_id, fy_year, report_type):
             ws.append([section_name, round(section['total'], 2)])
 
         ws.append([])
-        ws.append(['Rorelseresultat', round(data['operating_result'], 2)])
-        ws.append(['Resultat fore skatt', round(data['result_before_tax'], 2)])
+        ws.append(['Rörelseresultat', round(data['operating_result'], 2)])
+        ws.append(['Resultat före skatt', round(data['result_before_tax'], 2)])
         ws.append(['Elimineringar', round(data['elimination_total'], 2)])
         ws.append(['Justerat resultat', round(data['adjusted_result'], 2)])
         ws[ws.max_row][0].font = bold
 
         ws.append([])
-        ws.append(['Medlemsforetag'])
+        ws.append(['Medlemsföretag'])
         ws[ws.max_row][0].font = bold
         for m in data['members']:
             ws.append([m['company'].name, f'{m["ownership_pct"]}%'])
@@ -246,7 +246,7 @@ def export_consolidated_report(group_id, fy_year, report_type):
             ws.append([section_name, round(section['total'], 2)])
 
         ws.append([])
-        ws.append(['Summa tillgangar', round(data['total_assets'], 2)])
+        ws.append(['Summa tillgångar', round(data['total_assets'], 2)])
         ws.append(['Summa EK + skulder', round(data['total_equity_liabilities'], 2)])
 
     output = BytesIO()

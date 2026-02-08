@@ -84,11 +84,11 @@ class InvoiceLineItemForm(FlaskForm):
         ('kg', 'kg'),
         ('l', 'l'),
     ], default='st')
-    unit_price = DecimalField('Apris', places=2, validators=[DataRequired()])
+    unit_price = DecimalField('À-pris', places=2, validators=[DataRequired()])
     vat_rate = SelectField('Moms %', choices=[
         ('25', '25%'),
         ('12', '12%'),
         ('6', '6%'),
         ('0', '0%'),
     ], default='25')
-    submit = SubmitField('Lagg till rad')
+    submit = SubmitField('Lägg till rad')

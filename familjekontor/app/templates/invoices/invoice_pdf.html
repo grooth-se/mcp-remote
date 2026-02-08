@@ -49,7 +49,7 @@
                 <dl>
                     <dt>Fakturanr:</dt><dd>{{ invoice.invoice_number }}</dd><br>
                     <dt>Fakturadatum:</dt><dd>{{ invoice.invoice_date }}</dd><br>
-                    <dt>Forfallodatum:</dt><dd>{{ invoice.due_date }}</dd><br>
+                    <dt>Förfallodatum:</dt><dd>{{ invoice.due_date }}</dd><br>
                     <dt>Valuta:</dt><dd>{{ invoice.currency }}</dd>
                 </dl>
             </div>
@@ -70,7 +70,7 @@
                 <th style="width:40%">Beskrivning</th>
                 <th class="text-end" style="width:10%">Antal</th>
                 <th style="width:8%">Enhet</th>
-                <th class="text-end" style="width:15%">Apris</th>
+                <th class="text-end" style="width:15%">À-pris</th>
                 <th class="text-end" style="width:7%">Moms</th>
                 <th class="text-end" style="width:15%">Belopp</th>
             </tr>
@@ -110,7 +110,7 @@
     <div class="payment-info">
         <h4>Betalningsinformation</h4>
         <p>
-            Forfallodatum: <strong>{{ invoice.due_date }}</strong><br>
+            Förfallodatum: <strong>{{ invoice.due_date }}</strong><br>
             {% if company.org_number %}
             OCR/Referens: {{ invoice.invoice_number }}<br>
             {% endif %}

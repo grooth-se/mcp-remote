@@ -76,7 +76,7 @@ def add_member(group_id):
         consolidation_service.add_member(
             group_id, form.company_id.data, form.ownership_pct.data
         )
-        flash('Foretag har lagts till.', 'success')
+        flash('Företag har lagts till.', 'success')
 
     return redirect(url_for('consolidation.view_group', group_id=group_id))
 
@@ -85,7 +85,7 @@ def add_member(group_id):
 @login_required
 def remove_member(group_id, company_id):
     consolidation_service.remove_member(group_id, company_id)
-    flash('Foretag har tagits bort.', 'success')
+    flash('Företag har tagits bort.', 'success')
     return redirect(url_for('consolidation.view_group', group_id=group_id))
 
 
@@ -181,7 +181,7 @@ def report_excel(group_id):
     report_type = request.args.get('type', 'pnl')
 
     if not fy_year:
-        flash('Valj ett rakenskapsar.', 'warning')
+        flash('Välj ett räkenskapsår.', 'warning')
         return redirect(url_for('consolidation.view_group', group_id=group_id))
 
     output = consolidation_service.export_consolidated_report(group_id, fy_year, report_type)

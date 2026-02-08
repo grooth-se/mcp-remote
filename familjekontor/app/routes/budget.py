@@ -31,7 +31,7 @@ def _get_fy_choices(company_id):
 def index():
     company_id, company, active_fy = _get_active_context()
     if not company_id:
-        flash('Valj ett foretag forst.', 'warning')
+        flash('Välj ett företag först.', 'warning')
         return redirect(url_for('companies.index'))
 
     form = BudgetFilterForm()
@@ -53,7 +53,7 @@ def grid():
     if not fy_id and active_fy:
         fy_id = active_fy.id
     if not fy_id:
-        flash('Inget rakenskapsar valt.', 'warning')
+        flash('Inget räkenskapsår valt.', 'warning')
         return redirect(url_for('budget.index'))
 
     fy = db.session.get(FiscalYear, fy_id)
@@ -67,7 +67,7 @@ def grid():
 def api_save_grid():
     company_id, company, active_fy = _get_active_context()
     if not company_id:
-        return jsonify({'error': 'Inget foretag valt'}), 400
+        return jsonify({'error': 'Inget företag valt'}), 400
 
     data = request.get_json()
     if not data:
@@ -77,7 +77,7 @@ def api_save_grid():
     grid_data = data.get('grid', {})
 
     if not fy_id:
-        return jsonify({'error': 'Inget rakenskapsar'}), 400
+        return jsonify({'error': 'Inget räkenskapsår'}), 400
 
     count = budget_service.save_budget_grid(company_id, fy_id, grid_data, current_user.id)
     return jsonify({'success': True, 'updated': count})
@@ -94,7 +94,7 @@ def variance():
     if not fy_id and active_fy:
         fy_id = active_fy.id
     if not fy_id:
-        flash('Inget rakenskapsar valt.', 'warning')
+        flash('Inget räkenskapsår valt.', 'warning')
         return redirect(url_for('budget.index'))
 
     fy = db.session.get(FiscalYear, fy_id)
@@ -114,7 +114,7 @@ def forecast():
     if not fy_id and active_fy:
         fy_id = active_fy.id
     if not fy_id:
-        flash('Inget rakenskapsar valt.', 'warning')
+        flash('Inget räkenskapsår valt.', 'warning')
         return redirect(url_for('budget.index'))
 
     fy = db.session.get(FiscalYear, fy_id)
