@@ -35,52 +35,20 @@
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-journal-text"></i> Bokforing
+                            <i class="bi bi-journal-text"></i> Bokföring
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('accounting.index') }}">Verifikationer</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('accounting.new_verification') }}">Ny verifikation</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('accounting.trial_balance') }}">Rabalans</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-receipt"></i> Fakturor
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('invoices.supplier_invoices') }}">Leverantorsfakturor</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('invoices.suppliers') }}">Leverantorer</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('accounting.trial_balance') }}">Råbalans</a></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Fakturor</h6></li>
+                            <li><a class="dropdown-item" href="{{ url_for('invoices.supplier_invoices') }}">Leverantörsfakturor</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('invoices.suppliers') }}">Leverantörer</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('invoices.customer_invoices') }}">Kundfakturor</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('invoices.customers') }}">Kunder</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('sie.index') }}"><i class="bi bi-arrow-left-right"></i> SIE</a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-cash-stack"></i> Skatt
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('tax.index') }}">Översikt</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('tax.vat_index') }}">Momsrapporter</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('tax.employer_index') }}">Arbetsgivaravgifter</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('tax.deadlines_index') }}">Deadlines</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('tax.payments_index') }}">Skattebetalningar</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-wallet2"></i> Lon
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('salary.index') }}">Översikt</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('salary.employees') }}">Anstallda</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('salary.run_new') }}">Lonekoring</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('salary.collectum') }}">Collectum</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('sie.index') }}"><i class="bi bi-arrow-left-right"></i> SIE import/export</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
@@ -91,7 +59,7 @@
                             <li><a class="dropdown-item" href="{{ url_for('bank.index') }}">Översikt</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('bank.accounts') }}">Bankkonton</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('bank.import_csv') }}">Importera</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('bank.reconciliation') }}">Avstamning</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('bank.reconciliation') }}">Avstämning</a></li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
@@ -99,10 +67,29 @@
                             <i class="bi bi-bar-chart"></i> Rapporter
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('reports.profit_and_loss') }}">Resultatrakning</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('reports.balance_sheet') }}">Balansrakning</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('reports.profit_and_loss') }}">Resultaträkning</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('reports.balance_sheet') }}">Balansräkning</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('reports.general_ledger') }}">Huvudbok</a></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Skatt</h6></li>
+                            <li><a class="dropdown-item" href="{{ url_for('tax.index') }}">Skatteöversikt</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('tax.vat_index') }}">Momsrapporter</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('tax.employer_index') }}">Arbetsgivaravgifter</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('tax.deadlines_index') }}">Deadlines</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('tax.payments_index') }}">Skattebetalningar</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">Lön</h6></li>
+                            <li><a class="dropdown-item" href="{{ url_for('salary.index') }}">Löneöversikt</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('salary.employees') }}">Anställda</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('salary.run_new') }}">Lönekörning</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('salary.collectum') }}">Collectum</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-shield-check"></i> Bolagsstyrning
+                        </a>
+                        <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('budget.index') }}"><i class="bi bi-calculator"></i> Budget & Prognos</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('consolidation.index') }}"><i class="bi bi-diagram-3"></i> Koncernrapporter</a></li>
                         </ul>
