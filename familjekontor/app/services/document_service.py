@@ -182,30 +182,42 @@ def analyze_file(file_storage):
 
 INVOICE_NUMBER_PATTERNS = [
     r'(?:fakturanr|fakturanummer|invoice\s*no\.?|invoice\s*number)[:\s]*(\S+)',
-    r'(?:faktura)\s*#\s*(\S+)',
+    r'(?:faktura\s*nr\.?|faktura\s*#|inv[\.\s]*nr\.?)[:\s]*(\S+)',
+    r'(?:orderbekräftelse|order\s*nr\.?|ordernr\.?)[:\s]*(\S+)',
+    r'(?:kreditnota|kreditfaktura)[:\s]*(\S+)',
 ]
 
-INVOICE_DATE_KEYWORDS = ['fakturadatum', 'invoice date']
+INVOICE_DATE_KEYWORDS = ['fakturadatum', 'invoice date', 'orderdatum']
 DUE_DATE_KEYWORDS = ['förfallodatum', 'forfallodatum', 'förfallodag', 'due date',
                       'betalningsdatum', 'betalas senast']
 
-AMOUNT_EXCL_KEYWORDS = ['exkl moms', 'exkl. moms', 'netto', 'nettosumma', 'subtotal',
-                         'net amount', 'belopp exkl', 'belopp före moms']
-VAT_AMOUNT_KEYWORDS = ['varav moms', 'momsbelopp', 'moms ', 'moms:', 'moms\t',
-                        'mervärdesskatt', 'mervärdeskatt', 'vat amount', 'vat ']
-VAT_EXCLUDE_WORDS = ['momsnr', 'momsreg', 'momsnummer', 'momsregistrering']
+AMOUNT_EXCL_KEYWORDS = ['ex. moms', 'ex moms', 'exkl moms', 'exkl. moms', 'delsumma',
+                         'netto', 'nettosumma', 'subtotal', 'net amount', 'belopp exkl',
+                         'belopp före moms']
+VAT_AMOUNT_KEYWORDS = ['varav moms', 'momsbelopp', '% moms', 'moms ', 'moms:',
+                        'moms\t', 'mervärdesskatt', 'mervärdeskatt', 'vat amount', 'vat ']
+VAT_EXCLUDE_WORDS = ['momsnr', 'momsreg', 'momsnummer', 'momsregistrering',
+                      'vårt momsnummer', 'ert momsnummer', 'vat number', 'vat no']
 TOTAL_AMOUNT_KEYWORDS = ['att betala', 'summa att betala', 'totalt att betala',
                           'amount due', 'total amount', 'total att betala',
-                          'totalt ', 'totalt:', 'summa ', 'summa:', 'total ']
+                          'totalt ', 'totalt:', 'total ']
+# 'summa' searched separately — last resort since it matches subtotals too
+TOTAL_FALLBACK_KEYWORDS = ['summa ', 'summa:']
 
 CURRENCY_CODES = ['SEK', 'EUR', 'USD', 'NOK', 'DKK', 'GBP']
 ORG_NUMBER_PATTERN = re.compile(r'\b(\d{6})-?(\d{4})\b')
-AMOUNT_PATTERN = re.compile(r'\d[\d\s\xa0]*[,\.]\d{2}')
+# Match amounts with or without decimals: "799", "199,75", "1 234,50"
+AMOUNT_PATTERN = re.compile(r'\d[\d\s\xa0]*(?:[,\.]\d{1,2})?')
+# Stricter pattern for when we need to avoid matching random numbers
+AMOUNT_WITH_DECIMALS = re.compile(r'\d[\d\s\xa0]*[,\.]\d{2}')
 
 
 def _parse_swedish_amount(text):
-    """Parse Swedish-format amount like '1 234,50' to float string '1234.50'."""
-    cleaned = text.replace('\xa0', '').replace(' ', '').replace(',', '.')
+    """Parse Swedish-format amount like '1 234,50' or '799' to float string."""
+    cleaned = text.strip().replace('\xa0', '').replace(' ', '').replace(',', '.')
+    # Remove trailing currency codes
+    for code in CURRENCY_CODES:
+        cleaned = cleaned.replace(code, '').strip()
     try:
         val = float(cleaned)
         return f'{val:.2f}'
@@ -217,15 +229,22 @@ def _find_amount_near_keyword(lines, keywords, exclude_words=None):
     """Find an amount value on a line containing one of the keywords.
 
     Searches bottom-up since totals usually appear near the end of invoices.
+    Takes the LAST amount on the line (amounts are right-aligned in invoices).
+    Tries strict decimal pattern first, falls back to integer amounts.
     """
     for line in reversed(lines):
         line_lower = line.lower()
         if exclude_words and any(ew in line_lower for ew in exclude_words):
             continue
         if any(kw in line_lower for kw in keywords):
-            match = AMOUNT_PATTERN.search(line)
-            if match:
-                return _parse_swedish_amount(match.group())
+            # Try decimal amounts first — take LAST match (rightmost value)
+            matches = AMOUNT_WITH_DECIMALS.findall(line)
+            if matches:
+                return _parse_swedish_amount(matches[-1])
+            # Fall back to integer amounts (799) — take LAST match
+            matches = AMOUNT_PATTERN.findall(line)
+            if matches:
+                return _parse_swedish_amount(matches[-1])
     return None
 
 
@@ -323,6 +342,8 @@ def analyze_invoice_pdf(file_storage):
 
     # Amounts — search bottom-up, exclude false VAT matches
     result['total_amount'] = _find_amount_near_keyword(lines, TOTAL_AMOUNT_KEYWORDS)
+    if not result['total_amount']:
+        result['total_amount'] = _find_amount_near_keyword(lines, TOTAL_FALLBACK_KEYWORDS)
     result['amount_excl_vat'] = _find_amount_near_keyword(lines, AMOUNT_EXCL_KEYWORDS)
     result['vat_amount'] = _find_amount_near_keyword(
         lines, VAT_AMOUNT_KEYWORDS, exclude_words=VAT_EXCLUDE_WORDS)
