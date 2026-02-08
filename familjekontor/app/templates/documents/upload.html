@@ -5,6 +5,9 @@
 
 <div class="row">
     <div class="col-lg-10">
+        {# CSRF token for AJAX requests #}
+        <input type="hidden" id="csrfToken" name="csrf_token" value="{{ csrf_token() }}">
+
         {# Drag and drop zone #}
         <div class="drop-zone mb-3" id="dropZone">
             <i class="bi bi-cloud-arrow-up fs-1 text-muted"></i>

@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var stagingArea = document.getElementById('stagingArea');
     if (!dropZone || !stagingArea) return;
 
-    var csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+    var csrfToken = document.getElementById('csrfToken')?.value
+        || document.querySelector('input[name="csrf_token"]')?.value || '';
     var fileCounter = 0;
 
     var typeLabels = {
@@ -81,7 +82,13 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+            if (!r.ok) {
+                console.error('Analyze API error:', r.status, r.statusText);
+                return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.substring(0, 200)); });
+            }
+            return r.json();
+        })
         .then(function(data) {
             statusEl.innerHTML = '<i class="bi bi-check-circle text-success"></i> Analys klar';
             // Fill in suggestions
@@ -175,7 +182,12 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+            if (!r.ok) {
+                console.error('Upload API error:', r.status, r.statusText);
+            }
+            return r.json();
+        })
         .then(function(data) {
             if (data.success) {
                 card.className = 'card mb-3 border-success';
