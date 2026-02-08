@@ -31,9 +31,9 @@
             <i class="bi bi-upload"></i> Upload TC Data
         </a>
         {% if sim.status in ['ready', 'completed', 'failed'] %}
-        <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline">
+        <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline" id="runForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-success btn-sm">
+            <button type="submit" class="btn btn-success btn-sm" id="runBtn">
                 <i class="bi bi-play-fill"></i> Run
             </button>
         </form>
@@ -527,4 +527,46 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Running Overlay -->
+<div id="runningOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none"
+     style="background: rgba(0,0,0,0.7); z-index: 9999;">
+    <div class="d-flex flex-column justify-content-center align-items-center h-100 text-white">
+        <div class="spinner-border text-light mb-3" style="width: 4rem; height: 4rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h3><i class="bi bi-calculator"></i> Running Simulation</h3>
+        <p class="mb-2">Please wait while the heat treatment simulation is running...</p>
+        <p class="text-muted small">This may take a few minutes for large geometries.</p>
+        <div class="progress mt-3" style="width: 300px; height: 8px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 100%"></div>
+        </div>
+        <p class="mt-3 small text-warning">
+            <i class="bi bi-exclamation-triangle"></i> Do not close or navigate away from this page.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const runForm = document.getElementById('runForm');
+    const runBtn = document.getElementById('runBtn');
+    const overlay = document.getElementById('runningOverlay');
+
+    if (runForm && runBtn && overlay) {
+        runForm.addEventListener('submit', function(e) {
+            // Show overlay immediately
+            overlay.classList.remove('d-none');
+
+            // Disable the button to prevent double-clicks
+            runBtn.disabled = true;
+            runBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Running...';
+
+            // Form will submit normally and redirect when done
+        });
+    }
+});
+</script>
 {% endblock %}
