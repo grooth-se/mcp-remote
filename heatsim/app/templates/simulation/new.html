@@ -23,7 +23,7 @@
                 {% if edit_mode %}Edit{% else %}Create New{% endif %} Heat Treatment Simulation
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
 
                     <div class="mb-3">
@@ -48,11 +48,44 @@
                         {% if not edit_mode %}
                         <div class="col-md-6 mb-3">
                             {{ form.geometry_type.label(class="form-label") }}
-                            {{ form.geometry_type(class="form-select") }}
+                            {{ form.geometry_type(class="form-select", id="geometry-type-select") }}
                             <div class="form-text">Dimensions configured in next step</div>
                         </div>
                         {% endif %}
                     </div>
+
+                    <!-- CAD Upload Section (shown when geometry_type == 'cad') -->
+                    {% if not edit_mode %}
+                    <div id="cad-upload-section" class="d-none">
+                        <div class="card bg-light mb-3">
+                            <div class="card-header">
+                                <i class="bi bi-file-earmark-code"></i> CAD Import (STEP File)
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.cad_file.label(class="form-label") }}
+                                        {{ form.cad_file(class="form-control", accept=".step,.stp") }}
+                                        <div class="form-text">Upload a STEP file (.step, .stp)</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        {{ form.cad_equivalent_type.label(class="form-label") }}
+                                        {{ form.cad_equivalent_type(class="form-select") }}
+                                        <div class="form-text">How to model the 1D heat transfer</div>
+                                    </div>
+                                </div>
+                                <div class="alert alert-info py-2 mb-0">
+                                    <small>
+                                        <i class="bi bi-info-circle"></i>
+                                        <strong>How it works:</strong> The STEP file is analyzed to extract volume (V)
+                                        and surface area (A). An equivalent 1D geometry with matching characteristic
+                                        length (L<sub>c</sub> = V/A) is created for the simulation.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
 
                     <div class="d-flex gap-2">
                         {{ form.submit(class="btn btn-primary") }}
@@ -83,10 +116,33 @@
                 <p class="small text-muted">
                     <strong>Cylinder:</strong> Solid round bar or shaft<br>
                     <strong>Plate:</strong> Flat plate with symmetric cooling<br>
-                    <strong>Ring:</strong> Hollow cylinder with inner/outer surfaces
+                    <strong>Ring:</strong> Hollow cylinder with inner/outer surfaces<br>
+                    <strong>CAD Import:</strong> Analyze STEP file for equivalent 1D geometry
                 </p>
             </div>
         </div>
     </div>
 </div>
+
+{% if not edit_mode %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const geometrySelect = document.getElementById('geometry-type-select');
+    const cadSection = document.getElementById('cad-upload-section');
+
+    function toggleCadSection() {
+        if (geometrySelect.value === 'cad') {
+            cadSection.classList.remove('d-none');
+        } else {
+            cadSection.classList.add('d-none');
+        }
+    }
+
+    if (geometrySelect && cadSection) {
+        geometrySelect.addEventListener('change', toggleCadSection);
+        toggleCadSection(); // Initial state
+    }
+});
+</script>
+{% endif %}
 {% endblock %}

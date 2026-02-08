@@ -68,7 +68,15 @@
             <p class="fw-bold">{{ sim.geometry_label }}</p>
             {% set geom = sim.geometry_dict %}
             <small class="text-muted">
-                {% if sim.geometry_type == 'cylinder' %}
+                {% if sim.geometry_type == 'cad' %}
+                {% set cad = sim.cad_analysis_dict %}
+                {% if cad %}
+                Source: {{ cad.filename }}<br>
+                V={{ "%.2f"|format(cad.volume * 1e6) }}cm<sup>3</sup>,
+                A={{ "%.1f"|format(cad.surface_area * 1e4) }}cm<sup>2</sup><br>
+                L<sub>c</sub>={{ "%.2f"|format(cad.characteristic_length * 1000) }}mm
+                {% endif %}
+                {% elif sim.geometry_type == 'cylinder' %}
                 R={{ (geom.radius * 1000)|round(1) }}mm
                 {% elif sim.geometry_type == 'plate' %}
                 t={{ (geom.thickness * 1000)|round(1) }}mm

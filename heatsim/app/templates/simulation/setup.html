@@ -39,7 +39,75 @@
                     <i class="bi bi-box"></i> Geometry ({{ sim.geometry_label }})
                 </div>
                 <div class="card-body">
-                    {% if sim.geometry_type == 'cylinder' %}
+                    {% if sim.geometry_type == 'cad' and cad_analysis %}
+                    <!-- CAD Analysis Display -->
+                    <div class="alert alert-info py-2 mb-3">
+                        <small><i class="bi bi-file-earmark-code"></i> <strong>Source:</strong> {{ cad_analysis.filename }}</small>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Volume</label>
+                            <p class="fw-bold mb-0">{{ "%.6f"|format(cad_analysis.volume * 1e6) }} cm<sup>3</sup></p>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Surface Area</label>
+                            <p class="fw-bold mb-0">{{ "%.4f"|format(cad_analysis.surface_area * 1e4) }} cm<sup>2</sup></p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Characteristic Length (V/A)</label>
+                            <p class="fw-bold mb-0">{{ "%.3f"|format(cad_analysis.characteristic_length * 1000) }} mm</p>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Bounding Box</label>
+                            <p class="fw-bold mb-0">
+                                {{ "%.1f"|format(cad_analysis.bounding_box[0] * 1000) }} x
+                                {{ "%.1f"|format(cad_analysis.bounding_box[1] * 1000) }} x
+                                {{ "%.1f"|format(cad_analysis.bounding_box[2] * 1000) }} mm
+                            </p>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h6><i class="bi bi-arrow-repeat"></i> Equivalent {{ cad_analysis.equivalent_type|title }} Geometry</h6>
+                    <div class="row">
+                        {% if cad_analysis.equivalent_type == 'cylinder' %}
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Radius</label>
+                            <p class="fw-bold mb-0">{{ "%.2f"|format(cad_analysis.equivalent_params.radius * 1000) }} mm</p>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Length</label>
+                            <p class="fw-bold mb-0">{{ "%.2f"|format(cad_analysis.equivalent_params.length * 1000) }} mm</p>
+                        </div>
+                        {% else %}
+                        <div class="col-4">
+                            <label class="form-label text-muted small">Thickness</label>
+                            <p class="fw-bold mb-0">{{ "%.2f"|format(cad_analysis.equivalent_params.thickness * 1000) }} mm</p>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label text-muted small">Width</label>
+                            <p class="fw-bold mb-0">{{ "%.1f"|format(cad_analysis.equivalent_params.width * 1000) }} mm</p>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label text-muted small">Length</label>
+                            <p class="fw-bold mb-0">{{ "%.1f"|format(cad_analysis.equivalent_params.length * 1000) }} mm</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="alert alert-secondary py-2 mt-3 mb-0">
+                        <small>
+                            <i class="bi bi-info-circle"></i>
+                            The 1D simulation uses this equivalent geometry to approximate the thermal behavior
+                            of the actual CAD model. The characteristic length L<sub>c</sub> = V/A determines
+                            the thermal response.
+                        </small>
+                    </div>
+
+                    {% elif sim.geometry_type == 'cylinder' %}
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Radius (mm)</label>

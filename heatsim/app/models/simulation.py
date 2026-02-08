@@ -23,8 +23,9 @@ STATUSES = [STATUS_DRAFT, STATUS_READY, STATUS_RUNNING, STATUS_COMPLETED, STATUS
 GEOMETRY_CYLINDER = 'cylinder'
 GEOMETRY_PLATE = 'plate'
 GEOMETRY_RING = 'ring'
+GEOMETRY_CAD = 'cad'
 
-GEOMETRY_TYPES = [GEOMETRY_CYLINDER, GEOMETRY_PLATE, GEOMETRY_RING]
+GEOMETRY_TYPES = [GEOMETRY_CYLINDER, GEOMETRY_PLATE, GEOMETRY_RING, GEOMETRY_CAD]
 
 # Quench media types
 QUENCH_WATER = 'water'
@@ -187,6 +188,12 @@ class Simulation(db.Model):
     geometry_type = db.Column(db.Text, nullable=False, default=GEOMETRY_CYLINDER)
     geometry_config = db.Column(db.Text)  # JSON
 
+    # CAD geometry fields (for geometry_type == 'cad')
+    cad_filename = db.Column(db.Text)       # Original filename
+    cad_file_path = db.Column(db.Text)      # Stored file path
+    cad_analysis = db.Column(db.Text)       # JSON: CADAnalysisResult
+    cad_equivalent_type = db.Column(db.Text)  # 'cylinder' or 'plate'
+
     # Legacy process fields (kept for backwards compatibility)
     process_type = db.Column(db.Text, nullable=False, default=PROCESS_QUENCH_WATER)
     initial_temperature = db.Column(db.Float, default=850.0)
@@ -231,6 +238,34 @@ class Simulation(db.Model):
     def set_geometry(self, config: dict) -> None:
         """Set geometry config from dict."""
         self.geometry_config = json.dumps(config)
+
+    @property
+    def cad_analysis_dict(self) -> dict:
+        """Parse CAD analysis JSON."""
+        try:
+            return json.loads(self.cad_analysis) if self.cad_analysis else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def set_cad_analysis(self, analysis: dict) -> None:
+        """Set CAD analysis from dict."""
+        self.cad_analysis = json.dumps(analysis)
+
+    @property
+    def has_cad_geometry(self) -> bool:
+        """Check if this simulation uses CAD-imported geometry."""
+        return self.geometry_type == GEOMETRY_CAD and self.cad_analysis is not None
+
+    @property
+    def cad_equivalent_geometry_dict(self) -> dict:
+        """Get the equivalent geometry parameters for CAD geometry.
+
+        Returns the geometry config that should be used for the 1D simulation.
+        """
+        if not self.has_cad_geometry:
+            return {}
+        analysis = self.cad_analysis_dict
+        return analysis.get('equivalent_params', {})
 
     @property
     def bc_dict(self) -> dict:
@@ -318,6 +353,9 @@ class Simulation(db.Model):
     @property
     def geometry_label(self) -> str:
         """Human-readable geometry name."""
+        if self.geometry_type == GEOMETRY_CAD:
+            equiv = self.cad_equivalent_type or 'auto'
+            return f"CAD ({equiv.title()})"
         return self.geometry_type.title()
 
     @property

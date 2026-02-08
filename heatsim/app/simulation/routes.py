@@ -1,14 +1,18 @@
 """Routes for heat treatment simulation."""
+import os
+import uuid
 from datetime import datetime
-from flask import render_template, redirect, url_for, flash, request, Response
+from pathlib import Path
+from flask import render_template, redirect, url_for, flash, request, Response, current_app
 from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.models import SteelGrade, PhaseDiagram, MeasuredData
 from app.models.simulation import (
     Simulation, SimulationResult,
     STATUS_DRAFT, STATUS_READY, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
-    GEOMETRY_TYPES, PROCESS_TYPES, DEFAULT_HTC,
+    GEOMETRY_TYPES, GEOMETRY_CAD, PROCESS_TYPES, DEFAULT_HTC,
     QUENCH_MEDIA, QUENCH_MEDIA_LABELS, AGITATION_LEVELS, AGITATION_LABELS,
     FURNACE_ATMOSPHERES, FURNACE_ATMOSPHERE_LABELS, calculate_quench_htc
 )
@@ -20,12 +24,20 @@ from app.services import (
     visualization
 )
 from app.services.tc_data_parser import parse_tc_csv, validate_tc_csv
+from app.services.cad_geometry import analyze_step_file, CADAnalysisResult
 
 from . import simulation_bp
 from .forms import (
     SimulationForm, GeometryForm, SolverForm,
     HeatingPhaseForm, TransferPhaseForm, QuenchingPhaseForm, TemperingPhaseForm
 )
+
+
+def get_geometries_folder() -> Path:
+    """Get the folder for storing CAD geometry files."""
+    base_path = Path(current_app.root_path).parent / 'data' / 'geometries'
+    base_path.mkdir(parents=True, exist_ok=True)
+    return base_path
 
 
 @simulation_bp.route('/')
@@ -56,13 +68,46 @@ def new():
             status=STATUS_DRAFT
         )
 
-        # Set default geometry based on type
-        if form.geometry_type.data == 'cylinder':
-            sim.set_geometry({'radius': 0.05, 'length': 0.1})
-        elif form.geometry_type.data == 'plate':
-            sim.set_geometry({'thickness': 0.02, 'width': 0.1, 'length': 0.1})
+        # Handle CAD geometry
+        if form.geometry_type.data == 'cad':
+            cad_file = form.cad_file.data
+            if not cad_file:
+                flash('Please upload a STEP file for CAD geometry.', 'danger')
+                return render_template('simulation/new.html', form=form)
+
+            try:
+                # Save the file with UUID prefix
+                filename = secure_filename(cad_file.filename)
+                unique_filename = f"{uuid.uuid4().hex[:8]}_{filename}"
+                geometries_folder = get_geometries_folder()
+                file_path = geometries_folder / unique_filename
+                cad_file.save(str(file_path))
+
+                # Analyze the STEP file
+                equiv_type = form.cad_equivalent_type.data
+                analysis = analyze_step_file(file_path, equiv_type)
+
+                # Store CAD data
+                sim.cad_filename = filename
+                sim.cad_file_path = str(file_path)
+                sim.set_cad_analysis(analysis.to_dict())
+                sim.cad_equivalent_type = analysis.equivalent_type
+
+                # Set geometry config from equivalent parameters
+                sim.set_geometry(analysis.equivalent_params)
+
+            except Exception as e:
+                flash(f'Error analyzing STEP file: {str(e)}', 'danger')
+                return render_template('simulation/new.html', form=form)
+
         else:
-            sim.set_geometry({'inner_radius': 0.02, 'outer_radius': 0.05, 'length': 0.1})
+            # Set default geometry based on type
+            if form.geometry_type.data == 'cylinder':
+                sim.set_geometry({'radius': 0.05, 'length': 0.1})
+            elif form.geometry_type.data == 'plate':
+                sim.set_geometry({'thickness': 0.02, 'width': 0.1, 'length': 0.1})
+            else:  # ring
+                sim.set_geometry({'inner_radius': 0.02, 'outer_radius': 0.05, 'length': 0.1})
 
         # Set default solver config
         sim.set_solver_config({'n_nodes': 51, 'dt': 0.1, 'max_time': 1800})
@@ -160,11 +205,17 @@ def setup(id):
         flash('Geometry and solver configured.', 'success')
         return redirect(url_for('simulation.heat_treatment', id=sim.id))
 
+    # Load CAD analysis for display if applicable
+    cad_analysis = None
+    if sim.geometry_type == GEOMETRY_CAD and sim.cad_analysis:
+        cad_analysis = sim.cad_analysis_dict
+
     return render_template(
         'simulation/setup.html',
         sim=sim,
         geometry_form=geometry_form,
-        solver_form=solver_form
+        solver_form=solver_form,
+        cad_analysis=cad_analysis
     )
 
 
@@ -430,8 +481,14 @@ def run(id):
         sim.error_message = None
         db.session.commit()
 
-        # Build geometry
-        geometry = create_geometry(sim.geometry_type, sim.geometry_dict)
+        # Build geometry (use equivalent geometry for CAD types)
+        if sim.geometry_type == GEOMETRY_CAD:
+            # For CAD geometry, use the equivalent type and params
+            equiv_type = sim.cad_equivalent_type or 'cylinder'
+            equiv_params = sim.cad_equivalent_geometry_dict
+            geometry = create_geometry(equiv_type, equiv_params)
+        else:
+            geometry = create_geometry(sim.geometry_type, sim.geometry_dict)
 
         # Build solver config
         solver_config = SolverConfig.from_dict(sim.solver_dict)

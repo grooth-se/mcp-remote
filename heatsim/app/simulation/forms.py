@@ -1,5 +1,6 @@
 """Forms for heat treatment simulation setup."""
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
 from wtforms import (
     StringField, TextAreaField, SelectField, FloatField,
     IntegerField, BooleanField, SubmitField
@@ -33,9 +34,30 @@ class SimulationForm(FlaskForm):
     )
     geometry_type = SelectField(
         'Geometry',
-        choices=[(g, g.title()) for g in GEOMETRY_TYPES],
+        choices=[
+            ('cylinder', 'Cylinder'),
+            ('plate', 'Plate'),
+            ('ring', 'Ring'),
+            ('cad', 'Import from CAD (STEP file)')
+        ],
         default='cylinder'
     )
+
+    # CAD geometry fields
+    cad_file = FileField(
+        'STEP File',
+        validators=[FileAllowed(['step', 'stp'], 'Only STEP files (.step, .stp) are allowed')]
+    )
+    cad_equivalent_type = SelectField(
+        'Equivalent Geometry',
+        choices=[
+            ('auto', 'Auto-detect'),
+            ('cylinder', 'Cylinder (radial heat transfer)'),
+            ('plate', 'Plate (through-thickness heat transfer)')
+        ],
+        default='auto'
+    )
+
     submit = SubmitField('Create Simulation')
 
 

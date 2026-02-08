@@ -13,6 +13,7 @@ from .heat_solver import (
     SolverConfig, SolverResult, PhaseConfig, PhaseResult as SolverPhaseResult
 )
 from .phase_tracker import PhaseTracker, PhaseResult
+from .cad_geometry import CADGeometryAnalyzer, CADAnalysisResult, analyze_step_file
 from . import visualization
 from . import comsol
 
@@ -47,6 +48,10 @@ __all__ = [
     # Phase 3 services - Phase transformation
     'PhaseTracker',
     'PhaseResult',
+    # Phase 3 services - CAD geometry
+    'CADGeometryAnalyzer',
+    'CADAnalysisResult',
+    'analyze_step_file',
     # Phase 3 services - Visualization
     'visualization',
     # Phase 4 services - COMSOL integration
