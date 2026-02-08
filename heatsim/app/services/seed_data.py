@@ -64,7 +64,28 @@ STANDARD_GRADES = [
                      'value': [450, 480, 510, 540, 580, 620, 700, 780, 650]}
         },
         'density': {'type': 'constant', 'units': 'kg/m³', 'data': {'value': 7850}},
-        'emissivity': {'type': 'constant', 'units': '-', 'data': {'value': 0.85}},
+        # Radiation properties
+        'emissivity': {
+            'type': 'curve',
+            'units': '-',
+            'deps': 'temperature',
+            'data': {'temperature': [20, 200, 400, 600, 800, 1000],
+                     'value': [0.25, 0.35, 0.50, 0.70, 0.85, 0.90]},
+            'notes': 'Oxidized surface, increases with temperature'
+        },
+        'absorptivity': {'type': 'constant', 'units': '-', 'data': {'value': 0.85},
+                        'notes': 'Thermal radiation absorptivity'},
+        # Convection properties
+        'htc_natural_convection': {
+            'type': 'curve',
+            'units': 'W/(m²·K)',
+            'deps': 'temperature',
+            'data': {'temperature': [20, 200, 400, 600, 800],
+                     'value': [5, 8, 12, 18, 25]},
+            'notes': 'Vertical plate in still air'
+        },
+        'surface_roughness': {'type': 'constant', 'units': 'µm', 'data': {'value': 3.2},
+                             'notes': 'Typical machined surface Ra'},
     }, {'Ac1': 727, 'Ac3': 860, 'Ms': 420, 'Mf': 300}),
 
     ('AISI 4130', 'Chromium-molybdenum steel', {
@@ -102,7 +123,34 @@ STANDARD_GRADES = [
                      'value': [475, 500, 530, 560, 600, 640, 700, 780, 650]}
         },
         'density': {'type': 'constant', 'units': 'kg/m³', 'data': {'value': 7850}},
-        'emissivity': {'type': 'constant', 'units': '-', 'data': {'value': 0.87}},
+        # Radiation properties - temperature dependent emissivity
+        'emissivity': {
+            'type': 'curve',
+            'units': '-',
+            'deps': 'temperature',
+            'data': {'temperature': [20, 200, 400, 600, 800, 1000],
+                     'value': [0.28, 0.38, 0.52, 0.72, 0.87, 0.92]},
+            'notes': 'Total hemispherical emissivity, oxidized surface'
+        },
+        'absorptivity': {'type': 'constant', 'units': '-', 'data': {'value': 0.87}},
+        # Convection properties
+        'htc_natural_convection': {
+            'type': 'curve',
+            'units': 'W/(m²·K)',
+            'deps': 'temperature',
+            'data': {'temperature': [20, 200, 400, 600, 800],
+                     'value': [5, 8, 12, 18, 25]},
+            'notes': 'Natural convection in still air'
+        },
+        'htc_forced_convection': {
+            'type': 'polynomial',
+            'units': 'W/(m²·K)',
+            'deps': 'temperature',
+            'data': {'variable': 'temperature', 'coefficients': [20, 0.05, 0.00005]},
+            'notes': 'Forced air, moderate velocity ~5 m/s'
+        },
+        'surface_roughness': {'type': 'constant', 'units': 'µm', 'data': {'value': 1.6},
+                             'notes': 'Ground surface finish Ra'},
     }, {'Ac1': 724, 'Ac3': 780, 'Ms': 320, 'Mf': 180}),
 
     ('AISI 4330V', 'Vanadium-modified NiCrMo steel', {

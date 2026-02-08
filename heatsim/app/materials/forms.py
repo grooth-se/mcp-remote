@@ -40,13 +40,28 @@ class MaterialPropertyForm(FlaskForm):
     property_name = SelectField(
         'Property',
         choices=[
-            ('thermal_conductivity', 'Thermal Conductivity'),
-            ('specific_heat', 'Specific Heat'),
-            ('density', 'Density'),
-            ('emissivity', 'Emissivity'),
-            ('youngs_modulus', 'Young\'s Modulus'),
-            ('poissons_ratio', 'Poisson\'s Ratio'),
-            ('thermal_expansion', 'Thermal Expansion Coefficient'),
+            # Thermal properties - Conduction
+            ('thermal_conductivity', 'Thermal Conductivity (k)'),
+            ('specific_heat', 'Specific Heat (Cp)'),
+            ('density', 'Density (ρ)'),
+            ('thermal_diffusivity', 'Thermal Diffusivity (α = k/ρCp)'),
+            # Radiation heat transfer
+            ('emissivity', 'Emissivity (ε) - Total hemispherical'),
+            ('absorptivity', 'Absorptivity (α) - Solar/thermal'),
+            ('emissivity_spectral', 'Spectral Emissivity'),
+            ('reflectivity', 'Reflectivity (ρ)'),
+            # Convection heat transfer
+            ('surface_roughness', 'Surface Roughness (Ra)'),
+            ('htc_natural_convection', 'Natural Convection HTC'),
+            ('htc_forced_convection', 'Forced Convection HTC'),
+            ('nusselt_correlation', 'Nusselt Number Correlation'),
+            # Mechanical properties
+            ('youngs_modulus', 'Young\'s Modulus (E)'),
+            ('poissons_ratio', 'Poisson\'s Ratio (ν)'),
+            ('thermal_expansion', 'Thermal Expansion Coefficient (CTE)'),
+            ('yield_strength', 'Yield Strength'),
+            ('tensile_strength', 'Ultimate Tensile Strength'),
+            # Custom
             ('custom', 'Custom Property...'),
         ],
         validators=[DataRequired()]
