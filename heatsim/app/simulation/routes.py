@@ -371,6 +371,10 @@ def view(id):
     dtdt_temp_quenching = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'quenching']
     dtdt_temp_tempering = [r for r in results if r.result_type == 'dTdt_vs_temp' and r.phase == 'tempering']
 
+    # Absorbed power plots grouped by phase
+    power_heating = [r for r in results if r.result_type == 'absorbed_power' and r.phase == 'heating']
+    power_tempering = [r for r in results if r.result_type == 'absorbed_power' and r.phase == 'tempering']
+
     # Get measured TC data for comparison, grouped by process step
     measured_data = sim.measured_data.all()
     measured_heating = [m for m in measured_data if m.process_step == 'heating']
@@ -394,6 +398,8 @@ def view(id):
         dtdt_temp_heating=dtdt_temp_heating,
         dtdt_temp_quenching=dtdt_temp_quenching,
         dtdt_temp_tempering=dtdt_temp_tempering,
+        power_heating=power_heating,
+        power_tempering=power_tempering,
         measured_data=measured_data,
         measured_heating=measured_heating,
         measured_quenching=measured_quenching,
@@ -659,6 +665,55 @@ def run(id):
                     phase_name=phase_result.phase_name
                 )
                 db.session.add(dtdt_temp_result)
+
+        # Generate absorbed power plots for heating and tempering phases
+        if result.phase_results:
+            import numpy as np
+
+            # Calculate mass from geometry
+            mass = geometry.volume * density  # kg
+
+            # Create Cp interpolation function
+            def get_cp_at_temp(temp):
+                """Get specific heat at given temperature."""
+                if cp_prop:
+                    if cp_prop.property_type == 'constant':
+                        return cp_prop.data_dict.get('value', 500.0)
+                    elif cp_prop.property_type == 'curve':
+                        from app.services.property_evaluator import evaluate_property
+                        val = evaluate_property(cp_prop, temperature=temp)
+                        return val if val else 500.0
+                return 500.0  # Default specific heat
+
+            for phase_result in result.phase_results:
+                # Only generate for heating and tempering phases
+                if phase_result.phase_name not in ('heating', 'tempering'):
+                    continue
+                if not phase_result.time.size or len(phase_result.time) < 3:
+                    continue
+
+                phase_label = phase_result.phase_name.title()
+
+                # Get Cp values at center temperatures
+                center_temp = phase_result.center_temp
+                cp_values = np.array([get_cp_at_temp(t) for t in center_temp])
+
+                # Create absorbed power plot
+                power_result = SimulationResult(
+                    simulation_id=sim.id,
+                    result_type='absorbed_power',
+                    phase=phase_result.phase_name,
+                    location='all'
+                )
+                power_result.plot_image = visualization.create_absorbed_power_plot(
+                    phase_result.time,
+                    phase_result.temperature,
+                    mass=mass,
+                    cp_values=cp_values,
+                    title=f'Absorbed Power ({phase_label}) - {sim.name}',
+                    phase_name=phase_result.phase_name
+                )
+                db.session.add(power_result)
 
         sim.status = STATUS_COMPLETED
         sim.completed_at = datetime.utcnow()
@@ -1151,5 +1206,57 @@ def measured_dtdt_temp_plot_step(id, step):
     plot_data = visualization.create_measured_dtdt_vs_temp_plot(
         measured_data,
         title=f'Measured dT/dt vs Temperature ({step.title()})'
+    )
+    return Response(plot_data, mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/measured-absorbed-power/<step>')
+@login_required
+def measured_absorbed_power_plot_step(id, step):
+    """Generate absorbed power vs time plot for measured TC data for a specific process step."""
+    import numpy as np
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    measured_data = _get_measured_data_for_step(sim, step)
+    if not measured_data:
+        return Response('No measured data', status=404)
+
+    # Get geometry and material properties for mass calculation
+    geometry = create_geometry(sim.geometry_type, sim.geometry_dict)
+    grade = sim.steel_grade
+
+    # Get density
+    rho_prop = grade.get_property('density')
+    density = 7850
+    if rho_prop:
+        density = rho_prop.data_dict.get('value', 7850)
+
+    # Calculate mass
+    mass = geometry.volume * density
+
+    # Get Cp property for interpolation
+    cp_prop = grade.get_property('specific_heat')
+
+    def get_cp_at_temp(temp):
+        """Get specific heat at given temperature."""
+        if cp_prop:
+            if cp_prop.property_type == 'constant':
+                return cp_prop.data_dict.get('value', 500.0)
+            elif cp_prop.property_type == 'curve':
+                from app.services.property_evaluator import evaluate_property
+                val = evaluate_property(cp_prop, temperature=temp)
+                return val if val else 500.0
+        return 500.0
+
+    # Generate absorbed power plot
+    plot_data = visualization.create_measured_absorbed_power_plot(
+        measured_data,
+        mass=mass,
+        cp_func=get_cp_at_temp,
+        title=f'Measured Absorbed Power ({step.title()})',
+        phase_name=step
     )
     return Response(plot_data, mimetype='image/png')

@@ -913,6 +913,198 @@ def create_measured_dtdt_plot(
     return buf.getvalue()
 
 
+def create_absorbed_power_plot(
+    times: np.ndarray,
+    temperatures: np.ndarray,
+    mass: float,
+    cp_values: np.ndarray,
+    title: str = "Absorbed Power vs Time",
+    phase_name: str = "heating"
+) -> bytes:
+    """Generate absorbed power vs time plot with total energy annotation.
+
+    Power = m * Cp * dT/dt (W)
+
+    Parameters
+    ----------
+    times : np.ndarray
+        Time array in seconds
+    temperatures : np.ndarray
+        Temperature field [time, position]
+    mass : float
+        Part mass in kg
+    cp_values : np.ndarray
+        Specific heat values at each time point (J/kg·K)
+    title : str
+        Plot title
+    phase_name : str
+        Phase name (heating/tempering)
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Extract temperatures at 4 positions
+    temps = extract_four_point_temperatures(temperatures)
+
+    # Calculate time derivative and power
+    dt = np.diff(times)
+    dt[dt == 0] = 1e-6
+    time_mid = 0.5 * (times[:-1] + times[1:])
+
+    # Use average Cp for mid-points
+    cp_mid = 0.5 * (cp_values[:-1] + cp_values[1:])
+
+    # Calculate power for each position
+    total_energies = {}
+    for key in ['center', 'one_third', 'two_thirds', 'surface']:
+        T = temps[key]
+        dTdt = np.diff(T) / dt
+
+        # Power in kW (mass * Cp * dT/dt)
+        power_kw = (mass * cp_mid * dTdt) / 1000
+
+        # Only show positive power for heating phases
+        if phase_name in ('heating', 'tempering'):
+            power_kw = np.maximum(power_kw, 0)
+
+        ax.plot(time_mid, power_kw,
+                color=FOUR_POINT_COLORS[key],
+                linewidth=2,
+                label=FOUR_POINT_LABELS[key])
+
+        # Calculate total energy (integral of power over time)
+        # Energy = sum(P * dt) in kJ
+        energy_kj = np.sum(power_kw * dt)
+        total_energies[key] = energy_kj
+
+    # Calculate average energy across positions
+    avg_energy = np.mean(list(total_energies.values()))
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Absorbed Power (kW)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='upper right', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    # Add total energy annotation
+    textstr = f'Total Absorbed Energy:\n'
+    textstr += f'  Average: {avg_energy:.1f} kJ ({avg_energy/3600:.3f} kWh)\n'
+    textstr += f'  Center: {total_energies["center"]:.1f} kJ\n'
+    textstr += f'  Surface: {total_energies["surface"]:.1f} kJ'
+
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+    ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
+            verticalalignment='top', bbox=props)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
+
+
+def create_measured_absorbed_power_plot(
+    measured_data: List[dict],
+    mass: float,
+    cp_func,
+    title: str = "Measured Absorbed Power vs Time",
+    phase_name: str = "heating",
+    smooth_window: int = 10
+) -> bytes:
+    """Generate absorbed power vs time plot for measured TC data.
+
+    Parameters
+    ----------
+    measured_data : list
+        List of dicts with keys: name, times, temps
+    mass : float
+        Part mass in kg
+    cp_func : callable
+        Function that returns Cp(T) in J/kg·K
+    title : str
+        Plot title
+    phase_name : str
+        Phase name (heating/tempering)
+    smooth_window : int
+        Window size for smoothing
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    total_energies = []
+
+    for i, data in enumerate(measured_data):
+        times = np.array(data['times'])
+        temps = np.array(data['temps'])
+        name = data.get('name', f'TC{i+1}')
+
+        # Calculate dT/dt
+        dt = np.diff(times)
+        dt[dt == 0] = 1e-6
+        dTdt = np.diff(temps) / dt
+        time_mid = 0.5 * (times[:-1] + times[1:])
+        temp_mid = 0.5 * (temps[:-1] + temps[1:])
+
+        # Get Cp at mid-point temperatures
+        cp_mid = np.array([cp_func(t) for t in temp_mid])
+
+        # Power in kW
+        power_kw = (mass * cp_mid * dTdt) / 1000
+
+        # Apply smoothing
+        if smooth_window > 1:
+            power_kw = moving_average(power_kw, smooth_window)
+
+        # Only show positive power for heating
+        if phase_name in ('heating', 'tempering'):
+            power_kw = np.maximum(power_kw, 0)
+
+        color = TC_COLORS[i % len(TC_COLORS)]
+        ax.plot(time_mid, power_kw, color=color, linewidth=1.5, label=name, alpha=0.9)
+
+        # Calculate total energy
+        energy_kj = np.sum(np.maximum(power_kw, 0) * dt)
+        total_energies.append((name, energy_kj))
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Absorbed Power (kW)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='upper right', fontsize=9)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    # Add total energy annotation
+    if total_energies:
+        textstr = 'Total Absorbed Energy:\n'
+        for name, energy in total_energies:
+            textstr += f'  {name}: {energy:.1f} kJ\n'
+        avg_energy = np.mean([e for _, e in total_energies])
+        textstr += f'  Average: {avg_energy:.1f} kJ ({avg_energy/3600:.3f} kWh)'
+
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+        ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=9,
+                verticalalignment='top', bbox=props)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
+
+
 def create_measured_dtdt_vs_temp_plot(
     measured_data: List[dict],
     title: str = "Measured dT/dt vs Temperature",

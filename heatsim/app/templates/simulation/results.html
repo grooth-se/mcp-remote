@@ -438,7 +438,96 @@
 </div>
 
 <!-- ============================================================ -->
-<!-- SECTION 4: Additional Results -->
+<!-- SECTION 4: Absorbed Power vs Time -->
+<!-- ============================================================ -->
+<h5 class="mt-4"><i class="bi bi-lightning-charge"></i> Absorbed Power vs Time</h5>
+
+<!-- Row 8: Simulation Absorbed Power per process step -->
+<div class="plot-grid">
+    <!-- Heating (Simulation) -->
+    <div class="card">
+        <div class="card-header">
+            <span class="badge bg-warning text-dark">Heating</span> Absorbed Power (Sim)
+        </div>
+        <div class="card-body text-center">
+            {% for result in power_heating %}
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Absorbed Power Heating">
+            {% endif %}
+            {% endfor %}
+            {% if not power_heating %}
+            <p class="text-muted my-4">-</p>
+            {% endif %}
+        </div>
+    </div>
+    <!-- Quenching - N/A (cooling, not heating) -->
+    <div class="card">
+        <div class="card-header">
+            <span class="badge bg-info">Quenching</span> Absorbed Power
+        </div>
+        <div class="card-body text-center">
+            <p class="text-muted my-4">N/A (Cooling phase)</p>
+        </div>
+    </div>
+    <!-- Tempering (Simulation) -->
+    <div class="card">
+        <div class="card-header">
+            <span class="badge bg-secondary">Tempering</span> Absorbed Power (Sim)
+        </div>
+        <div class="card-body text-center">
+            {% for result in power_tempering %}
+            {% if result.has_plot %}
+            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Absorbed Power Tempering">
+            {% endif %}
+            {% endfor %}
+            {% if not power_tempering %}
+            <p class="text-muted my-4">-</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Row 9: Measured Absorbed Power per process step -->
+<div class="plot-grid">
+    <!-- Heating (Measured) -->
+    <div class="card">
+        <div class="card-header">
+            <span class="badge bg-warning text-dark">Heating</span> Absorbed Power (Measured)
+        </div>
+        <div class="card-body text-center">
+            {% if measured_heating %}
+            <img src="{{ url_for('simulation.measured_absorbed_power_plot_step', id=sim.id, step='heating') }}" class="img-fluid" alt="Measured Absorbed Power Heating">
+            {% else %}
+            <p class="text-muted my-4">No data uploaded</p>
+            {% endif %}
+        </div>
+    </div>
+    <!-- Quenching (Measured) - N/A -->
+    <div class="card">
+        <div class="card-header">
+            <span class="badge bg-info">Quenching</span> Absorbed Power (Measured)
+        </div>
+        <div class="card-body text-center">
+            <p class="text-muted my-4">N/A (Cooling phase)</p>
+        </div>
+    </div>
+    <!-- Tempering (Measured) -->
+    <div class="card">
+        <div class="card-header">
+            <span class="badge bg-secondary">Tempering</span> Absorbed Power (Measured)
+        </div>
+        <div class="card-body text-center">
+            {% if measured_tempering %}
+            <img src="{{ url_for('simulation.measured_absorbed_power_plot_step', id=sim.id, step='tempering') }}" class="img-fluid" alt="Measured Absorbed Power Tempering">
+            {% else %}
+            <p class="text-muted my-4">No data uploaded</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 5: Additional Results -->
 <!-- ============================================================ -->
 {% if profiles or rates or phases %}
 <h5 class="mt-4"><i class="bi bi-bar-chart"></i> Additional Results</h5>
