@@ -13,6 +13,7 @@ from app.models.accounting import FiscalYear, Account
 from app.models.document import Document
 from app.forms.company import CompanyForm, FiscalYearForm, CertificateUploadForm
 from app.services.company_service import create_company
+from app.services import document_service as doc_svc
 from app.utils.validators import validate_org_number
 from app.models.audit import AuditLog
 
@@ -246,25 +247,19 @@ def upload_certificate(company_id):
 
     form = CertificateUploadForm()
     if form.validate_on_submit():
-        cert_dir = _upload_dir('certificates', str(company_id))
-        filename = secure_filename(form.file.data.filename)
-        filepath = os.path.join(cert_dir, filename)
-        form.file.data.save(filepath)
-
-        mime = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
-        doc = Document(
+        doc, error = doc_svc.upload_document(
             company_id=company_id,
-            document_type='certificate',
-            file_name=filename,
-            file_path=os.path.join('certificates', str(company_id), filename),
-            mime_type=mime,
+            file=form.file.data,
+            doc_type='certificate',
             description=form.description.data,
+            valid_from=form.valid_from.data,
             expiry_date=form.expiry_date.data,
-            uploaded_by=current_user.id,
+            user_id=current_user.id,
         )
-        db.session.add(doc)
-        db.session.commit()
-        flash(f'Dokumentet "{filename}" har laddats upp.', 'success')
+        if doc:
+            flash(f'Dokumentet "{doc.file_name}" har laddats upp.', 'success')
+        else:
+            flash(error or 'Uppladdningen misslyckades.', 'danger')
     else:
         flash('Välj en fil att ladda upp.', 'danger')
 

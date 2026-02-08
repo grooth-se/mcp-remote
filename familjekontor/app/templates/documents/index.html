@@ -14,11 +14,11 @@
                 {{ form.doc_type(class="form-select form-select-sm", style="width:auto") }}
             </div>
             <div class="col-auto">
-                {{ form.search(class="form-control form-control-sm", placeholder="Sok...", style="width:200px") }}
+                {{ form.search(class="form-control form-control-sm", placeholder="Sök...", style="width:200px") }}
             </div>
             <div class="col-auto">
                 <button type="submit" class="btn btn-sm btn-outline-primary">Filtrera</button>
-                <a href="{{ url_for('documents.index') }}" class="btn btn-sm btn-outline-secondary">Nollstall</a>
+                <a href="{{ url_for('documents.index') }}" class="btn btn-sm btn-outline-secondary">Nollställ</a>
             </div>
         </form>
     </div>
@@ -30,7 +30,7 @@
             <thead>
                 <tr>
                     <th></th><th>Filnamn</th><th>Typ</th><th>Beskrivning</th>
-                    <th>Kopplad till</th><th>Uppladdad</th><th></th>
+                    <th>Giltig från</th><th>Giltig till</th><th>Uppladdad</th><th></th>
                 </tr>
             </thead>
             <tbody>
@@ -50,15 +50,32 @@
                         {% endif %}
                     </td>
                     <td><a href="{{ url_for('documents.view', doc_id=doc.id) }}">{{ doc.file_name }}</a></td>
-                    <td><span class="badge bg-secondary">{{ doc.document_type or '-' }}</span></td>
-                    <td>{{ doc.description or '-' }}</td>
                     <td>
-                        {% if doc.verification_id %}
-                        <span class="badge bg-info">Ver #{{ doc.verification.verification_number if doc.verification else doc.verification_id }}</span>
-                        {% elif doc.invoice_id %}
-                        <span class="badge bg-warning">Lev.fakt</span>
-                        {% elif doc.customer_invoice_id %}
-                        <span class="badge bg-primary">Kundfakt</span>
+                        {% if doc.document_type == 'certificate' %}
+                        <span class="badge bg-info">Registreringsdokument</span>
+                        {% elif doc.document_type == 'faktura' %}
+                        <span class="badge bg-warning">Faktura</span>
+                        {% elif doc.document_type == 'avtal' %}
+                        <span class="badge bg-primary">Avtal</span>
+                        {% elif doc.document_type == 'intyg' %}
+                        <span class="badge bg-success">Intyg</span>
+                        {% elif doc.document_type == 'arsredovisning' %}
+                        <span class="badge bg-dark">Årsredovisning</span>
+                        {% elif doc.document_type == 'kvitto' %}
+                        <span class="badge bg-secondary">Kvitto</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ doc.document_type or '-' }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ doc.description or '-' }}</td>
+                    <td>{{ doc.valid_from or '-' }}</td>
+                    <td>
+                        {% if doc.expiry_date %}
+                            {% if doc.expiry_date < today %}
+                            <span class="text-danger fw-bold">{{ doc.expiry_date }}</span>
+                            {% else %}
+                            {{ doc.expiry_date }}
+                            {% endif %}
                         {% else %}-{% endif %}
                     </td>
                     <td>{{ doc.created_at.strftime('%Y-%m-%d') if doc.created_at else '-' }}</td>
@@ -69,7 +86,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7" class="text-muted">Inga dokument.</td></tr>
+                <tr><td colspan="8" class="text-muted">Inga dokument.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

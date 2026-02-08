@@ -4,22 +4,28 @@ from wtforms import StringField, SelectField, DateField, SubmitField
 from wtforms.validators import DataRequired, Optional, Length
 
 
+DOCUMENT_TYPE_CHOICES = [
+    ('faktura', 'Faktura'),
+    ('avtal', 'Avtal'),
+    ('intyg', 'Intyg'),
+    ('certificate', 'Registreringsdokument'),
+    ('arsredovisning', 'Årsredovisning'),
+    ('kvitto', 'Kvitto'),
+    ('ovrigt', 'Övrigt'),
+]
+
+
 class DocumentUploadForm(FlaskForm):
     file = FileField('Fil', validators=[
         FileRequired(),
         FileAllowed(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx',
-                      'xls', 'xlsx', 'csv', 'txt'], 'Otillaten filtyp.')
+                      'xls', 'xlsx', 'csv', 'txt'], 'Otillåten filtyp.')
     ])
-    document_type = SelectField('Dokumenttyp', choices=[
-        ('faktura', 'Faktura'),
-        ('avtal', 'Avtal'),
-        ('intyg', 'Intyg'),
-        ('arsredovisning', 'Arsredovisning'),
-        ('kvitto', 'Kvitto'),
-        ('ovrigt', 'Ovrigt'),
-    ], validators=[DataRequired()])
+    document_type = SelectField('Dokumenttyp', choices=DOCUMENT_TYPE_CHOICES,
+                                validators=[DataRequired()])
     description = StringField('Beskrivning', validators=[Optional(), Length(max=500)])
-    expiry_date = DateField('Utgar', validators=[Optional()])
+    valid_from = DateField('Giltig från', validators=[Optional()])
+    expiry_date = DateField('Giltig till', validators=[Optional()])
     submit = SubmitField('Ladda upp')
 
 
@@ -29,11 +35,12 @@ class DocumentFilterForm(FlaskForm):
         ('faktura', 'Faktura'),
         ('avtal', 'Avtal'),
         ('intyg', 'Intyg'),
-        ('arsredovisning', 'Arsredovisning'),
+        ('certificate', 'Registreringsdokument'),
+        ('arsredovisning', 'Årsredovisning'),
         ('kvitto', 'Kvitto'),
-        ('ovrigt', 'Ovrigt'),
+        ('ovrigt', 'Övrigt'),
     ], validators=[Optional()])
-    search = StringField('Sok', validators=[Optional()])
+    search = StringField('Sök', validators=[Optional()])
     submit = SubmitField('Filtrera')
 
 

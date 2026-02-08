@@ -12,6 +12,7 @@ class Document(db.Model):
     file_path = db.Column(db.String(500))
     mime_type = db.Column(db.String(100))
     description = db.Column(db.String(500), nullable=True)
+    valid_from = db.Column(db.Date)
     expiry_date = db.Column(db.Date)
     reminder_date = db.Column(db.Date)
     uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)

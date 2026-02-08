@@ -1,3 +1,4 @@
+from datetime import date, datetime
 from flask import (Blueprint, render_template, redirect, url_for, flash,
                    request, session, send_file, jsonify)
 from flask_login import login_required, current_user
@@ -19,7 +20,7 @@ def _get_company_id():
 def index():
     company_id = _get_company_id()
     if not company_id:
-        flash('Valj ett foretag forst.', 'warning')
+        flash('Välj ett företag först.', 'warning')
         return redirect(url_for('companies.index'))
 
     form = DocumentFilterForm(request.args, meta={'csrf': False})
@@ -28,12 +29,14 @@ def index():
     page = request.args.get('page', 1, type=int)
 
     pagination = document_service.get_documents(
-        company_id, doc_type=doc_type or None, search=search or None, page=page
+        company_id, doc_type=doc_type or None, search=search or None, page=page,
+        exclude_accounting=True
     )
 
     return render_template('documents/index.html',
                            form=form, pagination=pagination,
-                           doc_type=doc_type, search=search)
+                           doc_type=doc_type, search=search,
+                           today=date.today())
 
 
 @documents_bp.route('/upload', methods=['GET', 'POST'])
@@ -50,6 +53,7 @@ def upload():
             file=form.file.data,
             doc_type=form.document_type.data,
             description=form.description.data,
+            valid_from=form.valid_from.data,
             expiry_date=form.expiry_date.data,
             user_id=current_user.id,
         )
@@ -62,13 +66,29 @@ def upload():
     return render_template('documents/upload.html', form=form)
 
 
+@documents_bp.route('/api/analyze', methods=['POST'])
+@login_required
+def api_analyze():
+    """Analyze an uploaded file and return metadata suggestions."""
+    company_id = _get_company_id()
+    if not company_id:
+        return jsonify({'error': 'Inget företag valt'}), 400
+
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'Ingen fil'}), 400
+
+    result = document_service.analyze_file(file)
+    return jsonify(result)
+
+
 @documents_bp.route('/api/upload', methods=['POST'])
 @login_required
 def api_upload():
     """AJAX drag-and-drop upload endpoint."""
     company_id = _get_company_id()
     if not company_id:
-        return jsonify({'error': 'Inget foretag valt'}), 400
+        return jsonify({'error': 'Inget företag valt'}), 400
 
     file = request.files.get('file')
     if not file:
@@ -77,11 +97,29 @@ def api_upload():
     doc_type = request.form.get('document_type', 'ovrigt')
     description = request.form.get('description', '')
 
+    # Parse dates from form data
+    valid_from = None
+    expiry_date = None
+    valid_from_str = request.form.get('valid_from', '')
+    expiry_date_str = request.form.get('expiry_date', '')
+    if valid_from_str:
+        try:
+            valid_from = datetime.strptime(valid_from_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    if expiry_date_str:
+        try:
+            expiry_date = datetime.strptime(expiry_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+
     doc, error = document_service.upload_document(
         company_id=company_id,
         file=file,
         doc_type=doc_type,
         description=description,
+        valid_from=valid_from,
+        expiry_date=expiry_date,
         user_id=current_user.id,
     )
 

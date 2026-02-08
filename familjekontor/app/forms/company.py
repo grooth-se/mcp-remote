@@ -45,5 +45,6 @@ class FiscalYearForm(FlaskForm):
 class CertificateUploadForm(FlaskForm):
     file = FileField('Fil', validators=[FileRequired('Välj en fil.')])
     description = StringField('Beskrivning', validators=[Optional(), Length(max=500)])
-    expiry_date = DateField('Utgångsdatum', validators=[Optional()])
+    valid_from = DateField('Giltig från', validators=[Optional()])
+    expiry_date = DateField('Giltig till', validators=[Optional()])
     submit = SubmitField('Ladda upp')

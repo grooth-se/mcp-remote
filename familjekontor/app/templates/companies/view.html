@@ -100,16 +100,21 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-folder2-open"></i> Registerdokument</span>
-        <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#uploadForm">
-            <i class="bi bi-upload"></i> Ladda upp
-        </button>
+        <div>
+            <a href="{{ url_for('documents.index', doc_type='certificate') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-list"></i> Visa alla
+            </a>
+            <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#uploadForm">
+                <i class="bi bi-upload"></i> Ladda upp
+            </button>
+        </div>
     </div>
     <div class="collapse" id="uploadForm">
         <div class="card-body border-bottom bg-light">
             <form method="POST" action="{{ url_for('companies.upload_certificate', company_id=company.id) }}" enctype="multipart/form-data">
                 {{ upload_form.hidden_tag() }}
                 <div class="row g-2 align-items-end">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         {{ upload_form.file.label(class="form-label") }}
                         {{ upload_form.file(class="form-control form-control-sm") }}
                     </div>
@@ -117,7 +122,11 @@
                         {{ upload_form.description.label(class="form-label") }}
                         {{ upload_form.description(class="form-control form-control-sm", placeholder="Valfri beskrivning") }}
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
+                        {{ upload_form.valid_from.label(class="form-label") }}
+                        {{ upload_form.valid_from(class="form-control form-control-sm", type="date") }}
+                    </div>
+                    <div class="col-md-2">
                         {{ upload_form.expiry_date.label(class="form-label") }}
                         {{ upload_form.expiry_date(class="form-control form-control-sm", type="date") }}
                     </div>
@@ -134,8 +143,9 @@
                 <tr>
                     <th>Filnamn</th>
                     <th>Beskrivning</th>
+                    <th>Giltig från</th>
+                    <th>Giltig till</th>
                     <th>Uppladdad</th>
-                    <th>Utgår</th>
                     <th></th>
                 </tr>
             </thead>
@@ -143,12 +153,12 @@
                 {% for doc in documents %}
                 <tr{% if doc.expiry_date and doc.expiry_date < today %} class="table-danger"{% endif %}>
                     <td>
-                        <a href="{{ url_for('companies.download_certificate', company_id=company.id, doc_id=doc.id) }}" target="_blank">
+                        <a href="{{ url_for('documents.view', doc_id=doc.id) }}">
                             <i class="bi bi-file-earmark"></i> {{ doc.file_name }}
                         </a>
                     </td>
                     <td>{{ doc.description or '-' }}</td>
-                    <td>{{ doc.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ doc.valid_from or '-' }}</td>
                     <td>
                         {% if doc.expiry_date %}
                             {% if doc.expiry_date < today %}
@@ -160,6 +170,7 @@
                         -
                         {% endif %}
                     </td>
+                    <td>{{ doc.created_at.strftime('%Y-%m-%d') }}</td>
                     <td>
                         <form method="POST" action="{{ url_for('companies.delete_certificate', company_id=company.id, doc_id=doc.id) }}" class="d-inline"
                               onsubmit="return confirm('Ta bort detta dokument?')">
@@ -171,7 +182,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5" class="text-muted">Inga dokument uppladdade.</td></tr>
+                <tr><td colspan="6" class="text-muted">Inga dokument uppladdade.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
