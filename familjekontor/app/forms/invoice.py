@@ -1,4 +1,5 @@
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, SelectField, DecimalField, DateField, SubmitField
 from wtforms.validators import DataRequired, Optional, Length
 from app.utils.currency import currency_choices
@@ -18,6 +19,9 @@ class SupplierForm(FlaskForm):
 
 class SupplierInvoiceForm(FlaskForm):
     supplier_id = SelectField('Leverantör', coerce=int, validators=[DataRequired()])
+    invoice_pdf = FileField('Faktura-PDF', validators=[
+        Optional(), FileAllowed(['pdf'], 'Endast PDF-filer.')
+    ])
     invoice_number = StringField('Fakturanummer', validators=[DataRequired()])
     invoice_date = DateField('Fakturadatum', validators=[DataRequired()])
     due_date = DateField('Förfallodatum', validators=[DataRequired()])

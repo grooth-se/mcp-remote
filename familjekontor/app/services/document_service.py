@@ -178,6 +178,140 @@ def analyze_file(file_storage):
     return result
 
 
+# --- Invoice-specific PDF analysis ---
+
+INVOICE_NUMBER_PATTERNS = [
+    r'(?:fakturanr|fakturanummer|invoice\s*no\.?|invoice\s*number)[:\s]*(\S+)',
+    r'(?:faktura)\s*#\s*(\S+)',
+]
+
+INVOICE_DATE_KEYWORDS = ['fakturadatum', 'invoice date']
+DUE_DATE_KEYWORDS = ['förfallodatum', 'forfallodatum', 'förfallodag', 'due date',
+                      'betalningsdatum', 'betalas senast']
+
+AMOUNT_EXCL_KEYWORDS = ['netto', 'exkl moms', 'exkl. moms', 'subtotal', 'net amount',
+                         'belopp exkl']
+VAT_AMOUNT_KEYWORDS = ['moms', 'vat', 'mervärdesskatt', 'mervärdeskatt']
+TOTAL_AMOUNT_KEYWORDS = ['att betala', 'totalt', 'total', 'summa att betala',
+                          'amount due', 'summa']
+
+CURRENCY_CODES = ['SEK', 'EUR', 'USD', 'NOK', 'DKK', 'GBP']
+ORG_NUMBER_PATTERN = re.compile(r'\b(\d{6})-?(\d{4})\b')
+AMOUNT_PATTERN = re.compile(r'[\d\s\xa0]+[,\.]\d{2}')
+
+
+def _parse_swedish_amount(text):
+    """Parse Swedish-format amount like '1 234,50' to float string '1234.50'."""
+    cleaned = text.replace('\xa0', '').replace(' ', '').replace(',', '.')
+    try:
+        val = float(cleaned)
+        return f'{val:.2f}'
+    except (ValueError, TypeError):
+        return None
+
+
+def _find_amount_near_keyword(lines, keywords):
+    """Find an amount value on a line containing one of the keywords."""
+    for line in lines:
+        line_lower = line.lower()
+        if any(kw in line_lower for kw in keywords):
+            match = AMOUNT_PATTERN.search(line)
+            if match:
+                return _parse_swedish_amount(match.group())
+    return None
+
+
+def _find_date_near_keyword(lines, keywords, all_dates):
+    """Find a date on a line containing one of the keywords."""
+    for line in lines:
+        line_lower = line.lower()
+        if any(kw in line_lower for kw in keywords):
+            line_dates = _extract_dates(line)
+            if line_dates:
+                return line_dates[0][0]
+    return None
+
+
+def analyze_invoice_pdf(file_storage):
+    """Analyze a supplier invoice PDF and extract invoice fields.
+
+    Returns:
+        dict with: invoice_number, invoice_date, due_date,
+                   amount_excl_vat, vat_amount, total_amount,
+                   org_number, currency
+    """
+    result = {
+        'invoice_number': None,
+        'invoice_date': None,
+        'due_date': None,
+        'amount_excl_vat': None,
+        'vat_amount': None,
+        'total_amount': None,
+        'org_number': None,
+        'currency': None,
+    }
+
+    try:
+        import pdfplumber
+        file_storage.seek(0)
+        with pdfplumber.open(file_storage) as pdf:
+            text = ''
+            for page in pdf.pages[:2]:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + '\n'
+        file_storage.seek(0)
+    except Exception:
+        file_storage.seek(0)
+        return result
+
+    if not text.strip():
+        return result
+
+    lines = text.split('\n')
+    text_lower = text.lower()
+
+    # Invoice number
+    for pattern in INVOICE_NUMBER_PATTERNS:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            result['invoice_number'] = match.group(1).strip().rstrip('.')
+            break
+
+    # All dates for fallback
+    all_dates = _extract_dates(text)
+
+    # Invoice date
+    result['invoice_date'] = _find_date_near_keyword(lines, INVOICE_DATE_KEYWORDS, all_dates)
+
+    # Due date
+    result['due_date'] = _find_date_near_keyword(lines, DUE_DATE_KEYWORDS, all_dates)
+
+    # Fallback: if we have dates but no keyword match, use first two
+    if not result['invoice_date'] and all_dates:
+        result['invoice_date'] = all_dates[0][0]
+    if not result['due_date'] and len(all_dates) > 1:
+        result['due_date'] = all_dates[1][0]
+
+    # Amounts
+    result['total_amount'] = _find_amount_near_keyword(lines, TOTAL_AMOUNT_KEYWORDS)
+    result['amount_excl_vat'] = _find_amount_near_keyword(lines, AMOUNT_EXCL_KEYWORDS)
+    result['vat_amount'] = _find_amount_near_keyword(lines, VAT_AMOUNT_KEYWORDS)
+
+    # Org number
+    org_match = ORG_NUMBER_PATTERN.search(text)
+    if org_match:
+        result['org_number'] = f'{org_match.group(1)}-{org_match.group(2)}'
+
+    # Currency
+    for code in CURRENCY_CODES:
+        if code in text:
+            result['currency'] = code
+            break
+
+    return result
+
+
 def upload_document(company_id, file, doc_type, description=None,
                     valid_from=None, expiry_date=None,
                     verification_id=None, invoice_id=None, customer_invoice_id=None,

@@ -1,10 +1,11 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, send_file
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, send_file, jsonify
 from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice, InvoiceLineItem
 from app.models.audit import AuditLog
 from app.forms.invoice import (SupplierForm, SupplierInvoiceForm, CustomerForm,
                                 CustomerInvoiceForm, InvoiceLineItemForm)
+from app.services import document_service
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -51,6 +52,34 @@ def new_supplier():
     return render_template('invoices/new_supplier.html', form=form)
 
 
+# === Supplier Invoice PDF Analysis ===
+
+@invoices_bp.route('/api/analyze-invoice-pdf', methods=['POST'])
+@login_required
+def api_analyze_invoice_pdf():
+    """Analyze uploaded invoice PDF, return extracted fields as JSON."""
+    company_id = session.get('active_company_id')
+    if not company_id:
+        return jsonify({'error': 'Inget företag valt'}), 400
+
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'Ingen fil'}), 400
+
+    result = document_service.analyze_invoice_pdf(file)
+
+    # Try to match supplier by org_number
+    if result.get('org_number'):
+        supplier = Supplier.query.filter_by(
+            company_id=company_id, active=True
+        ).filter(Supplier.org_number.ilike(f'%{result["org_number"]}%')).first()
+        if supplier:
+            result['supplier_id'] = supplier.id
+            result['supplier_name'] = supplier.name
+
+    return jsonify(result)
+
+
 # === Supplier Invoices ===
 
 @invoices_bp.route('/supplier-invoices')
@@ -94,6 +123,22 @@ def new_supplier_invoice():
             status='pending',
         )
         db.session.add(invoice)
+        db.session.flush()
+
+        # Handle PDF upload
+        pdf_file = request.files.get('invoice_pdf')
+        if pdf_file and pdf_file.filename:
+            doc, error = document_service.upload_document(
+                company_id=company_id,
+                file=pdf_file,
+                doc_type='faktura',
+                description=f'Leverantörsfaktura {form.invoice_number.data}',
+                invoice_id=invoice.id,
+                user_id=current_user.id,
+            )
+            if doc:
+                invoice.document_id = doc.id
+
         db.session.commit()
         flash('Leverantörsfaktura har skapats.', 'success')
         return redirect(url_for('invoices.supplier_invoices'))

@@ -7,6 +7,7 @@ from app.models.accounting import FiscalYear, Account, Verification, Verificatio
 from app.models.audit import AuditLog
 from app.forms.accounting import VerificationForm
 from app.services.accounting_service import create_verification, get_trial_balance
+from app.services import document_service
 
 accounting_bp = Blueprint('accounting', __name__)
 
@@ -132,6 +133,43 @@ def view_verification(verification_id):
         flash('Verifikationen hittades inte.', 'danger')
         return redirect(url_for('accounting.index'))
     return render_template('accounting/view_verification.html', verification=ver)
+
+
+@accounting_bp.route('/verification/<int:verification_id>/upload-document', methods=['POST'])
+@login_required
+def upload_verification_document(verification_id):
+    company_id = session.get('active_company_id')
+    if not company_id:
+        return redirect(url_for('companies.index'))
+
+    ver = db.session.get(Verification, verification_id)
+    if not ver or ver.company_id != company_id:
+        flash('Verifikationen hittades inte.', 'danger')
+        return redirect(url_for('accounting.index'))
+
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('accounting.view_verification', verification_id=verification_id))
+
+    file = request.files.get('document')
+    if not file or not file.filename:
+        flash('Ingen fil vald.', 'warning')
+        return redirect(url_for('accounting.view_verification', verification_id=verification_id))
+
+    doc, error = document_service.upload_document(
+        company_id=company_id,
+        file=file,
+        doc_type='underlag',
+        description=f'Verifikation #{ver.verification_number}',
+        verification_id=verification_id,
+        user_id=current_user.id,
+    )
+    if error:
+        flash(f'Uppladdning misslyckades: {error}', 'danger')
+    else:
+        flash('Dokument har laddats upp.', 'success')
+
+    return redirect(url_for('accounting.view_verification', verification_id=verification_id))
 
 
 @accounting_bp.route('/trial-balance')

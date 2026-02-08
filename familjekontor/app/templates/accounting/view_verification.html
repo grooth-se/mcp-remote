@@ -59,10 +59,10 @@
     </div>
 </div>
 
-{# Attached documents #}
-{% if verification.documents %}
+{# Attached documents — always visible #}
 <div class="card mt-4">
     <div class="card-header"><i class="bi bi-paperclip"></i> Bifogade dokument</div>
+    {% if verification.documents %}
     <div class="list-group list-group-flush">
         {% for doc in verification.documents %}
         <a href="{{ url_for('documents.view', doc_id=doc.id) }}" class="list-group-item list-group-item-action">
@@ -71,6 +71,17 @@
         </a>
         {% endfor %}
     </div>
+    {% else %}
+    <div class="card-body text-muted">Inga dokument bifogade.</div>
+    {% endif %}
+    {% if not current_user.is_readonly %}
+    <div class="card-footer">
+        <form method="POST" action="{{ url_for('accounting.upload_verification_document', verification_id=verification.id) }}" enctype="multipart/form-data" class="d-flex gap-2 align-items-center">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="file" name="document" class="form-control form-control-sm" required>
+            <button type="submit" class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-upload"></i> Ladda upp</button>
+        </form>
+    </div>
+    {% endif %}
 </div>
-{% endif %}
 {% endblock %}
