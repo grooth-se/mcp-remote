@@ -166,9 +166,13 @@ def new_supplier_invoice():
                 vat_amount = Decimal(str(form.vat_amount.data or 0))
                 total = Decimal(str(form.total_amount.data or 0))
 
+                # Handle öresavrundning — adjust expense to balance
+                rounding = total - (excl_amount + vat_amount)
+                adjusted_excl = excl_amount + rounding
+
                 rows.append({
                     'account_id': expense_acct.id,
-                    'debit': excl_amount,
+                    'debit': adjusted_excl,
                     'credit': Decimal('0'),
                     'description': form.invoice_number.data,
                 })
