@@ -197,7 +197,8 @@ AMOUNT_EXCL_KEYWORDS = ['ex. moms', 'ex moms', 'exkl moms', 'exkl. moms', 'delsu
 VAT_AMOUNT_KEYWORDS = ['varav moms', 'momsbelopp', '% moms', 'moms ', 'moms:',
                         'moms\t', 'mervärdesskatt', 'mervärdeskatt', 'vat amount', 'vat ']
 VAT_EXCLUDE_WORDS = ['momsnr', 'momsreg', 'momsnummer', 'momsregistrering',
-                      'vårt momsnummer', 'ert momsnummer', 'vat number', 'vat no']
+                      'vårt momsnummer', 'ert momsnummer', 'vat number', 'vat no',
+                      'inkl moms', 'inkl. moms', 'summa inkl']
 TOTAL_AMOUNT_KEYWORDS = ['att betala', 'summa att betala', 'totalt att betala',
                           'amount due', 'total amount', 'total att betala',
                           'totalt ', 'totalt:', 'total ']
@@ -318,12 +319,33 @@ def analyze_invoice_pdf(file_storage):
     lines = text.split('\n')
     text_lower = text.lower()
 
-    # Invoice number
+    # Invoice number — try regex patterns first
     for pattern in INVOICE_NUMBER_PATTERNS:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
-            result['invoice_number'] = match.group(1).strip().rstrip('.')
-            break
+            candidate = match.group(1).strip().rstrip('.')
+            # If captured text is another keyword, look at the next line instead
+            if candidate.lower() in ('fakturadatum', 'datum', 'date', 'sida'):
+                continue
+            # Must contain at least one digit to be a valid invoice number
+            if re.search(r'\d', candidate):
+                result['invoice_number'] = candidate
+                break
+
+    # Fallback: label on one line, value on the next (e.g. "Fakturanummer\n12601107583")
+    if not result['invoice_number']:
+        inv_label_kw = ['fakturanummer', 'fakturanr', 'invoice number', 'invoice no']
+        for i, line in enumerate(lines):
+            if any(kw in line.lower() for kw in inv_label_kw) and i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                # Take first token that looks like a number
+                tokens = next_line.split()
+                for token in tokens:
+                    if re.search(r'\d', token):
+                        result['invoice_number'] = token
+                        break
+                if result['invoice_number']:
+                    break
 
     # All dates for fallback
     all_dates = _extract_dates(text)
