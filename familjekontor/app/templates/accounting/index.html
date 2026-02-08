@@ -19,7 +19,7 @@
 <div class="table-responsive">
     <table class="table table-hover">
         <thead>
-            <tr><th>#</th><th>Datum</th><th>Beskrivning</th><th>Typ</th><th class="text-end">Debet</th><th class="text-end">Kredit</th><th></th></tr>
+            <tr><th>#</th><th>Datum</th><th>Beskrivning</th><th>Typ</th><th class="text-end">Debet</th><th class="text-end">Kredit</th><th><i class="bi bi-paperclip"></i></th><th></th></tr>
         </thead>
         <tbody>
             {% for ver in verifications %}
@@ -30,12 +30,30 @@
                 <td>{{ ver.verification_type }}</td>
                 <td class="text-end">{{ "%.2f"|format(ver.total_debit) }}</td>
                 <td class="text-end">{{ "%.2f"|format(ver.total_credit) }}</td>
+                <td>
+                    {% if ver.documents %}
+                    <span class="text-primary" style="cursor:pointer;"
+                          data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true"
+                          data-bs-content="{% for doc in ver.documents %}<a href='{{ url_for('documents.view', doc_id=doc.id) }}'>{{ doc.file_name }}</a><br>{% endfor %}">
+                        <i class="bi bi-paperclip"></i> {{ ver.documents|length }}
+                    </span>
+                    {% endif %}
+                </td>
                 <td><a href="{{ url_for('accounting.view_verification', verification_id=ver.id) }}" class="btn btn-sm btn-outline-primary">Visa</a></td>
             </tr>
             {% else %}
-            <tr><td colspan="7" class="text-muted">Inga verifikationer.</td></tr>
+            <tr><td colspan="8" class="text-muted">Inga verifikationer.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var popoverList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    popoverList.forEach(function(el) { new bootstrap.Popover(el); });
+});
+</script>
 {% endblock %}

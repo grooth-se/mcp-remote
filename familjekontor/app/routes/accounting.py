@@ -3,6 +3,7 @@ from decimal import Decimal
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify
 from flask_login import login_required, current_user
 from app.extensions import db
+from sqlalchemy.orm import joinedload
 from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.models.audit import AuditLog
 from app.forms.accounting import VerificationForm
@@ -32,7 +33,9 @@ def index():
     fiscal_years = FiscalYear.query.filter_by(company_id=company_id).order_by(FiscalYear.year.desc()).all()
 
     if fiscal_year_id:
-        verifications = Verification.query.filter_by(
+        verifications = Verification.query.options(
+            joinedload(Verification.documents)
+        ).filter_by(
             company_id=company_id, fiscal_year_id=fiscal_year_id
         ).order_by(Verification.verification_number.desc()).all()
 

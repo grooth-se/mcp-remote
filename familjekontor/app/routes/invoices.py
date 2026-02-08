@@ -1,11 +1,14 @@
+from decimal import Decimal
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, send_file, jsonify
 from flask_login import login_required, current_user
 from app.extensions import db
+from app.models.accounting import FiscalYear, Account
 from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice, InvoiceLineItem
 from app.models.audit import AuditLog
 from app.forms.invoice import (SupplierForm, SupplierInvoiceForm, CustomerForm,
                                 CustomerInvoiceForm, InvoiceLineItemForm)
 from app.services import document_service
+from app.services.accounting_service import create_verification
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -110,6 +113,7 @@ def new_supplier_invoice():
     form.supplier_id.choices = [(s.id, s.name) for s in suppliers]
 
     if form.validate_on_submit():
+        supplier = db.session.get(Supplier, form.supplier_id.data)
         invoice = SupplierInvoice(
             company_id=company_id,
             supplier_id=form.supplier_id.data,
@@ -126,6 +130,7 @@ def new_supplier_invoice():
         db.session.flush()
 
         # Handle PDF upload
+        uploaded_doc = None
         pdf_file = request.files.get('invoice_pdf')
         if pdf_file and pdf_file.filename:
             doc, error = document_service.upload_document(
@@ -138,8 +143,75 @@ def new_supplier_invoice():
             )
             if doc:
                 invoice.document_id = doc.id
+                uploaded_doc = doc
 
-        db.session.commit()
+        # Auto-create accounting verification
+        fy = FiscalYear.query.filter_by(
+            company_id=company_id, status='open'
+        ).order_by(FiscalYear.year.desc()).first()
+
+        if fy:
+            expense_num = (supplier.default_account if supplier and supplier.default_account
+                           else '4000')
+            expense_acct = Account.query.filter_by(
+                company_id=company_id, account_number=expense_num).first()
+            vat_acct = Account.query.filter_by(
+                company_id=company_id, account_number='2640').first()
+            payable_acct = Account.query.filter_by(
+                company_id=company_id, account_number='2440').first()
+
+            if expense_acct and payable_acct:
+                rows = []
+                excl_amount = Decimal(str(form.amount_excl_vat.data or 0))
+                vat_amount = Decimal(str(form.vat_amount.data or 0))
+                total = Decimal(str(form.total_amount.data or 0))
+
+                rows.append({
+                    'account_id': expense_acct.id,
+                    'debit': excl_amount,
+                    'credit': Decimal('0'),
+                    'description': form.invoice_number.data,
+                })
+                if vat_amount > 0 and vat_acct:
+                    rows.append({
+                        'account_id': vat_acct.id,
+                        'debit': vat_amount,
+                        'credit': Decimal('0'),
+                        'description': 'Ingående moms',
+                    })
+                rows.append({
+                    'account_id': payable_acct.id,
+                    'debit': Decimal('0'),
+                    'credit': total,
+                    'description': form.invoice_number.data,
+                })
+
+                try:
+                    supplier_name = supplier.name if supplier else ''
+                    ver = create_verification(
+                        company_id=company_id,
+                        fiscal_year_id=fy.id,
+                        verification_date=form.invoice_date.data,
+                        description=f'Lev.faktura {form.invoice_number.data} — {supplier_name}',
+                        rows=rows,
+                        verification_type='supplier',
+                        created_by=current_user.id,
+                        source='supplier_invoice',
+                    )
+                    invoice.verification_id = ver.id
+                    if uploaded_doc:
+                        uploaded_doc.verification_id = ver.id
+                    db.session.commit()
+                except ValueError as e:
+                    db.session.commit()
+                    flash(f'Faktura sparad, men verifikation kunde inte skapas: {e}', 'warning')
+            else:
+                db.session.commit()
+                flash('Faktura sparad. Konton 4000/2440 saknas — ingen verifikation skapades.', 'warning')
+        else:
+            db.session.commit()
+            flash('Faktura sparad. Inget öppet räkenskapsår — ingen verifikation skapades.', 'warning')
+
         flash('Leverantörsfaktura har skapats.', 'success')
         return redirect(url_for('invoices.supplier_invoices'))
 

@@ -189,15 +189,18 @@ INVOICE_DATE_KEYWORDS = ['fakturadatum', 'invoice date']
 DUE_DATE_KEYWORDS = ['förfallodatum', 'forfallodatum', 'förfallodag', 'due date',
                       'betalningsdatum', 'betalas senast']
 
-AMOUNT_EXCL_KEYWORDS = ['netto', 'exkl moms', 'exkl. moms', 'subtotal', 'net amount',
-                         'belopp exkl']
-VAT_AMOUNT_KEYWORDS = ['moms', 'vat', 'mervärdesskatt', 'mervärdeskatt']
-TOTAL_AMOUNT_KEYWORDS = ['att betala', 'totalt', 'total', 'summa att betala',
-                          'amount due', 'summa']
+AMOUNT_EXCL_KEYWORDS = ['exkl moms', 'exkl. moms', 'netto', 'nettosumma', 'subtotal',
+                         'net amount', 'belopp exkl', 'belopp före moms']
+VAT_AMOUNT_KEYWORDS = ['varav moms', 'momsbelopp', 'moms ', 'moms:', 'moms\t',
+                        'mervärdesskatt', 'mervärdeskatt', 'vat amount', 'vat ']
+VAT_EXCLUDE_WORDS = ['momsnr', 'momsreg', 'momsnummer', 'momsregistrering']
+TOTAL_AMOUNT_KEYWORDS = ['att betala', 'summa att betala', 'totalt att betala',
+                          'amount due', 'total amount', 'total att betala',
+                          'totalt ', 'totalt:', 'summa ', 'summa:', 'total ']
 
 CURRENCY_CODES = ['SEK', 'EUR', 'USD', 'NOK', 'DKK', 'GBP']
 ORG_NUMBER_PATTERN = re.compile(r'\b(\d{6})-?(\d{4})\b')
-AMOUNT_PATTERN = re.compile(r'[\d\s\xa0]+[,\.]\d{2}')
+AMOUNT_PATTERN = re.compile(r'\d[\d\s\xa0]*[,\.]\d{2}')
 
 
 def _parse_swedish_amount(text):
@@ -210,10 +213,15 @@ def _parse_swedish_amount(text):
         return None
 
 
-def _find_amount_near_keyword(lines, keywords):
-    """Find an amount value on a line containing one of the keywords."""
-    for line in lines:
+def _find_amount_near_keyword(lines, keywords, exclude_words=None):
+    """Find an amount value on a line containing one of the keywords.
+
+    Searches bottom-up since totals usually appear near the end of invoices.
+    """
+    for line in reversed(lines):
         line_lower = line.lower()
+        if exclude_words and any(ew in line_lower for ew in exclude_words):
+            continue
         if any(kw in line_lower for kw in keywords):
             match = AMOUNT_PATTERN.search(line)
             if match:
@@ -230,6 +238,26 @@ def _find_date_near_keyword(lines, keywords, all_dates):
             if line_dates:
                 return line_dates[0][0]
     return None
+
+
+def _cross_validate_amounts(result):
+    """If two of three amounts are known, derive the third."""
+    def _to_float(v):
+        try:
+            return float(v) if v else None
+        except (ValueError, TypeError):
+            return None
+
+    total = _to_float(result.get('total_amount'))
+    excl = _to_float(result.get('amount_excl_vat'))
+    vat = _to_float(result.get('vat_amount'))
+
+    if total and excl and not vat:
+        result['vat_amount'] = f'{total - excl:.2f}'
+    elif total and vat and not excl:
+        result['amount_excl_vat'] = f'{total - vat:.2f}'
+    elif excl and vat and not total:
+        result['total_amount'] = f'{excl + vat:.2f}'
 
 
 def analyze_invoice_pdf(file_storage):
@@ -293,10 +321,14 @@ def analyze_invoice_pdf(file_storage):
     if not result['due_date'] and len(all_dates) > 1:
         result['due_date'] = all_dates[1][0]
 
-    # Amounts
+    # Amounts — search bottom-up, exclude false VAT matches
     result['total_amount'] = _find_amount_near_keyword(lines, TOTAL_AMOUNT_KEYWORDS)
     result['amount_excl_vat'] = _find_amount_near_keyword(lines, AMOUNT_EXCL_KEYWORDS)
-    result['vat_amount'] = _find_amount_near_keyword(lines, VAT_AMOUNT_KEYWORDS)
+    result['vat_amount'] = _find_amount_near_keyword(
+        lines, VAT_AMOUNT_KEYWORDS, exclude_words=VAT_EXCLUDE_WORDS)
+
+    # Cross-validation: derive missing amount from the other two
+    _cross_validate_amounts(result)
 
     # Org number
     org_match = ORG_NUMBER_PATTERN.search(text)
