@@ -4,6 +4,7 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.accounting import FiscalYear, Account
 from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice, InvoiceLineItem
+from app.models.bank import BankAccount
 from app.models.audit import AuditLog
 from app.forms.invoice import (SupplierForm, SupplierInvoiceForm, CustomerForm,
                                 CustomerInvoiceForm, InvoiceLineItemForm)
@@ -246,12 +247,59 @@ def pay_supplier_invoice(invoice_id):
     if invoice:
         old_status = invoice.status
         invoice.status = 'paid'
+        from datetime import datetime, timezone
+        invoice.paid_at = datetime.now(timezone.utc)
+
         audit = AuditLog(
             company_id=invoice.company_id, user_id=current_user.id,
             action='update', entity_type='supplier_invoice', entity_id=invoice.id,
             old_values={'status': old_status}, new_values={'status': 'paid'},
         )
         db.session.add(audit)
+
+        # Auto-create payment verification
+        company_id = invoice.company_id
+        fy = FiscalYear.query.filter_by(
+            company_id=company_id, status='open'
+        ).order_by(FiscalYear.year.desc()).first()
+
+        if fy and invoice.total_amount:
+            payable_acct = Account.query.filter_by(
+                company_id=company_id, account_number='2440').first()
+
+            # Use bank account's ledger account, default to 1930
+            bank_account = BankAccount.query.filter_by(company_id=company_id).first()
+            bank_num = bank_account.ledger_account if bank_account else '1930'
+            bank_acct = Account.query.filter_by(
+                company_id=company_id, account_number=bank_num).first()
+
+            if payable_acct and bank_acct:
+                total = Decimal(str(invoice.total_amount))
+                rows = [
+                    {'account_id': payable_acct.id, 'debit': total, 'credit': Decimal('0'),
+                     'description': invoice.invoice_number},
+                    {'account_id': bank_acct.id, 'debit': Decimal('0'), 'credit': total,
+                     'description': invoice.invoice_number},
+                ]
+                try:
+                    ver = create_verification(
+                        company_id=company_id,
+                        fiscal_year_id=fy.id,
+                        verification_date=invoice.paid_at.date(),
+                        description=f'Betalning lev.faktura {invoice.invoice_number}',
+                        rows=rows,
+                        verification_type='bank',
+                        created_by=current_user.id,
+                        source='supplier_invoice_payment',
+                    )
+                    invoice.payment_verification_id = ver.id
+                except ValueError as e:
+                    flash(f'Betalningsverifikation kunde inte skapas: {e}', 'warning')
+            else:
+                flash('Konto 2440 eller bankkonto saknas — ingen betalningsverifikation skapades.', 'warning')
+        elif not fy:
+            flash('Inget öppet räkenskapsår — ingen betalningsverifikation skapades.', 'warning')
+
         db.session.commit()
         flash('Fakturan har markerats som betald.', 'success')
     return redirect(url_for('invoices.supplier_invoices'))
@@ -372,6 +420,49 @@ def mark_customer_invoice_paid(invoice_id):
         invoice.status = 'paid'
         from datetime import datetime, timezone
         invoice.paid_at = datetime.now(timezone.utc)
+
+        # Auto-create payment verification
+        company_id = invoice.company_id
+        fy = FiscalYear.query.filter_by(
+            company_id=company_id, status='open'
+        ).order_by(FiscalYear.year.desc()).first()
+
+        if fy and invoice.total_amount:
+            receivable_acct = Account.query.filter_by(
+                company_id=company_id, account_number='1510').first()
+
+            bank_account = BankAccount.query.filter_by(company_id=company_id).first()
+            bank_num = bank_account.ledger_account if bank_account else '1930'
+            bank_acct = Account.query.filter_by(
+                company_id=company_id, account_number=bank_num).first()
+
+            if receivable_acct and bank_acct:
+                total = Decimal(str(invoice.total_amount))
+                rows = [
+                    {'account_id': bank_acct.id, 'debit': total, 'credit': Decimal('0'),
+                     'description': invoice.invoice_number},
+                    {'account_id': receivable_acct.id, 'debit': Decimal('0'), 'credit': total,
+                     'description': invoice.invoice_number},
+                ]
+                try:
+                    ver = create_verification(
+                        company_id=company_id,
+                        fiscal_year_id=fy.id,
+                        verification_date=invoice.paid_at.date(),
+                        description=f'Betalning kundfaktura {invoice.invoice_number}',
+                        rows=rows,
+                        verification_type='customer',
+                        created_by=current_user.id,
+                        source='customer_invoice_payment',
+                    )
+                    invoice.payment_verification_id = ver.id
+                except ValueError as e:
+                    flash(f'Betalningsverifikation kunde inte skapas: {e}', 'warning')
+            else:
+                flash('Konto 1510 eller bankkonto saknas — ingen betalningsverifikation skapades.', 'warning')
+        elif not fy:
+            flash('Inget öppet räkenskapsår — ingen betalningsverifikation skapades.', 'warning')
+
         db.session.commit()
         flash('Fakturan har markerats som betald.', 'success')
     return redirect(url_for('invoices.customer_invoices'))

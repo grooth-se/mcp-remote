@@ -40,11 +40,14 @@ class SupplierInvoice(db.Model):
     currency = db.Column(db.String(3), default='SEK')
     status = db.Column(db.String(20), default='pending')  # pending, approved, paid, cancelled
     verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
+    payment_verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
     document_id = db.Column(db.Integer, db.ForeignKey('documents.id', use_alter=True, name='fk_supplier_invoice_document'), nullable=True)
+    paid_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     company = db.relationship('Company', backref='supplier_invoices')
-    verification = db.relationship('Verification')
+    verification = db.relationship('Verification', foreign_keys=[verification_id])
+    payment_verification = db.relationship('Verification', foreign_keys=[payment_verification_id])
 
     def __repr__(self):
         return f'<SupplierInvoice {self.invoice_number}>'
@@ -92,6 +95,7 @@ class CustomerInvoice(db.Model):
     vat_type = db.Column(db.String(20))  # standard, reverse_charge, export
     status = db.Column(db.String(20), default='draft')  # draft, sent, paid, overdue, cancelled
     verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
+    payment_verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
     sent_at = db.Column(db.DateTime)
     paid_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -102,7 +106,8 @@ class CustomerInvoice(db.Model):
     pdf_path = db.Column(db.String(500), nullable=True)
 
     company = db.relationship('Company', backref='customer_invoices')
-    verification = db.relationship('Verification')
+    verification = db.relationship('Verification', foreign_keys=[verification_id])
+    payment_verification = db.relationship('Verification', foreign_keys=[payment_verification_id])
     line_items = db.relationship('InvoiceLineItem', backref='customer_invoice',
                                  order_by='InvoiceLineItem.line_number',
                                  cascade='all, delete-orphan')
