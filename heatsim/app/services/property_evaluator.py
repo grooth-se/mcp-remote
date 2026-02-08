@@ -238,8 +238,8 @@ class PropertyPlotter:
         """Initialize plotter with default styling."""
         self.figure_size = (8, 5)
         self.dpi = 100
-        self.line_color = '#0d6efd'  # Bootstrap primary blue
-        self.marker_color = '#dc3545'  # Bootstrap danger red
+        self.line_color = '#1a5c5c'  # Dark blue-green (Subseatec theme)
+        self.marker_color = '#6c757d'  # Gray for data points
         self.grid_alpha = 0.3
 
     def plot_property(self, property_model, temp_range: tuple = None,
