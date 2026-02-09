@@ -98,7 +98,7 @@
                     </td>
                     <td>
                         {% if p.verification_id %}
-                        <a href="{{ url_for('accounting.view_verification', id=p.verification_id) }}">
+                        <a href="{{ url_for('accounting.view_verification', verification_id=p.verification_id) }}">
                             <i class="bi bi-link-45deg"></i> Ver #{{ p.verification_id }}
                         </a>
                         {% else %}
