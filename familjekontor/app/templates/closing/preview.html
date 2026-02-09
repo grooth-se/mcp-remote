@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Förhandsgranska bokslut — {{ fiscal_year.year }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('closing.index') }}">Årsbokslut</a></li>
+                <li class="breadcrumb-item active">Förhandsgranska {{ fiscal_year.year }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted">Intäkter</h6>
+                <h3 class="text-success">{{ "{:,.2f}".format(revenue) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted">Kostnader</h6>
+                <h3 class="text-danger">{{ "{:,.2f}".format(expenses) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card {% if year_result >= 0 %}border-primary{% else %}border-warning{% endif %}">
+            <div class="card-body text-center">
+                <h6 class="card-title text-muted">Årets resultat</h6>
+                <h3 class="{% if year_result >= 0 %}text-primary{% else %}text-warning{% endif %}">
+                    {{ "{:,.2f}".format(year_result) }} kr
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Resultatkonton att stänga</h5>
+            </div>
+            <div class="card-body">
+                {% if result_accounts %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Konto</th>
+                            <th>Namn</th>
+                            <th class="text-end">Debet</th>
+                            <th class="text-end">Kredit</th>
+                            <th class="text-end">Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in result_accounts %}
+                        <tr>
+                            <td>{{ a.account_number }}</td>
+                            <td>{{ a.account_name }}</td>
+                            <td class="text-end">{{ "{:,.2f}".format(a.total_debit) }}</td>
+                            <td class="text-end">{{ "{:,.2f}".format(a.total_credit) }}</td>
+                            <td class="text-end">{{ "{:,.2f}".format(a.balance) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">Inga resultatkonton med saldo.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Balanskonton att föra vidare</h5>
+            </div>
+            <div class="card-body">
+                {% if balance_accounts %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Konto</th>
+                            <th>Namn</th>
+                            <th class="text-end">Debet</th>
+                            <th class="text-end">Kredit</th>
+                            <th class="text-end">Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in balance_accounts %}
+                        <tr>
+                            <td>{{ a.account_number }}</td>
+                            <td>{{ a.account_name }}</td>
+                            <td class="text-end">{{ "{:,.2f}".format(a.total_debit) }}</td>
+                            <td class="text-end">{{ "{:,.2f}".format(a.total_credit) }}</td>
+                            <td class="text-end">{{ "{:,.2f}".format(a.balance) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">Inga balanskonton med saldo.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>Varning:</strong> När bokslutet genomförs stängs räkenskapsåret {{ fiscal_year.year }} och
+            inga fler verifikationer kan skapas. Resultatkonton nollställs till konto 2099 (Årets resultat)
+            och ingående balanser skapas i nästa räkenskapsår.
+        </div>
+        <form method="post" action="{{ url_for('closing.execute_close', fiscal_year_id=fiscal_year.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <a href="{{ url_for('closing.index') }}" class="btn btn-secondary me-2">
+                <i class="bi bi-arrow-left"></i> Tillbaka
+            </a>
+            <button type="submit" class="btn btn-danger"
+                    onclick="return confirm('Är du säker på att du vill genomföra bokslutet för {{ fiscal_year.year }}? Detta kan inte ångras.')">
+                <i class="bi bi-lock"></i> Genomför bokslut
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
