@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Betalningsöversikt - Familjekontor{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-cash-stack"></i> Betalningsöversikt</h2>
+</div>
+
+<!-- Type filter buttons -->
+<div class="btn-group mb-3" role="group">
+    <a href="{{ url_for('payments.overview', from_date=from_date, to_date=to_date) }}"
+       class="btn btn-outline-primary {% if active_type == 'all' %}active{% endif %}">Alla</a>
+    <a href="{{ url_for('payments.overview', type='supplier', from_date=from_date, to_date=to_date) }}"
+       class="btn btn-outline-primary {% if active_type == 'supplier' %}active{% endif %}">Leverantörer</a>
+    <a href="{{ url_for('payments.overview', type='customer', from_date=from_date, to_date=to_date) }}"
+       class="btn btn-outline-primary {% if active_type == 'customer' %}active{% endif %}">Kunder</a>
+    <a href="{{ url_for('payments.overview', type='tax', from_date=from_date, to_date=to_date) }}"
+       class="btn btn-outline-primary {% if active_type == 'tax' %}active{% endif %}">Skatter</a>
+</div>
+
+<!-- Date filter -->
+<form method="get" class="row g-2 mb-4 align-items-end">
+    {% if active_type != 'all' %}
+    <input type="hidden" name="type" value="{{ active_type }}">
+    {% endif %}
+    <div class="col-auto">
+        <label class="form-label mb-0 small">Från</label>
+        <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-0 small">Till</label>
+        <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary">Filtrera</button>
+        <a href="{{ url_for('payments.overview') }}" class="btn btn-sm btn-outline-secondary">Rensa</a>
+    </div>
+</form>
+
+<!-- Summary cards -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-1 text-muted">Inbetalningar</h6>
+                <h4 class="text-success mb-0">{{ "%.2f"|format(summary.total_in) }} kr</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-1 text-muted">Utbetalningar</h6>
+                <h4 class="text-danger mb-0">{{ "%.2f"|format(summary.total_out) }} kr</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card {% if summary.net >= 0 %}border-success{% else %}border-danger{% endif %}">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-1 text-muted">Netto</h6>
+                <h4 class="{% if summary.net >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">{{ "%.2f"|format(summary.net) }} kr</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payments table -->
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Datum</th>
+                    <th>Typ</th>
+                    <th>Beskrivning</th>
+                    <th class="text-end">Belopp</th>
+                    <th>Verifikation</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in payments %}
+                <tr>
+                    <td>{{ p.date.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        {% if p.type == 'supplier' %}
+                        <span class="badge bg-warning text-dark">Leverantör</span>
+                        {% elif p.type == 'customer' %}
+                        <span class="badge bg-info text-dark">Kund</span>
+                        {% elif p.type == 'tax' %}
+                        <span class="badge bg-success">Skatt</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ p.description }}</td>
+                    <td class="text-end {% if p.direction == 'in' %}text-success{% else %}text-danger{% endif %}">
+                        {% if p.direction == 'out' %}-{% endif %}{{ "%.2f"|format(p.amount) }} kr
+                    </td>
+                    <td>
+                        {% if p.verification_id %}
+                        <a href="{{ url_for('accounting.view_verification', id=p.verification_id) }}">
+                            <i class="bi bi-link-45deg"></i> Ver #{{ p.verification_id }}
+                        </a>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">Inga betalningar hittades.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
