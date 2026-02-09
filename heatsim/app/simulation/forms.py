@@ -202,9 +202,9 @@ class TransferPhaseForm(FlaskForm):
 
     duration = FloatField(
         'Transfer Time (s)',
-        validators=[Optional(), NumberRange(min=0, max=300)],
+        validators=[Optional(), NumberRange(min=0, max=600)],
         default=10.0,
-        render_kw={'placeholder': 'Time from furnace to quench'}
+        render_kw={'placeholder': 'Time from furnace to quench (up to 10 min for large parts)'}
     )
 
     ambient_temperature = FloatField(
@@ -258,9 +258,9 @@ class QuenchingPhaseForm(FlaskForm):
 
     duration = FloatField(
         'Quench Duration (s)',
-        validators=[Optional(), NumberRange(min=10, max=3600)],
+        validators=[Optional(), NumberRange(min=10, max=14400)],
         default=300.0,
-        render_kw={'placeholder': 'Time in quench tank'}
+        render_kw={'placeholder': 'Time in quench tank (up to 4 hours for large parts)'}
     )
 
     emissivity = FloatField(

@@ -173,8 +173,8 @@
             <div class="row">
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Transfer Time (s)</label>
-                    <input type="number" name="transfer-duration" class="form-control" step="1" min="0" max="300" value="{{ transfer_form.duration.data or 10 }}">
-                    <div class="form-text">Time from furnace to quench</div>
+                    <input type="number" name="transfer-duration" class="form-control" step="1" min="0" max="600" value="{{ transfer_form.duration.data or 10 }}">
+                    <div class="form-text">Up to 10 min for large crane-handled parts</div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Ambient Temperature (°C)</label>
@@ -248,7 +248,8 @@
                 </div>
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Quench Duration (s)</label>
-                    <input type="number" name="quenching-duration" class="form-control" step="10" min="10" max="3600" value="{{ quenching_form.duration.data or 300 }}">
+                    <input type="number" name="quenching-duration" class="form-control" step="10" min="10" max="14400" value="{{ quenching_form.duration.data or 300 }}">
+                    <div class="form-text">Up to 4 hours for large parts</div>
                 </div>
                 <div class="col-md-3 mb-3">
                     <label class="form-label">Surface Emissivity</label>

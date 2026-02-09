@@ -149,7 +149,7 @@ class PhaseConfig:
         max_duration = hold_time * 60  # Base hold time in seconds
         if cold_furnace and ramp_rate > 0:
             ramp_time = (target_temp - furnace_start_temp) / ramp_rate * 60
-            max_duration += ramp_time + 7200  # Add ramp time + 2hr buffer for part heating
+            max_duration += ramp_time + 36000  # Add ramp time + 10hr buffer for large parts (up to 1200mm dia)
 
         # Set end temperature based on condition
         if end_condition == 'center_offset':
@@ -262,7 +262,7 @@ class PhaseConfig:
         max_duration = hold_time * 60  # Base hold time in seconds
         if cold_furnace and ramp_rate > 0:
             ramp_time = (temp - furnace_start_temp) / ramp_rate * 60
-            max_duration += ramp_time + 7200  # Add ramp time + 2hr buffer for part heating
+            max_duration += ramp_time + 36000  # Add ramp time + 10hr buffer for large parts (up to 1200mm dia)
 
         # Set end temperature based on condition
         if end_condition == 'center_offset':
@@ -977,7 +977,7 @@ class MultiPhaseHeatSolver:
             cooling_phase = PhaseConfig(
                 name='cooling',
                 enabled=True,
-                duration=600.0,  # 10 minutes default
+                duration=14400.0,  # 4 hours for large parts (up to 1200mm dia)
                 target_temperature=25.0,
                 boundary_condition=cooling_bc,
                 end_condition='equilibrium',
