@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}{{ template.name }} - Återkommande faktura{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-arrow-repeat"></i> {{ template.name }}</h2>
+    <div class="btn-group">
+        <form method="post" action="{{ url_for('recurring.generate_single', template_id=template.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-success" {% if not template.active %}disabled{% endif %}>
+                <i class="bi bi-play-fill"></i> Generera faktura
+            </button>
+        </form>
+        <a href="{{ url_for('recurring.edit_recurring', template_id=template.id) }}" class="btn btn-primary">
+            <i class="bi bi-pencil"></i> Redigera
+        </a>
+        <form method="post" action="{{ url_for('recurring.toggle_recurring', template_id=template.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-{{ 'warning' if template.active else 'outline-success' }}">
+                <i class="bi bi-{{ 'pause' if template.active else 'play' }}"></i>
+                {{ 'Pausa' if template.active else 'Aktivera' }}
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">Malldetaljer</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-4">Kund</dt>
+                    <dd class="col-8">{{ template.customer.name }}</dd>
+                    <dt class="col-4">Intervall</dt>
+                    <dd class="col-8">
+                        {% if template.interval == 'monthly' %}Månad
+                        {% elif template.interval == 'quarterly' %}Kvartal
+                        {% elif template.interval == 'yearly' %}År
+                        {% endif %}
+                    </dd>
+                    <dt class="col-4">Valuta</dt>
+                    <dd class="col-8">{{ template.currency }}</dd>
+                    <dt class="col-4">Momstyp</dt>
+                    <dd class="col-8">
+                        {% if template.vat_type == 'standard' %}Standard 25%
+                        {% elif template.vat_type == 'reverse_charge' %}Omvänd skattskyldighet
+                        {% elif template.vat_type == 'export' %}Export (momsfri)
+                        {% endif %}
+                    </dd>
+                    <dt class="col-4">Betalningsvillkor</dt>
+                    <dd class="col-8">{{ template.payment_terms }} dagar</dd>
+                    <dt class="col-4">Startdatum</dt>
+                    <dd class="col-8">{{ template.start_date }}</dd>
+                    <dt class="col-4">Nästa datum</dt>
+                    <dd class="col-8">{{ template.next_date }}</dd>
+                    {% if template.end_date %}
+                    <dt class="col-4">Slutdatum</dt>
+                    <dd class="col-8">{{ template.end_date }}</dd>
+                    {% endif %}
+                    <dt class="col-4">Status</dt>
+                    <dd class="col-8">
+                        <span class="badge bg-{{ 'success' if template.active else 'secondary' }}">
+                            {{ 'Aktiv' if template.active else 'Pausad' }}
+                        </span>
+                    </dd>
+                    <dt class="col-4">Genererade fakturor</dt>
+                    <dd class="col-8">{{ template.invoices_generated }}</dd>
+                    {% if template.last_generated_at %}
+                    <dt class="col-4">Senast genererad</dt>
+                    <dd class="col-8">{{ template.last_generated_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">Ta bort mall</div>
+            <div class="card-body">
+                <p class="small text-muted">Tar bort mallen permanent. Redan genererade fakturor påverkas inte.</p>
+                <form method="post" action="{{ url_for('recurring.delete_recurring', template_id=template.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                            onclick="return confirm('Vill du verkligen ta bort denna mall?')">
+                        <i class="bi bi-trash"></i> Ta bort
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Line Items #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-ol"></i> Fakturarader</span>
+        {% set total_excl = namespace(val=0) %}
+        {% set total_vat = namespace(val=0) %}
+        {% for item in template.line_items %}
+            {% set total_excl.val = total_excl.val + (item.quantity * item.unit_price)|float %}
+            {% set total_vat.val = total_vat.val + (item.quantity * item.unit_price * item.vat_rate / 100)|float %}
+        {% endfor %}
+        <span class="text-muted">
+            Summa: {{ "{:,.2f}".format(total_excl.val) }} + moms {{ "{:,.2f}".format(total_vat.val) }}
+            = {{ "{:,.2f}".format(total_excl.val + total_vat.val) }} {{ template.currency }}
+        </span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Beskrivning</th>
+                    <th class="text-end">Antal</th>
+                    <th>Enhet</th>
+                    <th class="text-end">À-pris</th>
+                    <th class="text-end">Moms %</th>
+                    <th class="text-end">Belopp</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in template.line_items %}
+                <tr>
+                    <td>{{ item.line_number }}</td>
+                    <td>{{ item.description }}</td>
+                    <td class="text-end">{{ item.quantity }}</td>
+                    <td>{{ item.unit }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(item.unit_price|float) }}</td>
+                    <td class="text-end">{{ item.vat_rate|float|int }}%</td>
+                    <td class="text-end">{{ "{:,.2f}".format((item.quantity * item.unit_price)|float) }}</td>
+                    <td>
+                        <form method="post"
+                              action="{{ url_for('recurring.remove_line_item', template_id=template.id, line_id=item.id) }}"
+                              class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Ta bort">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-muted text-center">Inga rader ännu.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# Add line item form #}
+    <div class="card-footer">
+        <form method="post" action="{{ url_for('recurring.add_line_item', template_id=template.id) }}" class="row g-2 align-items-end">
+            {{ line_form.hidden_tag() }}
+            <div class="col-md-3">
+                {{ line_form.description(class="form-control form-control-sm", placeholder="Beskrivning") }}
+            </div>
+            <div class="col-md-1">
+                {{ line_form.quantity(class="form-control form-control-sm", placeholder="Antal") }}
+            </div>
+            <div class="col-md-1">
+                {{ line_form.unit(class="form-select form-select-sm") }}
+            </div>
+            <div class="col-md-2">
+                {{ line_form.unit_price(class="form-control form-control-sm", placeholder="À-pris") }}
+            </div>
+            <div class="col-md-2">
+                {{ line_form.vat_rate(class="form-select form-select-sm") }}
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-primary w-100">
+                    <i class="bi bi-plus"></i> Lägg till
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# Recent generated invoices #}
+{% if generated_invoices %}
+<div class="card">
+    <div class="card-header"><i class="bi bi-file-earmark-text"></i> Senaste fakturor för {{ template.customer.name }}</div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Fakturanr</th>
+                    <th>Datum</th>
+                    <th>Förfallodatum</th>
+                    <th class="text-end">Belopp</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in generated_invoices %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('invoices.customer_invoice_detail', invoice_id=inv.id) }}">
+                            {{ inv.invoice_number }}
+                        </a>
+                    </td>
+                    <td>{{ inv.invoice_date }}</td>
+                    <td>{{ inv.due_date }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(inv.total_amount|float if inv.total_amount else 0) }} {{ inv.currency }}</td>
+                    <td>
+                        <span class="badge bg-{% if inv.status == 'paid' %}success{% elif inv.status == 'sent' %}primary{% elif inv.status == 'overdue' %}danger{% else %}secondary{% endif %}">
+                            {{ inv.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="mt-3">
+    <a href="{{ url_for('recurring.recurring_list') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Tillbaka
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Återkommande fakturor - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-arrow-repeat"></i> Återkommande fakturor</h2>
+    <div>
+        {% if due_count > 0 %}
+        <form method="post" action="{{ url_for('recurring.generate_all') }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-success me-2">
+                <i class="bi bi-play-fill"></i> Generera alla
+                <span class="badge bg-light text-dark">{{ due_count }}</span>
+            </button>
+        </form>
+        {% endif %}
+        <a href="{{ url_for('recurring.new_recurring') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Ny mall
+        </a>
+    </div>
+</div>
+
+{% if due_count > 0 %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> {{ due_count }} mall{{ 'ar' if due_count > 1 else '' }} redo att generera fakturor.
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Namn</th>
+                    <th>Kund</th>
+                    <th>Intervall</th>
+                    <th>Valuta</th>
+                    <th>Nästa datum</th>
+                    <th>Genererade</th>
+                    <th>Status</th>
+                    <th>Åtgärder</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in templates %}
+                <tr class="{{ 'table-light text-muted' if not t.active else '' }}">
+                    <td>
+                        <a href="{{ url_for('recurring.view_recurring', template_id=t.id) }}">{{ t.name }}</a>
+                    </td>
+                    <td>{{ t.customer.name }}</td>
+                    <td>
+                        {% if t.interval == 'monthly' %}Månad
+                        {% elif t.interval == 'quarterly' %}Kvartal
+                        {% elif t.interval == 'yearly' %}År
+                        {% endif %}
+                    </td>
+                    <td>{{ t.currency }}</td>
+                    <td>
+                        {{ t.next_date }}
+                        {% if t.active and t.next_date <= today %}
+                        <span class="badge bg-warning text-dark">Förfallen</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ t.invoices_generated }}</td>
+                    <td>
+                        {% if t.active %}
+                        <span class="badge bg-success">Aktiv</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Pausad</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            {% if t.active %}
+                            <form method="post" action="{{ url_for('recurring.generate_single', template_id=t.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Generera faktura">
+                                    <i class="bi bi-play-fill"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                            <a href="{{ url_for('recurring.edit_recurring', template_id=t.id) }}"
+                               class="btn btn-sm btn-outline-primary" title="Redigera"><i class="bi bi-pencil"></i></a>
+                            <form method="post" action="{{ url_for('recurring.toggle_recurring', template_id=t.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-{{ 'warning' if t.active else 'success' }}"
+                                        title="{{ 'Pausa' if t.active else 'Aktivera' }}">
+                                    <i class="bi bi-{{ 'pause' if t.active else 'play' }}"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-muted text-center py-4">
+                        Inga återkommande fakturamallar ännu.
+                        <a href="{{ url_for('recurring.new_recurring') }}">Skapa en ny mall</a>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

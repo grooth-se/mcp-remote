@@ -289,6 +289,12 @@ def get_salary_overview(company_id):
     }
 
 
+def get_recurring_due_count(company_id):
+    """Count of recurring invoice templates due for generation."""
+    from app.services.recurring_invoice_service import get_due_count
+    return get_due_count(company_id)
+
+
 def get_fiscal_year_progress(company_id, fiscal_year_id):
     """Calculate fiscal year progress percentage and days remaining."""
     fy = db.session.get(FiscalYear, fiscal_year_id)

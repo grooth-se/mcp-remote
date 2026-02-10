@@ -21,6 +21,7 @@ def index():
     salary_overview = None
     fy_progress = None
     multi_company = None
+    recurring_due = 0
 
     if company_id:
         summary = get_company_summary(company_id)
@@ -40,6 +41,9 @@ def index():
             aging_data = get_invoice_aging(company_id)
             salary_overview = get_salary_overview(company_id)
             fy_progress = get_fiscal_year_progress(company_id, fy.id)
+
+        from app.services.dashboard_service import get_recurring_due_count
+        recurring_due = get_recurring_due_count(company_id)
 
         recent_audit = AuditLog.query.filter_by(
             company_id=company_id
@@ -62,7 +66,8 @@ def index():
                            aging_data=aging_data,
                            salary_overview=salary_overview,
                            fy_progress=fy_progress,
-                           multi_company=multi_company)
+                           multi_company=multi_company,
+                           recurring_due=recurring_due)
 
 
 @dashboard_bp.route('/switch-company/<int:company_id>')

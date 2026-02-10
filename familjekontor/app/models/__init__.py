@@ -10,6 +10,7 @@ from app.models.bank import BankAccount, BankTransaction
 from app.models.budget import BudgetLine
 from app.models.consolidation import ConsolidationGroup, ConsolidationGroupMember, IntercompanyElimination
 from app.models.exchange_rate import ExchangeRate
+from app.models.recurring_invoice import RecurringInvoiceTemplate, RecurringLineItem
 
 __all__ = [
     'User', 'Company',
@@ -22,4 +23,5 @@ __all__ = [
     'BudgetLine',
     'ConsolidationGroup', 'ConsolidationGroupMember', 'IntercompanyElimination',
     'ExchangeRate',
+    'RecurringInvoiceTemplate', 'RecurringLineItem',
 ]

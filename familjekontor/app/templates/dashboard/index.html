@@ -222,6 +222,20 @@
         </div>
     </div>
     {% endif %}
+    {% if recurring_due > 0 %}
+    <div class="col-md-{% if not aging_data and not salary_overview %}12{% elif not aging_data or not salary_overview %}6{% else %}12{% endif %}">
+        <div class="card border-info mt-{% if aging_data or salary_overview %}3{% else %}0{% endif %}">
+            <div class="card-header bg-info text-white"><i class="bi bi-arrow-repeat"></i> Återkommande fakturor</div>
+            <div class="card-body text-center">
+                <h2>{{ recurring_due }}</h2>
+                <p class="mb-2">mall{{ 'ar' if recurring_due > 1 else '' }} redo att generera</p>
+                <a href="{{ url_for('recurring.recurring_list') }}" class="btn btn-info btn-sm">
+                    <i class="bi bi-arrow-right"></i> Visa och generera
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 {% if upcoming_deadlines %}
