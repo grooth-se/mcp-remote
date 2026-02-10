@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from app.models.company import Company
-from app.models.accounting import FiscalYear
+from app.models.accounting import FiscalYear, Account, VerificationRow
 from app.models.invoice import Customer, CustomerInvoice, InvoiceLineItem
 from app.models.recurring_invoice import RecurringInvoiceTemplate, RecurringLineItem
 from app.models.user import User
@@ -302,6 +302,42 @@ class TestGeneration:
         for t in templates:
             assert t.next_date > date.today()
             assert t.invoices_generated == 1
+
+
+class TestGenerationVerification:
+    def test_generated_invoice_gets_verification(self, db, recurring_setup, template_with_lines):
+        """Generated invoice should auto-create an accounting verification."""
+        co = recurring_setup['company']
+
+        # Create required accounts
+        acct_1510 = Account(company_id=co.id, account_number='1510',
+                            name='Kundfordringar', account_type='asset')
+        acct_3010 = Account(company_id=co.id, account_number='3010',
+                            name='Försäljning', account_type='revenue')
+        acct_2610 = Account(company_id=co.id, account_number='2610',
+                            name='Utgående moms', account_type='liability')
+        db.session.add_all([acct_1510, acct_3010, acct_2610])
+        db.session.commit()
+
+        invoice = generate_invoice_from_template(template_with_lines.id)
+        assert invoice is not None
+        assert invoice.verification_id is not None
+
+        # Verify rows: 1510 debit, 3010 credit, 2610 credit
+        rows = VerificationRow.query.filter_by(
+            verification_id=invoice.verification_id).order_by(VerificationRow.id).all()
+        assert len(rows) == 3
+
+        # Total = 21250, excl = 17000, vat = 4250
+        assert float(rows[0].debit) == 21250.0  # 1510
+        assert float(rows[1].credit) == 17000.0  # 3010
+        assert float(rows[2].credit) == 4250.0   # 2610
+
+    def test_generated_invoice_no_accounts_no_crash(self, db, recurring_setup, template_with_lines):
+        """Without accounts 1510/3010, verification is skipped but invoice still created."""
+        invoice = generate_invoice_from_template(template_with_lines.id)
+        assert invoice is not None
+        assert invoice.verification_id is None
 
 
 class TestForeignCurrency:

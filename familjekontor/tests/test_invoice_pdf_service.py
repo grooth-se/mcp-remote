@@ -8,10 +8,12 @@ from app.models.company import Company
 from app.models.accounting import FiscalYear
 from app.models.invoice import Customer, CustomerInvoice, InvoiceLineItem
 from app.models.user import User
+from app.models.accounting import Account, Verification, VerificationRow
 from app.services.invoice_pdf_service import (
     add_line_item, update_line_item, remove_line_item,
     recalculate_invoice_totals, generate_next_invoice_number,
     generate_invoice_pdf, mark_invoice_sent,
+    create_customer_invoice_verification,
 )
 
 
@@ -148,3 +150,175 @@ class TestSend:
         db.session.refresh(inv)
         assert inv.status == 'sent'
         assert inv.sent_at is not None
+
+
+@pytest.fixture
+def verification_setup(db):
+    """Company with accounts 1510/3010/2610 and a customer invoice with totals."""
+    co = Company(name='VerAB', org_number='556600-0099', company_type='AB')
+    db.session.add(co)
+    db.session.flush()
+
+    fy = FiscalYear(company_id=co.id, year=2025, start_date=date(2025, 1, 1),
+                    end_date=date(2025, 12, 31), status='open')
+    db.session.add(fy)
+    db.session.flush()
+
+    acct_1510 = Account(company_id=co.id, account_number='1510', name='Kundfordringar',
+                        account_type='asset')
+    acct_3010 = Account(company_id=co.id, account_number='3010', name='Försäljning',
+                        account_type='revenue')
+    acct_2610 = Account(company_id=co.id, account_number='2610', name='Utgående moms',
+                        account_type='liability')
+    db.session.add_all([acct_1510, acct_3010, acct_2610])
+    db.session.flush()
+
+    cust = Customer(company_id=co.id, name='TestKund AB', org_number='556700-0099',
+                    address='Testv 1', postal_code='11100', city='Stockholm')
+    db.session.add(cust)
+    db.session.flush()
+
+    user = User(username='veruser', email='ver@test.com', role='admin')
+    user.set_password('test123')
+    db.session.add(user)
+    db.session.commit()
+
+    return {
+        'company': co, 'fy': fy, 'customer': cust, 'user': user,
+        'acct_1510': acct_1510, 'acct_3010': acct_3010, 'acct_2610': acct_2610,
+    }
+
+
+class TestCustomerInvoiceVerification:
+    def _make_invoice(self, db, setup, vat_type='standard', currency='SEK',
+                      excl=Decimal('10000'), vat=Decimal('2500'), total=Decimal('12500'),
+                      exchange_rate=Decimal('1')):
+        inv = CustomerInvoice(
+            company_id=setup['company'].id,
+            customer_id=setup['customer'].id,
+            invoice_number='VER-2025-0001',
+            invoice_date=date(2025, 6, 1),
+            due_date=date(2025, 6, 30),
+            currency=currency,
+            exchange_rate=exchange_rate,
+            amount_excl_vat=excl,
+            vat_amount=vat,
+            total_amount=total,
+            vat_type=vat_type,
+            status='draft',
+        )
+        db.session.add(inv)
+        db.session.flush()
+        return inv
+
+    def test_standard_invoice_creates_verification(self, db, verification_setup):
+        inv = self._make_invoice(db, verification_setup)
+
+        ver, reason = create_customer_invoice_verification(
+            inv, verification_setup['company'].id,
+            verification_setup['fy'].id, verification_setup['user'].id)
+
+        assert ver is not None
+        assert reason is None
+        assert inv.verification_id == ver.id
+
+        rows = VerificationRow.query.filter_by(verification_id=ver.id).order_by(VerificationRow.id).all()
+        assert len(rows) == 3
+
+        # Debit 1510 = 12500
+        assert rows[0].account_id == verification_setup['acct_1510'].id
+        assert float(rows[0].debit) == 12500.0
+        assert float(rows[0].credit) == 0.0
+
+        # Credit 3010 = 10000
+        assert rows[1].account_id == verification_setup['acct_3010'].id
+        assert float(rows[1].debit) == 0.0
+        assert float(rows[1].credit) == 10000.0
+
+        # Credit 2610 = 2500
+        assert rows[2].account_id == verification_setup['acct_2610'].id
+        assert float(rows[2].debit) == 0.0
+        assert float(rows[2].credit) == 2500.0
+
+    def test_reverse_charge_no_vat_row(self, db, verification_setup):
+        inv = self._make_invoice(db, verification_setup,
+                                 vat_type='reverse_charge',
+                                 excl=Decimal('10000'), vat=Decimal('0'),
+                                 total=Decimal('10000'))
+
+        ver, reason = create_customer_invoice_verification(
+            inv, verification_setup['company'].id,
+            verification_setup['fy'].id, verification_setup['user'].id)
+
+        assert ver is not None
+        rows = VerificationRow.query.filter_by(verification_id=ver.id).all()
+        assert len(rows) == 2  # Only 1510 debit + 3010 credit
+
+        # Full amount on 3010
+        credit_row = [r for r in rows if float(r.credit) > 0][0]
+        assert credit_row.account_id == verification_setup['acct_3010'].id
+        assert float(credit_row.credit) == 10000.0
+
+    def test_export_no_vat_row(self, db, verification_setup):
+        inv = self._make_invoice(db, verification_setup,
+                                 vat_type='export',
+                                 excl=Decimal('5000'), vat=Decimal('0'),
+                                 total=Decimal('5000'))
+
+        ver, reason = create_customer_invoice_verification(
+            inv, verification_setup['company'].id,
+            verification_setup['fy'].id, verification_setup['user'].id)
+
+        assert ver is not None
+        rows = VerificationRow.query.filter_by(verification_id=ver.id).all()
+        assert len(rows) == 2
+
+    def test_missing_accounts_returns_none(self, db):
+        co = Company(name='NoAcctAB', org_number='556600-0077', company_type='AB')
+        db.session.add(co)
+        db.session.flush()
+
+        fy = FiscalYear(company_id=co.id, year=2025, start_date=date(2025, 1, 1),
+                        end_date=date(2025, 12, 31), status='open')
+        db.session.add(fy)
+        db.session.flush()
+
+        cust = Customer(company_id=co.id, name='Kund AB', org_number='556700-0077',
+                        address='X', postal_code='11100', city='Sthlm')
+        db.session.add(cust)
+        db.session.flush()
+
+        inv = CustomerInvoice(
+            company_id=co.id, customer_id=cust.id,
+            invoice_number='MISS-0001',
+            invoice_date=date(2025, 6, 1), due_date=date(2025, 6, 30),
+            amount_excl_vat=Decimal('1000'), vat_amount=Decimal('250'),
+            total_amount=Decimal('1250'), vat_type='standard', status='draft',
+        )
+        db.session.add(inv)
+        db.session.flush()
+
+        ver, reason = create_customer_invoice_verification(inv, co.id, fy.id, None)
+        assert ver is None
+        assert 'saknas' in reason
+
+    def test_foreign_currency_sek_amounts(self, db, verification_setup):
+        """EUR invoice with exchange_rate=11.50 → SEK amounts in verification."""
+        inv = self._make_invoice(db, verification_setup,
+                                 currency='EUR', exchange_rate=Decimal('11.50'),
+                                 excl=Decimal('1000'), vat=Decimal('250'),
+                                 total=Decimal('1250'))
+
+        ver, reason = create_customer_invoice_verification(
+            inv, verification_setup['company'].id,
+            verification_setup['fy'].id, verification_setup['user'].id)
+
+        assert ver is not None
+        rows = VerificationRow.query.filter_by(verification_id=ver.id).order_by(VerificationRow.id).all()
+
+        # Debit 1510 = 1250 * 11.50 = 14375 SEK
+        assert float(rows[0].debit) == 14375.0
+        # Credit 3010 = 1000 * 11.50 = 11500 SEK
+        assert float(rows[1].credit) == 11500.0
+        # Credit 2610 = 250 * 11.50 = 2875 SEK
+        assert float(rows[2].credit) == 2875.0

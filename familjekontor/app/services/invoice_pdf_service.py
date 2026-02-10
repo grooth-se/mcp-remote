@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 from flask import render_template
 from app.extensions import db
 from app.models.invoice import CustomerInvoice, InvoiceLineItem
+from app.models.accounting import FiscalYear, Account
 from app.models.company import Company
 from app.models.audit import AuditLog
+from app.services.accounting_service import create_verification
 
 
 def generate_next_invoice_number(company_id):
@@ -207,3 +209,110 @@ def mark_invoice_sent(invoice_id, user_id):
     db.session.add(audit)
     db.session.commit()
     return True
+
+
+def create_customer_invoice_verification(invoice, company_id, fiscal_year_id, created_by=None):
+    """Create an accounting verification for a customer invoice.
+
+    Debit  1510 Kundfordringar     — total amount (SEK)
+    Credit 3010 Försäljning        — amount excl. VAT (SEK)
+    Credit 2610 Utgående moms      — VAT amount (SEK, only for vat_type='standard')
+
+    For reverse_charge / export: no VAT row, full credit to 3010.
+    FX: all amounts in SEK, with currency metadata on rows.
+
+    Returns (verification, None) on success or (None, reason_string) on failure.
+    """
+    receivable_acct = Account.query.filter_by(
+        company_id=company_id, account_number='1510').first()
+    revenue_acct = Account.query.filter_by(
+        company_id=company_id, account_number='3010').first()
+    vat_acct = Account.query.filter_by(
+        company_id=company_id, account_number='2610').first()
+
+    if not receivable_acct or not revenue_acct:
+        return None, 'Konton 1510/3010 saknas'
+
+    currency = invoice.currency or 'SEK'
+    is_foreign = currency != 'SEK'
+    ex_rate = Decimal(str(invoice.exchange_rate or 1))
+
+    excl_foreign = Decimal(str(invoice.amount_excl_vat or 0))
+    vat_foreign = Decimal(str(invoice.vat_amount or 0))
+    total_foreign = Decimal(str(invoice.total_amount or 0))
+
+    # Convert to SEK
+    if is_foreign:
+        excl_sek = (excl_foreign * ex_rate).quantize(Decimal('0.01'))
+        vat_sek = (vat_foreign * ex_rate).quantize(Decimal('0.01'))
+        amount_sek = (total_foreign * ex_rate).quantize(Decimal('0.01'))
+    else:
+        excl_sek = excl_foreign
+        vat_sek = vat_foreign
+        amount_sek = total_foreign
+
+    # Handle öresavrundning — adjust revenue to balance
+    rounding = amount_sek - (excl_sek + vat_sek)
+    adjusted_excl_sek = excl_sek + rounding
+
+    # Currency metadata for audit trail
+    fx_meta = {}
+    if is_foreign:
+        fx_meta = {
+            'currency': currency,
+            'exchange_rate': str(ex_rate),
+        }
+
+    has_vat = invoice.vat_type == 'standard' and vat_sek > 0
+
+    rows = []
+    # Debit 1510 Kundfordringar — total
+    rows.append({
+        'account_id': receivable_acct.id,
+        'debit': amount_sek,
+        'credit': Decimal('0'),
+        'description': invoice.invoice_number,
+        'foreign_amount_debit': total_foreign if is_foreign else None,
+        **fx_meta,
+    })
+    # Credit 3010 Försäljning — excl VAT (or full amount if no VAT)
+    credit_revenue = adjusted_excl_sek if has_vat else amount_sek
+    rows.append({
+        'account_id': revenue_acct.id,
+        'debit': Decimal('0'),
+        'credit': credit_revenue,
+        'description': invoice.invoice_number,
+        'foreign_amount_credit': excl_foreign if is_foreign and has_vat else (total_foreign if is_foreign else None),
+        **fx_meta,
+    })
+    # Credit 2610 Utgående moms — VAT (only for standard)
+    if has_vat and vat_acct:
+        rows.append({
+            'account_id': vat_acct.id,
+            'debit': Decimal('0'),
+            'credit': vat_sek,
+            'description': 'Utgående moms',
+            'foreign_amount_credit': vat_foreign if is_foreign else None,
+            **fx_meta,
+        })
+    elif has_vat and not vat_acct:
+        return None, 'Konto 2610 saknas för moms'
+
+    customer_name = invoice.customer.name if invoice.customer else ''
+    cur_label = f' ({currency})' if is_foreign else ''
+
+    try:
+        ver = create_verification(
+            company_id=company_id,
+            fiscal_year_id=fiscal_year_id,
+            verification_date=invoice.invoice_date,
+            description=f'Kundfaktura {invoice.invoice_number} — {customer_name}{cur_label}',
+            rows=rows,
+            verification_type='customer',
+            created_by=created_by,
+            source='customer_invoice',
+        )
+        invoice.verification_id = ver.id
+        return ver, None
+    except ValueError as e:
+        return None, str(e)

@@ -6,7 +6,10 @@ from decimal import Decimal
 from app.extensions import db
 from app.models.recurring_invoice import RecurringInvoiceTemplate, RecurringLineItem
 from app.models.invoice import CustomerInvoice, InvoiceLineItem
-from app.services.invoice_pdf_service import generate_next_invoice_number, recalculate_invoice_totals
+from app.services.invoice_pdf_service import (
+    generate_next_invoice_number, recalculate_invoice_totals,
+    create_customer_invoice_verification,
+)
 
 
 def get_due_templates(company_id):
@@ -149,6 +152,16 @@ def generate_invoice_from_template(template_id):
     db.session.refresh(invoice)
     if is_foreign and invoice.total_amount:
         invoice.amount_sek = (Decimal(str(invoice.total_amount)) * ex_rate).quantize(Decimal('0.01'))
+
+    # Auto-create accounting verification
+    from app.models.accounting import FiscalYear
+    fy = FiscalYear.query.filter_by(
+        company_id=template.company_id, status='open'
+    ).order_by(FiscalYear.year.desc()).first()
+
+    if fy:
+        create_customer_invoice_verification(
+            invoice, template.company_id, fy.id, created_by=None)
 
     # Advance template
     template.next_date = advance_next_date(invoice_date, template.interval)

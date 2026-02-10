@@ -10,6 +10,7 @@ from app.forms.invoice import (SupplierForm, SupplierInvoiceForm, CustomerForm,
                                 CustomerInvoiceForm, InvoiceLineItemForm)
 from app.services import document_service
 from app.services.accounting_service import create_verification
+from app.services.invoice_pdf_service import create_customer_invoice_verification
 from app.utils.currency import calculate_fx_gain_loss
 
 invoices_bp = Blueprint('invoices', __name__)
@@ -504,7 +505,25 @@ def new_customer_invoice():
             status='draft',
         )
         db.session.add(invoice)
-        db.session.commit()
+        db.session.flush()
+
+        # Auto-create accounting verification
+        fy = FiscalYear.query.filter_by(
+            company_id=company_id, status='open'
+        ).order_by(FiscalYear.year.desc()).first()
+
+        if fy:
+            ver, reason = create_customer_invoice_verification(
+                invoice, company_id, fy.id, created_by=current_user.id)
+            if ver:
+                db.session.commit()
+            else:
+                db.session.commit()
+                flash(f'Faktura sparad, men verifikation kunde inte skapas: {reason}', 'warning')
+        else:
+            db.session.commit()
+            flash('Faktura sparad. Inget öppet räkenskapsår — ingen verifikation skapades.', 'warning')
+
         flash('Kundfaktura har skapats.', 'success')
         return redirect(url_for('invoices.customer_invoices'))
 
