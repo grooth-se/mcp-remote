@@ -74,6 +74,7 @@ def test_create_account(bank_route_setup, logged_in_client):
         'bank_name': 'Nordea',
         'account_number': '99998888777',
         'clearing_number': '3300',
+        'currency': 'SEK',
         'ledger_account': '1930',
     }, follow_redirects=True)
     assert response.status_code == 200

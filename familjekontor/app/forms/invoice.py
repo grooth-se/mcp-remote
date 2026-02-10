@@ -9,12 +9,17 @@ class SupplierForm(FlaskForm):
     name = StringField('Namn', validators=[DataRequired(), Length(max=200)])
     org_number = StringField('Org.nummer', validators=[Optional()])
     default_account = StringField('Standardkonto', validators=[Optional()])
+    default_currency = SelectField('Standardvaluta')
     payment_terms = StringField('Betalningsvillkor (dagar)', default='30')
     bankgiro = StringField('Bankgiro', validators=[Optional()])
     plusgiro = StringField('PlusGiro', validators=[Optional()])
     iban = StringField('IBAN', validators=[Optional()])
     bic = StringField('BIC', validators=[Optional()])
     submit = SubmitField('Spara')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.default_currency.choices = currency_choices()
 
 
 class SupplierInvoiceForm(FlaskForm):
@@ -29,6 +34,7 @@ class SupplierInvoiceForm(FlaskForm):
     vat_amount = DecimalField('Moms', places=2, default=0, validators=[Optional()])
     total_amount = DecimalField('Totalbelopp', places=2, validators=[DataRequired()])
     currency = SelectField('Valuta')
+    exchange_rate = DecimalField('Växelkurs (1 utl. = X SEK)', places=6, default=1.0, validators=[Optional()])
     submit = SubmitField('Spara')
 
     def __init__(self, *args, **kwargs):
@@ -63,6 +69,7 @@ class CustomerInvoiceForm(FlaskForm):
     invoice_date = DateField('Fakturadatum', validators=[DataRequired()])
     due_date = DateField('Förfallodatum', validators=[DataRequired()])
     currency = SelectField('Valuta')
+    exchange_rate = DecimalField('Växelkurs (1 utl. = X SEK)', places=6, default=1.0, validators=[Optional()])
     amount_excl_vat = DecimalField('Belopp exkl. moms', places=2, validators=[DataRequired()])
     vat_amount = DecimalField('Moms', places=2, default=0, validators=[Optional()])
     total_amount = DecimalField('Totalbelopp', places=2, validators=[DataRequired()])

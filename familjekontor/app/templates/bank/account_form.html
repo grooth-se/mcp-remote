@@ -26,6 +26,10 @@
                         {{ form.iban(class="form-control") }}
                     </div>
                     <div class="mb-3">
+                        {{ form.currency.label(class="form-label") }}
+                        {{ form.currency(class="form-select") }}
+                    </div>
+                    <div class="mb-3">
                         {{ form.ledger_account.label(class="form-label") }}
                         {{ form.ledger_account(class="form-control") }}
                     </div>

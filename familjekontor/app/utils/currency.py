@@ -1,10 +1,14 @@
-"""Multi-currency support with manual exchange rates."""
+"""Multi-currency support with exchange rates."""
+
+from decimal import Decimal
 
 SUPPORTED_CURRENCIES = {
     'SEK': {'name': 'Svensk krona', 'symbol': 'kr', 'decimals': 2},
-    'NOK': {'name': 'Norsk krone', 'symbol': 'kr', 'decimals': 2},
-    'EUR': {'name': 'Euro', 'symbol': '€', 'decimals': 2},
+    'EUR': {'name': 'Euro', 'symbol': '\u20ac', 'decimals': 2},
     'USD': {'name': 'US Dollar', 'symbol': '$', 'decimals': 2},
+    'NOK': {'name': 'Norsk krone', 'symbol': 'kr', 'decimals': 2},
+    'DKK': {'name': 'Dansk krone', 'symbol': 'kr', 'decimals': 2},
+    'GBP': {'name': 'Brittiskt pund', 'symbol': '\u00a3', 'decimals': 2},
 }
 
 
@@ -27,3 +31,16 @@ def format_currency(amount, currency='SEK'):
     if currency == 'SEK':
         return f'{formatted} kr'
     return f'{info["symbol"]}{formatted}'
+
+
+def calculate_fx_gain_loss(invoice_sek, payment_sek):
+    """Calculate FX gain/loss between invoice booking and payment.
+
+    Returns a Decimal:
+      positive = loss (paid more SEK than booked)
+      negative = gain (paid less SEK than booked)
+      zero = no difference
+    """
+    invoice_sek = Decimal(str(invoice_sek))
+    payment_sek = Decimal(str(payment_sek))
+    return payment_sek - invoice_sek

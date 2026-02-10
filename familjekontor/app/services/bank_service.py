@@ -13,13 +13,14 @@ from app.models.audit import AuditLog
 
 
 def create_bank_account(company_id, bank_name, account_number, clearing_number=None,
-                        iban=None, ledger_account='1930'):
+                        iban=None, currency='SEK', ledger_account='1930'):
     account = BankAccount(
         company_id=company_id,
         bank_name=bank_name,
         account_number=account_number,
         clearing_number=clearing_number,
         iban=iban,
+        currency=currency,
         ledger_account=ledger_account,
     )
     db.session.add(account)

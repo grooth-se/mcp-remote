@@ -15,6 +15,7 @@ class Supplier(db.Model):
     plusgiro = db.Column(db.String(20))
     iban = db.Column(db.String(34))
     bic = db.Column(db.String(11))
+    default_currency = db.Column(db.String(3), default='SEK')
     active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -38,6 +39,8 @@ class SupplierInvoice(db.Model):
     vat_amount = db.Column(db.Numeric(15, 2))
     total_amount = db.Column(db.Numeric(15, 2))
     currency = db.Column(db.String(3), default='SEK')
+    exchange_rate = db.Column(db.Numeric(10, 6), default=1.0)
+    amount_sek = db.Column(db.Numeric(15, 2), nullable=True)
     status = db.Column(db.String(20), default='pending')  # pending, approved, paid, cancelled
     verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
     payment_verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
@@ -89,6 +92,7 @@ class CustomerInvoice(db.Model):
     due_date = db.Column(db.Date, nullable=False)
     currency = db.Column(db.String(3), default='SEK')
     exchange_rate = db.Column(db.Numeric(10, 6), default=1.0)
+    amount_sek = db.Column(db.Numeric(15, 2), nullable=True)
     amount_excl_vat = db.Column(db.Numeric(15, 2))
     vat_amount = db.Column(db.Numeric(15, 2))
     total_amount = db.Column(db.Numeric(15, 2))

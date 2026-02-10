@@ -10,6 +10,7 @@ from app.forms.invoice import (SupplierForm, SupplierInvoiceForm, CustomerForm,
                                 CustomerInvoiceForm, InvoiceLineItemForm)
 from app.services import document_service
 from app.services.accounting_service import create_verification
+from app.utils.currency import calculate_fx_gain_loss
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -42,6 +43,7 @@ def new_supplier():
             name=form.name.data,
             org_number=form.org_number.data,
             default_account=form.default_account.data,
+            default_currency=form.default_currency.data,
             payment_terms=int(form.payment_terms.data or 30),
             bankgiro=form.bankgiro.data,
             plusgiro=form.plusgiro.data,
@@ -115,6 +117,26 @@ def new_supplier_invoice():
 
     if form.validate_on_submit():
         supplier = db.session.get(Supplier, form.supplier_id.data)
+        currency = form.currency.data
+        is_foreign = currency != 'SEK'
+
+        # Determine exchange rate
+        ex_rate = Decimal('1.0')
+        if is_foreign:
+            if form.exchange_rate.data and form.exchange_rate.data != Decimal('1.0'):
+                ex_rate = Decimal(str(form.exchange_rate.data))
+            else:
+                # Try to fetch rate from Riksbanken
+                try:
+                    from app.services.exchange_rate_service import get_rate
+                    ex_rate = get_rate(currency, form.invoice_date.data)
+                except (ValueError, Exception):
+                    flash(f'Kunde inte hämta växelkurs för {currency}. Ange manuellt.', 'warning')
+                    return render_template('invoices/new_supplier_invoice.html', form=form)
+
+        total_foreign = Decimal(str(form.total_amount.data or 0))
+        amount_sek = (total_foreign * ex_rate).quantize(Decimal('0.01')) if is_foreign else total_foreign
+
         invoice = SupplierInvoice(
             company_id=company_id,
             supplier_id=form.supplier_id.data,
@@ -124,7 +146,9 @@ def new_supplier_invoice():
             amount_excl_vat=form.amount_excl_vat.data,
             vat_amount=form.vat_amount.data,
             total_amount=form.total_amount.data,
-            currency=form.currency.data,
+            currency=currency,
+            exchange_rate=ex_rate,
+            amount_sek=amount_sek,
             status='pending',
         )
         db.session.add(invoice)
@@ -146,7 +170,7 @@ def new_supplier_invoice():
                 invoice.document_id = doc.id
                 uploaded_doc = doc
 
-        # Auto-create accounting verification
+        # Auto-create accounting verification (all amounts in SEK)
         fy = FiscalYear.query.filter_by(
             company_id=company_id, status='open'
         ).order_by(FiscalYear.year.desc()).first()
@@ -163,41 +187,59 @@ def new_supplier_invoice():
 
             if expense_acct and payable_acct:
                 rows = []
-                excl_amount = Decimal(str(form.amount_excl_vat.data or 0))
-                vat_amount = Decimal(str(form.vat_amount.data or 0))
-                total = Decimal(str(form.total_amount.data or 0))
+                excl_foreign = Decimal(str(form.amount_excl_vat.data or 0))
+                vat_foreign = Decimal(str(form.vat_amount.data or 0))
+
+                # Convert to SEK
+                excl_sek = (excl_foreign * ex_rate).quantize(Decimal('0.01')) if is_foreign else excl_foreign
+                vat_sek = (vat_foreign * ex_rate).quantize(Decimal('0.01')) if is_foreign else vat_foreign
 
                 # Handle öresavrundning — adjust expense to balance
-                rounding = total - (excl_amount + vat_amount)
-                adjusted_excl = excl_amount + rounding
+                rounding = amount_sek - (excl_sek + vat_sek)
+                adjusted_excl_sek = excl_sek + rounding
+
+                # Currency metadata for audit trail
+                fx_meta = {}
+                if is_foreign:
+                    fx_meta = {
+                        'currency': currency,
+                        'exchange_rate': str(ex_rate),
+                    }
 
                 rows.append({
                     'account_id': expense_acct.id,
-                    'debit': adjusted_excl,
+                    'debit': adjusted_excl_sek,
                     'credit': Decimal('0'),
                     'description': form.invoice_number.data,
+                    'foreign_amount_debit': excl_foreign if is_foreign else None,
+                    **fx_meta,
                 })
-                if vat_amount > 0 and vat_acct:
+                if vat_sek > 0 and vat_acct:
                     rows.append({
                         'account_id': vat_acct.id,
-                        'debit': vat_amount,
+                        'debit': vat_sek,
                         'credit': Decimal('0'),
                         'description': 'Ingående moms',
+                        'foreign_amount_debit': vat_foreign if is_foreign else None,
+                        **fx_meta,
                     })
                 rows.append({
                     'account_id': payable_acct.id,
                     'debit': Decimal('0'),
-                    'credit': total,
+                    'credit': amount_sek,
                     'description': form.invoice_number.data,
+                    'foreign_amount_credit': total_foreign if is_foreign else None,
+                    **fx_meta,
                 })
 
                 try:
                     supplier_name = supplier.name if supplier else ''
+                    cur_label = f' ({currency})' if is_foreign else ''
                     ver = create_verification(
                         company_id=company_id,
                         fiscal_year_id=fy.id,
                         verification_date=form.invoice_date.data,
-                        description=f'Lev.faktura {form.invoice_number.data} — {supplier_name}',
+                        description=f'Lev.faktura {form.invoice_number.data} — {supplier_name}{cur_label}',
                         rows=rows,
                         verification_type='supplier',
                         created_by=current_user.id,
@@ -274,13 +316,62 @@ def pay_supplier_invoice(invoice_id):
                 company_id=company_id, account_number=bank_num).first()
 
             if payable_acct and bank_acct:
-                total = Decimal(str(invoice.total_amount))
+                is_foreign = invoice.currency and invoice.currency != 'SEK'
+                invoice_sek = Decimal(str(invoice.amount_sek or invoice.total_amount))
+
+                if is_foreign:
+                    # Get payment-date rate
+                    try:
+                        from app.services.exchange_rate_service import get_rate
+                        payment_rate = get_rate(invoice.currency, invoice.paid_at.date())
+                    except (ValueError, Exception):
+                        payment_rate = Decimal(str(invoice.exchange_rate or 1))
+
+                    total_foreign = Decimal(str(invoice.total_amount))
+                    payment_sek = (total_foreign * payment_rate).quantize(Decimal('0.01'))
+                    fx_diff = calculate_fx_gain_loss(invoice_sek, payment_sek)
+                else:
+                    payment_sek = invoice_sek
+                    fx_diff = Decimal('0')
+
                 rows = [
-                    {'account_id': payable_acct.id, 'debit': total, 'credit': Decimal('0'),
+                    {'account_id': payable_acct.id, 'debit': invoice_sek, 'credit': Decimal('0'),
                      'description': invoice.invoice_number},
-                    {'account_id': bank_acct.id, 'debit': Decimal('0'), 'credit': total,
+                    {'account_id': bank_acct.id, 'debit': Decimal('0'), 'credit': payment_sek,
                      'description': invoice.invoice_number},
                 ]
+
+                # FX gain/loss row
+                if abs(fx_diff) >= Decimal('0.01'):
+                    if fx_diff > 0:
+                        # Loss: paid more SEK → debit 6991
+                        fx_acct = Account.query.filter_by(
+                            company_id=company_id, account_number='6991').first()
+                        if not fx_acct:
+                            fx_acct = Account(company_id=company_id, account_number='6991',
+                                              name='Valutakursförluster', account_type='expense')
+                            db.session.add(fx_acct)
+                            db.session.flush()
+                        rows.append({
+                            'account_id': fx_acct.id,
+                            'debit': abs(fx_diff), 'credit': Decimal('0'),
+                            'description': f'Kursförlust {invoice.currency}',
+                        })
+                    else:
+                        # Gain: paid less SEK → credit 3960
+                        fx_acct = Account.query.filter_by(
+                            company_id=company_id, account_number='3960').first()
+                        if not fx_acct:
+                            fx_acct = Account(company_id=company_id, account_number='3960',
+                                              name='Valutakursvinster', account_type='revenue')
+                            db.session.add(fx_acct)
+                            db.session.flush()
+                        rows.append({
+                            'account_id': fx_acct.id,
+                            'debit': Decimal('0'), 'credit': abs(fx_diff),
+                            'description': f'Kursvinst {invoice.currency}',
+                        })
+
                 try:
                     ver = create_verification(
                         company_id=company_id,
@@ -378,13 +469,34 @@ def new_customer_invoice():
     form.customer_id.choices = [(c.id, c.name) for c in cust_list]
 
     if form.validate_on_submit():
+        currency = form.currency.data
+        is_foreign = currency != 'SEK'
+
+        # Determine exchange rate
+        ex_rate = Decimal('1.0')
+        if is_foreign:
+            if form.exchange_rate.data and form.exchange_rate.data != Decimal('1.0'):
+                ex_rate = Decimal(str(form.exchange_rate.data))
+            else:
+                try:
+                    from app.services.exchange_rate_service import get_rate
+                    ex_rate = get_rate(currency, form.invoice_date.data)
+                except (ValueError, Exception):
+                    flash(f'Kunde inte hämta växelkurs för {currency}. Ange manuellt.', 'warning')
+                    return render_template('invoices/new_customer_invoice.html', form=form)
+
+        total_foreign = Decimal(str(form.total_amount.data or 0))
+        amount_sek = (total_foreign * ex_rate).quantize(Decimal('0.01')) if is_foreign else total_foreign
+
         invoice = CustomerInvoice(
             company_id=company_id,
             customer_id=form.customer_id.data,
             invoice_number=form.invoice_number.data,
             invoice_date=form.invoice_date.data,
             due_date=form.due_date.data,
-            currency=form.currency.data,
+            currency=currency,
+            exchange_rate=ex_rate,
+            amount_sek=amount_sek,
             amount_excl_vat=form.amount_excl_vat.data,
             vat_amount=form.vat_amount.data,
             total_amount=form.total_amount.data,
@@ -437,13 +549,61 @@ def mark_customer_invoice_paid(invoice_id):
                 company_id=company_id, account_number=bank_num).first()
 
             if receivable_acct and bank_acct:
-                total = Decimal(str(invoice.total_amount))
+                is_foreign = invoice.currency and invoice.currency != 'SEK'
+                invoice_sek = Decimal(str(invoice.amount_sek or invoice.total_amount))
+
+                if is_foreign:
+                    try:
+                        from app.services.exchange_rate_service import get_rate
+                        payment_rate = get_rate(invoice.currency, invoice.paid_at.date())
+                    except (ValueError, Exception):
+                        payment_rate = Decimal(str(invoice.exchange_rate or 1))
+
+                    total_foreign = Decimal(str(invoice.total_amount))
+                    payment_sek = (total_foreign * payment_rate).quantize(Decimal('0.01'))
+                    fx_diff = calculate_fx_gain_loss(invoice_sek, payment_sek)
+                else:
+                    payment_sek = invoice_sek
+                    fx_diff = Decimal('0')
+
                 rows = [
-                    {'account_id': bank_acct.id, 'debit': total, 'credit': Decimal('0'),
+                    {'account_id': bank_acct.id, 'debit': payment_sek, 'credit': Decimal('0'),
                      'description': invoice.invoice_number},
-                    {'account_id': receivable_acct.id, 'debit': Decimal('0'), 'credit': total,
+                    {'account_id': receivable_acct.id, 'debit': Decimal('0'), 'credit': invoice_sek,
                      'description': invoice.invoice_number},
                 ]
+
+                # FX gain/loss row
+                if abs(fx_diff) >= Decimal('0.01'):
+                    if fx_diff > 0:
+                        # Received more SEK than booked → credit 3960 (gain)
+                        fx_acct = Account.query.filter_by(
+                            company_id=company_id, account_number='3960').first()
+                        if not fx_acct:
+                            fx_acct = Account(company_id=company_id, account_number='3960',
+                                              name='Valutakursvinster', account_type='revenue')
+                            db.session.add(fx_acct)
+                            db.session.flush()
+                        rows.append({
+                            'account_id': fx_acct.id,
+                            'debit': Decimal('0'), 'credit': abs(fx_diff),
+                            'description': f'Kursvinst {invoice.currency}',
+                        })
+                    else:
+                        # Received less SEK than booked → debit 6991 (loss)
+                        fx_acct = Account.query.filter_by(
+                            company_id=company_id, account_number='6991').first()
+                        if not fx_acct:
+                            fx_acct = Account(company_id=company_id, account_number='6991',
+                                              name='Valutakursförluster', account_type='expense')
+                            db.session.add(fx_acct)
+                            db.session.flush()
+                        rows.append({
+                            'account_id': fx_acct.id,
+                            'debit': abs(fx_diff), 'credit': Decimal('0'),
+                            'description': f'Kursförlust {invoice.currency}',
+                        })
+
                 try:
                     ver = create_verification(
                         company_id=company_id,

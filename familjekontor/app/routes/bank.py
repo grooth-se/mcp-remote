@@ -60,6 +60,7 @@ def new_account():
             account_number=form.account_number.data,
             clearing_number=form.clearing_number.data,
             iban=form.iban.data,
+            currency=form.currency.data,
             ledger_account=form.ledger_account.data,
         )
         flash('Bankkonto har skapats.', 'success')
@@ -88,6 +89,7 @@ def edit_account(account_id):
             account_number=form.account_number.data,
             clearing_number=form.clearing_number.data,
             iban=form.iban.data,
+            currency=form.currency.data,
             ledger_account=form.ledger_account.data,
         )
         flash('Bankkonto har uppdaterats.', 'success')

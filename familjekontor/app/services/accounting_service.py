@@ -62,6 +62,10 @@ def create_verification(company_id, fiscal_year_id, verification_date, descripti
             credit=Decimal(str(r.get('credit', 0) or 0)),
             description=r.get('description', ''),
             cost_center=r.get('cost_center', ''),
+            currency=r.get('currency'),
+            foreign_amount_debit=Decimal(str(r['foreign_amount_debit'])) if r.get('foreign_amount_debit') else None,
+            foreign_amount_credit=Decimal(str(r['foreign_amount_credit'])) if r.get('foreign_amount_credit') else None,
+            exchange_rate=Decimal(str(r['exchange_rate'])) if r.get('exchange_rate') else None,
         )
         db.session.add(row)
 
@@ -107,6 +111,10 @@ def _create_verification_no_lock_check(company_id, fiscal_year_id, verification_
             credit=Decimal(str(r.get('credit', 0) or 0)),
             description=r.get('description', ''),
             cost_center=r.get('cost_center', ''),
+            currency=r.get('currency'),
+            foreign_amount_debit=Decimal(str(r['foreign_amount_debit'])) if r.get('foreign_amount_debit') else None,
+            foreign_amount_credit=Decimal(str(r['foreign_amount_credit'])) if r.get('foreign_amount_credit') else None,
+            exchange_rate=Decimal(str(r['exchange_rate'])) if r.get('exchange_rate') else None,
         )
         db.session.add(row)
 

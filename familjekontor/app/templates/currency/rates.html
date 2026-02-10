@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Växelkurser - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-currency-exchange"></i> Växelkurser</h2>
+</div>
+
+<div class="row mb-4">
+    {# Fetch from Riksbanken #}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-cloud-download"></i> Hämta från Riksbanken</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('currency.fetch_rates') }}">
+                    {{ fetch_form.hidden_tag() }}
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            {{ fetch_form.currency_code.label(class="form-label") }}
+                            {{ fetch_form.currency_code(class="form-select") }}
+                        </div>
+                        <div class="col-md-3">
+                            {{ fetch_form.start_date.label(class="form-label") }}
+                            {{ fetch_form.start_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-md-3">
+                            {{ fetch_form.end_date.label(class="form-label") }}
+                            {{ fetch_form.end_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            {{ fetch_form.submit(class="btn btn-primary w-100") }}
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {# Manual entry #}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-pencil"></i> Ange kurs manuellt</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('currency.new_rate') }}">
+                    {{ form.hidden_tag() }}
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            {{ form.currency_code.label(class="form-label") }}
+                            {{ form.currency_code(class="form-select") }}
+                        </div>
+                        <div class="col-md-3">
+                            {{ form.rate_date.label(class="form-label") }}
+                            {{ form.rate_date(class="form-control", type="date") }}
+                        </div>
+                        <div class="col-md-3">
+                            {{ form.rate.label(class="form-label") }}
+                            {{ form.rate(class="form-control", step="0.000001") }}
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            {{ form.submit(class="btn btn-success w-100") }}
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Rates table #}
+<div class="card">
+    <div class="card-header"><i class="bi bi-table"></i> Sparade kurser</div>
+    <div class="card-body">
+        {% if rates.items %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Valuta</th>
+                        <th class="text-end">1 utl. = SEK</th>
+                        <th class="text-end">1 SEK = utl.</th>
+                        <th>Källa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rates.items %}
+                    <tr>
+                        <td>{{ r.rate_date }}</td>
+                        <td><span class="badge bg-secondary">{{ r.currency_code }}</span></td>
+                        <td class="text-end">{{ "%.4f"|format(r.rate) }}</td>
+                        <td class="text-end">{{ "%.6f"|format(r.inverse_rate) if r.inverse_rate else '-' }}</td>
+                        <td>
+                            {% if r.source == 'riksbanken' %}
+                            <span class="badge bg-info">Riksbanken</span>
+                            {% else %}
+                            <span class="badge bg-warning">Manuell</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Pagination #}
+        {% if rates.pages > 1 %}
+        <nav>
+            <ul class="pagination justify-content-center">
+                {% if rates.has_prev %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('currency.rates', page=rates.prev_num) }}">Föregående</a></li>
+                {% endif %}
+                {% for p in rates.iter_pages() %}
+                    {% if p %}
+                    <li class="page-item {% if p == rates.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('currency.rates', page=p) }}">{{ p }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                {% if rates.has_next %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('currency.rates', page=rates.next_num) }}">Nästa</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        {% else %}
+        <p class="text-muted">Inga sparade kurser ännu. Hämta från Riksbanken eller ange manuellt.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

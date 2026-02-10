@@ -11,16 +11,96 @@
             <div class="col-md-3">{{ form.vat_type.label(class="form-label") }}{{ form.vat_type(class="form-select") }}</div>
         </div>
         <div class="row mb-3">
-            <div class="col-md-4">{{ form.invoice_date.label(class="form-label") }}{{ form.invoice_date(class="form-control", type="date") }}</div>
-            <div class="col-md-4">{{ form.due_date.label(class="form-label") }}{{ form.due_date(class="form-control", type="date") }}</div>
-            <div class="col-md-4">{{ form.currency.label(class="form-label") }}{{ form.currency(class="form-select") }}</div>
+            <div class="col-md-3">{{ form.invoice_date.label(class="form-label") }}{{ form.invoice_date(class="form-control", type="date", id="ci_invoice_date") }}</div>
+            <div class="col-md-3">{{ form.due_date.label(class="form-label") }}{{ form.due_date(class="form-control", type="date") }}</div>
+            <div class="col-md-3">{{ form.currency.label(class="form-label") }}{{ form.currency(class="form-select", id="ci_currency") }}</div>
+            <div class="col-md-3" id="ci_exchangeRateGroup" style="display:none;">
+                {{ form.exchange_rate.label(class="form-label") }}
+                <div class="input-group">
+                    {{ form.exchange_rate(class="form-control", id="ci_exchange_rate", step="0.000001") }}
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="ci_fetchRateBtn" title="Hämta kurs">
+                        <i class="bi bi-cloud-download"></i>
+                    </button>
+                </div>
+                <small class="text-muted" id="ci_rateSource"></small>
+            </div>
         </div>
         <div class="row mb-3">
             <div class="col-md-4">{{ form.amount_excl_vat.label(class="form-label") }}{{ form.amount_excl_vat(class="form-control") }}</div>
             <div class="col-md-4">{{ form.vat_amount.label(class="form-label") }}{{ form.vat_amount(class="form-control") }}</div>
-            <div class="col-md-4">{{ form.total_amount.label(class="form-label") }}{{ form.total_amount(class="form-control") }}</div>
+            <div class="col-md-4">{{ form.total_amount.label(class="form-label") }}{{ form.total_amount(class="form-control", id="ci_total_amount") }}</div>
+        </div>
+        <div id="ci_sekPreview" class="alert alert-info" style="display:none;">
+            <i class="bi bi-calculator"></i> Belopp i SEK: <strong id="ci_sekAmount"></strong>
         </div>
         <div class="d-flex gap-2">{{ form.submit(class="btn btn-primary") }}<a href="{{ url_for('invoices.customer_invoices') }}" class="btn btn-secondary">Avbryt</a></div>
     </form>
 </div></div></div></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const currencySelect = document.getElementById('ci_currency');
+    const exchangeRateGroup = document.getElementById('ci_exchangeRateGroup');
+    const exchangeRateInput = document.getElementById('ci_exchange_rate');
+    const invoiceDateInput = document.getElementById('ci_invoice_date');
+    const totalAmountInput = document.getElementById('ci_total_amount');
+    const fetchRateBtn = document.getElementById('ci_fetchRateBtn');
+    const rateSource = document.getElementById('ci_rateSource');
+    const sekPreview = document.getElementById('ci_sekPreview');
+    const sekAmount = document.getElementById('ci_sekAmount');
+
+    function toggleExchangeRate() {
+        const isForeign = currencySelect.value !== 'SEK';
+        exchangeRateGroup.style.display = isForeign ? '' : 'none';
+        if (!isForeign) {
+            exchangeRateInput.value = '1.000000';
+            sekPreview.style.display = 'none';
+        } else {
+            fetchRate();
+        }
+    }
+
+    function fetchRate() {
+        const currency = currencySelect.value;
+        const dateVal = invoiceDateInput.value;
+        if (!currency || currency === 'SEK' || !dateVal) return;
+
+        rateSource.textContent = 'Hämtar kurs...';
+        fetch(`/currency/api/rate/${currency}/${dateVal}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.rate) {
+                    exchangeRateInput.value = data.rate;
+                    rateSource.textContent = 'Riksbankens kurs';
+                    updateSekPreview();
+                } else {
+                    rateSource.textContent = data.error || 'Kunde inte hämta kurs';
+                }
+            })
+            .catch(() => { rateSource.textContent = 'Fel vid hämtning'; });
+    }
+
+    function updateSekPreview() {
+        const isForeign = currencySelect.value !== 'SEK';
+        if (!isForeign) { sekPreview.style.display = 'none'; return; }
+        const total = parseFloat(totalAmountInput.value) || 0;
+        const rate = parseFloat(exchangeRateInput.value) || 1;
+        const sek = (total * rate).toFixed(2);
+        sekAmount.textContent = sek + ' kr';
+        sekPreview.style.display = total > 0 ? '' : 'none';
+    }
+
+    currencySelect.addEventListener('change', toggleExchangeRate);
+    invoiceDateInput.addEventListener('change', function() {
+        if (currencySelect.value !== 'SEK') fetchRate();
+    });
+    fetchRateBtn.addEventListener('click', fetchRate);
+    totalAmountInput.addEventListener('input', updateSekPreview);
+    exchangeRateInput.addEventListener('input', updateSekPreview);
+
+    toggleExchangeRate();
+})();
+</script>
 {% endblock %}

@@ -90,6 +90,10 @@ class VerificationRow(db.Model):
     credit = db.Column(db.Numeric(15, 2), default=0)
     description = db.Column(db.String(200))
     cost_center = db.Column(db.String(50))
+    currency = db.Column(db.String(3), nullable=True)
+    foreign_amount_debit = db.Column(db.Numeric(15, 2), nullable=True)
+    foreign_amount_credit = db.Column(db.Numeric(15, 2), nullable=True)
+    exchange_rate = db.Column(db.Numeric(10, 6), nullable=True)
 
     account = db.relationship('Account')
 

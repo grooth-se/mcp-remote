@@ -38,6 +38,7 @@ def create_app(config_name=None):
     from app.routes.consolidation import consolidation_bp
     from app.routes.payments import payments_bp
     from app.routes.closing import closing_bp
+    from app.routes.currency import currency_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -55,6 +56,7 @@ def create_app(config_name=None):
     app.register_blueprint(consolidation_bp, url_prefix='/consolidation')
     app.register_blueprint(payments_bp, url_prefix='/payments')
     app.register_blueprint(closing_bp, url_prefix='/closing')
+    app.register_blueprint(currency_bp, url_prefix='/currency')
 
     # Context processor for active company
     @app.context_processor

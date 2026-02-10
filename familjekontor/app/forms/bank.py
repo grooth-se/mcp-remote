@@ -2,6 +2,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired, FileAllowed
 from wtforms import StringField, SelectField, SubmitField
 from wtforms.validators import DataRequired, Optional, Length
+from app.utils.currency import currency_choices
 
 
 class BankAccountForm(FlaskForm):
@@ -16,8 +17,13 @@ class BankAccountForm(FlaskForm):
     account_number = StringField('Kontonummer', validators=[DataRequired(), Length(max=30)])
     clearing_number = StringField('Clearingnummer', validators=[Optional(), Length(max=10)])
     iban = StringField('IBAN', validators=[Optional(), Length(max=34)])
-    ledger_account = StringField('Bokforingskonto', default='1930', validators=[Optional()])
+    currency = SelectField('Valuta')
+    ledger_account = StringField('Bokföringskonto', default='1930', validators=[Optional()])
     submit = SubmitField('Spara')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.currency.choices = currency_choices()
 
 
 class BankImportForm(FlaskForm):

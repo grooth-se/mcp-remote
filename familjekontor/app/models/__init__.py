@@ -9,6 +9,7 @@ from app.models.salary import Employee, SalaryRun, SalaryEntry
 from app.models.bank import BankAccount, BankTransaction
 from app.models.budget import BudgetLine
 from app.models.consolidation import ConsolidationGroup, ConsolidationGroupMember, IntercompanyElimination
+from app.models.exchange_rate import ExchangeRate
 
 __all__ = [
     'User', 'Company',
@@ -20,4 +21,5 @@ __all__ = [
     'BankAccount', 'BankTransaction',
     'BudgetLine',
     'ConsolidationGroup', 'ConsolidationGroupMember', 'IntercompanyElimination',
+    'ExchangeRate',
 ]
