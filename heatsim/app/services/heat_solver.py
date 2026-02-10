@@ -146,10 +146,12 @@ class PhaseConfig:
             )
 
         # Calculate maximum duration based on ramp time + generous heat-up time + hold
+        # Always add buffer for part to heat through (large parts can take 10+ hours)
         max_duration = hold_time * 60  # Base hold time in seconds
+        max_duration += 36000  # Add 10hr buffer for large parts (up to 1200mm dia) to heat through
         if cold_furnace and ramp_rate > 0:
             ramp_time = (target_temp - furnace_start_temp) / ramp_rate * 60
-            max_duration += ramp_time + 36000  # Add ramp time + 10hr buffer for large parts (up to 1200mm dia)
+            max_duration += ramp_time  # Add furnace ramp time on top
 
         # Set end temperature based on condition
         if end_condition == 'center_offset':
@@ -259,10 +261,12 @@ class PhaseConfig:
             )
 
         # Calculate maximum duration based on ramp time + generous heat-up time + hold
+        # Always add buffer for part to heat through (large parts can take hours)
         max_duration = hold_time * 60  # Base hold time in seconds
+        max_duration += 36000  # Add 10hr buffer for large parts (up to 1200mm dia) to heat through
         if cold_furnace and ramp_rate > 0:
             ramp_time = (temp - furnace_start_temp) / ramp_rate * 60
-            max_duration += ramp_time + 36000  # Add ramp time + 10hr buffer for large parts (up to 1200mm dia)
+            max_duration += ramp_time  # Add furnace ramp time on top
 
         # Set end temperature based on condition
         if end_condition == 'center_offset':
