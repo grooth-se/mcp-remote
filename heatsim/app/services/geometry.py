@@ -198,32 +198,29 @@ def create_geometry(geometry_type: str, config: dict) -> GeometryBase:
     geometry_type : str
         One of 'cylinder', 'plate', 'ring'
     config : dict
-        Geometry parameters (values in mm, converted to meters internally)
+        Geometry parameters in meters
 
     Returns
     -------
     GeometryBase
         Geometry instance
     """
-    # Convert mm to meters (config stores dimensions in mm for UI convenience)
-    mm_to_m = 0.001
-
     if geometry_type == 'cylinder':
         return Cylinder(
-            radius=config.get('radius', 50) * mm_to_m,
-            length=config.get('length', 100) * mm_to_m
+            radius=config.get('radius', 0.05),
+            length=config.get('length', 0.1)
         )
     elif geometry_type == 'plate':
         return Plate(
-            thickness=config.get('thickness', 20) * mm_to_m,
-            width=config.get('width', 100) * mm_to_m,
-            length=config.get('length', 100) * mm_to_m
+            thickness=config.get('thickness', 0.02),
+            width=config.get('width', 0.1),
+            length=config.get('length', 0.1)
         )
     elif geometry_type == 'ring':
         return Ring(
-            inner_radius=config.get('inner_radius', 20) * mm_to_m,
-            outer_radius=config.get('outer_radius', 50) * mm_to_m,
-            length=config.get('length', 100) * mm_to_m
+            inner_radius=config.get('inner_radius', 0.02),
+            outer_radius=config.get('outer_radius', 0.05),
+            length=config.get('length', 0.1)
         )
     else:
         raise ValueError(f"Unknown geometry type: {geometry_type}")
