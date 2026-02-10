@@ -484,8 +484,10 @@ def run(id):
         # Build geometry (use equivalent geometry for CAD types)
         if sim.geometry_type == GEOMETRY_CAD:
             # For CAD geometry, use the equivalent type and params
+            # CAD analysis stores values in meters, convert to mm for create_geometry
             equiv_type = sim.cad_equivalent_type or 'cylinder'
-            equiv_params = sim.cad_equivalent_geometry_dict
+            equiv_params_m = sim.cad_equivalent_geometry_dict
+            equiv_params = {k: v * 1000 for k, v in equiv_params_m.items()}  # m to mm
             geometry = create_geometry(equiv_type, equiv_params)
         else:
             geometry = create_geometry(sim.geometry_type, sim.geometry_dict)
