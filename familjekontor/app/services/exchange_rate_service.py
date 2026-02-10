@@ -46,15 +46,16 @@ def fetch_rate_from_riksbanken(currency_code, rate_date):
 
         # API returns list of observations
         obs = data[0] if isinstance(data, list) else data
-        inverse_value = Decimal(str(obs['value']))
+        api_value = Decimal(str(obs['value']))
 
-        if inverse_value <= 0:
-            raise ValueError(f'Ogiltig kurs från Riksbanken: {inverse_value}')
+        if api_value <= 0:
+            raise ValueError(f'Ogiltig kurs från Riksbanken: {api_value}')
 
-        # Convert: if 1 SEK = 0.089 EUR, then 1 EUR = 1/0.089 = 11.236 SEK
-        rate = (Decimal('1') / inverse_value).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+        # API returns 1 foreign = X SEK (e.g. 1 EUR = 10.65 SEK)
+        rate = api_value.quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+        inverse_rate = (Decimal('1') / api_value).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
 
-        return rate, inverse_value
+        return rate, inverse_rate
 
     except requests.RequestException as e:
         logger.warning(f'Riksbanken API error for {currency_code} {date_str}: {e}')

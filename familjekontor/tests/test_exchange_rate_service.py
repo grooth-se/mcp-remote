@@ -58,17 +58,16 @@ class TestExchangeRateModel:
 class TestFetchFromRiksbanken:
     @patch('app.services.exchange_rate_service.requests.get')
     def test_fetch_success(self, mock_get):
-        # API returns 1 SEK = 0.089 EUR → 1 EUR = 11.235955 SEK
+        # API returns 1 EUR = 11.2345 SEK
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = [{'value': '0.089000'}]
+        mock_resp.json.return_value = [{'value': '11.234500'}]
         mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
         rate, inverse = fetch_rate_from_riksbanken('EUR', date(2026, 1, 15))
-        assert rate > Decimal('11')
-        assert inverse == Decimal('0.089000')
-        assert str(rate).startswith('11.235')
+        assert rate == Decimal('11.234500')
+        assert inverse < Decimal('0.1')  # 1/11.23 ~ 0.089
 
     @patch('app.services.exchange_rate_service.requests.get')
     def test_fetch_api_error(self, mock_get):
@@ -84,14 +83,15 @@ class TestFetchFromRiksbanken:
 
     @patch('app.services.exchange_rate_service.requests.get')
     def test_rate_conversion(self, mock_get):
-        # 1 SEK = 0.10 USD → 1 USD = 10.0 SEK
+        # API returns 1 USD = 10.0 SEK
         mock_resp = MagicMock()
-        mock_resp.json.return_value = [{'value': '0.100000'}]
+        mock_resp.json.return_value = [{'value': '10.000000'}]
         mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
         rate, inverse = fetch_rate_from_riksbanken('USD', date(2026, 1, 15))
         assert rate == Decimal('10.000000')
+        assert inverse == Decimal('0.100000')
 
 
 # === get_rate tests ===
@@ -108,7 +108,7 @@ class TestGetRate:
 
     @patch('app.services.exchange_rate_service.fetch_rate_from_riksbanken')
     def test_cache_miss_fetches(self, mock_fetch, db):
-        mock_fetch.return_value = (Decimal('11.50'), Decimal('0.087'))
+        mock_fetch.return_value = (Decimal('11.50'), Decimal('0.086957'))
 
         rate = get_rate('EUR', date(2026, 2, 1))
         assert rate == Decimal('11.50')
