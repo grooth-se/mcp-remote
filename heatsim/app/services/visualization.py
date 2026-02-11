@@ -1281,3 +1281,59 @@ def create_hardness_profile_plot(
     plt.close(fig)
 
     return buf.getvalue()
+
+
+# Colors for simulation comparison
+SIM_COLORS = [
+    '#1f77b4',  # Blue
+    '#ff7f0e',  # Orange
+    '#2ca02c',  # Green
+    '#d62728',  # Red
+    '#9467bd',  # Purple
+]
+
+
+def create_comparison_overlay_plot(
+    sim_data: List[dict],
+    title: str = "Temperature Comparison"
+) -> bytes:
+    """Generate overlay plot comparing multiple simulations.
+
+    Parameters
+    ----------
+    sim_data : list
+        List of dicts with keys: name, times, temps
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(12, 7))
+
+    for i, data in enumerate(sim_data):
+        color = SIM_COLORS[i % len(SIM_COLORS)]
+        times = np.array(data['times'])
+        temps = np.array(data['temps'])
+        name = data.get('name', f'Sim {i+1}')
+
+        ax.plot(times, temps, color=color, linewidth=2, label=name, alpha=0.9)
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Temperature (°C)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='best', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()

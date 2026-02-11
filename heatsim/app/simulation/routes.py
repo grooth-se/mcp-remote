@@ -1145,6 +1145,360 @@ def api_htc(media, agitation):
     return {'htc': htc}
 
 
+@simulation_bp.route('/compare')
+@login_required
+def compare():
+    """Compare 2-5 simulations side by side."""
+    ids_param = request.args.get('ids', '')
+    if not ids_param:
+        flash('No simulations selected for comparison.', 'warning')
+        return redirect(url_for('simulation.index'))
+
+    try:
+        sim_ids = [int(x) for x in ids_param.split(',')]
+    except ValueError:
+        flash('Invalid simulation IDs.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    if len(sim_ids) < 2 or len(sim_ids) > 5:
+        flash('Please select 2-5 simulations to compare.', 'warning')
+        return redirect(url_for('simulation.index'))
+
+    # Load simulations
+    simulations = []
+    for sid in sim_ids:
+        sim = Simulation.query.get(sid)
+        if not sim or sim.user_id != current_user.id:
+            flash(f'Simulation {sid} not found or access denied.', 'danger')
+            return redirect(url_for('simulation.index'))
+        if sim.status != STATUS_COMPLETED:
+            flash(f'Simulation "{sim.name}" is not completed.', 'warning')
+            return redirect(url_for('simulation.index'))
+        simulations.append(sim)
+
+    # Build comparison data
+    comparison_data = []
+    for sim in simulations:
+        # Get full cycle result for t8/5
+        cycle_result = sim.results.filter_by(result_type='full_cycle').first()
+        t85 = cycle_result.t_800_500 if cycle_result else None
+
+        # Get phase fractions
+        phase_result = sim.results.filter_by(result_type='phase_fraction').first()
+        phases = phase_result.phase_fractions_dict if phase_result else None
+
+        # Get hardness prediction
+        hardness_result = sim.results.filter_by(result_type='hardness_prediction').first()
+        hardness = hardness_result.data_dict if hardness_result else None
+
+        # Build config summary
+        ht = sim.ht_config or {}
+        config_summary = {
+            'geometry': sim.geometry_label,
+            'austenitizing_temp': ht.get('heating', {}).get('target_temperature'),
+            'quench_media': ht.get('quenching', {}).get('media'),
+            'quench_temp': ht.get('quenching', {}).get('media_temperature'),
+            'tempering_temp': ht.get('tempering', {}).get('temperature') if ht.get('tempering', {}).get('enabled') else None,
+        }
+
+        comparison_data.append({
+            'sim': sim,
+            't85': t85,
+            'phases': phases,
+            'hardness': hardness,
+            'config': config_summary,
+            'cycle_result': cycle_result
+        })
+
+    return render_template(
+        'simulation/compare.html',
+        simulations=simulations,
+        comparison_data=comparison_data
+    )
+
+
+@simulation_bp.route('/compare/overlay-plot')
+@login_required
+def compare_overlay_plot():
+    """Generate overlay plot for multiple simulations."""
+    ids_param = request.args.get('ids', '')
+    if not ids_param:
+        return Response('No simulations', status=400)
+
+    try:
+        sim_ids = [int(x) for x in ids_param.split(',')]
+    except ValueError:
+        return Response('Invalid IDs', status=400)
+
+    # Collect data for each simulation
+    import numpy as np
+
+    sim_data = []
+    for sid in sim_ids:
+        sim = Simulation.query.get(sid)
+        if not sim or sim.user_id != current_user.id:
+            continue
+
+        cycle_result = sim.results.filter_by(result_type='full_cycle').first()
+        if cycle_result and cycle_result.time_array and cycle_result.value_array:
+            sim_data.append({
+                'name': sim.name,
+                'times': np.array(cycle_result.time_array),
+                'temps': np.array(cycle_result.value_array)
+            })
+
+    if not sim_data:
+        return Response('No data', status=404)
+
+    # Create overlay plot
+    plot_data = visualization.create_comparison_overlay_plot(
+        sim_data,
+        title='Temperature Comparison'
+    )
+
+    return Response(plot_data, mimetype='image/png')
+
+
+@simulation_bp.route('/batch-run', methods=['POST'])
+@login_required
+def batch_run():
+    """Run multiple simulations sequentially."""
+    sim_ids = request.form.getlist('sim_ids')
+    if not sim_ids:
+        flash('No simulations selected.', 'warning')
+        return redirect(url_for('simulation.index'))
+
+    success_count = 0
+    fail_count = 0
+
+    for sid in sim_ids:
+        try:
+            sim = Simulation.query.get(int(sid))
+            if not sim or sim.user_id != current_user.id:
+                continue
+
+            if sim.status not in [STATUS_READY, STATUS_COMPLETED, STATUS_FAILED]:
+                continue
+
+            # Run simulation (same logic as single run)
+            _run_simulation(sim)
+            success_count += 1
+
+        except Exception as e:
+            fail_count += 1
+            current_app.logger.error(f'Batch run failed for sim {sid}: {e}')
+
+    if success_count > 0:
+        flash(f'Successfully ran {success_count} simulation(s).', 'success')
+    if fail_count > 0:
+        flash(f'{fail_count} simulation(s) failed.', 'warning')
+
+    return redirect(url_for('simulation.index'))
+
+
+@simulation_bp.route('/batch-delete', methods=['POST'])
+@login_required
+def batch_delete():
+    """Delete multiple simulations."""
+    sim_ids = request.form.getlist('sim_ids')
+    if not sim_ids:
+        flash('No simulations selected.', 'warning')
+        return redirect(url_for('simulation.index'))
+
+    deleted_count = 0
+    for sid in sim_ids:
+        try:
+            sim = Simulation.query.get(int(sid))
+            if sim and sim.user_id == current_user.id:
+                db.session.delete(sim)
+                deleted_count += 1
+        except Exception as e:
+            current_app.logger.error(f'Failed to delete sim {sid}: {e}')
+
+    db.session.commit()
+    flash(f'Deleted {deleted_count} simulation(s).', 'success')
+    return redirect(url_for('simulation.index'))
+
+
+def _run_simulation(sim):
+    """Internal helper to run a single simulation (used by batch_run)."""
+    # Clear previous results
+    SimulationResult.query.filter_by(simulation_id=sim.id).delete()
+
+    sim.status = STATUS_RUNNING
+    sim.started_at = datetime.utcnow()
+    sim.error_message = None
+    db.session.commit()
+
+    try:
+        # Build geometry (use equivalent geometry for CAD types)
+        if sim.geometry_type == GEOMETRY_CAD:
+            equiv_type = sim.cad_equivalent_type or 'cylinder'
+            equiv_params = sim.cad_equivalent_geometry_dict
+            geometry = create_geometry(equiv_type, equiv_params)
+        else:
+            geometry = create_geometry(sim.geometry_type, sim.geometry_dict)
+
+        # Build solver config
+        solver_config = SolverConfig.from_dict(sim.solver_dict)
+
+        # Get material properties
+        grade = sim.steel_grade
+        k_prop = grade.get_property('thermal_conductivity')
+        cp_prop = grade.get_property('specific_heat')
+        rho_prop = grade.get_property('density')
+        emiss_prop = grade.get_property('emissivity')
+
+        density = 7850
+        if rho_prop:
+            density = rho_prop.data_dict.get('value', 7850)
+
+        emissivity = 0.85
+        if emiss_prop:
+            emissivity = emiss_prop.data_dict.get('value', 0.85)
+
+        # Get heat treatment config
+        ht_config = sim.ht_config
+        if not ht_config:
+            ht_config = sim.create_default_ht_config()
+
+        # Create multi-phase solver
+        solver = MultiPhaseHeatSolver(geometry, config=solver_config)
+        solver.set_material(k_prop, cp_prop, density, emissivity)
+        solver.configure_from_ht_config(ht_config)
+
+        # Determine initial temperature
+        heating_config = ht_config.get('heating', {})
+        if heating_config.get('enabled', False):
+            initial_temp = heating_config.get('initial_temperature', 25.0)
+        else:
+            initial_temp = heating_config.get('target_temperature', sim.initial_temperature or 850.0)
+
+        # Run simulation
+        result = solver.solve(initial_temperature=initial_temp)
+
+        # Get phase diagram for transformation temps
+        diagram = grade.phase_diagrams.first()
+        trans_temps = diagram.temps_dict if diagram else {}
+
+        # Store full cycle result
+        cycle_result = SimulationResult(
+            simulation_id=sim.id,
+            result_type='full_cycle',
+            phase='full',
+            location='center',
+            t_800_500=result.t8_5
+        )
+        cycle_result.set_time_data(result.time.tolist())
+        cycle_result.set_value_data(result.center_temp.tolist())
+
+        # Build furnace temps
+        furnace_temps = []
+        if result.phase_results:
+            for pr in result.phase_results:
+                if pr.time.size < 2:
+                    continue
+                temp = None
+                phase_name = pr.phase_name
+                cold_furnace = False
+                furnace_start_temp = None
+                ramp_rate = 0
+
+                if phase_name == 'heating':
+                    heating_cfg = ht_config.get('heating', {})
+                    temp = heating_cfg.get('target_temperature')
+                    cold_furnace = heating_cfg.get('cold_furnace', False)
+                    furnace_start_temp = heating_cfg.get('furnace_start_temperature', 25.0)
+                    ramp_rate = heating_cfg.get('furnace_ramp_rate', 0)
+                elif phase_name == 'transfer':
+                    temp = ht_config.get('transfer', {}).get('ambient_temperature')
+                elif phase_name == 'quenching':
+                    temp = ht_config.get('quenching', {}).get('media_temperature')
+                elif phase_name == 'tempering':
+                    tempering_cfg = ht_config.get('tempering', {})
+                    temp = tempering_cfg.get('temperature')
+                    cold_furnace = tempering_cfg.get('cold_furnace', False)
+                    furnace_start_temp = tempering_cfg.get('furnace_start_temperature', 25.0)
+                    ramp_rate = tempering_cfg.get('furnace_ramp_rate', 0)
+                elif phase_name == 'cooling':
+                    temp = ht_config.get('transfer', {}).get('ambient_temperature', 25.0)
+
+                if temp is not None:
+                    furnace_temps.append({
+                        'start_time': pr.start_time,
+                        'end_time': pr.end_time,
+                        'temperature': temp,
+                        'phase_name': phase_name,
+                        'cold_furnace': cold_furnace,
+                        'furnace_start_temperature': furnace_start_temp if furnace_start_temp else temp,
+                        'furnace_ramp_rate': ramp_rate
+                    })
+
+        cycle_result.plot_image = visualization.create_heat_treatment_cycle_plot(
+            result.time,
+            result.temperature,
+            phase_results=result.phase_results,
+            title=f'Heat Treatment Cycle - {sim.name}',
+            transformation_temps=trans_temps,
+            furnace_temps=furnace_temps
+        )
+        db.session.add(cycle_result)
+
+        # Phase transformation prediction
+        tracker = None
+        if diagram:
+            tracker = PhaseTracker(diagram)
+            phases = tracker.predict_phases(result.time, result.center_temp, result.t8_5)
+
+            phase_result = SimulationResult(
+                simulation_id=sim.id,
+                result_type='phase_fraction',
+                phase='full',
+                location='center'
+            )
+            phase_result.set_phase_fractions(phases.to_dict())
+            phase_result.plot_image = visualization.create_phase_fraction_plot(
+                phases.to_dict(),
+                title=f'Predicted Phase Fractions - {sim.name}'
+            )
+            db.session.add(phase_result)
+
+        # Hardness prediction
+        if diagram and grade.composition:
+            try:
+                hardness_result = predict_hardness_profile(
+                    composition=grade.composition,
+                    temperatures=result.temperature,
+                    times=result.time,
+                    phase_tracker=tracker
+                )
+
+                hardness_sim_result = SimulationResult(
+                    simulation_id=sim.id,
+                    result_type='hardness_prediction',
+                    phase='full',
+                    location='all'
+                )
+                hardness_sim_result.set_data(hardness_result.to_dict())
+                hardness_sim_result.plot_image = visualization.create_hardness_profile_plot(
+                    hardness_result,
+                    title=f'Predicted Hardness - {sim.name}'
+                )
+                db.session.add(hardness_sim_result)
+            except Exception as e:
+                current_app.logger.warning(f'Hardness prediction failed: {e}')
+
+        sim.status = STATUS_COMPLETED
+        sim.completed_at = datetime.utcnow()
+        db.session.commit()
+
+    except Exception as e:
+        sim.status = STATUS_FAILED
+        sim.error_message = str(e)
+        db.session.commit()
+        raise
+
+
 # ============================================================================
 # Measured TC Data Routes
 # ============================================================================

@@ -15,73 +15,104 @@
 </div>
 
 {% if simulations %}
-<div class="card">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Name</th>
-                    <th>Steel Grade</th>
-                    <th>Process</th>
-                    <th>Geometry</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for sim in simulations %}
-                <tr>
-                    <td>
-                        <a href="{{ url_for('simulation.view', id=sim.id) }}" class="fw-bold text-decoration-none">
-                            {{ sim.name }}
-                        </a>
-                        {% if sim.description %}
-                        <br><small class="text-muted">{{ sim.description|truncate(40) }}</small>
-                        {% endif %}
-                    </td>
-                    <td>{{ sim.steel_grade.designation }}</td>
-                    <td>{{ sim.process_label }}</td>
-                    <td>{{ sim.geometry_label }}</td>
-                    <td>
-                        <span class="badge {{ sim.status_badge_class }}">{{ sim.status }}</span>
-                    </td>
-                    <td>
-                        <small>{{ sim.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
-                    </td>
-                    <td class="text-end">
-                        <div class="btn-group btn-group-sm">
-                            <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-primary" title="View">
-                                <i class="bi bi-eye"></i>
-                            </a>
-                            {% if sim.status in ['ready', 'completed', 'failed'] %}
-                            <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-success" title="Run">
-                                    <i class="bi bi-play-fill"></i>
-                                </button>
-                            </form>
-                            {% endif %}
-                            <form method="post" action="{{ url_for('simulation.clone', id=sim.id) }}" class="d-inline">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-secondary" title="Clone">
-                                    <i class="bi bi-copy"></i>
-                                </button>
-                            </form>
-                            <form method="post" action="{{ url_for('simulation.delete', id=sim.id) }}" class="d-inline" onsubmit="return confirm('Delete this simulation?');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-danger" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- Bulk Actions Bar (hidden by default, shown when items selected) -->
+<div id="bulkActionsBar" class="alert alert-secondary d-none mb-3">
+    <div class="d-flex align-items-center justify-content-between">
+        <span><strong id="selectedCount">0</strong> simulation(s) selected</span>
+        <div class="btn-group">
+            <button type="button" class="btn btn-info btn-sm" id="compareBtn" disabled title="Compare selected (2-5)">
+                <i class="bi bi-layout-split"></i> Compare
+            </button>
+            <button type="button" class="btn btn-success btn-sm" id="runSelectedBtn" disabled title="Run selected simulations">
+                <i class="bi bi-play-fill"></i> Run Selected
+            </button>
+            <button type="button" class="btn btn-danger btn-sm" id="deleteSelectedBtn" disabled title="Delete selected">
+                <i class="bi bi-trash"></i> Delete Selected
+            </button>
+        </div>
     </div>
 </div>
+
+<form id="bulkForm" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" id="bulkAction" value="">
+
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 40px;">
+                            <input type="checkbox" class="form-check-input" id="selectAll" title="Select all">
+                        </th>
+                        <th>Name</th>
+                        <th>Steel Grade</th>
+                        <th>Geometry</th>
+                        <th>Status</th>
+                        <th>t₈/₅</th>
+                        <th>Created</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sim in simulations %}
+                    <tr data-status="{{ sim.status }}">
+                        <td>
+                            <input type="checkbox" class="form-check-input sim-checkbox"
+                                   name="sim_ids" value="{{ sim.id }}" data-status="{{ sim.status }}">
+                        </td>
+                        <td>
+                            <a href="{{ url_for('simulation.view', id=sim.id) }}" class="fw-bold text-decoration-none">
+                                {{ sim.name }}
+                            </a>
+                            {% if sim.description %}
+                            <br><small class="text-muted">{{ sim.description|truncate(40) }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ sim.steel_grade.designation }}</td>
+                        <td>{{ sim.geometry_label }}</td>
+                        <td>
+                            <span class="badge {{ sim.status_badge_class }}">{{ sim.status }}</span>
+                        </td>
+                        <td>
+                            {% set t85 = sim.results.filter_by(result_type='full_cycle').first() %}
+                            {% if t85 and t85.t_800_500 %}
+                            <small>{{ t85.t_800_500|round(1) }}s</small>
+                            {% else %}
+                            <small class="text-muted">-</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ sim.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-primary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if sim.status in ['ready', 'completed', 'failed'] %}
+                                <button type="button" class="btn btn-outline-success run-single"
+                                        data-id="{{ sim.id }}" title="Run">
+                                    <i class="bi bi-play-fill"></i>
+                                </button>
+                                {% endif %}
+                                <button type="button" class="btn btn-outline-secondary clone-single"
+                                        data-id="{{ sim.id }}" title="Clone">
+                                    <i class="bi bi-copy"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger delete-single"
+                                        data-id="{{ sim.id }}" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
 
 <div class="mt-3 text-muted small">
     {{ simulations|length }} simulation(s)
@@ -96,4 +127,133 @@
     </a>
 </div>
 {% endif %}
+
+<!-- Hidden forms for single actions -->
+<form id="singleRunForm" method="post" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+<form id="singleCloneForm" method="post" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+<form id="singleDeleteForm" method="post" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.sim-checkbox');
+    const bulkBar = document.getElementById('bulkActionsBar');
+    const selectedCount = document.getElementById('selectedCount');
+    const compareBtn = document.getElementById('compareBtn');
+    const runSelectedBtn = document.getElementById('runSelectedBtn');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    const bulkForm = document.getElementById('bulkForm');
+    const bulkAction = document.getElementById('bulkAction');
+
+    function updateBulkActions() {
+        const checked = document.querySelectorAll('.sim-checkbox:checked');
+        const count = checked.length;
+
+        selectedCount.textContent = count;
+
+        if (count > 0) {
+            bulkBar.classList.remove('d-none');
+            deleteSelectedBtn.disabled = false;
+
+            // Compare: need 2-5 completed simulations
+            const completedCount = Array.from(checked).filter(cb => cb.dataset.status === 'completed').length;
+            compareBtn.disabled = !(completedCount >= 2 && completedCount <= 5);
+            compareBtn.title = completedCount >= 2 && completedCount <= 5
+                ? 'Compare selected simulations'
+                : 'Select 2-5 completed simulations to compare';
+
+            // Run: need at least one ready/completed/failed simulation
+            const runnableCount = Array.from(checked).filter(cb =>
+                ['ready', 'completed', 'failed'].includes(cb.dataset.status)
+            ).length;
+            runSelectedBtn.disabled = runnableCount === 0;
+        } else {
+            bulkBar.classList.add('d-none');
+        }
+    }
+
+    // Select all checkbox
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = this.checked);
+            updateBulkActions();
+        });
+    }
+
+    // Individual checkboxes
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateBulkActions);
+    });
+
+    // Compare button
+    if (compareBtn) {
+        compareBtn.addEventListener('click', function() {
+            const ids = Array.from(document.querySelectorAll('.sim-checkbox:checked'))
+                .filter(cb => cb.dataset.status === 'completed')
+                .map(cb => cb.value);
+            if (ids.length >= 2 && ids.length <= 5) {
+                window.location.href = '{{ url_for("simulation.compare") }}?ids=' + ids.join(',');
+            }
+        });
+    }
+
+    // Run Selected button
+    if (runSelectedBtn) {
+        runSelectedBtn.addEventListener('click', function() {
+            if (confirm('Run all selected simulations? This may take a while.')) {
+                bulkAction.value = 'run';
+                bulkForm.action = '{{ url_for("simulation.batch_run") }}';
+                bulkForm.submit();
+            }
+        });
+    }
+
+    // Delete Selected button
+    if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener('click', function() {
+            const count = document.querySelectorAll('.sim-checkbox:checked').length;
+            if (confirm('Delete ' + count + ' simulation(s)? This cannot be undone.')) {
+                bulkAction.value = 'delete';
+                bulkForm.action = '{{ url_for("simulation.batch_delete") }}';
+                bulkForm.submit();
+            }
+        });
+    }
+
+    // Single action buttons
+    document.querySelectorAll('.run-single').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const form = document.getElementById('singleRunForm');
+            form.action = '/simulation/' + this.dataset.id + '/run';
+            form.submit();
+        });
+    });
+
+    document.querySelectorAll('.clone-single').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const form = document.getElementById('singleCloneForm');
+            form.action = '/simulation/' + this.dataset.id + '/clone';
+            form.submit();
+        });
+    });
+
+    document.querySelectorAll('.delete-single').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (confirm('Delete this simulation?')) {
+                const form = document.getElementById('singleDeleteForm');
+                form.action = '/simulation/' + this.dataset.id + '/delete';
+                form.submit();
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

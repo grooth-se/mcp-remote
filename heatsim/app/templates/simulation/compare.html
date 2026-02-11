@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Compare Simulations{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item active">Compare</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-layout-split"></i> Compare Simulations</h2>
+    <a href="{{ url_for('simulation.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to List
+    </a>
+</div>
+
+<!-- Overlay Plot -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Temperature Comparison</h5>
+    </div>
+    <div class="card-body text-center">
+        {% set ids = simulations|map(attribute='id')|join(',') %}
+        <img src="{{ url_for('simulation.compare_overlay_plot', ids=ids) }}"
+             alt="Temperature Comparison" class="img-fluid" style="max-height: 500px;">
+    </div>
+</div>
+
+<!-- Comparison Table -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-table"></i> Configuration Comparison</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="min-width: 200px;">Property</th>
+                        {% for data in comparison_data %}
+                        <th class="text-center" style="min-width: 150px;">
+                            <a href="{{ url_for('simulation.view', id=data.sim.id) }}">
+                                {{ data.sim.name }}
+                            </a>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Geometry -->
+                    <tr class="table-secondary">
+                        <td colspan="{{ comparison_data|length + 1 }}"><strong>Geometry</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Type & Dimensions</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">{{ data.config.geometry }}</td>
+                        {% endfor %}
+                    </tr>
+
+                    <!-- Heat Treatment -->
+                    <tr class="table-secondary">
+                        <td colspan="{{ comparison_data|length + 1 }}"><strong>Heat Treatment</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Austenitizing Temperature</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">
+                            {% if data.config.austenitizing_temp %}
+                            {{ data.config.austenitizing_temp }}°C
+                            {% else %}-{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Quench Media</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">{{ data.config.quench_media|title if data.config.quench_media else '-' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Quench Temperature</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">
+                            {% if data.config.quench_temp is not none %}
+                            {{ data.config.quench_temp }}°C
+                            {% else %}-{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Tempering Temperature</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">
+                            {% if data.config.tempering_temp %}
+                            {{ data.config.tempering_temp }}°C
+                            {% else %}<span class="text-muted">Not enabled</span>{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+
+                    <!-- Results -->
+                    <tr class="table-secondary">
+                        <td colspan="{{ comparison_data|length + 1 }}"><strong>Results</strong></td>
+                    </tr>
+                    <tr>
+                        <td>t<sub>8/5</sub> (Cooling Time)</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center fw-bold">
+                            {% if data.t85 %}
+                            {{ data.t85|round(1) }} s
+                            {% else %}-{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+
+                    <!-- Phase Fractions -->
+                    {% if comparison_data[0].phases %}
+                    <tr>
+                        <td>Martensite</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">
+                            {% if data.phases and data.phases.martensite %}
+                            {{ (data.phases.martensite * 100)|round(1) }}%
+                            {% else %}-{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Bainite</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">
+                            {% if data.phases and data.phases.bainite %}
+                            {{ (data.phases.bainite * 100)|round(1) }}%
+                            {% else %}-{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Ferrite + Pearlite</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">
+                            {% if data.phases %}
+                            {% set fp = (data.phases.ferrite|default(0) + data.phases.pearlite|default(0)) * 100 %}
+                            {{ fp|round(1) }}%
+                            {% else %}-{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endif %}
+
+                    <!-- Hardness -->
+                    {% if comparison_data[0].hardness %}
+                    <tr>
+                        <td>Surface Hardness</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">
+                            {% if data.hardness and data.hardness.hardness_values %}
+                            {% set surface = data.hardness.hardness_values.get('surface', {}) %}
+                            {% if surface.HV %}
+                            {{ surface.HV|round(0) }} HV
+                            {% if surface.HRC %}({{ surface.HRC|round(0) }} HRC){% endif %}
+                            {% else %}-{% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td>Center Hardness</td>
+                        {% for data in comparison_data %}
+                        <td class="text-center">
+                            {% if data.hardness and data.hardness.hardness_values %}
+                            {% set center = data.hardness.hardness_values.get('center', {}) %}
+                            {% if center.HV %}
+                            {{ center.HV|round(0) }} HV
+                            {% if center.HRC %}({{ center.HRC|round(0) }} HRC){% endif %}
+                            {% else %}-{% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Individual Cycle Plots -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-images"></i> Individual Heat Treatment Cycles</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for data in comparison_data %}
+            <div class="col-md-{{ 12 // comparison_data|length }} mb-3">
+                <h6 class="text-center">{{ data.sim.name }}</h6>
+                {% if data.cycle_result and data.cycle_result.plot_image %}
+                <img src="{{ url_for('simulation.result_image', id=data.sim.id, result_id=data.cycle_result.id) }}"
+                     alt="{{ data.sim.name }}" class="img-fluid">
+                {% else %}
+                <div class="alert alert-secondary">No plot available</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
