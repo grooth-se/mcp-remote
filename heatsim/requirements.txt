@@ -39,6 +39,7 @@ cadquery>=2.4.0             # STEP file analysis
 
 # Report Generation
 python-docx>=1.1.0
+fpdf2>=2.7.0
 
 # Development
 pytest>=7.3.0

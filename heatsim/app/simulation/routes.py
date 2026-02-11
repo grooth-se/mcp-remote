@@ -23,7 +23,8 @@ from app.services import (
     PhaseTracker,
     predict_hardness_profile,
     visualization,
-    generate_simulation_report
+    generate_simulation_report,
+    generate_simulation_pdf_report
 )
 from app.services.tc_data_parser import parse_tc_csv, validate_tc_csv
 from app.services.cad_geometry import analyze_step_file, CADAnalysisResult
@@ -883,6 +884,41 @@ def download_report(id):
 
     except Exception as e:
         flash(f'Error generating report: {str(e)}', 'danger')
+        return redirect(url_for('simulation.view', id=id))
+
+
+@simulation_bp.route('/<int:id>/report/pdf')
+@login_required
+def download_pdf_report(id):
+    """Download simulation report as PDF document."""
+    sim = Simulation.query.get_or_404(id)
+
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    if sim.status != STATUS_COMPLETED:
+        flash('Report is only available for completed simulations.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    try:
+        # Generate PDF report
+        report_bytes = generate_simulation_pdf_report(sim)
+
+        # Create safe filename
+        safe_name = sim.name.replace(' ', '_').replace('/', '-')
+        filename = f"{safe_name}_report.pdf"
+
+        # Return as downloadable file
+        response = Response(
+            report_bytes,
+            mimetype='application/pdf'
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        flash(f'Error generating PDF report: {str(e)}', 'danger')
         return redirect(url_for('simulation.view', id=id))
 
 
