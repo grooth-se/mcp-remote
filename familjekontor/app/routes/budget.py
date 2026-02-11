@@ -1,7 +1,7 @@
 from flask import (Blueprint, render_template, redirect, url_for, flash,
                    request, session, jsonify, send_file)
 from flask_login import login_required, current_user
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.accounting import FiscalYear
 from app.forms.budget import BudgetFilterForm, BudgetCopyForm
 from app.services import budget_service
@@ -64,6 +64,7 @@ def grid():
 
 @budget_bp.route('/api/save-grid', methods=['POST'])
 @login_required
+@limiter.limit("60 per minute")
 def api_save_grid():
     company_id, company, active_fy = _get_active_context()
     if not company_id:

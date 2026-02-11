@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_required, current_user
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.user import User
 from app.models.audit import AuditLog
 from app.forms.admin import UserForm
@@ -37,6 +37,7 @@ def users():
 @admin_bp.route('/users/new', methods=['GET', 'POST'])
 @login_required
 @admin_required
+@limiter.limit("3 per hour", methods=["POST"])
 def new_user():
     form = UserForm()
     if form.validate_on_submit():
@@ -66,6 +67,7 @@ def new_user():
 @admin_bp.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
 @login_required
 @admin_required
+@limiter.limit("3 per hour", methods=["POST"])
 def edit_user(user_id):
     user = db.session.get(User, user_id)
     if not user:

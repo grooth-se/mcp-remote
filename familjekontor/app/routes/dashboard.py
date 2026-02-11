@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, session, redirect, url_for, jsonify
 from flask_login import login_required
+from app.extensions import limiter
 from app.services.company_service import get_company_summary
 from app.models.accounting import Verification
 from app.models.audit import AuditLog
@@ -79,6 +80,7 @@ def switch_company(company_id):
 
 @dashboard_bp.route('/api/revenue-expense-chart')
 @login_required
+@limiter.limit("60 per minute")
 def api_revenue_expense_chart():
     company_id = session.get('active_company_id')
     if not company_id:
@@ -95,6 +97,7 @@ def api_revenue_expense_chart():
 
 @dashboard_bp.route('/api/cash-flow-chart')
 @login_required
+@limiter.limit("60 per minute")
 def api_cash_flow_chart():
     company_id = session.get('active_company_id')
     if not company_id:

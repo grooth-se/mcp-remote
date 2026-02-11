@@ -17,6 +17,7 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
+    RATELIMIT_ENABLED = True
 
 
 class DevelopmentConfig(Config):
@@ -34,6 +35,7 @@ class TestingConfig(Config):
         'TEST_DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'instance', 'familjekontor_test.db')
     )
     WTF_CSRF_ENABLED = False
+    RATELIMIT_ENABLED = False
 
 
 config = {

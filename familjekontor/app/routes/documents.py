@@ -2,7 +2,7 @@ from datetime import date, datetime
 from flask import (Blueprint, render_template, redirect, url_for, flash,
                    request, session, send_file, jsonify)
 from flask_login import login_required, current_user
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.document import Document
 from app.models.accounting import Verification
 from app.forms.document import DocumentUploadForm, DocumentFilterForm
@@ -70,6 +70,7 @@ def upload():
 
 @documents_bp.route('/api/analyze', methods=['POST'])
 @login_required
+@limiter.limit("60 per minute")
 def api_analyze():
     """Analyze an uploaded file and return metadata suggestions."""
     company_id = _get_company_id()
@@ -86,6 +87,7 @@ def api_analyze():
 
 @documents_bp.route('/api/upload', methods=['POST'])
 @login_required
+@limiter.limit("60 per minute")
 def api_upload():
     """AJAX drag-and-drop upload endpoint."""
     company_id = _get_company_id()

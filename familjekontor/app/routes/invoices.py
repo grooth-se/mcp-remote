@@ -1,7 +1,7 @@
 from decimal import Decimal
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session, send_file, jsonify
 from flask_login import login_required, current_user
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models.accounting import FiscalYear, Account
 from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice, InvoiceLineItem
 from app.models.bank import BankAccount
@@ -63,6 +63,7 @@ def new_supplier():
 
 @invoices_bp.route('/api/analyze-invoice-pdf', methods=['POST'])
 @login_required
+@limiter.limit("60 per minute")
 def api_analyze_invoice_pdf():
     """Analyze uploaded invoice PDF, return extracted fields as JSON."""
     company_id = session.get('active_company_id')

@@ -1,6 +1,6 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, jsonify
 from config import config
-from app.extensions import db, migrate, login_manager, csrf
+from app.extensions import db, migrate, login_manager, csrf, limiter
 
 
 def create_app(config_name=None):
@@ -18,6 +18,9 @@ def create_app(config_name=None):
     migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
+    limiter.init_app(app)
+    if not app.config.get('RATELIMIT_ENABLED', True):
+        limiter.enabled = False
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Logga in för att fortsätta.'
 
@@ -68,6 +71,12 @@ def create_app(config_name=None):
     def not_found(e):
         return render_template('errors/404.html'), 404
 
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        if request.is_json or request.path.startswith('/api/'):
+            return jsonify({'error': 'För många förfrågningar'}), 429
+        return render_template('errors/429.html'), 429
+
     @app.errorhandler(500)
     def internal_error(e):
         db.session.rollback()
@@ -80,6 +89,23 @@ def create_app(config_name=None):
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+
+        # Content Security Policy
+        csp = '; '.join([
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+            "font-src 'self' https://cdn.jsdelivr.net",
+            "img-src 'self' data:",
+            "connect-src 'self'",
+            "frame-ancestors 'none'",
+        ])
+        response.headers['Content-Security-Policy'] = csp
+
+        # HSTS — production only
+        if not app.debug and not app.testing:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+
         return response
 
     # Context processor for active company

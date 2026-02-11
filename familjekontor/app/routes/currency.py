@@ -3,6 +3,7 @@ from decimal import Decimal
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required
 
+from app.extensions import limiter
 from app.models.exchange_rate import ExchangeRate
 from app.forms.currency import ExchangeRateForm, FetchRatesForm
 from app.services.exchange_rate_service import (
@@ -82,6 +83,7 @@ def fetch_rates():
 
 @currency_bp.route('/api/rate/<currency_code>/<rate_date>')
 @login_required
+@limiter.limit("60 per minute")
 def api_get_rate(currency_code, rate_date):
     """JSON endpoint for AJAX auto-fill in invoice forms."""
     try:
