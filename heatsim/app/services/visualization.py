@@ -1529,3 +1529,149 @@ def create_ttt_overlay_plot(
         times, temperatures, transformation_temps, curves,
         title=title
     )
+
+
+def create_jominy_curve_plot(
+    distances_mm: List[float],
+    hardness_hv: List[float],
+    hardness_hrc: List[Optional[float]],
+    j_distance_50hrc: Optional[float] = None,
+    title: str = "Jominy End-Quench Curve",
+    show_hrc: bool = True
+) -> bytes:
+    """Generate Jominy end-quench hardenability curve.
+
+    Parameters
+    ----------
+    distances_mm : list
+        Distances from quenched end in mm
+    hardness_hv : list
+        Vickers hardness at each distance
+    hardness_hrc : list
+        Rockwell C hardness at each distance (None if HV < 200)
+    j_distance_50hrc : float, optional
+        Jominy distance where hardness = 50 HRC
+    title : str
+        Plot title
+    show_hrc : bool
+        Whether to show HRC scale on right axis
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    # Plot HV curve
+    ax1.plot(distances_mm, hardness_hv, 'b-o', linewidth=2, markersize=6,
+             label='Hardness (HV)')
+    ax1.set_xlabel('Distance from Quenched End (mm)', fontsize=12)
+    ax1.set_ylabel('Hardness (HV)', fontsize=12, color='blue')
+    ax1.tick_params(axis='y', labelcolor='blue')
+
+    # Set HV axis limits
+    hv_min = min(hardness_hv) * 0.9
+    hv_max = max(hardness_hv) * 1.1
+    ax1.set_ylim(hv_min, hv_max)
+    ax1.set_xlim(0, max(distances_mm) + 2)
+
+    # Add HRC scale on right axis
+    if show_hrc:
+        ax2 = ax1.twinx()
+        # Filter valid HRC values
+        valid_hrc = [(d, h) for d, h in zip(distances_mm, hardness_hrc) if h is not None]
+        if valid_hrc:
+            d_hrc, hrc_vals = zip(*valid_hrc)
+            ax2.plot(d_hrc, hrc_vals, 'r--s', linewidth=1.5, markersize=5,
+                    alpha=0.7, label='Hardness (HRC)')
+            ax2.set_ylabel('Hardness (HRC)', fontsize=12, color='red')
+            ax2.tick_params(axis='y', labelcolor='red')
+
+            # Set HRC axis limits based on HV conversion
+            hrc_min = max(20, min(hrc_vals) - 5) if hrc_vals else 20
+            hrc_max = min(70, max(hrc_vals) + 5) if hrc_vals else 70
+            ax2.set_ylim(hrc_min, hrc_max)
+
+    # Mark J50 distance if available
+    if j_distance_50hrc is not None:
+        ax1.axvline(x=j_distance_50hrc, color='green', linestyle=':', linewidth=2,
+                   label=f'J50 = {j_distance_50hrc:.1f} mm')
+        ax1.annotate(f'J50 = {j_distance_50hrc:.1f} mm',
+                    xy=(j_distance_50hrc, hv_max * 0.95),
+                    xytext=(j_distance_50hrc + 5, hv_max * 0.95),
+                    fontsize=10, color='green',
+                    arrowprops=dict(arrowstyle='->', color='green'))
+
+    # Add reference lines for common hardness thresholds
+    # 50 HRC is approximately 513 HV
+    if hv_max > 500:
+        ax1.axhline(y=513, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+        ax1.annotate('50 HRC', xy=(max(distances_mm) - 5, 520), fontsize=9, color='gray')
+
+    ax1.set_title(title, fontsize=14)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc='upper right', fontsize=9)
+
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
+
+
+def create_jominy_phases_plot(
+    distances_mm: List[float],
+    phase_fractions: List[dict],
+    title: str = "Phase Distribution - Jominy Test"
+) -> bytes:
+    """Generate stacked area plot of phase distribution along Jominy bar.
+
+    Parameters
+    ----------
+    distances_mm : list
+        Distances from quenched end in mm
+    phase_fractions : list
+        Phase fraction dicts at each distance
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    # Extract phase data
+    martensite = [pf.get('martensite', 0) * 100 for pf in phase_fractions]
+    bainite = [pf.get('bainite', 0) * 100 for pf in phase_fractions]
+    ferrite = [pf.get('ferrite', 0) * 100 for pf in phase_fractions]
+    pearlite = [pf.get('pearlite', 0) * 100 for pf in phase_fractions]
+
+    # Create stacked area plot
+    ax.stackplot(distances_mm,
+                 martensite, bainite, ferrite, pearlite,
+                 labels=['Martensite', 'Bainite', 'Ferrite', 'Pearlite'],
+                 colors=['#d62728', '#ff7f0e', '#2ca02c', '#1f77b4'],
+                 alpha=0.8)
+
+    ax.set_xlabel('Distance from Quenched End (mm)', fontsize=12)
+    ax.set_ylabel('Phase Fraction (%)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.set_xlim(0, max(distances_mm))
+    ax.set_ylim(0, 100)
+    ax.legend(loc='center right', fontsize=9)
+    ax.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()

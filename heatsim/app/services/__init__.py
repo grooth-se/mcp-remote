@@ -15,6 +15,7 @@ from .heat_solver import (
 from .phase_tracker import PhaseTracker, PhaseResult
 from .cad_geometry import CADGeometryAnalyzer, CADAnalysisResult, analyze_step_file
 from .hardness_predictor import HardnessPredictor, HardnessResult, predict_hardness_profile
+from .jominy_service import JominySimulator, JominyResult, simulate_jominy_test
 from .report_generator import (
     SimulationReportGenerator, generate_simulation_report,
     SimulationPDFReportGenerator, generate_simulation_pdf_report
@@ -64,6 +65,10 @@ __all__ = [
     'HardnessPredictor',
     'HardnessResult',
     'predict_hardness_profile',
+    # Jominy hardenability test
+    'JominySimulator',
+    'JominyResult',
+    'simulate_jominy_test',
     # Phase 3 services - Report generation
     'SimulationReportGenerator',
     'generate_simulation_report',

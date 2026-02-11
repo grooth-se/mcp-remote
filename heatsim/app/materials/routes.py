@@ -774,3 +774,103 @@ def seed_compositions():
     )
     flash(msg, 'success')
     return redirect(url_for('materials.index'))
+
+
+# ============================================================================
+# Jominy End-Quench Test
+# ============================================================================
+
+@materials_bp.route('/<int:id>/jominy')
+@login_required
+def jominy_test(id):
+    """Display Jominy end-quench hardenability test results."""
+    from app.services import simulate_jominy_test, visualization
+
+    grade = SteelGrade.query.get_or_404(id)
+
+    # Check if composition is available
+    if not grade.composition:
+        flash('Composition data required for Jominy test. Please add composition first.', 'warning')
+        return redirect(url_for('materials.composition', id=id))
+
+    # Get austenitizing temperature from request or use default
+    aust_temp = request.args.get('aust_temp', 850, type=float)
+
+    # Run Jominy simulation
+    diagram = grade.phase_diagrams.first()
+    result = simulate_jominy_test(
+        composition=grade.composition,
+        phase_diagram=diagram,
+        austenitizing_temp=aust_temp
+    )
+
+    return render_template(
+        'materials/jominy.html',
+        grade=grade,
+        result=result,
+        aust_temp=aust_temp
+    )
+
+
+@materials_bp.route('/<int:id>/jominy/curve')
+@login_required
+def jominy_curve_plot(id):
+    """Generate Jominy hardness curve plot."""
+    from app.services import simulate_jominy_test, visualization
+
+    grade = SteelGrade.query.get_or_404(id)
+
+    if not grade.composition:
+        return Response('No composition data', status=400)
+
+    aust_temp = request.args.get('aust_temp', 850, type=float)
+
+    diagram = grade.phase_diagrams.first()
+    result = simulate_jominy_test(
+        composition=grade.composition,
+        phase_diagram=diagram,
+        austenitizing_temp=aust_temp
+    )
+
+    plot_data = visualization.create_jominy_curve_plot(
+        distances_mm=result.distances_mm,
+        hardness_hv=result.hardness_hv,
+        hardness_hrc=result.hardness_hrc,
+        j_distance_50hrc=result.j_distance_50hrc,
+        title=f'Jominy Curve - {grade.designation}'
+    )
+
+    response = Response(plot_data, mimetype='image/png')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+
+@materials_bp.route('/<int:id>/jominy/phases')
+@login_required
+def jominy_phases_plot(id):
+    """Generate Jominy phase distribution plot."""
+    from app.services import simulate_jominy_test, visualization
+
+    grade = SteelGrade.query.get_or_404(id)
+
+    if not grade.composition:
+        return Response('No composition data', status=400)
+
+    aust_temp = request.args.get('aust_temp', 850, type=float)
+
+    diagram = grade.phase_diagrams.first()
+    result = simulate_jominy_test(
+        composition=grade.composition,
+        phase_diagram=diagram,
+        austenitizing_temp=aust_temp
+    )
+
+    plot_data = visualization.create_jominy_phases_plot(
+        distances_mm=result.distances_mm,
+        phase_fractions=result.phase_fractions,
+        title=f'Phase Distribution - {grade.designation}'
+    )
+
+    response = Response(plot_data, mimetype='image/png')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response

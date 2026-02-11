@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Jominy Test - {{ grade.designation }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('materials.index') }}">Materials</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('materials.view', id=grade.id) }}">{{ grade.designation }}</a></li>
+        <li class="breadcrumb-item active">Jominy Test</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-bar-chart-steps"></i> Jominy End-Quench Test</h2>
+    <a href="{{ url_for('materials.view', id=grade.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Material
+    </a>
+</div>
+
+<div class="row">
+    <!-- Left: Jominy Curve -->
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-graph-down"></i> Jominy Hardenability Curve</span>
+                <form method="get" class="d-flex align-items-center gap-2 mb-0">
+                    <label class="small text-muted mb-0">Austenitizing:</label>
+                    <select name="aust_temp" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                        <option value="800" {% if aust_temp == 800 %}selected{% endif %}>800°C</option>
+                        <option value="850" {% if aust_temp == 850 %}selected{% endif %}>850°C</option>
+                        <option value="870" {% if aust_temp == 870 %}selected{% endif %}>870°C</option>
+                        <option value="900" {% if aust_temp == 900 %}selected{% endif %}>900°C</option>
+                        <option value="925" {% if aust_temp == 925 %}selected{% endif %}>925°C</option>
+                        <option value="950" {% if aust_temp == 950 %}selected{% endif %}>950°C</option>
+                    </select>
+                </form>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('materials.jominy_curve_plot', id=grade.id, aust_temp=aust_temp) }}"
+                     class="img-fluid" alt="Jominy Curve">
+            </div>
+        </div>
+
+        <!-- Phase Distribution -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="bi bi-layers"></i> Phase Distribution Along Bar
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('materials.jominy_phases_plot', id=grade.id, aust_temp=aust_temp) }}"
+                     class="img-fluid" alt="Phase Distribution">
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Info & Data -->
+    <div class="col-md-4">
+        <!-- Material Info -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Material
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Grade</dt>
+                    <dd class="col-7 fw-bold">{{ grade.designation }}</dd>
+
+                    <dt class="col-5">CE (IIW)</dt>
+                    <dd class="col-7">{{ "%.3f"|format(result.carbon_equivalent) }}</dd>
+
+                    <dt class="col-5">DI</dt>
+                    <dd class="col-7">{{ "%.2f"|format(result.ideal_diameter) }} in</dd>
+
+                    {% if result.j_distance_50hrc %}
+                    <dt class="col-5">J<sub>50</sub></dt>
+                    <dd class="col-7 fw-bold text-success">{{ "%.1f"|format(result.j_distance_50hrc) }} mm</dd>
+                    {% else %}
+                    <dt class="col-5">J<sub>50</sub></dt>
+                    <dd class="col-7 text-muted">N/A</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- Hardness Data Table -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="bi bi-table"></i> Hardness Data
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>J (mm)</th>
+                                <th>HV</th>
+                                <th>HRC</th>
+                                <th>t<sub>8/5</sub> (s)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for i in range(result.distances_mm|length) %}
+                            <tr>
+                                <td>{{ result.distances_mm[i] }}</td>
+                                <td class="fw-bold">{{ result.hardness_hv[i]|round(0)|int }}</td>
+                                <td>{{ result.hardness_hrc[i]|round(0)|int if result.hardness_hrc[i] else '-' }}</td>
+                                <td class="text-muted">{{ result.t85_values[i]|round(1) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- About Jominy Test -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-question-circle"></i> About Jominy Test
+            </div>
+            <div class="card-body small">
+                <p>
+                    The <strong>Jominy end-quench test</strong> (ASTM A255) measures steel hardenability
+                    by quenching one end of a standard specimen with a water jet.
+                </p>
+                <p>
+                    This creates a gradient of cooling rates:
+                </p>
+                <ul class="mb-2">
+                    <li><strong>Quenched end</strong>: Very fast cooling (~200°C/s)</li>
+                    <li><strong>Far end</strong>: Slow air cooling (~1°C/s)</li>
+                </ul>
+                <p class="mb-0">
+                    <strong>J<sub>50</sub></strong> is the distance (mm) where hardness drops to 50 HRC -
+                    a key hardenability metric.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
