@@ -404,3 +404,28 @@ class HeatTreatmentSetupForm(FlaskForm):
     """Combined form for full heat treatment setup."""
     # This is used for the combined setup page
     submit = SubmitField('Save Heat Treatment Configuration')
+
+
+class ParameterSweepForm(FlaskForm):
+    """Form for parameter sweep configuration."""
+    parameter = SelectField('Parameter to Vary', choices=[
+        # Quenching parameters
+        ('quenching.media_temperature', 'Quench Media Temperature (°C)'),
+        ('quenching.duration', 'Quench Duration (s)'),
+        # Heating parameters
+        ('heating.target_temperature', 'Austenitizing Temperature (°C)'),
+        ('heating.hold_time', 'Austenitizing Hold Time (min)'),
+        # Tempering parameters
+        ('tempering.temperature', 'Tempering Temperature (°C)'),
+        ('tempering.hold_time', 'Tempering Hold Time (min)'),
+        # Geometry parameters
+        ('geometry.radius', 'Cylinder Radius (mm)'),
+        ('geometry.thickness', 'Plate Thickness (mm)'),
+        ('geometry.outer_diameter', 'Hollow Cylinder OD (mm)'),
+    ], validators=[DataRequired()])
+    min_value = FloatField('Minimum Value', validators=[DataRequired()])
+    max_value = FloatField('Maximum Value', validators=[DataRequired()])
+    steps = IntegerField('Number of Steps', default=5,
+                        validators=[DataRequired(), NumberRange(min=2, max=20)])
+    run_immediately = BooleanField('Run Simulations Immediately', default=False)
+    submit = SubmitField('Create Parameter Sweep')

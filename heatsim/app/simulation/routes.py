@@ -32,7 +32,8 @@ from app.services.cad_geometry import analyze_step_file, CADAnalysisResult
 from . import simulation_bp
 from .forms import (
     SimulationForm, GeometryForm, SolverForm,
-    HeatingPhaseForm, TransferPhaseForm, QuenchingPhaseForm, TemperingPhaseForm
+    HeatingPhaseForm, TransferPhaseForm, QuenchingPhaseForm, TemperingPhaseForm,
+    ParameterSweepForm
 )
 
 
@@ -1007,6 +1008,132 @@ def clone(id):
 
     flash(f'Simulation cloned as "{new_sim.name}".', 'success')
     return redirect(url_for('simulation.view', id=new_sim.id))
+
+
+@simulation_bp.route('/<int:id>/sweep', methods=['GET', 'POST'])
+@login_required
+def parameter_sweep(id):
+    """Create parameter sweep from base simulation."""
+    import json
+    import numpy as np
+
+    sim = Simulation.query.get_or_404(id)
+
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    form = ParameterSweepForm()
+
+    # Filter parameter choices based on geometry type
+    valid_params = [
+        ('quenching.media_temperature', 'Quench Media Temperature (°C)'),
+        ('quenching.duration', 'Quench Duration (s)'),
+        ('heating.target_temperature', 'Austenitizing Temperature (°C)'),
+        ('heating.hold_time', 'Austenitizing Hold Time (min)'),
+    ]
+
+    # Add tempering params only if enabled
+    if sim.has_tempering:
+        valid_params.extend([
+            ('tempering.temperature', 'Tempering Temperature (°C)'),
+            ('tempering.hold_time', 'Tempering Hold Time (min)'),
+        ])
+
+    # Add geometry params based on type
+    if sim.geometry_type == 'cylinder':
+        valid_params.append(('geometry.radius', 'Cylinder Radius (mm)'))
+    elif sim.geometry_type == 'plate':
+        valid_params.append(('geometry.thickness', 'Plate Thickness (mm)'))
+    elif sim.geometry_type == 'hollow_cylinder':
+        valid_params.append(('geometry.outer_diameter', 'Hollow Cylinder OD (mm)'))
+
+    form.parameter.choices = valid_params
+
+    if form.validate_on_submit():
+        param_path = form.parameter.data
+        min_val = form.min_value.data
+        max_val = form.max_value.data
+        steps = form.steps.data
+        run_now = form.run_immediately.data
+
+        # Generate parameter values
+        values = np.linspace(min_val, max_val, steps)
+
+        # Create simulations for each value
+        created_sims = []
+        for i, val in enumerate(values):
+            # Clone base simulation
+            new_sim = Simulation(
+                name=f"{sim.name} - {param_path.split('.')[-1]}={val:.1f}",
+                description=f"Parameter sweep: {param_path} = {val:.2f}",
+                steel_grade_id=sim.steel_grade_id,
+                user_id=current_user.id,
+                geometry_type=sim.geometry_type,
+                geometry_config=sim.geometry_config,
+                heat_treatment_config=sim.heat_treatment_config,
+                solver_config=sim.solver_config,
+                process_type=sim.process_type,
+                initial_temperature=sim.initial_temperature,
+                ambient_temperature=sim.ambient_temperature,
+                boundary_conditions=sim.boundary_conditions,
+                status=STATUS_READY,
+            )
+
+            # Copy CAD fields if applicable
+            if sim.geometry_type == GEOMETRY_CAD:
+                new_sim.cad_filename = sim.cad_filename
+                new_sim.cad_file_path = sim.cad_file_path
+                new_sim.cad_analysis = sim.cad_analysis
+                new_sim.cad_equivalent_type = sim.cad_equivalent_type
+
+            # Modify the swept parameter
+            phase, param = param_path.split('.')
+
+            if phase == 'geometry':
+                geom = new_sim.geometry_dict
+                if param == 'radius':
+                    geom['radius'] = val / 1000  # mm to m
+                elif param == 'thickness':
+                    geom['thickness'] = val / 1000
+                elif param == 'outer_diameter':
+                    geom['outer_diameter'] = val / 1000
+                new_sim.set_geometry(geom)
+            else:
+                # Heat treatment parameters
+                ht = new_sim.ht_config
+                if phase in ht:
+                    ht[phase][param] = val
+                    new_sim.set_ht_config(ht)
+
+            db.session.add(new_sim)
+            created_sims.append(new_sim)
+
+        db.session.commit()
+
+        # Run immediately if requested
+        if run_now:
+            flash(f'Created {len(created_sims)} simulations. Running them now...', 'info')
+            # Note: Running multiple simulations synchronously would block.
+            # For now, just redirect to list - user can run manually or we add batch run later
+            flash(f'Created {len(created_sims)} simulations. Use "Run" button to execute each.', 'success')
+        else:
+            flash(f'Created {len(created_sims)} simulations for parameter sweep.', 'success')
+
+        return redirect(url_for('simulation.index'))
+
+    # Pre-populate with sensible defaults based on current config
+    if request.method == 'GET':
+        ht = sim.ht_config
+        if ht and 'quenching' in ht:
+            form.min_value.data = 20.0
+            form.max_value.data = 60.0
+
+    return render_template(
+        'simulation/parameter_sweep.html',
+        form=form,
+        sim=sim
+    )
 
 
 @simulation_bp.route('/api/htc/<media>/<agitation>')

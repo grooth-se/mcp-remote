@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Parameter Sweep - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item active">Parameter Sweep</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-sliders"></i> Parameter Sweep</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Create multiple simulations by varying a single parameter across a range of values.
+                    Each simulation will be a copy of <strong>{{ sim.name }}</strong> with the selected parameter modified.
+                </p>
+
+                <form method="post">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        <label for="parameter" class="form-label">Parameter to Vary</label>
+                        {{ form.parameter(class="form-select") }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="min_value" class="form-label">Minimum Value</label>
+                                {{ form.min_value(class="form-control", placeholder="e.g., 20") }}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="max_value" class="form-label">Maximum Value</label>
+                                {{ form.max_value(class="form-control", placeholder="e.g., 60") }}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="steps" class="form-label">Number of Steps</label>
+                                {{ form.steps(class="form-control") }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            {{ form.run_immediately(class="form-check-input") }}
+                            <label class="form-check-label" for="run_immediately">
+                                Run simulations immediately after creation
+                            </label>
+                            <div class="form-text">Note: Running multiple simulations may take significant time.</div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info" id="previewAlert">
+                        <strong>Preview:</strong> <span id="previewText">Select parameters to see preview</span>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Base Simulation</h6>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Name</dt>
+                    <dd class="col-7">{{ sim.name }}</dd>
+
+                    <dt class="col-5">Steel Grade</dt>
+                    <dd class="col-7">{{ sim.steel_grade.designation }}</dd>
+
+                    <dt class="col-5">Geometry</dt>
+                    <dd class="col-7">{{ sim.geometry_label }}</dd>
+
+                    {% set ht = sim.ht_config %}
+                    {% if ht %}
+                    <dt class="col-5">Austenitizing</dt>
+                    <dd class="col-7">{{ ht.heating.target_temperature|default(850) }}°C</dd>
+
+                    <dt class="col-5">Quench Media</dt>
+                    <dd class="col-7">{{ ht.quenching.media|default('water')|title }} @ {{ ht.quenching.media_temperature|default(25) }}°C</dd>
+
+                    {% if ht.tempering and ht.tempering.enabled %}
+                    <dt class="col-5">Tempering</dt>
+                    <dd class="col-7">{{ ht.tempering.temperature|default(550) }}°C</dd>
+                    {% endif %}
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-lightbulb"></i> Tips</h6>
+            </div>
+            <div class="card-body small">
+                <ul class="mb-0">
+                    <li>Start with 3-5 steps to quickly explore the parameter space</li>
+                    <li>Use more steps (10-20) for detailed studies</li>
+                    <li>Quench temperature sweep: 20-60°C is typical</li>
+                    <li>Tempering temperature sweep: 450-650°C covers common range</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const paramSelect = document.getElementById('parameter');
+    const minInput = document.getElementById('min_value');
+    const maxInput = document.getElementById('max_value');
+    const stepsInput = document.getElementById('steps');
+    const previewText = document.getElementById('previewText');
+
+    function updatePreview() {
+        const param = paramSelect.options[paramSelect.selectedIndex].text;
+        const min = parseFloat(minInput.value) || 0;
+        const max = parseFloat(maxInput.value) || 0;
+        const steps = parseInt(stepsInput.value) || 5;
+
+        if (min && max && steps >= 2) {
+            const stepSize = (max - min) / (steps - 1);
+            let values = [];
+            for (let i = 0; i < steps; i++) {
+                values.push((min + i * stepSize).toFixed(1));
+            }
+            previewText.textContent = `Will create ${steps} simulations with ${param}: ${values.join(', ')}`;
+        } else {
+            previewText.textContent = 'Enter min, max, and steps to see preview';
+        }
+    }
+
+    paramSelect.addEventListener('change', updatePreview);
+    minInput.addEventListener('input', updatePreview);
+    maxInput.addEventListener('input', updatePreview);
+    stepsInput.addEventListener('input', updatePreview);
+
+    updatePreview();
+});
+</script>
+{% endblock %}

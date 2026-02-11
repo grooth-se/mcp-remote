@@ -54,6 +54,9 @@
                 <i class="bi bi-copy"></i>
             </button>
         </form>
+        <a href="{{ url_for('simulation.parameter_sweep', id=sim.id) }}" class="btn btn-outline-info btn-sm" title="Parameter sweep">
+            <i class="bi bi-sliders"></i>
+        </a>
         <form method="post" action="{{ url_for('simulation.delete', id=sim.id) }}" class="d-inline" onsubmit="return confirm('Delete this simulation?');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-danger btn-sm">
