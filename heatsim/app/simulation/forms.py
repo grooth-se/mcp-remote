@@ -35,9 +35,10 @@ class SimulationForm(FlaskForm):
     geometry_type = SelectField(
         'Geometry',
         choices=[
-            ('cylinder', 'Cylinder'),
+            ('cylinder', 'Cylinder (solid)'),
+            ('hollow_cylinder', 'Hollow Cylinder (OD/ID)'),
             ('plate', 'Plate'),
-            ('ring', 'Ring'),
+            ('ring', 'Ring (Ri/Ro)'),
             ('cad', 'Import from CAD (STEP file)')
         ],
         default='cylinder'
@@ -96,6 +97,17 @@ class GeometryForm(FlaskForm):
         'Outer Radius (mm)',
         validators=[Optional(), NumberRange(min=1, max=1500)],
         default=50
+    )
+    # Hollow Cylinder - OD/ID notation (more common in engineering)
+    outer_diameter = FloatField(
+        'Outer Diameter OD (mm)',
+        validators=[Optional(), NumberRange(min=2, max=3000)],
+        default=100
+    )
+    inner_diameter = FloatField(
+        'Inner Diameter ID (mm)',
+        validators=[Optional(), NumberRange(min=1, max=2990)],
+        default=40
     )
 
 

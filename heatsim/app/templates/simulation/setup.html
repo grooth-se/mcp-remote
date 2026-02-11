@@ -158,6 +158,36 @@
                         <div class="small text-muted mt-1">1D through-thickness heat transfer (symmetric)</div>
                     </div>
 
+                    {% elif sim.geometry_type == 'hollow_cylinder' %}
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Outer Diameter OD (mm)</label>
+                            <input type="number" name="outer_diameter" class="form-control" step="0.1" min="2" max="3000" value="{{ geometry_form.outer_diameter.data or 100 }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Inner Diameter ID (mm)</label>
+                            <input type="number" name="inner_diameter" class="form-control" step="0.1" min="1" max="2990" value="{{ geometry_form.inner_diameter.data or 40 }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Length (mm)</label>
+                            <input type="number" name="length" class="form-control" step="0.1" min="1" max="5000" value="{{ geometry_form.length.data or 100 }}">
+                        </div>
+                    </div>
+                    <div class="text-center py-3 bg-light rounded">
+                        <svg width="120" height="100" viewBox="0 0 120 100">
+                            <!-- Hollow cylinder cross section -->
+                            <circle cx="60" cy="50" r="40" fill="none" stroke="#0d6efd" stroke-width="2"/>
+                            <circle cx="60" cy="50" r="16" fill="white" stroke="#0d6efd" stroke-width="2"/>
+                            <!-- OD arrow -->
+                            <line x1="20" y1="50" x2="100" y2="50" stroke="#dc3545" stroke-width="1" stroke-dasharray="3,3"/>
+                            <text x="60" y="45" text-anchor="middle" font-size="9" fill="#dc3545">OD</text>
+                            <!-- ID arrow -->
+                            <line x1="44" y1="65" x2="76" y2="65" stroke="#198754" stroke-width="1" stroke-dasharray="3,3"/>
+                            <text x="60" y="75" text-anchor="middle" font-size="9" fill="#198754">ID</text>
+                        </svg>
+                        <div class="small text-muted mt-1">1D radial heat transfer (ID to OD)</div>
+                    </div>
+
                     {% else %}
                     <div class="row">
                         <div class="col-md-4 mb-3">

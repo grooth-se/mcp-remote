@@ -107,6 +107,8 @@ def new():
                 sim.set_geometry({'radius': 0.05, 'length': 0.1})
             elif form.geometry_type.data == 'plate':
                 sim.set_geometry({'thickness': 0.02, 'width': 0.1, 'length': 0.1})
+            elif form.geometry_type.data == 'hollow_cylinder':
+                sim.set_geometry({'outer_diameter': 0.1, 'inner_diameter': 0.04, 'length': 0.1})
             else:  # ring
                 sim.set_geometry({'inner_radius': 0.02, 'outer_radius': 0.05, 'length': 0.1})
 
@@ -150,7 +152,11 @@ def setup(id):
             geometry_form.thickness.data = geom.get('thickness', 0.02) * 1000
             geometry_form.width.data = geom.get('width', 0.1) * 1000
             geometry_form.length.data = geom.get('length', 0.1) * 1000
-        else:
+        elif sim.geometry_type == 'hollow_cylinder':
+            geometry_form.outer_diameter.data = geom.get('outer_diameter', 0.1) * 1000
+            geometry_form.inner_diameter.data = geom.get('inner_diameter', 0.04) * 1000
+            geometry_form.length.data = geom.get('length', 0.1) * 1000
+        else:  # ring
             geometry_form.inner_radius.data = geom.get('inner_radius', 0.02) * 1000
             geometry_form.outer_radius.data = geom.get('outer_radius', 0.05) * 1000
             geometry_form.length.data = geom.get('length', 0.1) * 1000
@@ -174,7 +180,13 @@ def setup(id):
                 'width': float(request.form.get('width', 100)) / 1000,
                 'length': float(request.form.get('length', 100)) / 1000
             }
-        else:
+        elif sim.geometry_type == 'hollow_cylinder':
+            geom_config = {
+                'outer_diameter': float(request.form.get('outer_diameter', 100)) / 1000,
+                'inner_diameter': float(request.form.get('inner_diameter', 40)) / 1000,
+                'length': float(request.form.get('length', 100)) / 1000
+            }
+        else:  # ring
             geom_config = {
                 'inner_radius': float(request.form.get('inner_radius', 20)) / 1000,
                 'outer_radius': float(request.form.get('outer_radius', 50)) / 1000,
@@ -645,7 +657,7 @@ def run(id):
         time_indices = [0, n_times//4, n_times//2, 3*n_times//4, n_times-1]
         time_indices = [i for i in time_indices if i < n_times]
 
-        is_cylindrical = sim.geometry_type in ['cylinder', 'ring']
+        is_cylindrical = sim.geometry_type in ['cylinder', 'ring', 'hollow_cylinder']
         profile_result.plot_image = visualization.create_temperature_profile_plot(
             result.positions,
             result.temperature,

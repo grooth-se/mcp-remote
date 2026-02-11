@@ -2,7 +2,7 @@
 from .property_evaluator import PropertyEvaluator, PropertyPlotter, evaluate_property
 from .excel_importer import ExcelImporter
 from .seed_data import seed_standard_grades, seed_standard_compositions, STANDARD_GRADES, STANDARD_COMPOSITIONS
-from .geometry import Cylinder, Plate, Ring, create_geometry
+from .geometry import Cylinder, Plate, Ring, HollowCylinder, create_geometry
 from .boundary_conditions import (
     BoundaryCondition, InsulatedBoundary,
     create_quench_bc, create_heating_bc, create_transfer_bc,
@@ -32,6 +32,7 @@ __all__ = [
     'Cylinder',
     'Plate',
     'Ring',
+    'HollowCylinder',
     'create_geometry',
     # Phase 3 services - Boundary conditions
     'BoundaryCondition',

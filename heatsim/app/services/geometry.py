@@ -190,6 +190,77 @@ class Ring(GeometryBase):
         return f"Ring(Ri={self.inner_radius*1000:.1f}mm, Ro={self.outer_radius*1000:.1f}mm)"
 
 
+@dataclass
+class HollowCylinder(GeometryBase):
+    """Hollow cylinder geometry using OD/ID notation.
+
+    Similar to Ring but uses outer/inner diameter (OD/ID) instead of radii,
+    which is more common in engineering applications.
+
+    Parameters
+    ----------
+    outer_diameter : float
+        Outer diameter in meters (OD)
+    inner_diameter : float
+        Inner diameter in meters (ID)
+    length : float
+        Axial length in meters
+    """
+    outer_diameter: float
+    inner_diameter: float
+    length: float = 1.0
+
+    @property
+    def outer_radius(self) -> float:
+        """Outer radius (OD/2)."""
+        return self.outer_diameter / 2
+
+    @property
+    def inner_radius(self) -> float:
+        """Inner radius (ID/2)."""
+        return self.inner_diameter / 2
+
+    def create_mesh(self, n_nodes: int) -> np.ndarray:
+        """Create radial mesh from inner to outer radius."""
+        return np.linspace(self.inner_radius, self.outer_radius, n_nodes)
+
+    def get_surface_area(self, position: float) -> float:
+        """Cylindrical surface area at radius r."""
+        return 2 * np.pi * position * self.length
+
+    def get_volume_element(self, position: float, dr: float) -> float:
+        """Annular volume element."""
+        return 2 * np.pi * position * dr * self.length
+
+    @property
+    def wall_thickness(self) -> float:
+        """Wall thickness of hollow cylinder."""
+        return self.outer_radius - self.inner_radius
+
+    @property
+    def outer_surface_area(self) -> float:
+        """Outer cylindrical surface area."""
+        return 2 * np.pi * self.outer_radius * self.length
+
+    @property
+    def inner_surface_area(self) -> float:
+        """Inner cylindrical surface area."""
+        return 2 * np.pi * self.inner_radius * self.length
+
+    @property
+    def volume(self) -> float:
+        """Total volume."""
+        return np.pi * (self.outer_radius**2 - self.inner_radius**2) * self.length
+
+    @property
+    def characteristic_length(self) -> float:
+        """Wall thickness for hollow cylinder."""
+        return self.wall_thickness
+
+    def __str__(self) -> str:
+        return f"HollowCylinder(OD={self.outer_diameter*1000:.1f}mm, ID={self.inner_diameter*1000:.1f}mm)"
+
+
 def create_geometry(geometry_type: str, config: dict) -> GeometryBase:
     """Factory function to create geometry from type and config.
 
@@ -220,6 +291,12 @@ def create_geometry(geometry_type: str, config: dict) -> GeometryBase:
         return Ring(
             inner_radius=config.get('inner_radius', 0.02),
             outer_radius=config.get('outer_radius', 0.05),
+            length=config.get('length', 0.1)
+        )
+    elif geometry_type == 'hollow_cylinder':
+        return HollowCylinder(
+            outer_diameter=config.get('outer_diameter', 0.1),
+            inner_diameter=config.get('inner_diameter', 0.04),
             length=config.get('length', 0.1)
         )
     else:
