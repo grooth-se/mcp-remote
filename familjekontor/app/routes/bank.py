@@ -146,6 +146,8 @@ def reconciliation():
         return redirect(url_for('companies.index'))
 
     status_filter = request.args.get('status', 'unmatched')
+    if status_filter not in ('unmatched', 'matched', 'ignored'):
+        status_filter = 'unmatched'
     bank_account_id = request.args.get('account_id', type=int)
 
     query = BankTransaction.query.filter_by(company_id=company_id)

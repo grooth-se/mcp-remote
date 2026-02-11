@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed, FileRequired
 from wtforms import StringField, SelectField, IntegerField, DateField, SubmitField
-from wtforms.validators import DataRequired, Length, Optional
+from wtforms.validators import DataRequired, Length, Optional, NumberRange, Regexp
 from app.utils.currency import currency_choices
 
 
@@ -27,7 +27,10 @@ class CompanyForm(FlaskForm):
         Optional(),
         FileAllowed(['jpg', 'jpeg', 'png', 'gif', 'svg'], 'Endast bildfiler.'),
     ])
-    theme_color = StringField('Färgtema', validators=[Optional(), Length(max=7)])
+    theme_color = StringField('Färgtema', validators=[
+        Optional(), Length(max=7),
+        Regexp(r'^#[0-9a-fA-F]{6}$', message='Ange en giltig hexfärg (t.ex. #ff0000).'),
+    ])
     submit = SubmitField('Spara')
 
     def __init__(self, *args, **kwargs):
@@ -36,14 +39,17 @@ class CompanyForm(FlaskForm):
 
 
 class FiscalYearForm(FlaskForm):
-    year = IntegerField('År', validators=[DataRequired()])
+    year = IntegerField('År', validators=[DataRequired(), NumberRange(min=2000, max=2099)])
     start_date = StringField('Startdatum (YYYY-MM-DD)', validators=[DataRequired()])
     end_date = StringField('Slutdatum (YYYY-MM-DD)', validators=[DataRequired()])
     submit = SubmitField('Skapa räkenskapsår')
 
 
 class CertificateUploadForm(FlaskForm):
-    file = FileField('Fil', validators=[FileRequired('Välj en fil.')])
+    file = FileField('Fil', validators=[
+        FileRequired('Välj en fil.'),
+        FileAllowed(['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'], 'Otillåten filtyp.'),
+    ])
     description = StringField('Beskrivning', validators=[Optional(), Length(max=500)])
     valid_from = DateField('Giltig från', validators=[Optional()])
     expiry_date = DateField('Giltig till', validators=[Optional()])

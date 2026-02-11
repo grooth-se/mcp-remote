@@ -146,6 +146,8 @@ def report(group_id):
     if form.validate_on_submit() or request.args.get('year'):
         fy_year = form.fiscal_year_year.data or request.args.get('year', type=int)
         report_type = form.report_type.data or request.args.get('type', 'pnl')
+        if report_type not in ('pnl', 'balance'):
+            report_type = 'pnl'
 
         if report_type == 'pnl':
             report_data = consolidation_service.get_consolidated_pnl(group_id, fy_year)

@@ -97,6 +97,8 @@ def supplier_invoices():
         return redirect(url_for('companies.index'))
 
     status = request.args.get('status', '')
+    if status and status not in ('pending', 'approved', 'paid', 'cancelled'):
+        status = ''
     query = SupplierInvoice.query.filter_by(company_id=company_id)
     if status:
         query = query.filter_by(status=status)
@@ -464,6 +466,8 @@ def customer_invoices():
         return redirect(url_for('companies.index'))
 
     status = request.args.get('status', '')
+    if status and status not in ('draft', 'sent', 'paid', 'overdue', 'cancelled'):
+        status = ''
     query = CustomerInvoice.query.filter_by(company_id=company_id)
     if status:
         query = query.filter_by(status=status)

@@ -25,6 +25,8 @@ def index():
 
     form = DocumentFilterForm(request.args, meta={'csrf': False})
     doc_type = request.args.get('doc_type', '')
+    if doc_type and doc_type not in ('faktura', 'avtal', 'intyg', 'certificate', 'arsredovisning', 'kvitto', 'ovrigt'):
+        doc_type = ''
     search = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)
 

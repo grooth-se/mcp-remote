@@ -238,6 +238,8 @@ def deadlines_index():
         return redirect(url_for('dashboard.index'))
 
     status_filter = request.args.get('status', 'all')
+    if status_filter != 'all' and status_filter not in ('pending', 'completed', 'overdue'):
+        status_filter = 'all'
     query = Deadline.query.filter_by(company_id=company_id)
     if status_filter != 'all':
         query = query.filter_by(status=status_filter)

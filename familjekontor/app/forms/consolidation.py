@@ -29,7 +29,7 @@ class ConsolidationReportForm(FlaskForm):
 class EliminationForm(FlaskForm):
     from_company_id = SelectField('Från företag', coerce=int, validators=[DataRequired()])
     to_company_id = SelectField('Till företag', coerce=int, validators=[DataRequired()])
-    account_number = StringField('Kontonummer', validators=[DataRequired()])
+    account_number = StringField('Kontonummer', validators=[DataRequired(), Length(max=10)])
     amount = DecimalField('Belopp', places=2, validators=[DataRequired()])
     description = StringField('Beskrivning', validators=[Optional(), Length(max=500)])
     submit = SubmitField('Skapa eliminering')

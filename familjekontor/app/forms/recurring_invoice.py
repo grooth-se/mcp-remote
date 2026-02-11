@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, DecimalField, DateField, IntegerField, SubmitField
-from wtforms.validators import DataRequired, Optional, Length
+from wtforms.validators import DataRequired, Optional, Length, NumberRange
 from app.utils.currency import currency_choices
 
 
@@ -18,7 +18,8 @@ class RecurringInvoiceTemplateForm(FlaskForm):
         ('quarterly', 'Kvartal'),
         ('yearly', 'År'),
     ], validators=[DataRequired()])
-    payment_terms = IntegerField('Betalningsvillkor (dagar)', default=30, validators=[DataRequired()])
+    payment_terms = IntegerField('Betalningsvillkor (dagar)', default=30,
+                                 validators=[DataRequired(), NumberRange(min=0, max=365)])
     start_date = DateField('Startdatum', validators=[DataRequired()])
     end_date = DateField('Slutdatum (valfritt)', validators=[Optional()])
     submit = SubmitField('Spara')
@@ -30,7 +31,8 @@ class RecurringInvoiceTemplateForm(FlaskForm):
 
 class RecurringLineItemForm(FlaskForm):
     description = StringField('Beskrivning', validators=[DataRequired(), Length(max=500)])
-    quantity = DecimalField('Antal', places=2, default=1, validators=[DataRequired()])
+    quantity = DecimalField('Antal', places=2, default=1,
+                            validators=[DataRequired(), NumberRange(min=0)])
     unit = SelectField('Enhet', choices=[
         ('st', 'st'),
         ('tim', 'tim'),
@@ -38,7 +40,8 @@ class RecurringLineItemForm(FlaskForm):
         ('kg', 'kg'),
         ('l', 'l'),
     ], default='st')
-    unit_price = DecimalField('À-pris', places=2, validators=[DataRequired()])
+    unit_price = DecimalField('À-pris', places=2,
+                              validators=[DataRequired(), NumberRange(min=0)])
     vat_rate = SelectField('Moms %', choices=[
         ('25', '25%'),
         ('12', '12%'),

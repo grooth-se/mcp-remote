@@ -4,7 +4,7 @@ from wtforms import (
     SelectField, IntegerField, DecimalField, StringField,
     TextAreaField, DateField, SubmitField,
 )
-from wtforms.validators import DataRequired, Optional, NumberRange
+from wtforms.validators import DataRequired, Optional, NumberRange, Length
 
 
 class VATGenerateForm(FlaskForm):
@@ -69,5 +69,6 @@ class TaxPaymentForm(FlaskForm):
 
 class EmployerTaxPeriodForm(FlaskForm):
     """Select period for employer tax summary."""
-    year = IntegerField('År', default=date.today().year)
+    year = IntegerField('År', default=date.today().year,
+                        validators=[DataRequired(), NumberRange(min=2020, max=2050)])
     submit = SubmitField('Visa')
