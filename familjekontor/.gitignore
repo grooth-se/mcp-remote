@@ -30,6 +30,7 @@ env/
 docker-compose.override.yml
 
 # Uploads and generated files
+app/static/uploads/
 data/uploads/*
 data/generated/*
 data/backups/*
