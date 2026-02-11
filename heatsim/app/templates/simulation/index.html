@@ -62,6 +62,12 @@
                                 </button>
                             </form>
                             {% endif %}
+                            <form method="post" action="{{ url_for('simulation.clone', id=sim.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-secondary" title="Clone">
+                                    <i class="bi bi-copy"></i>
+                                </button>
+                            </form>
                             <form method="post" action="{{ url_for('simulation.delete', id=sim.id) }}" class="d-inline" onsubmit="return confirm('Delete this simulation?');">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-outline-danger" title="Delete">

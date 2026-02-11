@@ -968,6 +968,47 @@ def edit(id):
     return render_template('simulation/new.html', form=form, edit_mode=True, sim=sim)
 
 
+@simulation_bp.route('/<int:id>/clone', methods=['POST'])
+@login_required
+def clone(id):
+    """Clone an existing simulation with all settings."""
+    sim = Simulation.query.get_or_404(id)
+
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    # Create new simulation with copied settings
+    new_sim = Simulation(
+        name=f"{sim.name} (Copy)",
+        description=sim.description,
+        steel_grade_id=sim.steel_grade_id,
+        user_id=current_user.id,
+        geometry_type=sim.geometry_type,
+        geometry_config=sim.geometry_config,
+        heat_treatment_config=sim.heat_treatment_config,
+        solver_config=sim.solver_config,
+        process_type=sim.process_type,
+        initial_temperature=sim.initial_temperature,
+        ambient_temperature=sim.ambient_temperature,
+        boundary_conditions=sim.boundary_conditions,
+        status=STATUS_READY if sim.heat_treatment_config else STATUS_DRAFT,
+    )
+
+    # Copy CAD geometry fields if applicable
+    if sim.geometry_type == GEOMETRY_CAD:
+        new_sim.cad_filename = sim.cad_filename
+        new_sim.cad_file_path = sim.cad_file_path
+        new_sim.cad_analysis = sim.cad_analysis
+        new_sim.cad_equivalent_type = sim.cad_equivalent_type
+
+    db.session.add(new_sim)
+    db.session.commit()
+
+    flash(f'Simulation cloned as "{new_sim.name}".', 'success')
+    return redirect(url_for('simulation.view', id=new_sim.id))
+
+
 @simulation_bp.route('/api/htc/<media>/<agitation>')
 @login_required
 def api_htc(media, agitation):
