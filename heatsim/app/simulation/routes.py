@@ -564,6 +564,23 @@ def run(id):
         cycle_result.set_time_data(result.time.tolist())
         cycle_result.set_value_data(result.center_temp.tolist())
 
+        # Store multi-position temperature data for CCT overlay
+        n_pos = result.temperature.shape[1] if result.temperature.ndim > 1 else 1
+        if n_pos > 1:
+            # Extract 4 key positions: center, 1/3R, 2/3R, surface
+            idx_center = 0
+            idx_one_third = n_pos // 3
+            idx_two_thirds = 2 * n_pos // 3
+            idx_surface = n_pos - 1
+            multi_pos_data = {
+                'positions': ['center', 'one_third', 'two_thirds', 'surface'],
+                'center': result.temperature[:, idx_center].tolist(),
+                'one_third': result.temperature[:, idx_one_third].tolist(),
+                'two_thirds': result.temperature[:, idx_two_thirds].tolist(),
+                'surface': result.temperature[:, idx_surface].tolist(),
+            }
+            cycle_result.set_data(multi_pos_data)
+
         # Build furnace/ambient temperature list for plotting (with ramp info)
         furnace_temps = []
         if result.phase_results:
@@ -856,7 +873,7 @@ def result_image(id, result_id):
 @simulation_bp.route('/<int:id>/cct-overlay')
 @login_required
 def cct_overlay(id):
-    """Generate CCT diagram with cooling curve overlay."""
+    """Generate CCT diagram with cooling curve overlay (center only)."""
     import numpy as np
 
     sim = Simulation.query.get_or_404(id)
@@ -952,6 +969,67 @@ def cct_overlay_quenching(id):
         transformation_temps=trans_temps,
         curves=curves if curves else None,
         title=f'CCT Diagram (Quenching) - {sim.name}'
+    )
+
+    response = Response(plot_data, mimetype='image/png')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+
+@simulation_bp.route('/<int:id>/cct-overlay/multi-position')
+@login_required
+def cct_overlay_multi_position(id):
+    """Generate CCT diagram with multi-position cooling curves (center, 1/3R, 2/3R, surface)."""
+    import numpy as np
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    if sim.status != STATUS_COMPLETED:
+        return Response('Simulation not completed', status=400)
+
+    # Get simulation result data
+    cycle_result = sim.results.filter_by(result_type='full_cycle').first()
+    if not cycle_result:
+        return Response('No simulation results', status=404)
+
+    times = np.array(cycle_result.time_array)
+
+    # Check for multi-position data
+    multi_pos_data = cycle_result.data_dict
+    if multi_pos_data and 'center' in multi_pos_data:
+        # Build multi-position temperature array [time, position]
+        temps = np.column_stack([
+            np.array(multi_pos_data['center']),
+            np.array(multi_pos_data['one_third']),
+            np.array(multi_pos_data['two_thirds']),
+            np.array(multi_pos_data['surface']),
+        ])
+        positions = ['Center', '1/3 R', '2/3 R', 'Surface']
+    else:
+        # Fall back to single curve
+        temps = np.array(cycle_result.value_array)
+        positions = None
+
+    # Get phase diagram for this steel grade
+    grade = sim.steel_grade
+    diagram = grade.phase_diagrams.first()
+
+    if not diagram:
+        return Response('No phase diagram available for this steel grade', status=404)
+
+    trans_temps = diagram.temps_dict
+    curves = diagram.curves_dict
+
+    # Generate CCT overlay plot with multiple positions
+    plot_data = visualization.create_cct_overlay_plot(
+        times=times,
+        temperatures=temps,
+        transformation_temps=trans_temps,
+        curves=curves if curves else None,
+        title=f'CCT Diagram (Multi-Position) - {sim.name}',
+        positions=positions
     )
 
     response = Response(plot_data, mimetype='image/png')
@@ -1497,6 +1575,22 @@ def _run_simulation(sim):
         )
         cycle_result.set_time_data(result.time.tolist())
         cycle_result.set_value_data(result.center_temp.tolist())
+
+        # Store multi-position temperature data for CCT overlay
+        n_pos = result.temperature.shape[1] if result.temperature.ndim > 1 else 1
+        if n_pos > 1:
+            idx_center = 0
+            idx_one_third = n_pos // 3
+            idx_two_thirds = 2 * n_pos // 3
+            idx_surface = n_pos - 1
+            multi_pos_data = {
+                'positions': ['center', 'one_third', 'two_thirds', 'surface'],
+                'center': result.temperature[:, idx_center].tolist(),
+                'one_third': result.temperature[:, idx_one_third].tolist(),
+                'two_thirds': result.temperature[:, idx_two_thirds].tolist(),
+                'surface': result.temperature[:, idx_surface].tolist(),
+            }
+            cycle_result.set_data(multi_pos_data)
 
         # Build furnace temps
         furnace_temps = []

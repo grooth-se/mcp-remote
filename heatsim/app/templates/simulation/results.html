@@ -562,16 +562,27 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-graph-up"></i> Cooling Curve on CCT Diagram</span>
-                <div class="btn-group btn-group-sm">
-                    <a href="{{ url_for('simulation.cct_overlay', id=sim.id) }}"
-                       class="btn btn-outline-primary" target="_blank" title="Full cycle">
+                <span><i class="bi bi-graph-up"></i> Cooling Curves on CCT Diagram</span>
+                <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check" name="cctView" id="cctMulti" checked onchange="switchCCT('multi')">
+                    <label class="btn btn-outline-primary" for="cctMulti" title="Show all positions">
+                        <i class="bi bi-layers"></i> Multi
+                    </label>
+                    <input type="radio" class="btn-check" name="cctView" id="cctCenter" onchange="switchCCT('center')">
+                    <label class="btn btn-outline-primary" for="cctCenter" title="Show center only">
+                        <i class="bi bi-dot"></i> Center
+                    </label>
+                    <a href="{{ url_for('simulation.cct_overlay_multi_position', id=sim.id) }}"
+                       class="btn btn-outline-secondary" target="_blank" title="Open in new tab">
                         <i class="bi bi-arrows-fullscreen"></i>
                     </a>
                 </div>
             </div>
             <div class="card-body text-center">
-                <img src="{{ url_for('simulation.cct_overlay_quenching', id=sim.id) }}"
+                <img id="cctPlotImg"
+                     src="{{ url_for('simulation.cct_overlay_multi_position', id=sim.id) }}"
+                     data-multi="{{ url_for('simulation.cct_overlay_multi_position', id=sim.id) }}"
+                     data-center="{{ url_for('simulation.cct_overlay_quenching', id=sim.id) }}"
                      class="img-fluid" alt="CCT Overlay">
             </div>
         </div>
@@ -603,9 +614,17 @@
                         {% endif %}
                     </tbody>
                 </table>
+                <p class="small mb-2">
+                    <strong>Multi-position view</strong> shows cooling curves at:
+                </p>
+                <ul class="small text-muted mb-2">
+                    <li><strong>Center</strong> - slowest cooling</li>
+                    <li><strong>1/3 R</strong> - intermediate</li>
+                    <li><strong>2/3 R</strong> - intermediate</li>
+                    <li><strong>Surface</strong> - fastest cooling</li>
+                </ul>
                 <small class="text-muted">
-                    The cooling curve is superimposed on the CCT diagram to show which phase transformation
-                    regions the material passes through during quenching.
+                    This shows hardenability variation through the cross-section.
                 </small>
             </div>
         </div>
@@ -838,5 +857,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// CCT view toggle
+function switchCCT(view) {
+    const img = document.getElementById('cctPlotImg');
+    if (!img) return;
+
+    if (view === 'multi') {
+        img.src = img.dataset.multi;
+    } else {
+        img.src = img.dataset.center;
+    }
+}
 </script>
 {% endblock %}
