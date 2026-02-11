@@ -427,3 +427,192 @@ class PhaseProperty(db.Model):
 
     def __repr__(self) -> str:
         return f'<PhaseProperty {self.phase} for grade_id={self.steel_grade_id}>'
+
+
+class SteelComposition(db.Model):
+    """Chemical composition for a steel grade.
+
+    Stores element percentages (wt%) for hardness prediction using
+    Maynier equations and carbon equivalent calculations.
+
+    Attributes
+    ----------
+    id : int
+        Primary key
+    steel_grade_id : int
+        Foreign key to steel_grades (unique, one composition per grade)
+    carbon : float
+        Carbon content (wt%), required
+    manganese : float
+        Manganese content (wt%)
+    silicon : float
+        Silicon content (wt%)
+    chromium : float
+        Chromium content (wt%)
+    nickel : float
+        Nickel content (wt%)
+    molybdenum : float
+        Molybdenum content (wt%)
+    vanadium : float
+        Vanadium content (wt%)
+    tungsten : float
+        Tungsten content (wt%)
+    copper : float
+        Copper content (wt%)
+    phosphorus : float
+        Phosphorus content (wt%)
+    sulfur : float
+        Sulfur content (wt%)
+    nitrogen : float
+        Nitrogen content (wt%)
+    boron : float
+        Boron content (wt%)
+    source : str
+        Data source (e.g., "ASTM A29", "Mill certificate")
+    notes : str
+        Optional notes
+    created_at : datetime
+        Record creation timestamp
+    """
+    __tablename__ = 'steel_compositions'
+    __bind_key__ = 'materials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    steel_grade_id = db.Column(db.Integer, db.ForeignKey('steel_grades.id'),
+                                nullable=False, unique=True)
+
+    # Primary alloying elements (wt%)
+    carbon = db.Column(db.Float, nullable=False)
+    manganese = db.Column(db.Float, default=0.0)
+    silicon = db.Column(db.Float, default=0.0)
+
+    # Secondary alloying elements
+    chromium = db.Column(db.Float, default=0.0)
+    nickel = db.Column(db.Float, default=0.0)
+    molybdenum = db.Column(db.Float, default=0.0)
+    vanadium = db.Column(db.Float, default=0.0)
+
+    # Additional elements
+    tungsten = db.Column(db.Float, default=0.0)
+    copper = db.Column(db.Float, default=0.0)
+    phosphorus = db.Column(db.Float, default=0.0)
+    sulfur = db.Column(db.Float, default=0.0)
+    nitrogen = db.Column(db.Float, default=0.0)
+    boron = db.Column(db.Float, default=0.0)
+
+    # Metadata
+    source = db.Column(db.Text)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationship
+    steel_grade = db.relationship('SteelGrade', backref=db.backref(
+        'composition', uselist=False, cascade='all, delete-orphan'
+    ))
+
+    __table_args__ = (
+        db.Index('ix_steel_compositions_steel_grade', 'steel_grade_id'),
+    )
+
+    @property
+    def carbon_equivalent_iiw(self) -> float:
+        """Calculate IIW carbon equivalent.
+
+        CE(IIW) = C + Mn/6 + (Cr+Mo+V)/5 + (Ni+Cu)/15
+
+        Returns
+        -------
+        float
+            Carbon equivalent (IIW formula)
+        """
+        C = self.carbon or 0.0
+        Mn = self.manganese or 0.0
+        Cr = self.chromium or 0.0
+        Mo = self.molybdenum or 0.0
+        V = self.vanadium or 0.0
+        Ni = self.nickel or 0.0
+        Cu = self.copper or 0.0
+
+        return C + Mn/6 + (Cr + Mo + V)/5 + (Ni + Cu)/15
+
+    @property
+    def carbon_equivalent_pcm(self) -> float:
+        """Calculate Pcm carbon equivalent.
+
+        Pcm = C + Si/30 + (Mn+Cu+Cr)/20 + Ni/60 + Mo/15 + V/10 + 5*B
+
+        Returns
+        -------
+        float
+            Carbon equivalent (Pcm formula)
+        """
+        C = self.carbon or 0.0
+        Si = self.silicon or 0.0
+        Mn = self.manganese or 0.0
+        Cu = self.copper or 0.0
+        Cr = self.chromium or 0.0
+        Ni = self.nickel or 0.0
+        Mo = self.molybdenum or 0.0
+        V = self.vanadium or 0.0
+        B = self.boron or 0.0
+
+        return C + Si/30 + (Mn + Cu + Cr)/20 + Ni/60 + Mo/15 + V/10 + 5*B
+
+    @property
+    def ideal_diameter_di(self) -> float:
+        """Calculate Grossmann ideal critical diameter (DI).
+
+        Estimates hardenability using multiplying factors.
+
+        Returns
+        -------
+        float
+            Ideal diameter in inches
+        """
+        C = self.carbon or 0.0
+        Mn = self.manganese or 0.0
+        Si = self.silicon or 0.0
+        Cr = self.chromium or 0.0
+        Ni = self.nickel or 0.0
+        Mo = self.molybdenum or 0.0
+
+        # Base DI from carbon content (simplified from Grossmann)
+        if C <= 0.0:
+            return 0.0
+        DI_base = 0.54 * (C ** 0.5)
+
+        # Multiplying factors (simplified)
+        f_Mn = 1.0 + 3.33 * Mn
+        f_Si = 1.0 + 0.70 * Si
+        f_Cr = 1.0 + 2.16 * Cr
+        f_Ni = 1.0 + 0.36 * Ni
+        f_Mo = 1.0 + 3.00 * Mo
+
+        return DI_base * f_Mn * f_Si * f_Cr * f_Ni * f_Mo
+
+    def to_dict(self) -> dict:
+        """Convert composition to dictionary for calculations.
+
+        Returns
+        -------
+        dict
+            Element symbols as keys, wt% as values
+        """
+        return {
+            'C': self.carbon or 0.0,
+            'Mn': self.manganese or 0.0,
+            'Si': self.silicon or 0.0,
+            'Cr': self.chromium or 0.0,
+            'Ni': self.nickel or 0.0,
+            'Mo': self.molybdenum or 0.0,
+            'V': self.vanadium or 0.0,
+            'W': self.tungsten or 0.0,
+            'Cu': self.copper or 0.0,
+            'P': self.phosphorus or 0.0,
+            'S': self.sulfur or 0.0,
+            'N': self.nitrogen or 0.0,
+            'B': self.boron or 0.0,
+        }
+
+    def __repr__(self) -> str:
+        return f'<SteelComposition C={self.carbon} for grade_id={self.steel_grade_id}>'

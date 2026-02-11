@@ -119,6 +119,63 @@
             </div>
         </div>
 
+        <!-- Chemical Composition Section -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-percent"></i> Chemical Composition</span>
+                <a href="{{ url_for('materials.composition', id=grade.id) }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-pencil"></i> {% if grade.composition %}Edit{% else %}Add{% endif %}
+                </a>
+            </div>
+            <div class="card-body">
+                {% if grade.composition %}
+                {% set comp = grade.composition %}
+                <div class="row">
+                    <div class="col-md-8">
+                        <table class="table table-sm mb-2">
+                            <tr>
+                                <td><strong>C</strong></td><td>{{ '%.2f'|format(comp.carbon) }}%</td>
+                                <td><strong>Mn</strong></td><td>{{ '%.2f'|format(comp.manganese) }}%</td>
+                                <td><strong>Si</strong></td><td>{{ '%.2f'|format(comp.silicon) }}%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Cr</strong></td><td>{{ '%.2f'|format(comp.chromium) }}%</td>
+                                <td><strong>Ni</strong></td><td>{{ '%.2f'|format(comp.nickel) }}%</td>
+                                <td><strong>Mo</strong></td><td>{{ '%.2f'|format(comp.molybdenum) }}%</td>
+                            </tr>
+                            {% if comp.vanadium > 0 or comp.tungsten > 0 or comp.copper > 0 %}
+                            <tr>
+                                {% if comp.vanadium > 0 %}<td><strong>V</strong></td><td>{{ '%.3f'|format(comp.vanadium) }}%</td>{% endif %}
+                                {% if comp.tungsten > 0 %}<td><strong>W</strong></td><td>{{ '%.2f'|format(comp.tungsten) }}%</td>{% endif %}
+                                {% if comp.copper > 0 %}<td><strong>Cu</strong></td><td>{{ '%.2f'|format(comp.copper) }}%</td>{% endif %}
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                    <div class="col-md-4">
+                        <p class="mb-1"><strong>CE(IIW):</strong> {{ '%.3f'|format(comp.carbon_equivalent_iiw) }}</p>
+                        <p class="mb-1"><strong>Pcm:</strong> {{ '%.3f'|format(comp.carbon_equivalent_pcm) }}</p>
+                        <p class="mb-0"><strong>DI:</strong> {{ '%.2f'|format(comp.ideal_diameter_di) }} in</p>
+                    </div>
+                </div>
+                {% if comp.source %}
+                <small class="text-muted">Source: {{ comp.source }}</small>
+                {% endif %}
+                {% else %}
+                <div class="text-center py-3 text-muted">
+                    <i class="bi bi-percent fs-3"></i>
+                    <p class="mb-1">No composition defined</p>
+                    <small>Required for hardness prediction</small>
+                    <div class="mt-2">
+                        <a href="{{ url_for('materials.composition', id=grade.id) }}" class="btn btn-sm btn-outline-primary">
+                            Add Composition
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Phase Properties Section -->
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">

@@ -471,6 +471,9 @@ class SimulationResult(db.Model):
     # Phase transformation results (JSON)
     phase_fractions = db.Column(db.Text)
 
+    # Generic result data (JSON) - for hardness, etc.
+    result_data = db.Column(db.Text)
+
     # Stored plot image (PNG bytes)
     plot_image = db.Column(db.LargeBinary)
 
@@ -517,6 +520,18 @@ class SimulationResult(db.Model):
         self.phase_fractions = json.dumps(phases)
 
     @property
+    def data_dict(self) -> dict:
+        """Parse result data JSON to dict."""
+        try:
+            return json.loads(self.result_data) if self.result_data else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def set_data(self, data: dict) -> None:
+        """Set result data from dict."""
+        self.result_data = json.dumps(data)
+
+    @property
     def has_plot(self) -> bool:
         """Check if plot image is stored."""
         return self.plot_image is not None
@@ -531,6 +546,7 @@ class SimulationResult(db.Model):
             'cooling_rate': 'Cooling Rate',
             'full_cycle': 'Full Heat Treatment Cycle',
             'heating_curve': 'Heating Curve',
+            'hardness_prediction': 'Predicted Hardness',
         }
         return labels.get(self.result_type, self.result_type)
 

@@ -1191,3 +1191,93 @@ def create_measured_dtdt_vs_temp_plot(
     plt.close(fig)
 
     return buf.getvalue()
+
+
+def create_hardness_profile_plot(
+    hardness_result,
+    title: str = "Predicted Hardness Profile"
+) -> bytes:
+    """Generate hardness profile bar chart at 4 radial positions.
+
+    Parameters
+    ----------
+    hardness_result : HardnessResult
+        Hardness prediction results from hardness_predictor
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Position labels and keys
+    positions = ['center', 'one_third', 'two_thirds', 'surface']
+    labels = ['Center', '1/3 R', '2/3 R', 'Surface']
+
+    # Get hardness values
+    hv_values = [hardness_result.hardness_hv.get(p, 0) for p in positions]
+    hrc_values = [hardness_result.hardness_hrc.get(p) for p in positions]
+
+    # Color gradient: blue (cool center) to red (hot surface)
+    colors = ['#3498db', '#2ecc71', '#f39c12', '#e74c3c']
+
+    # Create bar chart
+    x = np.arange(len(labels))
+    bars = ax.bar(x, hv_values, color=colors, edgecolor='black', linewidth=1.5)
+
+    # Add value labels on bars
+    for i, (bar, hv, hrc) in enumerate(zip(bars, hv_values, hrc_values)):
+        height = bar.get_height()
+        # HV value at top
+        ax.annotate(f'{hv:.0f} HV',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 3),
+                    textcoords="offset points",
+                    ha='center', va='bottom', fontsize=12, fontweight='bold')
+        # HRC value inside bar
+        if hrc is not None:
+            ax.annotate(f'({hrc:.0f} HRC)',
+                        xy=(bar.get_x() + bar.get_width() / 2, height / 2),
+                        ha='center', va='center', fontsize=10, color='white',
+                        fontweight='bold')
+
+    # Styling
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=12)
+    ax.set_ylabel('Hardness (HV)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.set_ylim(0, max(hv_values) * 1.15 if hv_values else 600)
+    ax.grid(True, axis='y', alpha=0.3)
+
+    # Add annotation box with CE and DI
+    ce = hardness_result.carbon_equivalent
+    di = hardness_result.ideal_diameter
+    textstr = f'CE(IIW) = {ce:.3f}\nDI = {di:.2f} in'
+
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+    ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
+            verticalalignment='top', bbox=props)
+
+    # Add t8/5 values at bottom
+    t8_5_text = 't8/5: '
+    t8_5_parts = []
+    for p, label in zip(positions, labels):
+        t8_5 = hardness_result.t8_5_values.get(p)
+        if t8_5:
+            t8_5_parts.append(f'{label}={t8_5:.1f}s')
+    t8_5_text += ', '.join(t8_5_parts)
+
+    ax.text(0.5, -0.12, t8_5_text, transform=ax.transAxes, fontsize=9,
+            ha='center', color='gray')
+
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()

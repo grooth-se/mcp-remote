@@ -195,6 +195,94 @@ class PropertyEvaluateForm(FlaskForm):
     submit = SubmitField('Evaluate')
 
 
+class SteelCompositionForm(FlaskForm):
+    """Form for creating/editing steel chemical composition."""
+    # Primary elements (wt%)
+    carbon = FloatField(
+        'Carbon (C) %',
+        validators=[DataRequired(), NumberRange(min=0, max=3.0)],
+        render_kw={'placeholder': 'e.g., 0.40', 'step': '0.01'}
+    )
+    manganese = FloatField(
+        'Manganese (Mn) %',
+        validators=[Optional(), NumberRange(min=0, max=3.0)],
+        render_kw={'placeholder': 'e.g., 0.70', 'step': '0.01'}
+    )
+    silicon = FloatField(
+        'Silicon (Si) %',
+        validators=[Optional(), NumberRange(min=0, max=3.0)],
+        render_kw={'placeholder': 'e.g., 0.25', 'step': '0.01'}
+    )
+
+    # Secondary alloying elements
+    chromium = FloatField(
+        'Chromium (Cr) %',
+        validators=[Optional(), NumberRange(min=0, max=20.0)],
+        render_kw={'placeholder': 'e.g., 0.80', 'step': '0.01'}
+    )
+    nickel = FloatField(
+        'Nickel (Ni) %',
+        validators=[Optional(), NumberRange(min=0, max=20.0)],
+        render_kw={'placeholder': 'e.g., 1.80', 'step': '0.01'}
+    )
+    molybdenum = FloatField(
+        'Molybdenum (Mo) %',
+        validators=[Optional(), NumberRange(min=0, max=5.0)],
+        render_kw={'placeholder': 'e.g., 0.25', 'step': '0.01'}
+    )
+    vanadium = FloatField(
+        'Vanadium (V) %',
+        validators=[Optional(), NumberRange(min=0, max=3.0)],
+        render_kw={'placeholder': 'e.g., 0.05', 'step': '0.001'}
+    )
+
+    # Additional elements (collapsible)
+    tungsten = FloatField(
+        'Tungsten (W) %',
+        validators=[Optional(), NumberRange(min=0, max=10.0)],
+        render_kw={'placeholder': '0.0', 'step': '0.01'}
+    )
+    copper = FloatField(
+        'Copper (Cu) %',
+        validators=[Optional(), NumberRange(min=0, max=3.0)],
+        render_kw={'placeholder': '0.0', 'step': '0.01'}
+    )
+    phosphorus = FloatField(
+        'Phosphorus (P) %',
+        validators=[Optional(), NumberRange(min=0, max=0.5)],
+        render_kw={'placeholder': '0.0', 'step': '0.001'}
+    )
+    sulfur = FloatField(
+        'Sulfur (S) %',
+        validators=[Optional(), NumberRange(min=0, max=0.5)],
+        render_kw={'placeholder': '0.0', 'step': '0.001'}
+    )
+    nitrogen = FloatField(
+        'Nitrogen (N) %',
+        validators=[Optional(), NumberRange(min=0, max=0.5)],
+        render_kw={'placeholder': '0.0', 'step': '0.001'}
+    )
+    boron = FloatField(
+        'Boron (B) %',
+        validators=[Optional(), NumberRange(min=0, max=0.01)],
+        render_kw={'placeholder': '0.0', 'step': '0.0001'}
+    )
+
+    # Metadata
+    source = StringField(
+        'Data Source',
+        validators=[Optional(), Length(max=200)],
+        render_kw={'placeholder': 'e.g., ASTM A29, Mill certificate'}
+    )
+    notes = TextAreaField(
+        'Notes',
+        validators=[Optional(), Length(max=500)],
+        render_kw={'placeholder': 'Optional notes', 'rows': 2}
+    )
+
+    submit = SubmitField('Save Composition')
+
+
 class PhasePropertyForm(FlaskForm):
     """Form for creating/editing phase-specific properties."""
     phase = SelectField(

@@ -9,18 +9,18 @@ from io import BytesIO
 
 from app.extensions import db
 from app.models import (
-    SteelGrade, MaterialProperty, PhaseDiagram, PhaseProperty,
+    SteelGrade, MaterialProperty, PhaseDiagram, PhaseProperty, SteelComposition,
     PROPERTY_TYPE_CONSTANT, PROPERTY_TYPE_CURVE,
     PROPERTY_TYPE_POLYNOMIAL, PROPERTY_TYPE_EQUATION,
     DATA_SOURCE_STANDARD,
     PHASES, PHASE_LABELS,
 )
-from app.services import PropertyEvaluator, PropertyPlotter, ExcelImporter, seed_standard_grades
+from app.services import PropertyEvaluator, PropertyPlotter, ExcelImporter, seed_standard_grades, seed_standard_compositions
 
 from . import materials_bp
 from .forms import (
     SteelGradeForm, MaterialPropertyForm, PhaseDiagramForm,
-    ImportForm, PropertyEvaluateForm, PhasePropertyForm
+    ImportForm, PropertyEvaluateForm, PhasePropertyForm, SteelCompositionForm
 )
 
 
@@ -499,6 +499,106 @@ def delete_phase_property(id, pp_id):
 
 
 # ============================================================================
+# Steel Composition
+# ============================================================================
+
+@materials_bp.route('/<int:id>/composition', methods=['GET', 'POST'])
+@login_required
+def composition(id):
+    """Manage chemical composition for a steel grade."""
+    grade = SteelGrade.query.get_or_404(id)
+    form = SteelCompositionForm()
+
+    # Pre-populate form if composition exists
+    existing = grade.composition
+    if request.method == 'GET' and existing:
+        form.carbon.data = existing.carbon
+        form.manganese.data = existing.manganese
+        form.silicon.data = existing.silicon
+        form.chromium.data = existing.chromium
+        form.nickel.data = existing.nickel
+        form.molybdenum.data = existing.molybdenum
+        form.vanadium.data = existing.vanadium
+        form.tungsten.data = existing.tungsten
+        form.copper.data = existing.copper
+        form.phosphorus.data = existing.phosphorus
+        form.sulfur.data = existing.sulfur
+        form.nitrogen.data = existing.nitrogen
+        form.boron.data = existing.boron
+        form.source.data = existing.source
+        form.notes.data = existing.notes
+
+    if form.validate_on_submit():
+        if existing:
+            # Update existing
+            existing.carbon = form.carbon.data
+            existing.manganese = form.manganese.data or 0.0
+            existing.silicon = form.silicon.data or 0.0
+            existing.chromium = form.chromium.data or 0.0
+            existing.nickel = form.nickel.data or 0.0
+            existing.molybdenum = form.molybdenum.data or 0.0
+            existing.vanadium = form.vanadium.data or 0.0
+            existing.tungsten = form.tungsten.data or 0.0
+            existing.copper = form.copper.data or 0.0
+            existing.phosphorus = form.phosphorus.data or 0.0
+            existing.sulfur = form.sulfur.data or 0.0
+            existing.nitrogen = form.nitrogen.data or 0.0
+            existing.boron = form.boron.data or 0.0
+            existing.source = form.source.data
+            existing.notes = form.notes.data
+            flash('Composition updated.', 'success')
+        else:
+            # Create new
+            comp = SteelComposition(
+                steel_grade_id=grade.id,
+                carbon=form.carbon.data,
+                manganese=form.manganese.data or 0.0,
+                silicon=form.silicon.data or 0.0,
+                chromium=form.chromium.data or 0.0,
+                nickel=form.nickel.data or 0.0,
+                molybdenum=form.molybdenum.data or 0.0,
+                vanadium=form.vanadium.data or 0.0,
+                tungsten=form.tungsten.data or 0.0,
+                copper=form.copper.data or 0.0,
+                phosphorus=form.phosphorus.data or 0.0,
+                sulfur=form.sulfur.data or 0.0,
+                nitrogen=form.nitrogen.data or 0.0,
+                boron=form.boron.data or 0.0,
+                source=form.source.data,
+                notes=form.notes.data
+            )
+            db.session.add(comp)
+            flash('Composition created.', 'success')
+
+        db.session.commit()
+        return redirect(url_for('materials.view', id=grade.id))
+
+    return render_template(
+        'materials/composition.html',
+        form=form,
+        grade=grade,
+        existing=existing
+    )
+
+
+@materials_bp.route('/<int:id>/composition/delete', methods=['POST'])
+@login_required
+def delete_composition(id):
+    """Delete composition."""
+    grade = SteelGrade.query.get_or_404(id)
+    comp = grade.composition
+
+    if comp:
+        db.session.delete(comp)
+        db.session.commit()
+        flash('Composition deleted.', 'success')
+    else:
+        flash('No composition to delete.', 'warning')
+
+    return redirect(url_for('materials.view', id=id))
+
+
+# ============================================================================
 # Property Plots
 # ============================================================================
 
@@ -653,6 +753,24 @@ def seed():
         f"{results['properties_created']} properties, "
         f"{results['diagrams_created']} diagrams, "
         f"{results.get('phase_properties_created', 0)} phase properties"
+    )
+    flash(msg, 'success')
+    return redirect(url_for('materials.index'))
+
+
+@materials_bp.route('/seed-compositions', methods=['POST'])
+@login_required
+def seed_compositions():
+    """Load standard chemical compositions."""
+    results = seed_standard_compositions()
+
+    if results['errors']:
+        for error in results['errors'][:5]:
+            flash(error, 'warning')
+
+    msg = (
+        f"Compositions seeded: {results['compositions_created']} created, "
+        f"{results['compositions_skipped']} skipped (already exist)"
     )
     flash(msg, 'success')
     return redirect(url_for('materials.index'))

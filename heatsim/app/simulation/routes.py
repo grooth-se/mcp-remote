@@ -21,6 +21,7 @@ from app.services import (
     create_quench_bc, create_heating_bc, create_transfer_bc,
     HeatSolver, MultiPhaseHeatSolver, SolverConfig,
     PhaseTracker,
+    predict_hardness_profile,
     visualization
 )
 from app.services.tc_data_parser import parse_tc_csv, validate_tc_csv
@@ -426,6 +427,9 @@ def view(id):
     power_heating = [r for r in results if r.result_type == 'absorbed_power' and r.phase == 'heating']
     power_tempering = [r for r in results if r.result_type == 'absorbed_power' and r.phase == 'tempering']
 
+    # Hardness prediction results
+    hardness_results = [r for r in results if r.result_type == 'hardness_prediction']
+
     # Get measured TC data for comparison, grouped by process step
     measured_data = sim.measured_data.all()
     measured_heating = [m for m in measured_data if m.process_step == 'heating']
@@ -454,7 +458,8 @@ def view(id):
         measured_data=measured_data,
         measured_heating=measured_heating,
         measured_quenching=measured_quenching,
-        measured_tempering=measured_tempering
+        measured_tempering=measured_tempering,
+        hardness_results=hardness_results
     )
 
 
@@ -652,6 +657,7 @@ def run(id):
         db.session.add(profile_result)
 
         # Phase transformation prediction (based on quenching cooling)
+        tracker = None
         if diagram:
             tracker = PhaseTracker(diagram)
             phases = tracker.predict_phases(result.time, result.center_temp, result.t8_5)
@@ -668,6 +674,33 @@ def run(id):
                 title=f'Predicted Phase Fractions - {sim.name}'
             )
             db.session.add(phase_result)
+
+        # Hardness prediction (requires composition and phase diagram)
+        if diagram and grade.composition:
+            try:
+                hardness_result = predict_hardness_profile(
+                    composition=grade.composition,
+                    temperatures=result.temperature,
+                    times=result.time,
+                    phase_tracker=tracker
+                )
+
+                # Store hardness result
+                hardness_sim_result = SimulationResult(
+                    simulation_id=sim.id,
+                    result_type='hardness_prediction',
+                    phase='full',
+                    location='all'
+                )
+                hardness_sim_result.set_data(hardness_result.to_dict())
+                hardness_sim_result.plot_image = visualization.create_hardness_profile_plot(
+                    hardness_result,
+                    title=f'Predicted Hardness - {sim.name}'
+                )
+                db.session.add(hardness_sim_result)
+            except Exception as e:
+                # Log but don't fail simulation if hardness prediction fails
+                current_app.logger.warning(f'Hardness prediction failed: {e}')
 
         # Cooling rate plot
         rate_result = SimulationResult(

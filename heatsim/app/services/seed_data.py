@@ -11,11 +11,30 @@ Data sources:
 """
 from app.extensions import db
 from app.models import (
-    SteelGrade, MaterialProperty, PhaseDiagram, PhaseProperty,
+    SteelGrade, MaterialProperty, PhaseDiagram, PhaseProperty, SteelComposition,
     PROPERTY_TYPE_CONSTANT, PROPERTY_TYPE_CURVE,
     DATA_SOURCE_STANDARD, DIAGRAM_TYPE_CCT,
     PHASE_FERRITE, PHASE_AUSTENITE, PHASE_MARTENSITE, PHASE_BAINITE, PHASE_PEARLITE,
 )
+
+
+# Standard chemical compositions (wt%)
+# Source: ASTM/AISI specifications, ASM Metals Handbook
+STANDARD_COMPOSITIONS = {
+    'S355J2G3': {'C': 0.20, 'Mn': 1.50, 'Si': 0.55},
+    'AISI 4130': {'C': 0.30, 'Mn': 0.50, 'Si': 0.25, 'Cr': 0.95, 'Mo': 0.20},
+    'AISI 4340': {'C': 0.40, 'Mn': 0.70, 'Si': 0.25, 'Cr': 0.80, 'Ni': 1.80, 'Mo': 0.25},
+    'AISI 4330V': {'C': 0.30, 'Mn': 0.90, 'Si': 0.25, 'Cr': 0.80, 'Ni': 1.80, 'Mo': 0.40, 'V': 0.08},
+    'AISI 8630': {'C': 0.30, 'Mn': 0.80, 'Si': 0.25, 'Cr': 0.50, 'Ni': 0.55, 'Mo': 0.20},
+    'A182 F22': {'C': 0.12, 'Mn': 0.45, 'Si': 0.25, 'Cr': 2.25, 'Mo': 1.00},
+    'A182 F11': {'C': 0.12, 'Mn': 0.45, 'Si': 0.50, 'Cr': 1.25, 'Mo': 0.50},
+    'A182 F5': {'C': 0.15, 'Mn': 0.50, 'Si': 0.50, 'Cr': 5.00, 'Mo': 0.50},
+    '410': {'C': 0.12, 'Mn': 1.00, 'Si': 1.00, 'Cr': 12.50},
+    'H13': {'C': 0.40, 'Mn': 0.35, 'Si': 1.00, 'Cr': 5.25, 'Mo': 1.35, 'V': 1.00},
+    'P20': {'C': 0.35, 'Mn': 1.00, 'Si': 0.40, 'Cr': 1.70, 'Mo': 0.40},
+    '300M': {'C': 0.42, 'Mn': 0.70, 'Si': 1.60, 'Cr': 0.80, 'Ni': 1.80, 'Mo': 0.40, 'V': 0.08},
+    'AISI 1045': {'C': 0.45, 'Mn': 0.75, 'Si': 0.25},
+}
 
 
 # Standard phase properties for low-alloy steel (typical values)
@@ -564,6 +583,59 @@ def seed_standard_grades() -> dict:
 
         except Exception as e:
             results['errors'].append(f"Error creating {designation}: {str(e)}")
+
+    db.session.commit()
+    return results
+
+
+def seed_standard_compositions() -> dict:
+    """Seed the database with standard steel compositions.
+
+    Returns
+    -------
+    dict
+        Results with count of created/updated compositions
+    """
+    results = {
+        'compositions_created': 0,
+        'compositions_skipped': 0,
+        'errors': []
+    }
+
+    for designation, comp_data in STANDARD_COMPOSITIONS.items():
+        # Find the steel grade
+        grade = SteelGrade.query.filter_by(
+            designation=designation,
+            data_source=DATA_SOURCE_STANDARD
+        ).first()
+
+        if not grade:
+            results['errors'].append(f"Grade {designation} not found")
+            continue
+
+        # Check if composition already exists
+        if grade.composition:
+            results['compositions_skipped'] += 1
+            continue
+
+        try:
+            comp = SteelComposition(
+                steel_grade_id=grade.id,
+                carbon=comp_data.get('C', 0.0),
+                manganese=comp_data.get('Mn', 0.0),
+                silicon=comp_data.get('Si', 0.0),
+                chromium=comp_data.get('Cr', 0.0),
+                nickel=comp_data.get('Ni', 0.0),
+                molybdenum=comp_data.get('Mo', 0.0),
+                vanadium=comp_data.get('V', 0.0),
+                tungsten=comp_data.get('W', 0.0),
+                copper=comp_data.get('Cu', 0.0),
+                source='ASTM/AISI specification (typical)'
+            )
+            db.session.add(comp)
+            results['compositions_created'] += 1
+        except Exception as e:
+            results['errors'].append(f"Error creating composition for {designation}: {str(e)}")
 
     db.session.commit()
     return results
