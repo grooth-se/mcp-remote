@@ -15,6 +15,7 @@ from .heat_solver import (
 from .phase_tracker import PhaseTracker, PhaseResult
 from .cad_geometry import CADGeometryAnalyzer, CADAnalysisResult, analyze_step_file
 from .hardness_predictor import HardnessPredictor, HardnessResult, predict_hardness_profile
+from .report_generator import SimulationReportGenerator, generate_simulation_report
 from . import visualization
 from . import comsol
 
@@ -60,6 +61,9 @@ __all__ = [
     'HardnessPredictor',
     'HardnessResult',
     'predict_hardness_profile',
+    # Phase 3 services - Report generation
+    'SimulationReportGenerator',
+    'generate_simulation_report',
     # Phase 3 services - Visualization
     'visualization',
     # Phase 4 services - COMSOL integration

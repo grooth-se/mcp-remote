@@ -22,7 +22,8 @@ from app.services import (
     HeatSolver, MultiPhaseHeatSolver, SolverConfig,
     PhaseTracker,
     predict_hardness_profile,
-    visualization
+    visualization,
+    generate_simulation_report
 )
 from app.services.tc_data_parser import parse_tc_csv, validate_tc_csv
 from app.services.cad_geometry import analyze_step_file, CADAnalysisResult
@@ -848,6 +849,41 @@ def result_image(id, result_id):
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     return response
+
+
+@simulation_bp.route('/<int:id>/report')
+@login_required
+def download_report(id):
+    """Download simulation report as Word document."""
+    sim = Simulation.query.get_or_404(id)
+
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    if sim.status != STATUS_COMPLETED:
+        flash('Report is only available for completed simulations.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    try:
+        # Generate report
+        report_bytes = generate_simulation_report(sim)
+
+        # Create safe filename
+        safe_name = sim.name.replace(' ', '_').replace('/', '-')
+        filename = f"{safe_name}_report.docx"
+
+        # Return as downloadable file
+        response = Response(
+            report_bytes,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        flash(f'Error generating report: {str(e)}', 'danger')
+        return redirect(url_for('simulation.view', id=id))
 
 
 @simulation_bp.route('/<int:id>/delete', methods=['POST'])

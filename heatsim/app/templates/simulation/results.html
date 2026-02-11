@@ -30,6 +30,11 @@
         <a href="{{ url_for('simulation.upload_tc_data', id=sim.id) }}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-upload"></i> Upload TC Data
         </a>
+        {% if sim.status == 'completed' %}
+        <a href="{{ url_for('simulation.download_report', id=sim.id) }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-file-earmark-word"></i> Download Report
+        </a>
+        {% endif %}
         {% if sim.status in ['ready', 'completed', 'failed'] %}
         <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline" id="runForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
