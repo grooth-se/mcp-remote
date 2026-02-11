@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Sidan hittades inte - Familjekontor{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <h1 class="display-1 text-muted">404</h1>
+                <h4>Sidan hittades inte</h4>
+                <p class="text-muted">Sidan du letar efter finns inte eller har flyttats.</p>
+                <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary mt-3">
+                    <i class="bi bi-house"></i> Till startsidan
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

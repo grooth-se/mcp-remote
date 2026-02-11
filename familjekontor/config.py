@@ -14,6 +14,9 @@ class Config:
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'uploads')
     GENERATED_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'generated')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
 
 
 class DevelopmentConfig(Config):
@@ -22,6 +25,7 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    SESSION_COOKIE_SECURE = True
 
 
 class TestingConfig(Config):

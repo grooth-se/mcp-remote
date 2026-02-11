@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template
 from config import config
 from app.extensions import db, migrate, login_manager, csrf
 
@@ -10,6 +10,9 @@ def create_app(config_name=None):
 
     app = Flask(__name__)
     app.config.from_object(config.get(config_name, config['default']))
+
+    if config_name == 'production' and app.config['SECRET_KEY'] == 'dev-secret-key-change-me':
+        raise RuntimeError('Set SECRET_KEY environment variable for production')
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -59,6 +62,25 @@ def create_app(config_name=None):
     app.register_blueprint(closing_bp, url_prefix='/closing')
     app.register_blueprint(currency_bp, url_prefix='/currency')
     app.register_blueprint(recurring_bp, url_prefix='/invoices/recurring')
+
+    # Error handlers
+    @app.errorhandler(404)
+    def not_found(e):
+        return render_template('errors/404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        db.session.rollback()
+        return render_template('errors/500.html'), 500
+
+    # Security headers
+    @app.after_request
+    def set_security_headers(response):
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+        return response
 
     # Context processor for active company
     @app.context_processor
