@@ -15,6 +15,7 @@ from app.forms.company import CompanyForm, FiscalYearForm, CertificateUploadForm
 from app.services.company_service import create_company
 from app.services import document_service as doc_svc
 from app.utils.validators import validate_org_number
+from app.utils.security import safe_path
 from app.models.audit import AuditLog
 
 companies_bp = Blueprint('companies', __name__)
@@ -173,7 +174,11 @@ def serve_logo(company_id):
         from flask import abort
         abort(404)
     base = current_app.config.get('UPLOAD_FOLDER', 'data/uploads')
-    full_path = os.path.join(base, company.logo_path)
+    try:
+        full_path = safe_path(base, company.logo_path)
+    except ValueError:
+        from flask import abort
+        abort(404)
     if not os.path.exists(full_path):
         from flask import abort
         abort(404)
@@ -194,9 +199,12 @@ def delete_logo(company_id):
 
     if company.logo_path:
         base = current_app.config.get('UPLOAD_FOLDER', 'data/uploads')
-        full_path = os.path.join(base, company.logo_path)
-        if os.path.exists(full_path):
-            os.remove(full_path)
+        try:
+            full_path = safe_path(base, company.logo_path)
+            if os.path.exists(full_path):
+                os.remove(full_path)
+        except ValueError:
+            pass  # Path traversal — skip file deletion
         company.logo_path = None
         db.session.commit()
         flash('Logotypen har tagits bort.', 'success')
@@ -275,7 +283,11 @@ def download_certificate(company_id, doc_id):
         return redirect(url_for('companies.view', company_id=company_id))
 
     base = current_app.config.get('UPLOAD_FOLDER', 'data/uploads')
-    full_path = os.path.join(base, doc.file_path)
+    try:
+        full_path = safe_path(base, doc.file_path)
+    except ValueError:
+        flash('Filen saknas på servern.', 'danger')
+        return redirect(url_for('companies.view', company_id=company_id))
     if not os.path.exists(full_path):
         flash('Filen saknas på servern.', 'danger')
         return redirect(url_for('companies.view', company_id=company_id))
@@ -296,9 +308,12 @@ def delete_certificate(company_id, doc_id):
         return redirect(url_for('companies.view', company_id=company_id))
 
     base = current_app.config.get('UPLOAD_FOLDER', 'data/uploads')
-    full_path = os.path.join(base, doc.file_path)
-    if os.path.exists(full_path):
-        os.remove(full_path)
+    try:
+        full_path = safe_path(base, doc.file_path)
+        if os.path.exists(full_path):
+            os.remove(full_path)
+    except ValueError:
+        pass  # Path traversal — skip file deletion
 
     db.session.delete(doc)
     db.session.commit()

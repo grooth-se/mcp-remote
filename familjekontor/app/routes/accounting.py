@@ -131,8 +131,9 @@ def new_verification():
 @accounting_bp.route('/verification/<int:verification_id>')
 @login_required
 def view_verification(verification_id):
+    company_id = session.get('active_company_id')
     ver = db.session.get(Verification, verification_id)
-    if not ver:
+    if not ver or ver.company_id != company_id:
         flash('Verifikationen hittades inte.', 'danger')
         return redirect(url_for('accounting.index'))
     return render_template('accounting/view_verification.html', verification=ver)

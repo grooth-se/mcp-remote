@@ -30,6 +30,11 @@ def preview(fiscal_year_id):
         flash('Välj ett företag först.', 'warning')
         return redirect(url_for('companies.index'))
 
+    fy = db.session.get(FiscalYear, fiscal_year_id)
+    if not fy or fy.company_id != company_id:
+        flash('Räkenskapsåret hittades inte.', 'danger')
+        return redirect(url_for('closing.index'))
+
     try:
         data = preview_closing(company_id, fiscal_year_id)
     except ValueError as e:
@@ -46,6 +51,11 @@ def execute_close(fiscal_year_id):
     if not company_id:
         flash('Välj ett företag först.', 'warning')
         return redirect(url_for('companies.index'))
+
+    fy = db.session.get(FiscalYear, fiscal_year_id)
+    if not fy or fy.company_id != company_id:
+        flash('Räkenskapsåret hittades inte.', 'danger')
+        return redirect(url_for('closing.index'))
 
     if current_user.is_readonly:
         flash('Du har inte behörighet att stänga räkenskapsår.', 'danger')

@@ -44,3 +44,21 @@ def logged_in_client(client, admin_user):
         'password': 'testpass123',
     }, follow_redirects=True)
     return client
+
+
+@pytest.fixture
+def readonly_user(db):
+    user = User(username='reader', email='reader@test.com', role='readonly')
+    user.set_password('testpass123')
+    db.session.add(user)
+    db.session.commit()
+    return user
+
+
+@pytest.fixture
+def readonly_client(app, readonly_user):
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['_user_id'] = str(readonly_user.id)
+        sess['_fresh'] = True
+    return client

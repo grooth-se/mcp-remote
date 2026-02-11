@@ -113,8 +113,8 @@ def test_report_page(consol_route_setup, logged_in_client):
 
 
 def test_redirect_without_company(logged_in_client):
-    """Consolidation doesn't require active company, so index should work."""
+    """Consolidation requires active company for access control."""
     with logged_in_client.session_transaction() as sess:
         sess.pop('active_company_id', None)
     response = logged_in_client.get('/consolidation/')
-    assert response.status_code == 200
+    assert response.status_code == 302

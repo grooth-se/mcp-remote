@@ -203,9 +203,14 @@ def match_transaction(txn_id):
 def unmatch_transaction(txn_id):
     company_id = session.get('active_company_id')
     txn = db.session.get(BankTransaction, txn_id)
-    if txn and txn.company_id == company_id:
-        bank_service.unmatch_transaction(txn_id, current_user.id)
-        flash('Matchning har tagits bort.', 'success')
+    if not txn or txn.company_id != company_id:
+        flash('Transaktion hittades inte.', 'danger')
+        return redirect(url_for('bank.reconciliation'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('bank.reconciliation'))
+    bank_service.unmatch_transaction(txn_id, current_user.id)
+    flash('Matchning har tagits bort.', 'success')
     return redirect(url_for('bank.reconciliation'))
 
 
@@ -214,7 +219,12 @@ def unmatch_transaction(txn_id):
 def ignore_transaction(txn_id):
     company_id = session.get('active_company_id')
     txn = db.session.get(BankTransaction, txn_id)
-    if txn and txn.company_id == company_id:
-        bank_service.ignore_transaction(txn_id, current_user.id)
-        flash('Transaktionen har ignorerats.', 'success')
+    if not txn or txn.company_id != company_id:
+        flash('Transaktion hittades inte.', 'danger')
+        return redirect(url_for('bank.reconciliation'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('bank.reconciliation'))
+    bank_service.ignore_transaction(txn_id, current_user.id)
+    flash('Transaktionen har ignorerats.', 'success')
     return redirect(url_for('bank.reconciliation'))

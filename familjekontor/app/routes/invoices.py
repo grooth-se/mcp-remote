@@ -269,7 +269,14 @@ def new_supplier_invoice():
 @invoices_bp.route('/supplier-invoices/<int:invoice_id>/approve', methods=['POST'])
 @login_required
 def approve_supplier_invoice(invoice_id):
+    company_id = session.get('active_company_id')
     invoice = db.session.get(SupplierInvoice, invoice_id)
+    if not invoice or invoice.company_id != company_id:
+        flash('Faktura hittades inte.', 'danger')
+        return redirect(url_for('invoices.supplier_invoices'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('invoices.supplier_invoices'))
     if invoice:
         invoice.status = 'approved'
         audit = AuditLog(
@@ -286,7 +293,14 @@ def approve_supplier_invoice(invoice_id):
 @invoices_bp.route('/supplier-invoices/<int:invoice_id>/pay', methods=['POST'])
 @login_required
 def pay_supplier_invoice(invoice_id):
+    company_id = session.get('active_company_id')
     invoice = db.session.get(SupplierInvoice, invoice_id)
+    if not invoice or invoice.company_id != company_id:
+        flash('Faktura hittades inte.', 'danger')
+        return redirect(url_for('invoices.supplier_invoices'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('invoices.supplier_invoices'))
     if invoice:
         old_status = invoice.status
         invoice.status = 'paid'
@@ -533,7 +547,14 @@ def new_customer_invoice():
 @invoices_bp.route('/customer-invoices/<int:invoice_id>/send', methods=['POST'])
 @login_required
 def send_customer_invoice(invoice_id):
+    company_id = session.get('active_company_id')
     invoice = db.session.get(CustomerInvoice, invoice_id)
+    if not invoice or invoice.company_id != company_id:
+        flash('Faktura hittades inte.', 'danger')
+        return redirect(url_for('invoices.customer_invoices'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('invoices.customer_invoices'))
     if invoice:
         invoice.status = 'sent'
         from datetime import datetime, timezone
@@ -546,7 +567,14 @@ def send_customer_invoice(invoice_id):
 @invoices_bp.route('/customer-invoices/<int:invoice_id>/mark-paid', methods=['POST'])
 @login_required
 def mark_customer_invoice_paid(invoice_id):
+    company_id = session.get('active_company_id')
     invoice = db.session.get(CustomerInvoice, invoice_id)
+    if not invoice or invoice.company_id != company_id:
+        flash('Faktura hittades inte.', 'danger')
+        return redirect(url_for('invoices.customer_invoices'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('invoices.customer_invoices'))
     if invoice:
         invoice.status = 'paid'
         from datetime import datetime, timezone
@@ -690,6 +718,14 @@ def add_line_item(invoice_id):
 @invoices_bp.route('/customer-invoices/<int:invoice_id>/lines/<int:line_id>/delete', methods=['POST'])
 @login_required
 def delete_line_item(invoice_id, line_id):
+    company_id = session.get('active_company_id')
+    invoice = db.session.get(CustomerInvoice, invoice_id)
+    if not invoice or invoice.company_id != company_id:
+        flash('Faktura hittades inte.', 'danger')
+        return redirect(url_for('invoices.customer_invoices'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('invoices.customer_invoice_detail', invoice_id=invoice_id))
     from app.services.invoice_pdf_service import remove_line_item
     remove_line_item(line_id)
     flash('Rad har tagits bort.', 'success')
@@ -699,6 +735,11 @@ def delete_line_item(invoice_id, line_id):
 @invoices_bp.route('/customer-invoices/<int:invoice_id>/preview')
 @login_required
 def preview_invoice_pdf(invoice_id):
+    company_id = session.get('active_company_id')
+    invoice = db.session.get(CustomerInvoice, invoice_id)
+    if not invoice or invoice.company_id != company_id:
+        flash('Faktura hittades inte.', 'danger')
+        return redirect(url_for('invoices.customer_invoices'))
     from app.services.invoice_pdf_service import generate_invoice_pdf, get_invoice_pdf_path
 
     path = get_invoice_pdf_path(invoice_id)
@@ -722,6 +763,11 @@ def preview_invoice_pdf(invoice_id):
 @invoices_bp.route('/customer-invoices/<int:invoice_id>/pdf')
 @login_required
 def download_invoice_pdf(invoice_id):
+    company_id = session.get('active_company_id')
+    invoice_obj = db.session.get(CustomerInvoice, invoice_id)
+    if not invoice_obj or invoice_obj.company_id != company_id:
+        flash('Faktura hittades inte.', 'danger')
+        return redirect(url_for('invoices.customer_invoices'))
     from app.services.invoice_pdf_service import generate_invoice_pdf, get_invoice_pdf_path
 
     path = get_invoice_pdf_path(invoice_id)

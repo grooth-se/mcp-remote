@@ -14,16 +14,34 @@ from app.services import consolidation_service
 consolidation_bp = Blueprint('consolidation', __name__)
 
 
+def _user_can_access_group(group, company_id):
+    """Check if active company is parent or member of the consolidation group."""
+    if group.parent_company_id == company_id:
+        return True
+    return any(m.company_id == company_id for m in group.members)
+
+
 @consolidation_bp.route('/')
 @login_required
 def index():
-    groups = ConsolidationGroup.query.order_by(ConsolidationGroup.name).all()
+    company_id = session.get('active_company_id')
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+
+    # Only show groups where active company is parent or member
+    all_groups = ConsolidationGroup.query.order_by(ConsolidationGroup.name).all()
+    groups = [g for g in all_groups if _user_can_access_group(g, company_id)]
     return render_template('consolidation/index.html', groups=groups)
 
 
 @consolidation_bp.route('/groups/new', methods=['GET', 'POST'])
 @login_required
 def new_group():
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('consolidation.index'))
+
     form = ConsolidationGroupForm()
     companies = Company.query.filter_by(active=True).order_by(Company.name).all()
     form.parent_company_id.choices = [(c.id, c.name) for c in companies]
@@ -43,8 +61,9 @@ def new_group():
 @consolidation_bp.route('/groups/<int:group_id>')
 @login_required
 def view_group(group_id):
+    company_id = session.get('active_company_id')
     group = db.session.get(ConsolidationGroup, group_id)
-    if not group:
+    if not group or not _user_can_access_group(group, company_id):
         flash('Gruppen hittades inte.', 'danger')
         return redirect(url_for('consolidation.index'))
 
@@ -68,6 +87,15 @@ def view_group(group_id):
 @consolidation_bp.route('/groups/<int:group_id>/add-member', methods=['POST'])
 @login_required
 def add_member(group_id):
+    company_id = session.get('active_company_id')
+    group = db.session.get(ConsolidationGroup, group_id)
+    if not group or not _user_can_access_group(group, company_id):
+        flash('Gruppen hittades inte.', 'danger')
+        return redirect(url_for('consolidation.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('consolidation.view_group', group_id=group_id))
+
     form = AddMemberForm()
     companies = Company.query.filter_by(active=True).all()
     form.company_id.choices = [(c.id, c.name) for c in companies]
@@ -84,6 +112,15 @@ def add_member(group_id):
 @consolidation_bp.route('/groups/<int:group_id>/remove-member/<int:company_id>', methods=['POST'])
 @login_required
 def remove_member(group_id, company_id):
+    active_company_id = session.get('active_company_id')
+    group = db.session.get(ConsolidationGroup, group_id)
+    if not group or not _user_can_access_group(group, active_company_id):
+        flash('Gruppen hittades inte.', 'danger')
+        return redirect(url_for('consolidation.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('consolidation.view_group', group_id=group_id))
+
     consolidation_service.remove_member(group_id, company_id)
     flash('Företag har tagits bort.', 'success')
     return redirect(url_for('consolidation.view_group', group_id=group_id))
@@ -92,8 +129,10 @@ def remove_member(group_id, company_id):
 @consolidation_bp.route('/groups/<int:group_id>/report', methods=['GET', 'POST'])
 @login_required
 def report(group_id):
+    active_company_id = session.get('active_company_id')
     group = db.session.get(ConsolidationGroup, group_id)
-    if not group:
+    if not group or not _user_can_access_group(group, active_company_id):
+        flash('Gruppen hittades inte.', 'danger')
         return redirect(url_for('consolidation.index'))
 
     form = ConsolidationReportForm()
@@ -120,8 +159,10 @@ def report(group_id):
 @consolidation_bp.route('/groups/<int:group_id>/eliminations')
 @login_required
 def eliminations(group_id):
+    active_company_id = session.get('active_company_id')
     group = db.session.get(ConsolidationGroup, group_id)
-    if not group:
+    if not group or not _user_can_access_group(group, active_company_id):
+        flash('Gruppen hittades inte.', 'danger')
         return redirect(url_for('consolidation.index'))
 
     elims = IntercompanyElimination.query.filter_by(group_id=group_id).order_by(
@@ -136,9 +177,14 @@ def eliminations(group_id):
 @consolidation_bp.route('/groups/<int:group_id>/eliminations/new', methods=['GET', 'POST'])
 @login_required
 def new_elimination(group_id):
+    active_company_id = session.get('active_company_id')
     group = db.session.get(ConsolidationGroup, group_id)
-    if not group:
+    if not group or not _user_can_access_group(group, active_company_id):
+        flash('Gruppen hittades inte.', 'danger')
         return redirect(url_for('consolidation.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('consolidation.view_group', group_id=group_id))
 
     form = EliminationForm()
     member_companies = [(m.company_id, m.company.name) for m in group.members]
@@ -173,8 +219,10 @@ def new_elimination(group_id):
 @consolidation_bp.route('/groups/<int:group_id>/report/excel')
 @login_required
 def report_excel(group_id):
+    active_company_id = session.get('active_company_id')
     group = db.session.get(ConsolidationGroup, group_id)
-    if not group:
+    if not group or not _user_can_access_group(group, active_company_id):
+        flash('Gruppen hittades inte.', 'danger')
         return redirect(url_for('consolidation.index'))
 
     fy_year = request.args.get('year', type=int)

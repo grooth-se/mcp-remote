@@ -114,8 +114,9 @@ def vat_generate():
 @tax_bp.route('/vat/<int:report_id>')
 @login_required
 def vat_view(report_id):
+    company_id = session.get('active_company_id')
     report = db.session.get(VATReport, report_id)
-    if not report:
+    if not report or report.company_id != company_id:
         flash('Rapporten hittades inte.', 'danger')
         return redirect(url_for('tax.vat_index'))
 
@@ -127,6 +128,11 @@ def vat_view(report_id):
 @tax_bp.route('/vat/<int:report_id>/finalize', methods=['POST'])
 @login_required
 def vat_finalize(report_id):
+    company_id = session.get('active_company_id')
+    report_obj = db.session.get(VATReport, report_id)
+    if not report_obj or report_obj.company_id != company_id:
+        flash('Rapporten hittades inte.', 'danger')
+        return redirect(url_for('tax.vat_index'))
     if current_user.is_readonly:
         flash('Du har inte behörighet.', 'danger')
         return redirect(url_for('tax.vat_view', report_id=report_id))
@@ -143,8 +149,9 @@ def vat_finalize(report_id):
 @login_required
 def vat_export(report_id):
     """Export a VAT report as Excel."""
+    company_id = session.get('active_company_id')
     report = db.session.get(VATReport, report_id)
-    if not report:
+    if not report or report.company_id != company_id:
         flash('Rapporten hittades inte.', 'danger')
         return redirect(url_for('tax.vat_index'))
 
@@ -301,6 +308,11 @@ def deadlines_seed():
 @tax_bp.route('/deadlines/<int:deadline_id>/complete', methods=['POST'])
 @login_required
 def deadline_complete(deadline_id):
+    company_id = session.get('active_company_id')
+    deadline = db.session.get(Deadline, deadline_id)
+    if not deadline or deadline.company_id != company_id:
+        flash('Deadline hittades inte.', 'danger')
+        return redirect(url_for('tax.deadlines_index'))
     if current_user.is_readonly:
         flash('Du har inte behörighet.', 'danger')
         return redirect(url_for('tax.deadlines_index'))

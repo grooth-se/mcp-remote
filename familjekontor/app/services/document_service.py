@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 
 from flask import current_app
 from app.extensions import db
+from app.utils.security import safe_path
 from app.models.document import Document
 from app.models.audit import AuditLog
 
@@ -540,8 +541,11 @@ def delete_document(doc_id, user_id):
 
     # Delete file from disk
     if doc.file_path:
-        full_path = os.path.join(current_app.static_folder, doc.file_path)
-        if os.path.exists(full_path):
+        try:
+            full_path = safe_path(current_app.static_folder, doc.file_path)
+        except ValueError:
+            full_path = None
+        if full_path and os.path.exists(full_path):
             os.remove(full_path)
 
     audit = AuditLog(
@@ -559,5 +563,8 @@ def get_document_file_path(doc_id):
     doc = db.session.get(Document, doc_id)
     if not doc or not doc.file_path:
         return None, None
-    full_path = os.path.join(current_app.static_folder, doc.file_path)
+    try:
+        full_path = safe_path(current_app.static_folder, doc.file_path)
+    except ValueError:
+        return None, None
     return full_path, doc.mime_type

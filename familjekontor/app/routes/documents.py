@@ -149,6 +149,11 @@ def view(doc_id):
 @documents_bp.route('/<int:doc_id>/download')
 @login_required
 def download(doc_id):
+    company_id = _get_company_id()
+    doc = db.session.get(Document, doc_id)
+    if not doc or doc.company_id != company_id:
+        flash('Dokument hittades inte.', 'danger')
+        return redirect(url_for('documents.index'))
     path, mime = document_service.get_document_file_path(doc_id)
     if not path:
         flash('Fil hittades inte.', 'danger')
@@ -159,6 +164,11 @@ def download(doc_id):
 @documents_bp.route('/<int:doc_id>/preview')
 @login_required
 def preview(doc_id):
+    company_id = _get_company_id()
+    doc = db.session.get(Document, doc_id)
+    if not doc or doc.company_id != company_id:
+        flash('Dokument hittades inte.', 'danger')
+        return redirect(url_for('documents.index'))
     path, mime = document_service.get_document_file_path(doc_id)
     if not path:
         flash('Fil hittades inte.', 'danger')
@@ -169,6 +179,14 @@ def preview(doc_id):
 @documents_bp.route('/<int:doc_id>/attach-verification', methods=['POST'])
 @login_required
 def attach_verification(doc_id):
+    company_id = _get_company_id()
+    doc = db.session.get(Document, doc_id)
+    if not doc or doc.company_id != company_id:
+        flash('Dokument hittades inte.', 'danger')
+        return redirect(url_for('documents.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('documents.view', doc_id=doc_id))
     verification_id = request.form.get('verification_id', type=int)
     if verification_id:
         document_service.attach_to_verification(doc_id, verification_id, current_user.id)
@@ -179,6 +197,14 @@ def attach_verification(doc_id):
 @documents_bp.route('/<int:doc_id>/attach-invoice', methods=['POST'])
 @login_required
 def attach_invoice(doc_id):
+    company_id = _get_company_id()
+    doc = db.session.get(Document, doc_id)
+    if not doc or doc.company_id != company_id:
+        flash('Dokument hittades inte.', 'danger')
+        return redirect(url_for('documents.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('documents.view', doc_id=doc_id))
     invoice_id = request.form.get('invoice_id', type=int)
     invoice_type = request.form.get('invoice_type', 'supplier')
     if invoice_id:
@@ -190,6 +216,14 @@ def attach_invoice(doc_id):
 @documents_bp.route('/<int:doc_id>/detach', methods=['POST'])
 @login_required
 def detach(doc_id):
+    company_id = _get_company_id()
+    doc = db.session.get(Document, doc_id)
+    if not doc or doc.company_id != company_id:
+        flash('Dokument hittades inte.', 'danger')
+        return redirect(url_for('documents.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('documents.view', doc_id=doc_id))
     document_service.detach_document(doc_id, current_user.id)
     flash('Koppling borttagen.', 'success')
     return redirect(url_for('documents.view', doc_id=doc_id))
@@ -198,6 +232,14 @@ def detach(doc_id):
 @documents_bp.route('/<int:doc_id>/delete', methods=['POST'])
 @login_required
 def delete(doc_id):
+    company_id = _get_company_id()
+    doc = db.session.get(Document, doc_id)
+    if not doc or doc.company_id != company_id:
+        flash('Dokument hittades inte.', 'danger')
+        return redirect(url_for('documents.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('documents.view', doc_id=doc_id))
     document_service.delete_document(doc_id, current_user.id)
     flash('Dokument har tagits bort.', 'success')
     return redirect(url_for('documents.index'))
