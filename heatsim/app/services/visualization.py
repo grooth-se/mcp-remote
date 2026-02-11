@@ -1337,3 +1337,195 @@ def create_comparison_overlay_plot(
     plt.close(fig)
 
     return buf.getvalue()
+
+
+# CCT diagram colors
+CCT_COLORS = {
+    'ferrite': '#2ca02c',      # Green
+    'pearlite': '#1f77b4',     # Blue
+    'bainite': '#ff7f0e',      # Orange
+    'martensite': '#d62728',   # Red
+    'austenite': '#9467bd',    # Purple
+}
+
+
+def create_cct_overlay_plot(
+    times: np.ndarray,
+    temperatures: np.ndarray,
+    transformation_temps: dict,
+    curves: Optional[dict] = None,
+    source_image: Optional[bytes] = None,
+    title: str = "Cooling Curve on CCT Diagram",
+    positions: Optional[List[str]] = None
+) -> bytes:
+    """Generate CCT diagram with cooling curve overlay.
+
+    Parameters
+    ----------
+    times : np.ndarray
+        Time array in seconds
+    temperatures : np.ndarray
+        Temperature field [time, position] or [time] for single curve
+    transformation_temps : dict
+        Dict with Ms, Mf, Bs, Bf, Ac1, Ac3 temperatures
+    curves : dict, optional
+        Digitized CCT curves with structure:
+        {
+            "ferrite": {"start": [[t,T], ...], "finish": [[t,T], ...]},
+            "pearlite": {...},
+            "bainite": {...}
+        }
+    source_image : bytes, optional
+        Original CCT diagram image to use as background
+    title : str
+        Plot title
+    positions : list, optional
+        Position labels for multi-position data
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    # If source image provided, use as background
+    if source_image:
+        try:
+            from PIL import Image
+            import io as io_module
+            img = Image.open(io_module.BytesIO(source_image))
+            # Note: User would need to calibrate the image axes
+            # For now, we'll skip background image and just plot curves
+        except Exception:
+            pass  # Continue without background image
+
+    # Plot digitized CCT curves if available
+    if curves:
+        for phase, phase_curves in curves.items():
+            color = CCT_COLORS.get(phase, '#333333')
+
+            if isinstance(phase_curves, dict):
+                # Start curve
+                if 'start' in phase_curves and phase_curves['start']:
+                    start_data = np.array(phase_curves['start'])
+                    if len(start_data) > 1:
+                        ax.plot(start_data[:, 0], start_data[:, 1],
+                                color=color, linewidth=2, linestyle='-',
+                                label=f'{phase.title()} start')
+
+                # Finish curve
+                if 'finish' in phase_curves and phase_curves['finish']:
+                    finish_data = np.array(phase_curves['finish'])
+                    if len(finish_data) > 1:
+                        ax.plot(finish_data[:, 0], finish_data[:, 1],
+                                color=color, linewidth=2, linestyle='--',
+                                label=f'{phase.title()} finish')
+
+    # Plot transformation temperature lines
+    temp_lines = [
+        ('Ac3', transformation_temps.get('Ac3'), '#9467bd', 'Ac3'),
+        ('Ac1', transformation_temps.get('Ac1'), '#8c564b', 'Ac1'),
+        ('Bs', transformation_temps.get('Bs'), '#ff7f0e', 'Bs'),
+        ('Ms', transformation_temps.get('Ms'), '#d62728', 'Ms'),
+        ('Mf', transformation_temps.get('Mf'), '#e377c2', 'Mf'),
+    ]
+
+    x_min = 0.1  # Start at 0.1 seconds for log scale
+    x_max = max(times) if len(times) > 0 else 10000
+
+    for name, temp, color, label in temp_lines:
+        if temp is not None:
+            ax.axhline(y=temp, color=color, linestyle=':', linewidth=1.5,
+                      alpha=0.7, label=f'{label} = {temp:.0f}°C')
+
+    # Plot cooling curves (thick lines)
+    if temperatures.ndim == 1:
+        # Single curve
+        valid_mask = times > 0
+        ax.plot(times[valid_mask], temperatures[valid_mask],
+                'k-', linewidth=3, label='Cooling curve (center)', zorder=10)
+    else:
+        # Multiple positions
+        n_pos = temperatures.shape[1]
+        pos_colors = ['#000000', '#555555', '#888888', '#bbbbbb']
+        pos_labels = positions if positions else ['Center', '1/3 R', '2/3 R', 'Surface']
+
+        for i in range(min(n_pos, 4)):
+            valid_mask = times > 0
+            idx = [0, n_pos//3, 2*n_pos//3, n_pos-1][i] if n_pos > 1 else 0
+            ax.plot(times[valid_mask], temperatures[valid_mask, idx],
+                    color=pos_colors[i], linewidth=2.5,
+                    label=f'Cooling curve ({pos_labels[i]})', zorder=10)
+
+    # Formatting
+    ax.set_xscale('log')
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Temperature (°C)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+
+    # Set axis limits
+    if len(times) > 0:
+        ax.set_xlim(x_min, x_max * 1.5)
+
+    y_min = 0
+    y_max = max(
+        transformation_temps.get('Ac3', 900) or 900,
+        np.max(temperatures) if temperatures.size > 0 else 900
+    )
+    ax.set_ylim(y_min, y_max * 1.1)
+
+    # Legend outside plot
+    ax.legend(loc='upper right', fontsize=9, framealpha=0.9)
+    ax.grid(True, alpha=0.3, which='both')
+
+    # Add phase region labels if curves exist
+    if curves:
+        # Add text labels in approximate phase regions
+        pass  # Could add later for better visualization
+
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
+
+
+def create_ttt_overlay_plot(
+    times: np.ndarray,
+    temperatures: np.ndarray,
+    transformation_temps: dict,
+    curves: Optional[dict] = None,
+    title: str = "Isothermal Hold on TTT Diagram"
+) -> bytes:
+    """Generate TTT diagram with isothermal hold overlay.
+
+    Similar to CCT but for isothermal transformations.
+
+    Parameters
+    ----------
+    times : np.ndarray
+        Time array in seconds (from start of isothermal hold)
+    temperatures : np.ndarray
+        Temperature array (should be relatively constant for TTT)
+    transformation_temps : dict
+        Dict with Ms, Mf, Bs, Bf, Ac1, Ac3 temperatures
+    curves : dict, optional
+        Digitized TTT curves
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    # TTT diagram is similar to CCT but typically shows isothermal holds
+    # For now, use same implementation
+    return create_cct_overlay_plot(
+        times, temperatures, transformation_temps, curves,
+        title=title
+    )

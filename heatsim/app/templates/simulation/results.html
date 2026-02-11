@@ -554,7 +554,89 @@
 </div>
 
 <!-- ============================================================ -->
-<!-- SECTION 5: Hardness Prediction -->
+<!-- SECTION 5: CCT Diagram Overlay -->
+<!-- ============================================================ -->
+{% if sim.status == 'completed' and sim.steel_grade.phase_diagrams.first() %}
+<h5 class="mt-4"><i class="bi bi-diagram-2"></i> CCT Diagram Overlay</h5>
+<div class="row mb-3">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-graph-up"></i> Cooling Curve on CCT Diagram</span>
+                <div class="btn-group btn-group-sm">
+                    <a href="{{ url_for('simulation.cct_overlay', id=sim.id) }}"
+                       class="btn btn-outline-primary" target="_blank" title="Full cycle">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('simulation.cct_overlay_quenching', id=sim.id) }}"
+                     class="img-fluid" alt="CCT Overlay">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Transformation Temperatures
+            </div>
+            <div class="card-body">
+                {% set diagram = sim.steel_grade.phase_diagrams.first() %}
+                {% set temps = diagram.temps_dict %}
+                <table class="table table-sm">
+                    <tbody>
+                        {% if temps.Ac3 %}
+                        <tr><td>Ac3</td><td class="fw-bold">{{ temps.Ac3|round(0) }}°C</td></tr>
+                        {% endif %}
+                        {% if temps.Ac1 %}
+                        <tr><td>Ac1</td><td class="fw-bold">{{ temps.Ac1|round(0) }}°C</td></tr>
+                        {% endif %}
+                        {% if temps.Bs %}
+                        <tr><td>Bs (Bainite start)</td><td class="fw-bold">{{ temps.Bs|round(0) }}°C</td></tr>
+                        {% endif %}
+                        {% if temps.Ms %}
+                        <tr><td>Ms (Martensite start)</td><td class="fw-bold">{{ temps.Ms|round(0) }}°C</td></tr>
+                        {% endif %}
+                        {% if temps.Mf %}
+                        <tr><td>Mf (Martensite finish)</td><td class="fw-bold">{{ temps.Mf|round(0) }}°C</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                <small class="text-muted">
+                    The cooling curve is superimposed on the CCT diagram to show which phase transformation
+                    regions the material passes through during quenching.
+                </small>
+            </div>
+        </div>
+        {% if diagram.has_image %}
+        <div class="card mt-2">
+            <div class="card-header">
+                <i class="bi bi-image"></i> Original CCT Diagram
+            </div>
+            <div class="card-body text-center">
+                <a href="{{ url_for('materials.phase_diagram_image', id=sim.steel_grade.id) }}" target="_blank">
+                    <img src="{{ url_for('materials.phase_diagram_image', id=sim.steel_grade.id) }}"
+                         class="img-fluid" style="max-height: 200px;" alt="Original CCT">
+                </a>
+                <br><small class="text-muted">Click to enlarge</small>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% elif sim.status == 'completed' %}
+<h5 class="mt-4"><i class="bi bi-diagram-2"></i> CCT Diagram Overlay</h5>
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    No phase diagram available for {{ sim.steel_grade.designation }}.
+    <a href="{{ url_for('materials.phase_diagram', id=sim.steel_grade.id) }}">Add phase diagram</a>
+    to enable CCT overlay visualization.
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- SECTION 6: Hardness Prediction -->
 <!-- ============================================================ -->
 {% if hardness_results %}
 <h5 class="mt-4"><i class="bi bi-gem"></i> Hardness Prediction</h5>

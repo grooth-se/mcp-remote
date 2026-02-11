@@ -853,6 +853,112 @@ def result_image(id, result_id):
     return response
 
 
+@simulation_bp.route('/<int:id>/cct-overlay')
+@login_required
+def cct_overlay(id):
+    """Generate CCT diagram with cooling curve overlay."""
+    import numpy as np
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    if sim.status != STATUS_COMPLETED:
+        return Response('Simulation not completed', status=400)
+
+    # Get simulation result data
+    cycle_result = sim.results.filter_by(result_type='full_cycle').first()
+    if not cycle_result:
+        return Response('No simulation results', status=404)
+
+    times = np.array(cycle_result.time_array)
+    temps = np.array(cycle_result.value_array)
+
+    # Get phase diagram for this steel grade
+    grade = sim.steel_grade
+    diagram = grade.phase_diagrams.first()
+
+    if not diagram:
+        return Response('No phase diagram available for this steel grade', status=404)
+
+    # Get transformation temperatures and curves
+    trans_temps = diagram.temps_dict
+    curves = diagram.curves_dict
+
+    # Get source image if available
+    source_image = diagram.source_image
+
+    # Generate CCT overlay plot
+    plot_data = visualization.create_cct_overlay_plot(
+        times=times,
+        temperatures=temps,
+        transformation_temps=trans_temps,
+        curves=curves if curves else None,
+        source_image=source_image,
+        title=f'CCT Diagram - {sim.name} ({grade.designation})'
+    )
+
+    response = Response(plot_data, mimetype='image/png')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+
+@simulation_bp.route('/<int:id>/cct-overlay/quenching')
+@login_required
+def cct_overlay_quenching(id):
+    """Generate CCT diagram with quenching phase cooling curve only."""
+    import numpy as np
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    if sim.status != STATUS_COMPLETED:
+        return Response('Simulation not completed', status=400)
+
+    # Get quenching phase result
+    quench_result = sim.results.filter_by(
+        result_type='cooling_curve',
+        phase='quenching'
+    ).first()
+
+    if not quench_result:
+        # Fall back to full cycle
+        quench_result = sim.results.filter_by(result_type='full_cycle').first()
+
+    if not quench_result:
+        return Response('No simulation results', status=404)
+
+    times = np.array(quench_result.time_array)
+    temps = np.array(quench_result.value_array)
+
+    # Adjust times to start from quench start (t=0 at quench)
+    if quench_result.phase == 'quenching':
+        times = times - times[0] if len(times) > 0 else times
+
+    # Get phase diagram
+    grade = sim.steel_grade
+    diagram = grade.phase_diagrams.first()
+
+    if not diagram:
+        return Response('No phase diagram available', status=404)
+
+    trans_temps = diagram.temps_dict
+    curves = diagram.curves_dict
+
+    plot_data = visualization.create_cct_overlay_plot(
+        times=times,
+        temperatures=temps,
+        transformation_temps=trans_temps,
+        curves=curves if curves else None,
+        title=f'CCT Diagram (Quenching) - {sim.name}'
+    )
+
+    response = Response(plot_data, mimetype='image/png')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+
 @simulation_bp.route('/<int:id>/report')
 @login_required
 def download_report(id):
