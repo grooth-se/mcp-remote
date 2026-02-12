@@ -105,10 +105,12 @@
         </div>
     </div>
     <div class="col-12 col-md-6">
-        <div class="card h-100">
+        <div class="card">
             <div class="card-body p-2">
                 <div class="text-muted small mb-1 ps-2">Simulations / Week (last 8 weeks)</div>
-                <canvas id="weeklyTrendChart" height="55"></canvas>
+                <div style="position: relative; height: 80px;">
+                    <canvas id="weeklyTrendChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -159,7 +161,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <small class="text-muted">{{ sim.updated_at.strftime('%m/%d %H:%M') }}</small>
+                                    <small class="text-muted">{{ sim.created_at.strftime('%m/%d %H:%M') }}</small>
                                 </td>
                                 <td class="text-end">
                                     {% if sim.status in ['ready', 'completed', 'failed'] %}

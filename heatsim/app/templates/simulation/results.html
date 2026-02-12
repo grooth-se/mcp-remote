@@ -104,8 +104,10 @@
                 R={{ (geom.radius * 1000)|round(1) }}mm
                 {% elif sim.geometry_type == 'plate' %}
                 t={{ (geom.thickness * 1000)|round(1) }}mm
-                {% else %}
-                Ri={{ (geom.inner_radius * 1000)|round(1) }}, Ro={{ (geom.outer_radius * 1000)|round(1) }}mm
+                {% elif sim.geometry_type == 'hollow_cylinder' %}
+                OD={{ (geom.outer_diameter * 1000)|round(1) }}mm, ID={{ (geom.inner_diameter * 1000)|round(1) }}mm
+                {% elif sim.geometry_type == 'ring' %}
+                Ri={{ (geom.inner_radius * 1000)|round(1) }}mm, Ro={{ (geom.outer_radius * 1000)|round(1) }}mm
                 {% endif %}
             </small>
         </div>

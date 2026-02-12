@@ -38,7 +38,7 @@ def dashboard():
 
     # Recent simulations (last 10)
     recent_simulations = user_sims.order_by(
-        Simulation.updated_at.desc()
+        Simulation.created_at.desc()
     ).limit(10).all()
 
     # Simulations this week
