@@ -8,129 +8,295 @@
         <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
         <p class="text-muted">Welcome, {{ current_user.username }}. Subseatec Materials Simulation Platform.</p>
     </div>
+    <div class="col-auto">
+        <a href="{{ url_for('simulation.new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> New Simulation
+        </a>
+    </div>
 </div>
 
-<!-- Feature Cards -->
-<div class="row g-4 mb-5">
-    <!-- Material Database -->
-    <div class="col-md-4 col-lg-3">
-        <a href="{{ url_for('materials.index') }}" class="text-decoration-none">
-            <div class="card h-100 feature-card">
-                <div class="card-body text-center">
-                    <i class="bi bi-database display-4 text-primary mb-2"></i>
-                    <h5 class="card-title">Material Database</h5>
-                    <p class="card-text text-muted small">Steel grades and thermal properties</p>
-                    <span class="badge bg-success">Active</span>
+<!-- Statistics Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-white-50 small">Total Simulations</div>
+                        <div class="fs-2 fw-bold">{{ stats.total_simulations }}</div>
+                    </div>
+                    <i class="bi bi-thermometer-half fs-1 opacity-50"></i>
                 </div>
-            </div>
-        </a>
-    </div>
-
-    <!-- Heat Treatment Simulation -->
-    <div class="col-md-4 col-lg-3">
-        <a href="{{ url_for('simulation.index') }}" class="text-decoration-none">
-            <div class="card h-100 feature-card">
-                <div class="card-body text-center">
-                    <i class="bi bi-thermometer-half display-4 text-danger mb-2"></i>
-                    <h5 class="card-title">Heat Treatment</h5>
-                    <p class="card-text text-muted small">Quenching, tempering simulation</p>
-                    <span class="badge bg-success">Active</span>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <!-- Welding Simulation (Phase 4 - Active) -->
-    <div class="col-md-4 col-lg-3">
-        <a href="{{ url_for('welding.index') }}" class="text-decoration-none">
-            <div class="card h-100 feature-card">
-                <div class="card-body text-center">
-                    <i class="bi bi-lightning display-4 text-warning mb-2"></i>
-                    <h5 class="card-title">Welding Simulation</h5>
-                    <p class="card-text text-muted small">Multi-pass weld with COMSOL</p>
-                    <span class="badge bg-success">Active</span>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <!-- COMSOL Integration (Phase 4 - Active) -->
-    <div class="col-md-4 col-lg-3">
-        <a href="{{ url_for('welding.index') }}" class="text-decoration-none">
-            <div class="card h-100 feature-card">
-                <div class="card-body text-center">
-                    <i class="bi bi-cpu display-4 text-info mb-2"></i>
-                    <h5 class="card-title">COMSOL Integration</h5>
-                    <p class="card-text text-muted small">3D accurate simulations</p>
-                    <span class="badge bg-success">Active</span>
-                </div>
-            </div>
-        </a>
-    </div>
-
-    <!-- Visualization -->
-    <div class="col-md-4 col-lg-3">
-        <div class="card h-100 feature-card">
-            <div class="card-body text-center">
-                <i class="bi bi-graph-up display-4 text-success mb-2"></i>
-                <h5 class="card-title">Visualization</h5>
-                <p class="card-text text-muted small">3D rendering and animations</p>
-                <span class="badge bg-secondary">Phase 7</span>
             </div>
         </div>
     </div>
-
-    <!-- Optimization -->
-    <div class="col-md-4 col-lg-3">
-        <div class="card h-100 feature-card">
-            <div class="card-body text-center">
-                <i class="bi bi-gear display-4 mb-2" style="color: #6f42c1;"></i>
-                <h5 class="card-title">Optimization</h5>
-                <p class="card-text text-muted small">Parameter sweeps and tuning</p>
-                <span class="badge bg-secondary">Phase 6</span>
+    <div class="col-6 col-md-3">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-white-50 small">Completed</div>
+                        <div class="fs-2 fw-bold">{{ stats.completed }}</div>
+                    </div>
+                    <i class="bi bi-check-circle fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card bg-info text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-white-50 small">This Week</div>
+                        <div class="fs-2 fw-bold">{{ stats.this_week }}</div>
+                    </div>
+                    <i class="bi bi-calendar-week fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card bg-secondary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-white-50 small">Steel Grades</div>
+                        <div class="fs-2 fw-bold">{{ stats.total_materials }}</div>
+                    </div>
+                    <i class="bi bi-database fs-1 opacity-50"></i>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- System Status -->
 <div class="row g-4">
-    <div class="col-md-4">
-        <div class="card bg-success bg-opacity-10 border-success">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-success">System Status</h6>
-                        <h4>Online</h4>
-                    </div>
-                    <i class="bi bi-check-circle display-4 text-success opacity-50"></i>
+    <!-- Recent Simulations -->
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clock-history"></i> Recent Simulations</span>
+                <a href="{{ url_for('simulation.index') }}" class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_simulations %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Steel Grade</th>
+                                <th>Status</th>
+                                <th>t₈/₅</th>
+                                <th>Updated</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sim in recent_simulations %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('simulation.view', id=sim.id) }}" class="text-decoration-none fw-bold">
+                                        {{ sim.name|truncate(30) }}
+                                    </a>
+                                </td>
+                                <td>{{ sim.steel_grade.designation }}</td>
+                                <td>
+                                    <span class="badge {{ sim.status_badge_class }}">{{ sim.status }}</span>
+                                </td>
+                                <td>
+                                    {% set t85 = sim.results.filter_by(result_type='full_cycle').first() %}
+                                    {% if t85 and t85.t_800_500 %}
+                                    <small>{{ t85.t_800_500|round(1) }}s</small>
+                                    {% else %}
+                                    <small class="text-muted">-</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ sim.updated_at.strftime('%m/%d %H:%M') }}</small>
+                                </td>
+                                <td class="text-end">
+                                    {% if sim.status in ['ready', 'completed', 'failed'] %}
+                                    <form method="post" action="{{ url_for('simulation.run', id=sim.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Run">
+                                            <i class="bi bi-play-fill"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <p class="mt-2">No simulations yet</p>
+                    <a href="{{ url_for('simulation.new') }}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg"></i> Create First Simulation
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card bg-info bg-opacity-10 border-info">
+
+    <!-- Right Column -->
+    <div class="col-lg-4">
+        <!-- Quick Actions -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-lightning"></i> Quick Actions
+            </div>
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-info">Your Role</h6>
-                        <h4>{{ current_user.role_label }}</h4>
-                    </div>
-                    <i class="bi bi-person-badge display-4 text-info opacity-50"></i>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('simulation.new') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i> New Simulation
+                    </a>
+                    <a href="{{ url_for('materials.index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-database"></i> Browse Materials
+                    </a>
+                    <a href="{{ url_for('simulation.index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-list-ul"></i> All Simulations
+                    </a>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card bg-warning bg-opacity-10 border-warning">
+
+        <!-- Simulation Status Breakdown -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-pie-chart"></i> Status Breakdown
+            </div>
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="text-warning">Current Phase</h6>
-                        <h4>Material Database</h4>
+                {% if stats.total_simulations > 0 %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small">
+                        <span>Completed</span>
+                        <span>{{ stats.completed }}</span>
                     </div>
-                    <i class="bi bi-database display-4 text-warning opacity-50"></i>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-success" style="width: {{ (stats.completed / stats.total_simulations * 100)|round }}%"></div>
+                    </div>
                 </div>
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small">
+                        <span>Ready to Run</span>
+                        <span>{{ stats.ready }}</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-primary" style="width: {{ (stats.ready / stats.total_simulations * 100)|round }}%"></div>
+                    </div>
+                </div>
+                {% if stats.running > 0 %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small">
+                        <span>Running</span>
+                        <span>{{ stats.running }}</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" style="width: {{ (stats.running / stats.total_simulations * 100)|round }}%"></div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if stats.failed > 0 %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between small">
+                        <span>Failed</span>
+                        <span>{{ stats.failed }}</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-danger" style="width: {{ (stats.failed / stats.total_simulations * 100)|round }}%"></div>
+                    </div>
+                </div>
+                {% endif %}
+                {% else %}
+                <p class="text-muted small mb-0">No simulation data yet</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Top Steel Grades -->
+        {% if top_grades %}
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-star"></i> Most Used Grades
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for grade, count in top_grades %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ grade }}
+                    <span class="badge bg-primary rounded-pill">{{ count }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Feature Cards (collapsed by default, expandable) -->
+<div class="mt-4">
+    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#featureCards">
+        <i class="bi bi-grid"></i> Show Platform Features
+    </button>
+    <div class="collapse mt-3" id="featureCards">
+        <div class="row g-4">
+            <!-- Material Database -->
+            <div class="col-md-4 col-lg-3">
+                <a href="{{ url_for('materials.index') }}" class="text-decoration-none">
+                    <div class="card h-100 feature-card">
+                        <div class="card-body text-center">
+                            <i class="bi bi-database display-4 text-primary mb-2"></i>
+                            <h5 class="card-title">Material Database</h5>
+                            <p class="card-text text-muted small">Steel grades and thermal properties</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Heat Treatment Simulation -->
+            <div class="col-md-4 col-lg-3">
+                <a href="{{ url_for('simulation.index') }}" class="text-decoration-none">
+                    <div class="card h-100 feature-card">
+                        <div class="card-body text-center">
+                            <i class="bi bi-thermometer-half display-4 text-danger mb-2"></i>
+                            <h5 class="card-title">Heat Treatment</h5>
+                            <p class="card-text text-muted small">Quenching, tempering simulation</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Welding Simulation -->
+            <div class="col-md-4 col-lg-3">
+                <a href="{{ url_for('welding.index') }}" class="text-decoration-none">
+                    <div class="card h-100 feature-card">
+                        <div class="card-body text-center">
+                            <i class="bi bi-lightning display-4 text-warning mb-2"></i>
+                            <h5 class="card-title">Welding Simulation</h5>
+                            <p class="card-text text-muted small">Multi-pass weld with COMSOL</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Jominy Test -->
+            <div class="col-md-4 col-lg-3">
+                <a href="{{ url_for('materials.index') }}" class="text-decoration-none">
+                    <div class="card h-100 feature-card">
+                        <div class="card-body text-center">
+                            <i class="bi bi-bar-chart-steps display-4 text-info mb-2"></i>
+                            <h5 class="card-title">Jominy Test</h5>
+                            <p class="card-text text-muted small">End-quench hardenability</p>
+                        </div>
+                    </div>
+                </a>
             </div>
         </div>
     </div>
