@@ -83,8 +83,8 @@
                         {% for run in recent_runs %}
                         <tr>
                             <td>{{ run.period_label|capitalize }}</td>
-                            <td class="text-end">{{ "{:,.0f}".format(run.total_gross|float) }} kr</td>
-                            <td class="text-end">{{ "{:,.0f}".format(run.total_net|float) }} kr</td>
+                            <td class="text-end">{{ run.total_gross|float|sek(0) }} kr</td>
+                            <td class="text-end">{{ run.total_net|float|sek(0) }} kr</td>
                             <td>
                                 {% if run.status == 'draft' %}
                                 <span class="badge bg-warning text-dark">Utkast</span>

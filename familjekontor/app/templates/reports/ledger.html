@@ -35,16 +35,16 @@
                     <td>{{ entry.date }}</td>
                     <td>{{ entry.verification_number }}</td>
                     <td>{{ entry.description }}</td>
-                    <td class="text-end">{{ "%.2f"|format(entry.debit) if entry.debit else '' }}</td>
-                    <td class="text-end">{{ "%.2f"|format(entry.credit) if entry.credit else '' }}</td>
+                    <td class="text-end">{{ entry.debit|sek if entry.debit else '' }}</td>
+                    <td class="text-end">{{ entry.credit|sek if entry.credit else '' }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
             <tfoot>
                 <tr class="table-light">
                     <td colspan="3"><strong>Saldo</strong></td>
-                    <td class="text-end"><strong>{{ "%.2f"|format(data.total_debit) }}</strong></td>
-                    <td class="text-end"><strong>{{ "%.2f"|format(data.total_credit) }}</strong></td>
+                    <td class="text-end"><strong>{{ data.total_debit|sek }}</strong></td>
+                    <td class="text-end"><strong>{{ data.total_credit|sek }}</strong></td>
                 </tr>
             </tfoot>
         </table>

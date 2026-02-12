@@ -37,21 +37,21 @@
                     {{ form.hidden_tag() }}
                     <div class="row mb-3">
                         <div class="col-md-8">
-                            {{ form.supplier_id.label(class="form-label") }}
+                            {{ form.supplier_id.label(class="form-label required") }}
                             {{ form.supplier_id(class="form-select", id="supplier_id") }}
                         </div>
                         <div class="col-md-4">
-                            {{ form.invoice_number.label(class="form-label") }}
+                            {{ form.invoice_number.label(class="form-label required") }}
                             {{ form.invoice_number(class="form-control", id="invoice_number") }}
                         </div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-3">
-                            {{ form.invoice_date.label(class="form-label") }}
+                            {{ form.invoice_date.label(class="form-label required") }}
                             {{ form.invoice_date(class="form-control", type="date", id="invoice_date") }}
                         </div>
                         <div class="col-md-3">
-                            {{ form.due_date.label(class="form-label") }}
+                            {{ form.due_date.label(class="form-label required") }}
                             {{ form.due_date(class="form-control", type="date", id="due_date") }}
                         </div>
                         <div class="col-md-3">
@@ -59,7 +59,7 @@
                             {{ form.currency(class="form-select", id="currency") }}
                         </div>
                         <div class="col-md-3" id="exchangeRateGroup" style="display:none;">
-                            {{ form.exchange_rate.label(class="form-label") }}
+                            {{ form.exchange_rate.label(class="form-label") }} <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Kurs: 1 utländsk enhet = X SEK"></i>
                             <div class="input-group">
                                 {{ form.exchange_rate(class="form-control", id="exchange_rate", step="0.000001") }}
                                 <button type="button" class="btn btn-outline-secondary btn-sm" id="fetchRateBtn" title="Hämta kurs från Riksbanken" aria-label="Hämta växelkurs">
@@ -71,11 +71,11 @@
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            {{ form.amount_excl_vat.label(class="form-label") }}
+                            {{ form.amount_excl_vat.label(class="form-label required") }}
                             {{ form.amount_excl_vat(class="form-control", id="amount_excl_vat") }}
                         </div>
                         <div class="col-md-4">
-                            {{ form.vat_amount.label(class="form-label") }}
+                            {{ form.vat_amount.label(class="form-label required") }}
                             {{ form.vat_amount(class="form-control", id="vat_amount") }}
                         </div>
                         <div class="col-md-4">

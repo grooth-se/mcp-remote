@@ -32,16 +32,16 @@
                         <div class="col-md-6">
                             <h5 class="mb-3">Personuppgifter</h5>
                             <div class="mb-3">
-                                {{ form.personal_number.label(class="form-label") }}
+                                {{ form.personal_number.label(class="form-label required") }}
                                 {{ render_field_inline(form.personal_number, class="form-control", placeholder="YYYYMMDD-XXXX") }}
                             </div>
                             <div class="row mb-3">
                                 <div class="col-md-6">
-                                    {{ form.first_name.label(class="form-label") }}
+                                    {{ form.first_name.label(class="form-label required") }}
                                     {{ render_field_inline(form.first_name, class="form-control") }}
                                 </div>
                                 <div class="col-md-6">
-                                    {{ form.last_name.label(class="form-label") }}
+                                    {{ form.last_name.label(class="form-label required") }}
                                     {{ render_field_inline(form.last_name, class="form-control") }}
                                 </div>
                             </div>
@@ -73,20 +73,20 @@
                                 </div>
                             </div>
                             <div class="mb-3">
-                                {{ form.monthly_salary.label(class="form-label") }}
+                                {{ form.monthly_salary.label(class="form-label required") }}
                                 {{ render_field_inline(form.monthly_salary, class="form-control") }}
                             </div>
                             <div class="row mb-3">
                                 <div class="col-md-4">
-                                    {{ form.tax_table.label(class="form-label") }}
+                                    {{ form.tax_table.label(class="form-label") }} <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Skattetabell enligt Skatteverket (SKV 434)"></i>
                                     {{ render_field_inline(form.tax_table, class="form-control") }}
                                 </div>
                                 <div class="col-md-4">
-                                    {{ form.tax_column.label(class="form-label") }}
+                                    {{ form.tax_column.label(class="form-label") }} <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Kolumn 1-6 enligt skattetabellen"></i>
                                     {{ render_field_inline(form.tax_column, class="form-control") }}
                                 </div>
                                 <div class="col-md-4">
-                                    {{ form.pension_plan.label(class="form-label") }}
+                                    {{ form.pension_plan.label(class="form-label") }} <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="ITP1 = premiebaserad (4,5%/30%). ITP2 = förmånsbaserad. Standard = ingen tjänstepension"></i>
                                     {{ render_field_inline(form.pension_plan, class="form-select") }}
                                 </div>
                             </div>

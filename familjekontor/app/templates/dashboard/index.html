@@ -57,7 +57,7 @@
         <div class="card text-bg-success">
             <div class="card-body">
                 <h6 class="card-title">Intäkter YTD</h6>
-                <h3>{{ "{:,.0f}".format(kpi_data.revenue) }} kr</h3>
+                <h3>{{ kpi_data.revenue|sek(0) }} kr</h3>
             </div>
         </div>
     </div>
@@ -73,7 +73,7 @@
         <div class="card text-bg-danger">
             <div class="card-body">
                 <h6 class="card-title">Burn rate/mån</h6>
-                <h3>{{ "{:,.0f}".format(kpi_data.burn_rate) }} kr</h3>
+                <h3>{{ kpi_data.burn_rate|sek(0) }} kr</h3>
             </div>
         </div>
     </div>
@@ -190,23 +190,23 @@
             <div class="card-body">
                 <div class="row text-center">
                     <div class="col">
-                        <div class="fs-5 fw-bold text-success">{{ "{:,.0f}".format(aging_data.current) }}</div>
+                        <div class="fs-5 fw-bold text-success">{{ aging_data.current|sek(0) }}</div>
                         <small class="text-muted">Ej förfallt</small>
                     </div>
                     <div class="col">
-                        <div class="fs-5 fw-bold text-warning">{{ "{:,.0f}".format(aging_data['1_30']) }}</div>
+                        <div class="fs-5 fw-bold text-warning">{{ aging_data['1_30']|sek(0) }}</div>
                         <small class="text-muted">1-30 dagar</small>
                     </div>
                     <div class="col">
-                        <div class="fs-5 fw-bold text-orange">{{ "{:,.0f}".format(aging_data['31_60']) }}</div>
+                        <div class="fs-5 fw-bold text-orange">{{ aging_data['31_60']|sek(0) }}</div>
                         <small class="text-muted">31-60 dagar</small>
                     </div>
                     <div class="col">
-                        <div class="fs-5 fw-bold text-danger">{{ "{:,.0f}".format(aging_data['61_90']) }}</div>
+                        <div class="fs-5 fw-bold text-danger">{{ aging_data['61_90']|sek(0) }}</div>
                         <small class="text-muted">61-90 dagar</small>
                     </div>
                     <div class="col">
-                        <div class="fs-5 fw-bold text-danger">{{ "{:,.0f}".format(aging_data['90_plus']) }}</div>
+                        <div class="fs-5 fw-bold text-danger">{{ aging_data['90_plus']|sek(0) }}</div>
                         <small class="text-muted">90+ dagar</small>
                     </div>
                 </div>
@@ -227,7 +227,7 @@
                             {{ salary_overview.status }}
                         </span>
                     </dd>
-                    <dt class="col-6">Bruttolöner</dt><dd class="col-6">{{ "{:,.0f}".format(salary_overview.total_gross) }} kr</dd>
+                    <dt class="col-6">Bruttolöner</dt><dd class="col-6">{{ salary_overview.total_gross|sek(0) }} kr</dd>
                     <dt class="col-6">Anställda</dt><dd class="col-6">{{ salary_overview.employee_count }}</dd>
                 </dl>
             </div>

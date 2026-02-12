@@ -32,7 +32,7 @@
         <div class="card text-bg-info">
             <div class="card-body">
                 <h6 class="card-title">Banksaldo</h6>
-                <h2>{{ "{:,.0f}".format(summary.bank_balance) }} kr</h2>
+                <h2>{{ summary.bank_balance|sek(0) }} kr</h2>
             </div>
         </div>
     </div>

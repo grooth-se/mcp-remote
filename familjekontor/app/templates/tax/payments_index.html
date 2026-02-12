@@ -41,7 +41,7 @@
                 <tr>
                     <td>{{ p.payment_date }}</td>
                     <td><span class="badge bg-secondary">{{ p.payment_type }}</span></td>
-                    <td class="text-end">{{ "%.2f"|format(p.amount) }} kr</td>
+                    <td class="text-end">{{ p.amount|sek }} kr</td>
                     <td>{{ p.reference or '-' }}</td>
                     <td>{{ p.deadline.description if p.deadline else '-' }}</td>
                     <td>{{ p.notes or '-' }}</td>

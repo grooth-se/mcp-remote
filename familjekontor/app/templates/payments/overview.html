@@ -44,7 +44,7 @@
         <div class="card border-success">
             <div class="card-body text-center">
                 <h6 class="card-subtitle mb-1 text-muted">Inbetalningar</h6>
-                <h4 class="text-success mb-0">{{ "%.2f"|format(summary.total_in) }} kr</h4>
+                <h4 class="text-success mb-0">{{ summary.total_in|sek }} kr</h4>
             </div>
         </div>
     </div>
@@ -52,7 +52,7 @@
         <div class="card border-danger">
             <div class="card-body text-center">
                 <h6 class="card-subtitle mb-1 text-muted">Utbetalningar</h6>
-                <h4 class="text-danger mb-0">{{ "%.2f"|format(summary.total_out) }} kr</h4>
+                <h4 class="text-danger mb-0">{{ summary.total_out|sek }} kr</h4>
             </div>
         </div>
     </div>
@@ -60,7 +60,7 @@
         <div class="card {% if summary.net >= 0 %}border-success{% else %}border-danger{% endif %}">
             <div class="card-body text-center">
                 <h6 class="card-subtitle mb-1 text-muted">Netto</h6>
-                <h4 class="{% if summary.net >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">{{ "%.2f"|format(summary.net) }} kr</h4>
+                <h4 class="{% if summary.net >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">{{ summary.net|sek }} kr</h4>
             </div>
         </div>
     </div>
@@ -94,7 +94,7 @@
                     </td>
                     <td>{{ p.description }}</td>
                     <td class="text-end {% if p.direction == 'in' %}text-success{% else %}text-danger{% endif %}">
-                        {% if p.direction == 'out' %}-{% endif %}{{ "%.2f"|format(p.amount) }} kr
+                        {% if p.direction == 'out' %}-{% endif %}{{ p.amount|sek }} kr
                     </td>
                     <td>
                         {% if p.verification_id %}

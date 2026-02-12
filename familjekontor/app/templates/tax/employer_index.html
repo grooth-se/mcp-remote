@@ -31,16 +31,16 @@
                 {% for m in months %}
                 <tr>
                     <td>{{ m.month_name }}</td>
-                    <td class="text-end">{{ "%.2f"|format(m.total_salaries) }} kr</td>
-                    <td class="text-end">{{ "%.2f"|format(m.total_employer_tax) }} kr</td>
+                    <td class="text-end">{{ m.total_salaries|sek }} kr</td>
+                    <td class="text-end">{{ m.total_employer_tax|sek }} kr</td>
                 </tr>
                 {% set total_sal.v = total_sal.v + m.total_salaries|float %}
                 {% set total_tax.v = total_tax.v + m.total_employer_tax|float %}
                 {% endfor %}
                 <tr class="table-info fw-bold">
                     <td>Totalt</td>
-                    <td class="text-end">{{ "%.2f"|format(total_sal.v) }} kr</td>
-                    <td class="text-end">{{ "%.2f"|format(total_tax.v) }} kr</td>
+                    <td class="text-end">{{ total_sal.v|sek }} kr</td>
+                    <td class="text-end">{{ total_tax.v|sek }} kr</td>
                 </tr>
             </tbody>
         </table>

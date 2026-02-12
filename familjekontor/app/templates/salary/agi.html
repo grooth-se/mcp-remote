@@ -33,20 +33,20 @@
                 <tr>
                     <td>{{ e.personal_number }}</td>
                     <td>{{ e.full_name }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(e.gross_salary|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(e.tax_deduction|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(e.employer_contributions|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(e.pension_amount|float) }}</td>
+                    <td class="text-end">{{ e.gross_salary|float|sek(0) }}</td>
+                    <td class="text-end">{{ e.tax_deduction|float|sek(0) }}</td>
+                    <td class="text-end">{{ e.employer_contributions|float|sek(0) }}</td>
+                    <td class="text-end">{{ e.pension_amount|float|sek(0) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
             <tfoot>
                 <tr class="fw-bold">
                     <td colspan="2">Totalt</td>
-                    <td class="text-end">{{ "{:,.0f}".format(agi.total_gross|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(agi.total_tax|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(agi.total_employer|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(run.total_pension|float) }}</td>
+                    <td class="text-end">{{ agi.total_gross|float|sek(0) }}</td>
+                    <td class="text-end">{{ agi.total_tax|float|sek(0) }}</td>
+                    <td class="text-end">{{ agi.total_employer|float|sek(0) }}</td>
+                    <td class="text-end">{{ run.total_pension|float|sek(0) }}</td>
                 </tr>
             </tfoot>
         </table>
@@ -59,19 +59,19 @@
         <table class="table table-sm" style="max-width: 500px;">
             <tr>
                 <td>Summa kontant bruttolön (fält 050)</td>
-                <td class="text-end fw-bold">{{ "{:,.0f}".format(agi.total_gross|float) }} kr</td>
+                <td class="text-end fw-bold">{{ agi.total_gross|float|sek(0) }} kr</td>
             </tr>
             <tr>
                 <td>Summa avdragen skatt (fält 060)</td>
-                <td class="text-end fw-bold">{{ "{:,.0f}".format(agi.total_tax|float) }} kr</td>
+                <td class="text-end fw-bold">{{ agi.total_tax|float|sek(0) }} kr</td>
             </tr>
             <tr>
                 <td>Arbetsgivaravgifter (fält 487)</td>
-                <td class="text-end fw-bold">{{ "{:,.0f}".format(agi.total_employer|float) }} kr</td>
+                <td class="text-end fw-bold">{{ agi.total_employer|float|sek(0) }} kr</td>
             </tr>
             <tr class="table-warning">
                 <td>Summa att betala</td>
-                <td class="text-end fw-bold">{{ "{:,.0f}".format(agi.total_tax|float + agi.total_employer|float) }} kr</td>
+                <td class="text-end fw-bold">{{ (agi.total_tax|float + agi.total_employer|float)|sek(0) }} kr</td>
             </tr>
         </table>
     </div>

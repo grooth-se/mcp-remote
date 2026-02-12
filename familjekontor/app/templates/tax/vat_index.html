@@ -34,11 +34,11 @@
                 <tr>
                     <td>{{ r.period_start }} - {{ r.period_end }}</td>
                     <td>{{ r.period_type }}</td>
-                    <td class="text-end">{{ "%.2f"|format(r.output_vat_25) }}</td>
-                    <td class="text-end">{{ "%.2f"|format(r.output_vat_12) }}</td>
-                    <td class="text-end">{{ "%.2f"|format(r.output_vat_6) }}</td>
-                    <td class="text-end">{{ "%.2f"|format(r.input_vat) }}</td>
-                    <td class="text-end fw-bold">{{ "%.2f"|format(r.vat_to_pay) }}</td>
+                    <td class="text-end">{{ r.output_vat_25|sek }}</td>
+                    <td class="text-end">{{ r.output_vat_12|sek }}</td>
+                    <td class="text-end">{{ r.output_vat_6|sek }}</td>
+                    <td class="text-end">{{ r.input_vat|sek }}</td>
+                    <td class="text-end fw-bold">{{ r.vat_to_pay|sek }}</td>
                     <td>
                         {% if r.status == 'filed' %}
                         <span class="badge bg-success">Inlämnad</span>

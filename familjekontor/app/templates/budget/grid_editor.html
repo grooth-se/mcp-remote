@@ -41,7 +41,7 @@
                                step="0.01" style="width:85px">
                     </td>
                     {% endfor %}
-                    <td class="text-end fw-bold row-total">{{ "{:,.0f}".format(data.total) }}</td>
+                    <td class="text-end fw-bold row-total">{{ data.total|sek(0) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

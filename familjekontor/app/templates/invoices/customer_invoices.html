@@ -45,7 +45,7 @@
                 <td>{{ inv.invoice_number }}</td>
                 <td>{{ inv.invoice_date }}</td>
                 <td>{{ inv.due_date }}</td>
-                <td class="text-end">{{ "%.2f"|format(inv.total_amount) }}</td>
+                <td class="text-end">{{ inv.total_amount|sek }}</td>
                 <td>{{ inv.currency }}</td>
                 <td>
                     {% if inv.status == 'draft' %}<span class="badge bg-secondary">Utkast</span>

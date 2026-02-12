@@ -9,7 +9,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <h6 class="text-muted">Snitt intäkter/mån</h6>
-                <h3>{{ "{:,.0f}".format(forecast.avg_revenue) }} kr</h3>
+                <h3>{{ forecast.avg_revenue|sek(0) }} kr</h3>
             </div>
         </div>
     </div>
@@ -17,7 +17,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <h6 class="text-muted">Snitt kostnader/mån</h6>
-                <h3>{{ "{:,.0f}".format(forecast.avg_expenses) }} kr</h3>
+                <h3>{{ forecast.avg_expenses|sek(0) }} kr</h3>
             </div>
         </div>
     </div>
@@ -25,7 +25,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <h6 class="text-muted">Snitt resultat/mån</h6>
-                <h3>{{ "{:,.0f}".format(forecast.avg_revenue - forecast.avg_expenses) }} kr</h3>
+                <h3>{{ (forecast.avg_revenue - forecast.avg_expenses)|sek(0) }} kr</h3>
             </div>
         </div>
     </div>
@@ -54,12 +54,12 @@
                     <td>{{ forecast.labels[i] }}</td>
                     <td class="text-end">
                         {% if forecast.actual[i] is not none %}
-                        {{ "{:,.0f}".format(forecast.actual[i]) }} kr
+                        {{ forecast.actual[i]|sek(0) }} kr
                         {% else %}-{% endif %}
                     </td>
                     <td class="text-end">
                         {% if forecast.forecast[i] is not none %}
-                        <em>{{ "{:,.0f}".format(forecast.forecast[i]) }} kr</em>
+                        <em>{{ forecast.forecast[i]|sek(0) }} kr</em>
                         {% else %}-{% endif %}
                     </td>
                 </tr>

@@ -175,3 +175,9 @@ tr[data-row-link]:hover td {
     font-weight: 600;
     border-bottom: 2px solid #fff;
 }
+
+/* Required field asterisk */
+.form-label.required::after {
+    content: " *";
+    color: #dc3545;
+}

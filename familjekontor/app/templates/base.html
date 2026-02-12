@@ -180,6 +180,7 @@
             bootstrap.Alert.getOrCreateInstance(el).close();
         });
     }, 5000);
+    [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]')).forEach(function(el) { new bootstrap.Tooltip(el); });
     </script>
     {% block scripts %}{% endblock %}
 </body>

@@ -36,7 +36,7 @@
                                 {% else %}{{ type_key }}{% endif %}
                             </td>
                             <td class="text-end">{{ data.count }}</td>
-                            <td class="text-end">{{ "%.2f"|format(data.total) }} kr</td>
+                            <td class="text-end">{{ data.total|sek }} kr</td>
                         </tr>
                         {% else %}
                         <tr><td colspan="3" class="text-muted">Inga betalningar för {{ year }}.</td></tr>
@@ -45,7 +45,7 @@
                         <tr class="table-info fw-bold">
                             <td>Totalt</td>
                             <td></td>
-                            <td class="text-end">{{ "%.2f"|format(summary['_grand_total']) }} kr</td>
+                            <td class="text-end">{{ summary['_grand_total']|sek }} kr</td>
                         </tr>
                         {% endif %}
                     </tbody>

@@ -50,8 +50,8 @@
                 <td>{{ ver.verification_date }}</td>
                 <td>{{ ver.description }}</td>
                 <td>{{ ver.verification_type }}</td>
-                <td class="text-end">{{ "%.2f"|format(ver.total_debit) }}</td>
-                <td class="text-end">{{ "%.2f"|format(ver.total_credit) }}</td>
+                <td class="text-end">{{ ver.total_debit|sek }}</td>
+                <td class="text-end">{{ ver.total_credit|sek }}</td>
                 <td>
                     {% if ver.documents %}
                     <span class="text-primary" style="cursor:pointer;"

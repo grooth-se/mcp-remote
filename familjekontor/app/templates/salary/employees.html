@@ -54,7 +54,7 @@
                     <td>{{ emp.full_name }}</td>
                     <td>{{ emp.masked_personal_number }}</td>
                     <td>{{ emp.email or '-' }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(emp.monthly_salary|float) }} kr</td>
+                    <td class="text-end">{{ emp.monthly_salary|float|sek(0) }} kr</td>
                     <td>{{ emp.pension_plan }}</td>
                     <td>
                         {% if emp.active %}

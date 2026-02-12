@@ -14,16 +14,16 @@
     <form method="POST" data-warn-unsaved>
         {{ form.hidden_tag() }}
         <div class="row mb-3">
-            <div class="col-md-6">{{ form.customer_id.label(class="form-label") }}{{ form.customer_id(class="form-select") }}</div>
-            <div class="col-md-3">{{ form.invoice_number.label(class="form-label") }}{{ form.invoice_number(class="form-control") }}</div>
-            <div class="col-md-3">{{ form.vat_type.label(class="form-label") }}{{ form.vat_type(class="form-select") }}</div>
+            <div class="col-md-6">{{ form.customer_id.label(class="form-label required") }}{{ form.customer_id(class="form-select") }}</div>
+            <div class="col-md-3">{{ form.invoice_number.label(class="form-label required") }}{{ form.invoice_number(class="form-control") }}</div>
+            <div class="col-md-3">{{ form.vat_type.label(class="form-label") }} <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Omvänd skattskyldighet = köparen redovisar moms. Export = momsfri utlandsförsäljning"></i>{{ form.vat_type(class="form-select") }}</div>
         </div>
         <div class="row mb-3">
-            <div class="col-md-3">{{ form.invoice_date.label(class="form-label") }}{{ form.invoice_date(class="form-control", type="date", id="ci_invoice_date") }}</div>
-            <div class="col-md-3">{{ form.due_date.label(class="form-label") }}{{ form.due_date(class="form-control", type="date") }}</div>
+            <div class="col-md-3">{{ form.invoice_date.label(class="form-label required") }}{{ form.invoice_date(class="form-control", type="date", id="ci_invoice_date") }}</div>
+            <div class="col-md-3">{{ form.due_date.label(class="form-label required") }}{{ form.due_date(class="form-control", type="date") }}</div>
             <div class="col-md-3">{{ form.currency.label(class="form-label") }}{{ form.currency(class="form-select", id="ci_currency") }}</div>
             <div class="col-md-3" id="ci_exchangeRateGroup" style="display:none;">
-                {{ form.exchange_rate.label(class="form-label") }}
+                {{ form.exchange_rate.label(class="form-label") }} <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Kurs: 1 utländsk enhet = X SEK"></i>
                 <div class="input-group">
                     {{ form.exchange_rate(class="form-control", id="ci_exchange_rate", step="0.000001") }}
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="ci_fetchRateBtn" title="Hämta kurs" aria-label="Hämta växelkurs">
@@ -34,7 +34,7 @@
             </div>
         </div>
         <div class="row mb-3">
-            <div class="col-md-4">{{ form.amount_excl_vat.label(class="form-label") }}{{ form.amount_excl_vat(class="form-control") }}</div>
+            <div class="col-md-4">{{ form.amount_excl_vat.label(class="form-label required") }}{{ form.amount_excl_vat(class="form-control") }}</div>
             <div class="col-md-4">{{ form.vat_amount.label(class="form-label") }}{{ form.vat_amount(class="form-control") }}</div>
             <div class="col-md-4">{{ form.total_amount.label(class="form-label") }}{{ form.total_amount(class="form-control", id="ci_total_amount") }}</div>
         </div>

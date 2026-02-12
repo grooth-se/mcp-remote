@@ -34,7 +34,7 @@
                 <tr>
                     <td style="width:10%">{{ account.account_number }}</td>
                     <td>{{ account.name }}</td>
-                    <td class="text-end" style="width:20%">{{ "%.2f"|format(balance) }}</td>
+                    <td class="text-end" style="width:20%">{{ balance|sek }}</td>
                 </tr>
                 {% endif %}
                 {% endfor %}
@@ -42,7 +42,7 @@
             <tfoot>
                 <tr class="table-light">
                     <td colspan="2"><strong>Summa {{ section_name }}</strong></td>
-                    <td class="text-end"><strong>{{ "%.2f"|format(section.total) }}</strong></td>
+                    <td class="text-end"><strong>{{ section.total|sek }}</strong></td>
                 </tr>
             </tfoot>
         </table>
@@ -54,11 +54,11 @@
             <tbody>
                 <tr class="table-primary">
                     <td><strong>Rörelseresultat</strong></td>
-                    <td class="text-end"><strong>{{ "%.2f"|format(report.operating_result) }}</strong></td>
+                    <td class="text-end"><strong>{{ report.operating_result|sek }}</strong></td>
                 </tr>
                 <tr class="table-info">
                     <td><strong>Resultat före skatt</strong></td>
-                    <td class="text-end"><strong>{{ "%.2f"|format(report.result_before_tax) }}</strong></td>
+                    <td class="text-end"><strong>{{ report.result_before_tax|sek }}</strong></td>
                 </tr>
             </tbody>
         </table>

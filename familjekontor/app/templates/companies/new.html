@@ -10,17 +10,17 @@
                     {{ form.hidden_tag() }}
                     <div class="row mb-3">
                         <div class="col-md-8">
-                            {{ form.name.label(class="form-label") }}
+                            {{ form.name.label(class="form-label required") }}
                             {{ form.name(class="form-control") }}
                         </div>
                         <div class="col-md-4">
-                            {{ form.org_number.label(class="form-label") }}
+                            {{ form.org_number.label(class="form-label required") }}
                             {{ form.org_number(class="form-control", placeholder="NNNNNN-NNNN") }}
                         </div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            {{ form.company_type.label(class="form-label") }}
+                            {{ form.company_type.label(class="form-label required") }}
                             {{ form.company_type(class="form-select") }}
                         </div>
                         <div class="col-md-4">

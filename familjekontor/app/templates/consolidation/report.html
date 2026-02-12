@@ -49,27 +49,27 @@
                 {% for section_name, section in report.sections.items() %}
                 <tr>
                     <td>{{ section_name }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(section.total) }} kr</td>
+                    <td class="text-end">{{ section.total|sek(0) }} kr</td>
                 </tr>
                 {% endfor %}
             </tbody>
             <tfoot>
                 <tr class="table-light">
                     <td><strong>Rörelseresultat</strong></td>
-                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.operating_result) }} kr</strong></td>
+                    <td class="text-end"><strong>{{ report.operating_result|sek(0) }} kr</strong></td>
                 </tr>
                 <tr class="table-light">
                     <td><strong>Resultat före skatt</strong></td>
-                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.result_before_tax) }} kr</strong></td>
+                    <td class="text-end"><strong>{{ report.result_before_tax|sek(0) }} kr</strong></td>
                 </tr>
                 {% if report.elimination_total %}
                 <tr>
                     <td>Koncernelimineringar</td>
-                    <td class="text-end text-danger">-{{ "{:,.0f}".format(report.elimination_total) }} kr</td>
+                    <td class="text-end text-danger">-{{ report.elimination_total|sek(0) }} kr</td>
                 </tr>
                 <tr class="table-warning">
                     <td><strong>Justerat resultat</strong></td>
-                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.adjusted_result) }} kr</strong></td>
+                    <td class="text-end"><strong>{{ report.adjusted_result|sek(0) }} kr</strong></td>
                 </tr>
                 {% endif %}
             </tfoot>
@@ -86,18 +86,18 @@
                 {% for section_name, section in report.sections.items() %}
                 <tr>
                     <td>{{ section_name }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(section.total) }} kr</td>
+                    <td class="text-end">{{ section.total|sek(0) }} kr</td>
                 </tr>
                 {% endfor %}
             </tbody>
             <tfoot>
                 <tr class="table-light">
                     <td><strong>Summa tillgångar</strong></td>
-                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.total_assets) }} kr</strong></td>
+                    <td class="text-end"><strong>{{ report.total_assets|sek(0) }} kr</strong></td>
                 </tr>
                 <tr class="table-light">
                     <td><strong>Summa EK + skulder</strong></td>
-                    <td class="text-end"><strong>{{ "{:,.0f}".format(report.total_equity_liabilities) }} kr</strong></td>
+                    <td class="text-end"><strong>{{ report.total_equity_liabilities|sek(0) }} kr</strong></td>
                 </tr>
             </tfoot>
         </table>

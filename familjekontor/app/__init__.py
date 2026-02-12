@@ -66,9 +66,19 @@ def create_app(config_name=None):
     app.register_blueprint(currency_bp, url_prefix='/currency')
     app.register_blueprint(recurring_bp, url_prefix='/invoices/recurring')
 
-    # Jinja2 globals
+    # Jinja2 globals and filters
     from datetime import datetime
     app.jinja_env.globals['now'] = datetime.now
+
+    def format_sek(value, decimals=2):
+        """Format number Swedish style: 1 234 567,89"""
+        if value is None:
+            return '-'
+        formatted = f"{value:,.{decimals}f}"
+        formatted = formatted.replace(',', '\xa0').replace('.', ',')
+        return formatted
+
+    app.jinja_env.filters['sek'] = format_sek
 
     # Error handlers
     @app.errorhandler(404)

@@ -31,27 +31,27 @@
                     <tbody>
                         <tr>
                             <td>Utgående moms 25% (konto 2610)</td>
-                            <td class="text-end">{{ "%.2f"|format(report.output_vat_25) }} kr</td>
+                            <td class="text-end">{{ report.output_vat_25|sek }} kr</td>
                         </tr>
                         <tr>
                             <td>Utgående moms 12% (konto 2620)</td>
-                            <td class="text-end">{{ "%.2f"|format(report.output_vat_12) }} kr</td>
+                            <td class="text-end">{{ report.output_vat_12|sek }} kr</td>
                         </tr>
                         <tr>
                             <td>Utgående moms 6% (konto 2630)</td>
-                            <td class="text-end">{{ "%.2f"|format(report.output_vat_6) }} kr</td>
+                            <td class="text-end">{{ report.output_vat_6|sek }} kr</td>
                         </tr>
                         <tr class="table-info">
                             <td><strong>Summa utgående moms</strong></td>
-                            <td class="text-end"><strong>{{ "%.2f"|format(report.output_vat_25 + report.output_vat_12 + report.output_vat_6) }} kr</strong></td>
+                            <td class="text-end"><strong>{{ (report.output_vat_25 + report.output_vat_12 + report.output_vat_6)|sek }} kr</strong></td>
                         </tr>
                         <tr>
                             <td>Ingående moms (konto 2640/2641/2645)</td>
-                            <td class="text-end">{{ "%.2f"|format(report.input_vat) }} kr</td>
+                            <td class="text-end">{{ report.input_vat|sek }} kr</td>
                         </tr>
                         <tr class="table-warning fw-bold">
                             <td>Moms att betala</td>
-                            <td class="text-end">{{ "%.2f"|format(report.vat_to_pay) }} kr</td>
+                            <td class="text-end">{{ report.vat_to_pay|sek }} kr</td>
                         </tr>
                     </tbody>
                 </table>

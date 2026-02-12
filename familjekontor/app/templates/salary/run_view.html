@@ -23,7 +23,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <small class="text-muted">Brutto</small>
-                <h5>{{ "{:,.0f}".format(run.total_gross|float) }} kr</h5>
+                <h5>{{ run.total_gross|float|sek(0) }} kr</h5>
             </div>
         </div>
     </div>
@@ -31,7 +31,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <small class="text-muted">Skatt</small>
-                <h5>{{ "{:,.0f}".format(run.total_tax|float) }} kr</h5>
+                <h5>{{ run.total_tax|float|sek(0) }} kr</h5>
             </div>
         </div>
     </div>
@@ -39,7 +39,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <small class="text-muted">Netto</small>
-                <h5 class="text-success">{{ "{:,.0f}".format(run.total_net|float) }} kr</h5>
+                <h5 class="text-success">{{ run.total_net|float|sek(0) }} kr</h5>
             </div>
         </div>
     </div>
@@ -47,7 +47,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <small class="text-muted">Arb.avg.</small>
-                <h5>{{ "{:,.0f}".format(run.total_employer_contributions|float) }} kr</h5>
+                <h5>{{ run.total_employer_contributions|float|sek(0) }} kr</h5>
             </div>
         </div>
     </div>
@@ -55,7 +55,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <small class="text-muted">Pension</small>
-                <h5>{{ "{:,.0f}".format(run.total_pension|float) }} kr</h5>
+                <h5>{{ run.total_pension|float|sek(0) }} kr</h5>
             </div>
         </div>
     </div>
@@ -63,7 +63,7 @@
         <div class="card">
             <div class="card-body text-center">
                 <small class="text-muted">Total kostnad</small>
-                <h5 class="text-danger">{{ "{:,.0f}".format((run.total_gross|float + run.total_employer_contributions|float + run.total_pension|float)) }} kr</h5>
+                <h5 class="text-danger">{{ (run.total_gross|float + run.total_employer_contributions|float + run.total_pension|float)|sek(0) }} kr</h5>
             </div>
         </div>
     </div>
@@ -101,12 +101,12 @@
                 {% for entry in run.entries %}
                 <tr>
                     <td>{{ entry.employee.full_name }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(entry.gross_salary|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(entry.tax_deduction|float) }}</td>
-                    <td class="text-end text-success">{{ "{:,.0f}".format(entry.net_salary|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(entry.employer_contributions|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(entry.pension_amount|float) }}</td>
-                    <td class="text-end">{{ "{:,.0f}".format(entry.vacation_pay_provision|float) }}</td>
+                    <td class="text-end">{{ entry.gross_salary|float|sek(0) }}</td>
+                    <td class="text-end">{{ entry.tax_deduction|float|sek(0) }}</td>
+                    <td class="text-end text-success">{{ entry.net_salary|float|sek(0) }}</td>
+                    <td class="text-end">{{ entry.employer_contributions|float|sek(0) }}</td>
+                    <td class="text-end">{{ entry.pension_amount|float|sek(0) }}</td>
+                    <td class="text-end">{{ entry.vacation_pay_provision|float|sek(0) }}</td>
                     <td>{{ entry.notes or '' }}</td>
                     <td>
                         {% if run.status == 'draft' %}
