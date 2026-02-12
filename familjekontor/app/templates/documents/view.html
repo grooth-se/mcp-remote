@@ -79,10 +79,9 @@
         </div>
 
         {# Delete #}
-        <form method="post" action="{{ url_for('documents.delete', doc_id=doc.id) }}"
-              onsubmit="return confirm('Ta bort detta dokument?')">
+        <form method="post" action="{{ url_for('documents.delete', doc_id=doc.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Ta bort</button>
+            <button class="btn btn-sm btn-outline-danger" data-confirm="Ta bort detta dokument?"><i class="bi bi-trash"></i> Ta bort</button>
         </form>
     </div>
     <div class="col-md-8">

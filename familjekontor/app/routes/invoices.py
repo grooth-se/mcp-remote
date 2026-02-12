@@ -26,8 +26,15 @@ def suppliers():
         flash('Välj ett företag först.', 'warning')
         return redirect(url_for('companies.index'))
 
-    suppliers = Supplier.query.filter_by(company_id=company_id, active=True).order_by(Supplier.name).all()
-    return render_template('invoices/suppliers.html', suppliers=suppliers)
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '')
+    query = Supplier.query.filter_by(company_id=company_id, active=True)
+    if search:
+        query = query.filter(
+            db.or_(Supplier.name.ilike(f'%{search}%'), Supplier.org_number.ilike(f'%{search}%'))
+        )
+    pagination = query.order_by(Supplier.name).paginate(page=page, per_page=25, error_out=False)
+    return render_template('invoices/suppliers.html', pagination=pagination, search=search)
 
 
 @invoices_bp.route('/suppliers/new', methods=['GET', 'POST'])
@@ -100,12 +107,18 @@ def supplier_invoices():
     status = request.args.get('status', '')
     if status and status not in ('pending', 'approved', 'paid', 'cancelled'):
         status = ''
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '')
     query = SupplierInvoice.query.filter_by(company_id=company_id)
     if status:
         query = query.filter_by(status=status)
-    invoices = query.order_by(SupplierInvoice.due_date.desc()).all()
+    if search:
+        query = query.join(Supplier).filter(
+            db.or_(SupplierInvoice.invoice_number.ilike(f'%{search}%'), Supplier.name.ilike(f'%{search}%'))
+        )
+    pagination = query.order_by(SupplierInvoice.due_date.desc()).paginate(page=page, per_page=25, error_out=False)
 
-    return render_template('invoices/supplier_invoices.html', invoices=invoices, status=status)
+    return render_template('invoices/supplier_invoices.html', pagination=pagination, status=status, search=search)
 
 
 @invoices_bp.route('/supplier-invoices/new', methods=['GET', 'POST'])
@@ -423,8 +436,15 @@ def customers():
     if not company_id:
         return redirect(url_for('companies.index'))
 
-    customers = Customer.query.filter_by(company_id=company_id, active=True).order_by(Customer.name).all()
-    return render_template('invoices/customers.html', customers=customers)
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '')
+    query = Customer.query.filter_by(company_id=company_id, active=True)
+    if search:
+        query = query.filter(
+            db.or_(Customer.name.ilike(f'%{search}%'), Customer.org_number.ilike(f'%{search}%'))
+        )
+    pagination = query.order_by(Customer.name).paginate(page=page, per_page=25, error_out=False)
+    return render_template('invoices/customers.html', pagination=pagination, search=search)
 
 
 @invoices_bp.route('/customers/new', methods=['GET', 'POST'])
@@ -469,12 +489,18 @@ def customer_invoices():
     status = request.args.get('status', '')
     if status and status not in ('draft', 'sent', 'paid', 'overdue', 'cancelled'):
         status = ''
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '')
     query = CustomerInvoice.query.filter_by(company_id=company_id)
     if status:
         query = query.filter_by(status=status)
-    invoices = query.order_by(CustomerInvoice.invoice_date.desc()).all()
+    if search:
+        query = query.join(Customer).filter(
+            db.or_(CustomerInvoice.invoice_number.ilike(f'%{search}%'), Customer.name.ilike(f'%{search}%'))
+        )
+    pagination = query.order_by(CustomerInvoice.invoice_date.desc()).paginate(page=page, per_page=25, error_out=False)
 
-    return render_template('invoices/customer_invoices.html', invoices=invoices, status=status)
+    return render_template('invoices/customer_invoices.html', pagination=pagination, status=status, search=search)
 
 
 @invoices_bp.route('/customer-invoices/new', methods=['GET', 'POST'])

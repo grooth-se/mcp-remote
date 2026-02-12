@@ -161,6 +161,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/confirm_dialog.js') }}"></script>
+    <script>
+    setTimeout(function() {
+        document.querySelectorAll('.alert-success').forEach(function(el) {
+            bootstrap.Alert.getOrCreateInstance(el).close();
+        });
+    }, 5000);
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

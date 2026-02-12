@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
 {% block title %}Leverantörsfakturor - Familjekontor{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -13,13 +14,21 @@
         <a href="{{ url_for('invoices.new_supplier_invoice') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Ny</a>
     </div>
 </div>
+<form class="mb-3" method="GET">
+    {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+    <div class="input-group input-group-sm" style="max-width:400px;">
+        <input type="text" name="search" class="form-control" placeholder="Sök fakturanr eller leverantör..." value="{{ search }}">
+        <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+        {% if search %}<a href="{{ url_for('invoices.supplier_invoices', status=status) }}" class="btn btn-outline-secondary">Rensa</a>{% endif %}
+    </div>
+</form>
 <div class="table-responsive">
     <table class="table table-hover">
         <thead>
             <tr><th>Leverantör</th><th>Fakturanr</th><th>Datum</th><th>Förfaller</th><th class="text-end">Belopp</th><th>Valuta</th><th>Status</th><th></th></tr>
         </thead>
         <tbody>
-            {% for inv in invoices %}
+            {% for inv in pagination.items %}
             <tr>
                 <td>{{ inv.supplier.name }}</td>
                 <td>{{ inv.invoice_number }}</td>
@@ -42,15 +51,16 @@
                     {% elif inv.status == 'approved' %}
                     <form method="POST" action="{{ url_for('invoices.pay_supplier_invoice', invoice_id=inv.id) }}" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-success">Betala</button>
+                        <button class="btn btn-sm btn-outline-success" data-confirm="Markera fakturan som betald?">Betala</button>
                     </form>
                     {% endif %}
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="8" class="text-muted">Inga fakturor.</td></tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">Inga fakturor. <a href="{{ url_for('invoices.new_supplier_invoice') }}">Skapa ny leverantörsfaktura</a></td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+{{ render_pagination(pagination, 'invoices.supplier_invoices', status=status, search=search) }}
 {% endblock %}

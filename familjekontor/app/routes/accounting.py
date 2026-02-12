@@ -29,20 +29,33 @@ def index():
         if fy:
             fiscal_year_id = fy.id
 
-    verifications = []
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '')
     fiscal_years = FiscalYear.query.filter_by(company_id=company_id).order_by(FiscalYear.year.desc()).all()
 
+    pagination = None
     if fiscal_year_id:
-        verifications = Verification.query.options(
+        query = Verification.query.options(
             joinedload(Verification.documents)
         ).filter_by(
             company_id=company_id, fiscal_year_id=fiscal_year_id
-        ).order_by(Verification.verification_number.desc()).all()
+        )
+        if search:
+            query = query.filter(
+                db.or_(
+                    Verification.description.ilike(f'%{search}%'),
+                    Verification.verification_number.cast(db.String).ilike(f'%{search}%'),
+                )
+            )
+        pagination = query.order_by(
+            Verification.verification_number.desc()
+        ).paginate(page=page, per_page=25, error_out=False)
 
     return render_template('accounting/index.html',
-                           verifications=verifications,
+                           pagination=pagination,
                            fiscal_years=fiscal_years,
-                           current_fy_id=fiscal_year_id)
+                           current_fy_id=fiscal_year_id,
+                           search=search)
 
 
 @accounting_bp.route('/verification/new', methods=['GET', 'POST'])

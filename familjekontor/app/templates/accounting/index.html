@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
 {% block title %}Verifikationer - Familjekontor{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -16,13 +17,22 @@
         <a href="{{ url_for('accounting.new_verification') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Ny</a>
     </div>
 </div>
+<form class="mb-3" method="GET">
+    {% if current_fy_id %}<input type="hidden" name="fiscal_year_id" value="{{ current_fy_id }}">{% endif %}
+    <div class="input-group input-group-sm" style="max-width:400px;">
+        <input type="text" name="search" class="form-control" placeholder="Sök beskrivning eller nummer..." value="{{ search }}">
+        <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+        {% if search %}<a href="{{ url_for('accounting.index', fiscal_year_id=current_fy_id) }}" class="btn btn-outline-secondary">Rensa</a>{% endif %}
+    </div>
+</form>
 <div class="table-responsive">
     <table class="table table-hover">
         <thead>
             <tr><th>#</th><th>Datum</th><th>Beskrivning</th><th>Typ</th><th class="text-end">Debet</th><th class="text-end">Kredit</th><th><i class="bi bi-paperclip"></i></th><th></th></tr>
         </thead>
         <tbody>
-            {% for ver in verifications %}
+            {% if pagination %}
+            {% for ver in pagination.items %}
             <tr>
                 <td>{{ ver.verification_number }}</td>
                 <td>{{ ver.verification_date }}</td>
@@ -42,11 +52,17 @@
                 <td><a href="{{ url_for('accounting.view_verification', verification_id=ver.id) }}" class="btn btn-sm btn-outline-primary">Visa</a></td>
             </tr>
             {% else %}
-            <tr><td colspan="8" class="text-muted">Inga verifikationer.</td></tr>
+            <tr><td colspan="8" class="text-center text-muted py-4">Inga verifikationer. <a href="{{ url_for('accounting.new_verification') }}">Skapa ny verifikation</a></td></tr>
             {% endfor %}
+            {% else %}
+            <tr><td colspan="8" class="text-center text-muted py-4">Välj ett räkenskapsår.</td></tr>
+            {% endif %}
         </tbody>
     </table>
 </div>
+{% if pagination %}
+{{ render_pagination(pagination, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

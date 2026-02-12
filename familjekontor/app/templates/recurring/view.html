@@ -81,7 +81,7 @@
                 <form method="post" action="{{ url_for('recurring.delete_recurring', template_id=template.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-danger btn-sm"
-                            onclick="return confirm('Vill du verkligen ta bort denna mall?')">
+                            data-confirm="Vill du verkligen ta bort denna mall?">
                         <i class="bi bi-trash"></i> Ta bort
                     </button>
                 </form>

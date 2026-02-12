@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
 {% block title %}Anställda - Familjekontor{% endblock %}
 {% block content %}
 <div class="row mb-3">
@@ -13,13 +14,22 @@
     </div>
 </div>
 
-<div class="mb-3">
+<div class="d-flex gap-2 mb-3">
     {% if show_inactive %}
     <a href="{{ url_for('salary.employees') }}" class="btn btn-sm btn-outline-secondary">Dölj inaktiva</a>
     {% else %}
     <a href="{{ url_for('salary.employees', show_inactive='1') }}" class="btn btn-sm btn-outline-secondary">Visa inaktiva</a>
     {% endif %}
 </div>
+
+<form class="mb-3" method="GET">
+    {% if show_inactive %}<input type="hidden" name="show_inactive" value="1">{% endif %}
+    <div class="input-group input-group-sm" style="max-width:400px;">
+        <input type="text" name="search" class="form-control" placeholder="Sök namn..." value="{{ search }}">
+        <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+        {% if search %}<a href="{{ url_for('salary.employees', show_inactive='1' if show_inactive else '') }}" class="btn btn-outline-secondary">Rensa</a>{% endif %}
+    </div>
+</form>
 
 <div class="card">
     <div class="table-responsive">
@@ -36,7 +46,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for emp in employees %}
+                {% for emp in pagination.items %}
                 <tr{% if not emp.active %} class="text-muted"{% endif %}>
                     <td>{{ emp.full_name }}</td>
                     <td>{{ emp.masked_personal_number }}</td>
@@ -55,7 +65,8 @@
                             <a href="{{ url_for('salary.employee_edit', employee_id=emp.id) }}" class="btn btn-outline-secondary">Redigera</a>
                             <form method="POST" action="{{ url_for('salary.employee_deactivate', employee_id=emp.id) }}" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-outline-{{ 'success' if not emp.active else 'warning' }}">
+                                <button type="submit" class="btn btn-outline-{{ 'success' if not emp.active else 'warning' }}"
+                                        data-confirm="{{ 'Aktivera' if not emp.active else 'Avaktivera' }} denna anställd?">
                                     {{ 'Aktivera' if not emp.active else 'Avaktivera' }}
                                 </button>
                             </form>
@@ -63,10 +74,11 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7" class="text-muted">Inga anställda registrerade.</td></tr>
+                <tr><td colspan="7" class="text-center text-muted py-4">Inga anställda registrerade. <a href="{{ url_for('salary.employee_new') }}">Lägg till anställd</a></td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+{{ render_pagination(pagination, 'salary.employees', show_inactive='1' if show_inactive else '', search=search) }}
 {% endblock %}
