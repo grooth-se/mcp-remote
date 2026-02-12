@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Heat Treatment Templates{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2><i class="bi bi-bookmark-star"></i> Heat Treatment Templates</h2>
+        <p class="text-muted mb-0">Reusable configurations for common heat treatment processes</p>
+    </div>
+    <a href="{{ url_for('ht_templates.new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> New Template
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <label class="col-form-label">Category:</label>
+            </div>
+            <div class="col-auto">
+                <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">All Categories</option>
+                    {% for cat_id, cat_label in categories.items() %}
+                    <option value="{{ cat_id }}" {% if cat_id == selected_category %}selected{% endif %}>
+                        {{ cat_label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input type="checkbox" name="mine" value="1" class="form-check-input"
+                           id="showMine" {% if show_mine %}checked{% endif %} onchange="this.form.submit()">
+                    <label class="form-check-label" for="showMine">My templates only</label>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Templates Grid -->
+{% if templates %}
+<div class="row g-3">
+    {% for template in templates %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 {% if template.user_id == current_user.id %}border-primary{% endif %}">
+            <div class="card-header d-flex justify-content-between align-items-start">
+                <div>
+                    <h6 class="mb-0">
+                        <a href="{{ url_for('ht_templates.view', id=template.id) }}" class="text-decoration-none">
+                            {{ template.name }}
+                        </a>
+                    </h6>
+                    <small class="text-muted">{{ template.category_label }}</small>
+                </div>
+                <div>
+                    {% if template.is_public %}
+                    <span class="badge bg-success" title="Public template"><i class="bi bi-globe"></i></span>
+                    {% endif %}
+                    {% if template.user_id == current_user.id %}
+                    <span class="badge bg-primary" title="Your template"><i class="bi bi-person"></i></span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="card-text small">
+                    <strong>Process:</strong> {{ template.get_summary() }}
+                </p>
+                {% if template.description %}
+                <p class="card-text small text-muted">{{ template.description|truncate(100) }}</p>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-transparent d-flex justify-content-between align-items-center">
+                <small class="text-muted">
+                    <i class="bi bi-bar-chart"></i> Used {{ template.use_count or 0 }} times
+                </small>
+                <div class="btn-group btn-group-sm">
+                    <a href="{{ url_for('ht_templates.view', id=template.id) }}" class="btn btn-outline-primary" title="View">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                    {% if template.user_id == current_user.id %}
+                    <a href="{{ url_for('ht_templates.edit', id=template.id) }}" class="btn btn-outline-secondary" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    {% else %}
+                    <form method="post" action="{{ url_for('ht_templates.duplicate', id=template.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-secondary" title="Duplicate">
+                            <i class="bi bi-copy"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-bookmark-x fs-1"></i>
+    <p class="mt-2">No templates found</p>
+    <a href="{{ url_for('ht_templates.new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Create First Template
+    </a>
+</div>
+{% endif %}
+{% endblock %}

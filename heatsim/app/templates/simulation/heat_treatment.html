@@ -422,8 +422,70 @@
         <button type="submit" class="btn btn-success">
             <i class="bi bi-check-lg"></i> Save & Ready to Run
         </button>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-bookmark-star"></i> Templates
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#saveTemplateModal">
+                    <i class="bi bi-bookmark-plus"></i> Save as Template
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{{ url_for('ht_templates.index') }}">
+                    <i class="bi bi-list"></i> Browse Templates
+                </a></li>
+            </ul>
+        </div>
     </div>
 </form>
+
+<!-- Save as Template Modal -->
+<div class="modal fade" id="saveTemplateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('simulation.save_as_template', id=sim.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-bookmark-plus"></i> Save as Template</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Template Name</label>
+                        <input type="text" name="template_name" class="form-control" required
+                               placeholder="e.g., Standard Q&T for {{ sim.steel_grade.designation }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="template_description" class="form-control" rows="2"
+                                  placeholder="Optional description..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select name="template_category" class="form-select">
+                            <option value="quench_temper">Quench & Temper</option>
+                            <option value="normalizing">Normalizing</option>
+                            <option value="stress_relief">Stress Relief</option>
+                            <option value="annealing">Annealing</option>
+                            <option value="hardening">Hardening</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="is_public" class="form-check-input" id="templatePublic">
+                        <label class="form-check-label" for="templatePublic">Share publicly</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-bookmark-check"></i> Save Template
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <script>
 // Update calculated HTC when media/agitation/temp changes

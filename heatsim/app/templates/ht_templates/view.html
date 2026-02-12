@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}{{ template.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('ht_templates.index') }}">Templates</a></li>
+        <li class="breadcrumb-item active">{{ template.name }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h2>
+            {{ template.name }}
+            {% if template.is_public %}
+            <span class="badge bg-success"><i class="bi bi-globe"></i> Public</span>
+            {% endif %}
+        </h2>
+        <p class="text-muted mb-0">
+            <span class="badge bg-secondary">{{ template.category_label }}</span>
+            <span class="ms-2">Used {{ template.use_count or 0 }} times</span>
+        </p>
+    </div>
+    <div class="btn-group">
+        {% if template.user_id == current_user.id %}
+        <a href="{{ url_for('ht_templates.edit', id=template.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+        <a href="{{ url_for('ht_templates.edit_config', id=template.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-gear"></i> Configure
+        </a>
+        <form method="post" action="{{ url_for('ht_templates.delete', id=template.id) }}" class="d-inline"
+              onsubmit="return confirm('Delete this template?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i>
+            </button>
+        </form>
+        {% else %}
+        <form method="post" action="{{ url_for('ht_templates.duplicate', id=template.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="bi bi-copy"></i> Duplicate
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+{% if template.description %}
+<div class="alert alert-light">
+    {{ template.description }}
+</div>
+{% endif %}
+
+<div class="row">
+    <!-- Heat Treatment Config -->
+    <div class="col-lg-8">
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="bi bi-thermometer-half"></i> Heat Treatment Configuration
+            </div>
+            <div class="card-body">
+                {% set ht = template.ht_config %}
+
+                <!-- Heating Phase -->
+                {% set heating = ht.get('heating', {}) %}
+                {% if heating.get('enabled') %}
+                <h6><span class="badge bg-warning text-dark">Heating</span></h6>
+                <table class="table table-sm mb-3">
+                    <tr>
+                        <td width="40%">Initial Temperature</td>
+                        <td>{{ heating.get('initial_temperature', 25) }}°C</td>
+                    </tr>
+                    <tr>
+                        <td>Target Temperature</td>
+                        <td><strong>{{ heating.get('target_temperature', 850) }}°C</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Hold Time</td>
+                        <td>{{ heating.get('hold_time', 60) }} min</td>
+                    </tr>
+                    <tr>
+                        <td>Furnace Atmosphere</td>
+                        <td>{{ heating.get('furnace_atmosphere', 'air')|title }}</td>
+                    </tr>
+                </table>
+                {% endif %}
+
+                <!-- Transfer Phase -->
+                {% set transfer = ht.get('transfer', {}) %}
+                {% if transfer.get('enabled') %}
+                <h6><span class="badge bg-secondary">Transfer</span></h6>
+                <table class="table table-sm mb-3">
+                    <tr>
+                        <td width="40%">Duration</td>
+                        <td>{{ transfer.get('duration', 10) }} s</td>
+                    </tr>
+                    <tr>
+                        <td>Ambient Temperature</td>
+                        <td>{{ transfer.get('ambient_temperature', 25) }}°C</td>
+                    </tr>
+                </table>
+                {% endif %}
+
+                <!-- Quenching Phase -->
+                {% set quenching = ht.get('quenching', {}) %}
+                {% if quenching %}
+                <h6><span class="badge bg-info">Quenching</span></h6>
+                <table class="table table-sm mb-3">
+                    <tr>
+                        <td width="40%">Media</td>
+                        <td><strong>{{ quenching.get('media', 'water')|title }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Media Temperature</td>
+                        <td>{{ quenching.get('media_temperature', 25) }}°C</td>
+                    </tr>
+                    <tr>
+                        <td>Agitation</td>
+                        <td>{{ quenching.get('agitation', 'moderate')|title }}</td>
+                    </tr>
+                    <tr>
+                        <td>Duration</td>
+                        <td>{{ quenching.get('duration', 300) }} s</td>
+                    </tr>
+                </table>
+                {% endif %}
+
+                <!-- Tempering Phase -->
+                {% set tempering = ht.get('tempering', {}) %}
+                {% if tempering.get('enabled') %}
+                <h6><span class="badge bg-danger">Tempering</span></h6>
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td width="40%">Temperature</td>
+                        <td><strong>{{ tempering.get('temperature', 550) }}°C</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Hold Time</td>
+                        <td>{{ tempering.get('hold_time', 120) }} min</td>
+                    </tr>
+                    <tr>
+                        <td>Cooling Method</td>
+                        <td>{{ tempering.get('cooling_method', 'air')|title }}</td>
+                    </tr>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Apply -->
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="bi bi-lightning"></i> Apply to Simulation
+            </div>
+            <div class="card-body">
+                <p class="small text-muted">Apply this template to an existing simulation:</p>
+                <form method="get" action="{{ url_for('simulation.index') }}">
+                    <input type="hidden" name="template_id" value="{{ template.id }}">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-arrow-right"></i> Select Simulation
+                    </button>
+                </form>
+                <hr>
+                <p class="small text-muted">Or create a new simulation with this template:</p>
+                <a href="{{ url_for('simulation.new') }}?template_id={{ template.id }}" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-plus-lg"></i> New Simulation
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Template Info
+            </div>
+            <div class="card-body">
+                <dl class="mb-0">
+                    <dt>Created</dt>
+                    <dd>{{ template.created_at.strftime('%Y-%m-%d') }}</dd>
+                    {% if template.updated_at %}
+                    <dt>Updated</dt>
+                    <dd>{{ template.updated_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                    {% endif %}
+                    <dt>Owner</dt>
+                    <dd>{% if template.user_id == current_user.id %}You{% else %}Other user{% endif %}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

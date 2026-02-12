@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Configure {{ template.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('ht_templates.index') }}">Templates</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('ht_templates.view', id=template.id) }}">{{ template.name }}</a></li>
+        <li class="breadcrumb-item active">Configure</li>
+    </ol>
+</nav>
+
+<h2><i class="bi bi-gear"></i> Configure Heat Treatment</h2>
+<p class="text-muted">Edit the heat treatment parameters for "{{ template.name }}"</p>
+
+{% set ht = template.ht_config %}
+
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="row">
+        <div class="col-lg-6">
+            <!-- Heating Phase -->
+            <div class="card mb-3">
+                <div class="card-header bg-warning bg-opacity-25">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="heating_enabled" id="heatingEnabled"
+                               {% if ht.get('heating', {}).get('enabled', True) %}checked{% endif %}
+                               onchange="togglePhase('heating', this.checked)">
+                        <label class="form-check-label fw-bold" for="heatingEnabled">
+                            <i class="bi bi-fire"></i> Heating Phase
+                        </label>
+                    </div>
+                </div>
+                <div class="card-body" id="heatingFields">
+                    {% set heating = ht.get('heating', {}) %}
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small">Initial Temp (°C)</label>
+                            <input type="number" class="form-control form-control-sm" name="heating_initial_temperature"
+                                   value="{{ heating.get('initial_temperature', 25) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Target Temp (°C)</label>
+                            <input type="number" class="form-control form-control-sm" name="heating_target_temperature"
+                                   value="{{ heating.get('target_temperature', 850) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Hold Time (min)</label>
+                            <input type="number" class="form-control form-control-sm" name="heating_hold_time"
+                                   value="{{ heating.get('hold_time', 60) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Atmosphere</label>
+                            <select class="form-select form-select-sm" name="heating_furnace_atmosphere">
+                                <option value="air" {% if heating.get('furnace_atmosphere') == 'air' %}selected{% endif %}>Air</option>
+                                <option value="inert" {% if heating.get('furnace_atmosphere') == 'inert' %}selected{% endif %}>Inert (N2/Ar)</option>
+                                <option value="vacuum" {% if heating.get('furnace_atmosphere') == 'vacuum' %}selected{% endif %}>Vacuum</option>
+                                <option value="protective" {% if heating.get('furnace_atmosphere') == 'protective' %}selected{% endif %}>Protective</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Furnace HTC (W/m²K)</label>
+                            <input type="number" class="form-control form-control-sm" name="heating_furnace_htc"
+                                   value="{{ heating.get('furnace_htc', 25) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Emissivity</label>
+                            <input type="number" class="form-control form-control-sm" name="heating_furnace_emissivity"
+                                   value="{{ heating.get('furnace_emissivity', 0.85) }}" step="0.01" min="0" max="1">
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="heating_use_radiation" id="heatingRadiation"
+                                       {% if heating.get('use_radiation', True) %}checked{% endif %}>
+                                <label class="form-check-label small" for="heatingRadiation">Include radiation</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transfer Phase -->
+            <div class="card mb-3">
+                <div class="card-header bg-secondary bg-opacity-25">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="transfer_enabled" id="transferEnabled"
+                               {% if ht.get('transfer', {}).get('enabled', True) %}checked{% endif %}
+                               onchange="togglePhase('transfer', this.checked)">
+                        <label class="form-check-label fw-bold" for="transferEnabled">
+                            <i class="bi bi-arrow-right"></i> Transfer Phase
+                        </label>
+                    </div>
+                </div>
+                <div class="card-body" id="transferFields">
+                    {% set transfer = ht.get('transfer', {}) %}
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small">Duration (s)</label>
+                            <input type="number" class="form-control form-control-sm" name="transfer_duration"
+                                   value="{{ transfer.get('duration', 10) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Ambient Temp (°C)</label>
+                            <input type="number" class="form-control form-control-sm" name="transfer_ambient_temperature"
+                                   value="{{ transfer.get('ambient_temperature', 25) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">HTC (W/m²K)</label>
+                            <input type="number" class="form-control form-control-sm" name="transfer_htc"
+                                   value="{{ transfer.get('htc', 10) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Emissivity</label>
+                            <input type="number" class="form-control form-control-sm" name="transfer_emissivity"
+                                   value="{{ transfer.get('emissivity', 0.85) }}" step="0.01" min="0" max="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <!-- Quenching Phase -->
+            <div class="card mb-3">
+                <div class="card-header bg-info bg-opacity-25">
+                    <span class="fw-bold"><i class="bi bi-droplet"></i> Quenching Phase</span>
+                </div>
+                <div class="card-body">
+                    {% set quenching = ht.get('quenching', {}) %}
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small">Media</label>
+                            <select class="form-select form-select-sm" name="quenching_media">
+                                <option value="water" {% if quenching.get('media') == 'water' %}selected{% endif %}>Water</option>
+                                <option value="oil" {% if quenching.get('media') == 'oil' %}selected{% endif %}>Oil</option>
+                                <option value="polymer" {% if quenching.get('media') == 'polymer' %}selected{% endif %}>Polymer</option>
+                                <option value="brine" {% if quenching.get('media') == 'brine' %}selected{% endif %}>Brine</option>
+                                <option value="air" {% if quenching.get('media') == 'air' %}selected{% endif %}>Air</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Media Temp (°C)</label>
+                            <input type="number" class="form-control form-control-sm" name="quenching_media_temperature"
+                                   value="{{ quenching.get('media_temperature', 25) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Agitation</label>
+                            <select class="form-select form-select-sm" name="quenching_agitation">
+                                <option value="none" {% if quenching.get('agitation') == 'none' %}selected{% endif %}>None (Still)</option>
+                                <option value="mild" {% if quenching.get('agitation') == 'mild' %}selected{% endif %}>Mild</option>
+                                <option value="moderate" {% if quenching.get('agitation') == 'moderate' %}selected{% endif %}>Moderate</option>
+                                <option value="strong" {% if quenching.get('agitation') == 'strong' %}selected{% endif %}>Strong</option>
+                                <option value="violent" {% if quenching.get('agitation') == 'violent' %}selected{% endif %}>Violent</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Duration (s)</label>
+                            <input type="number" class="form-control form-control-sm" name="quenching_duration"
+                                   value="{{ quenching.get('duration', 300) }}" step="1">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">HTC Override (W/m²K)</label>
+                            <input type="number" class="form-control form-control-sm" name="quenching_htc_override"
+                                   value="{{ quenching.get('htc_override', '') }}" step="1" placeholder="Leave empty for auto">
+                            <small class="text-muted">Leave empty to calculate based on media and agitation</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tempering Phase -->
+            <div class="card mb-3">
+                <div class="card-header bg-danger bg-opacity-25">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="tempering_enabled" id="temperingEnabled"
+                               {% if ht.get('tempering', {}).get('enabled', False) %}checked{% endif %}
+                               onchange="togglePhase('tempering', this.checked)">
+                        <label class="form-check-label fw-bold" for="temperingEnabled">
+                            <i class="bi bi-thermometer-low"></i> Tempering Phase
+                        </label>
+                    </div>
+                </div>
+                <div class="card-body" id="temperingFields">
+                    {% set tempering = ht.get('tempering', {}) %}
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label small">Temperature (°C)</label>
+                            <input type="number" class="form-control form-control-sm" name="tempering_temperature"
+                                   value="{{ tempering.get('temperature', 550) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Hold Time (min)</label>
+                            <input type="number" class="form-control form-control-sm" name="tempering_hold_time"
+                                   value="{{ tempering.get('hold_time', 120) }}" step="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">Cooling Method</label>
+                            <select class="form-select form-select-sm" name="tempering_cooling_method">
+                                <option value="air" {% if tempering.get('cooling_method') == 'air' %}selected{% endif %}>Air Cool</option>
+                                <option value="furnace" {% if tempering.get('cooling_method') == 'furnace' %}selected{% endif %}>Furnace Cool</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">HTC (W/m²K)</label>
+                            <input type="number" class="form-control form-control-sm" name="tempering_htc"
+                                   value="{{ tempering.get('htc', 25) }}" step="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save Configuration
+        </button>
+        <a href="{{ url_for('ht_templates.view', id=template.id) }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePhase(phase, enabled) {
+    const fields = document.getElementById(phase + 'Fields');
+    if (fields) {
+        fields.style.opacity = enabled ? '1' : '0.5';
+        const inputs = fields.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            input.disabled = !enabled;
+        });
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    ['heating', 'transfer', 'tempering'].forEach(function(phase) {
+        const checkbox = document.getElementById(phase + 'Enabled');
+        if (checkbox) {
+            togglePhase(phase, checkbox.checked);
+        }
+    });
+});
+</script>
+{% endblock %}

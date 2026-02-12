@@ -21,6 +21,7 @@ from .material import (
 from .simulation import (
     Simulation,
     SimulationResult,
+    HeatTreatmentTemplate,
     STATUS_DRAFT, STATUS_READY, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED, STATUSES,
     GEOMETRY_CYLINDER, GEOMETRY_PLATE, GEOMETRY_RING, GEOMETRY_TYPES,
     PROCESS_TYPES, PROCESS_LABELS, DEFAULT_HTC,
@@ -58,6 +59,7 @@ __all__ = [
     # Simulation models (PostgreSQL)
     'Simulation',
     'SimulationResult',
+    'HeatTreatmentTemplate',
     'STATUS_DRAFT', 'STATUS_READY', 'STATUS_RUNNING', 'STATUS_COMPLETED', 'STATUS_FAILED', 'STATUSES',
     'GEOMETRY_CYLINDER', 'GEOMETRY_PLATE', 'GEOMETRY_RING', 'GEOMETRY_TYPES',
     'PROCESS_TYPES', 'PROCESS_LABELS', 'DEFAULT_HTC',

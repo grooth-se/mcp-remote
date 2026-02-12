@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import SteelGrade, PhaseDiagram, MeasuredData
+from app.models import SteelGrade, PhaseDiagram, MeasuredData, HeatTreatmentTemplate
 from app.models.simulation import (
     Simulation, SimulationResult,
     STATUS_DRAFT, STATUS_READY, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
@@ -410,6 +410,44 @@ def heat_treatment(id):
         furnace_atmospheres=FURNACE_ATMOSPHERES,
         furnace_atmosphere_labels=FURNACE_ATMOSPHERE_LABELS
     )
+
+
+@simulation_bp.route('/<int:id>/save-as-template', methods=['POST'])
+@login_required
+def save_as_template(id):
+    """Save simulation's heat treatment config as a reusable template."""
+    sim = Simulation.query.get_or_404(id)
+
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    # Get form data
+    name = request.form.get('template_name', '').strip()
+    description = request.form.get('template_description', '').strip()
+    category = request.form.get('template_category', 'custom')
+    is_public = request.form.get('is_public') == 'on'
+
+    if not name:
+        flash('Template name is required.', 'warning')
+        return redirect(url_for('simulation.heat_treatment', id=id))
+
+    # Create template from simulation's heat treatment config
+    template = HeatTreatmentTemplate(
+        name=name,
+        description=description,
+        category=category,
+        is_public=is_public,
+        user_id=current_user.id,
+        heat_treatment_config=sim.heat_treatment_config,
+        solver_config=sim.solver_config,
+    )
+
+    db.session.add(template)
+    db.session.commit()
+
+    flash(f'Template "{name}" saved successfully!', 'success')
+    return redirect(url_for('ht_templates.view', id=template.id))
 
 
 @simulation_bp.route('/<int:id>')

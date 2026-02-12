@@ -553,3 +553,143 @@ class SimulationResult(db.Model):
 
     def __repr__(self) -> str:
         return f'<SimulationResult {self.id}: {self.result_type} at {self.location}>'
+
+
+class HeatTreatmentTemplate(db.Model):
+    """Reusable heat treatment configuration template.
+
+    Allows users to save and reuse common heat treatment configurations
+    like "Standard Q&T for 4140" or "Normalizing for Low Carbon Steel".
+    """
+    __tablename__ = 'heat_treatment_templates'
+    __bind_key__ = 'materials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.Text, nullable=False)
+    description = db.Column(db.Text)
+
+    # Owner (note: users table is in default bind, so no FK constraint)
+    user_id = db.Column(db.Integer, nullable=False)
+
+    # Public templates are visible to all users
+    is_public = db.Column(db.Boolean, default=False)
+
+    # Category for organization
+    category = db.Column(db.Text)  # e.g., 'quench_temper', 'normalizing', 'stress_relief'
+
+    # Heat treatment configuration (JSON) - same structure as Simulation.heat_treatment_config
+    heat_treatment_config = db.Column(db.Text, nullable=False)
+
+    # Optional: suggested geometry type and config
+    suggested_geometry_type = db.Column(db.Text)
+    suggested_geometry_config = db.Column(db.Text)  # JSON
+
+    # Optional: solver settings
+    solver_config = db.Column(db.Text)  # JSON
+
+    # Usage statistics
+    use_count = db.Column(db.Integer, default=0)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('ix_templates_user', 'user_id'),
+        db.Index('ix_templates_public', 'is_public'),
+        db.Index('ix_templates_category', 'category'),
+    )
+
+    # Category constants
+    CATEGORY_QUENCH_TEMPER = 'quench_temper'
+    CATEGORY_NORMALIZING = 'normalizing'
+    CATEGORY_STRESS_RELIEF = 'stress_relief'
+    CATEGORY_ANNEALING = 'annealing'
+    CATEGORY_HARDENING = 'hardening'
+    CATEGORY_CUSTOM = 'custom'
+
+    CATEGORIES = [
+        CATEGORY_QUENCH_TEMPER,
+        CATEGORY_NORMALIZING,
+        CATEGORY_STRESS_RELIEF,
+        CATEGORY_ANNEALING,
+        CATEGORY_HARDENING,
+        CATEGORY_CUSTOM,
+    ]
+
+    CATEGORY_LABELS = {
+        CATEGORY_QUENCH_TEMPER: 'Quench & Temper',
+        CATEGORY_NORMALIZING: 'Normalizing',
+        CATEGORY_STRESS_RELIEF: 'Stress Relief',
+        CATEGORY_ANNEALING: 'Annealing',
+        CATEGORY_HARDENING: 'Hardening',
+        CATEGORY_CUSTOM: 'Custom',
+    }
+
+    @property
+    def ht_config(self) -> dict:
+        """Parse heat treatment config JSON."""
+        try:
+            return json.loads(self.heat_treatment_config) if self.heat_treatment_config else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def set_ht_config(self, config: dict) -> None:
+        """Set heat treatment config from dict."""
+        self.heat_treatment_config = json.dumps(config)
+
+    @property
+    def geometry_dict(self) -> dict:
+        """Parse suggested geometry config JSON."""
+        try:
+            return json.loads(self.suggested_geometry_config) if self.suggested_geometry_config else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def set_geometry(self, config: dict) -> None:
+        """Set suggested geometry config from dict."""
+        self.suggested_geometry_config = json.dumps(config)
+
+    @property
+    def solver_dict(self) -> dict:
+        """Parse solver config JSON."""
+        try:
+            return json.loads(self.solver_config) if self.solver_config else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def set_solver(self, config: dict) -> None:
+        """Set solver config from dict."""
+        self.solver_config = json.dumps(config)
+
+    @property
+    def category_label(self) -> str:
+        """Human-readable category label."""
+        return self.CATEGORY_LABELS.get(self.category, self.category or 'Uncategorized')
+
+    def get_summary(self) -> str:
+        """Get a brief summary of the heat treatment configuration."""
+        ht = self.ht_config
+        parts = []
+
+        heating = ht.get('heating', {})
+        if heating.get('enabled'):
+            parts.append(f"Heat to {heating.get('target_temperature', 850):.0f}°C")
+
+        quenching = ht.get('quenching', {})
+        if quenching:
+            media = quenching.get('media', 'water').title()
+            parts.append(f"{media} quench")
+
+        tempering = ht.get('tempering', {})
+        if tempering.get('enabled'):
+            parts.append(f"Temper at {tempering.get('temperature', 550):.0f}°C")
+
+        return ' → '.join(parts) if parts else 'No configuration'
+
+    def increment_use_count(self) -> None:
+        """Increment the use count when template is applied."""
+        self.use_count = (self.use_count or 0) + 1
+
+    def __repr__(self) -> str:
+        return f'<HeatTreatmentTemplate {self.id}: {self.name}>'
