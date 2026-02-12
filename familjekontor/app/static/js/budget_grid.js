@@ -31,6 +31,13 @@ function saveBudget() {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content ||
                       document.querySelector('input[name="csrf_token"]')?.value || '';
 
+    // Loading state on save button
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Sparar...';
+    }
+
     fetch('/budget/api/save-grid', {
         method: 'POST',
         headers: {
@@ -54,12 +61,20 @@ function saveBudget() {
         }
         status.classList.remove('d-none');
         setTimeout(() => status.classList.add('d-none'), 3000);
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-save"></i> Spara';
+        }
     })
     .catch(err => {
         const status = document.getElementById('saveStatus');
         status.textContent = 'Natverksfel: ' + err.message;
         status.className = 'alert alert-danger mb-3';
         status.classList.remove('d-none');
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-save"></i> Spara';
+        }
     });
 }
 

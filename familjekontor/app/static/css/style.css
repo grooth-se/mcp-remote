@@ -41,7 +41,7 @@ body {
 
 /* Report print styles */
 @media print {
-    .navbar, .btn, .form-select, .alert, .no-print, .breadcrumb, .back-to-top {
+    .navbar, .btn, .form-select, .alert, .no-print, .breadcrumb, .back-to-top, footer {
         display: none !important;
     }
 
@@ -168,4 +168,10 @@ tr[data-row-link]:hover td {
 
 .back-to-top:hover {
     opacity: 1;
+}
+
+/* Active nav highlight */
+.navbar-nav .nav-link.active {
+    font-weight: 600;
+    border-bottom: 2px solid #fff;
 }

@@ -10,7 +10,7 @@
 {% endblock %}
 {% block content %}
 <h2>Ny verifikation <small class="text-muted">{{ fiscal_year.year }}</small></h2>
-<form method="POST" id="verificationForm">
+<form method="POST" id="verificationForm" data-warn-unsaved>
     {{ form.hidden_tag() }}
     <div class="card mb-3">
         <div class="card-body">

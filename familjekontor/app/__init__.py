@@ -66,6 +66,10 @@ def create_app(config_name=None):
     app.register_blueprint(currency_bp, url_prefix='/currency')
     app.register_blueprint(recurring_bp, url_prefix='/invoices/recurring')
 
+    # Jinja2 globals
+    from datetime import datetime
+    app.jinja_env.globals['now'] = datetime.now
+
     # Error handlers
     @app.errorhandler(404)
     def not_found(e):

@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     {% if active_company and active_company.theme_color %}
     <style>
@@ -30,13 +31,13 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard.index') }}"><i class="bi bi-house"></i> Start</a>
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('dashboard.') %}active{% endif %}" href="{{ url_for('dashboard.index') }}"><i class="bi bi-house"></i> Start</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('companies.index') }}"><i class="bi bi-building"></i> Företag</a>
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('companies.') %}active{% endif %}" href="{{ url_for('companies.index') }}"><i class="bi bi-building"></i> Företag</a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('accounting.') or request.endpoint.startswith('invoices.') or request.endpoint.startswith('recurring.') or request.endpoint.startswith('payments.') or request.endpoint.startswith('closing.') or request.endpoint.startswith('currency.') or request.endpoint.startswith('sie.')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-journal-text"></i> Bokföring
                         </a>
                         <ul class="dropdown-menu">
@@ -59,7 +60,7 @@
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint and request.endpoint.startswith('bank.') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-bank"></i> Bank
                         </a>
                         <ul class="dropdown-menu">
@@ -70,7 +71,7 @@
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('reports.') or request.endpoint.startswith('tax.') or request.endpoint.startswith('salary.')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-bar-chart"></i> Rapporter
                         </a>
                         <ul class="dropdown-menu">
@@ -93,7 +94,7 @@
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('budget.') or request.endpoint.startswith('consolidation.')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-shield-check"></i> Bolagsstyrning
                         </a>
                         <ul class="dropdown-menu">
@@ -102,11 +103,11 @@
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('documents.index') }}"><i class="bi bi-folder2-open"></i> Dokument</a>
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('documents.') %}active{% endif %}" href="{{ url_for('documents.index') }}"><i class="bi bi-folder2-open"></i> Dokument</a>
                     </li>
                     {% if current_user.is_admin %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint and request.endpoint.startswith('admin.') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-gear"></i> Admin
                         </a>
                         <ul class="dropdown-menu">
@@ -162,12 +163,17 @@
         {% block content %}{% endblock %}
     </div>
 
+    <footer class="text-center text-muted py-3 mt-5 border-top small">
+        <p class="mb-0">Familjekontor &copy; {{ now().year }} &mdash; Bokföring &amp; Ekonomi</p>
+    </footer>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/confirm_dialog.js') }}"></script>
     <script src="{{ url_for('static', filename='js/form_submit.js') }}"></script>
     <script src="{{ url_for('static', filename='js/keyboard_shortcuts.js') }}"></script>
     <script src="{{ url_for('static', filename='js/row_click.js') }}"></script>
     <script src="{{ url_for('static', filename='js/back_to_top.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/unsaved_changes.js') }}"></script>
     <script>
     setTimeout(function() {
         document.querySelectorAll('.alert-success').forEach(function(el) {
