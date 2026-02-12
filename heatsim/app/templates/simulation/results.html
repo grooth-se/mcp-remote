@@ -166,6 +166,78 @@
 </div>
 {% endif %}
 
+<!-- Comparison Summary (when measured data exists) -->
+{% if comparison_metrics %}
+<div class="card mb-3 border-{% if comparison_metrics.rating == 'good' %}success{% elif comparison_metrics.rating == 'acceptable' %}warning{% else %}danger{% endif %}">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clipboard-data"></i> Simulation vs Measured Data</span>
+        <span class="badge {% if comparison_metrics.rating == 'good' %}bg-success{% elif comparison_metrics.rating == 'acceptable' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+            {{ comparison_metrics.rating|title }}
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 text-center">
+            <div class="col-4 col-md-2">
+                <div class="text-muted small">RMS Error</div>
+                <div class="fs-5 fw-bold">{{ comparison_metrics.rms_error|round(1) }}°C</div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="text-muted small">R²</div>
+                <div class="fs-5 fw-bold">{{ comparison_metrics.r_squared }}</div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="text-muted small">Peak T Diff</div>
+                <div class="fs-5 fw-bold">{{ comparison_metrics.peak_temp_diff|round(1) }}°C</div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="text-muted small">Max |Error|</div>
+                <div class="fs-5 fw-bold">{{ comparison_metrics.max_abs_error|round(1) }}°C</div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="text-muted small">Time Offset</div>
+                <div class="fs-5 fw-bold">{{ comparison_metrics.time_offset|round(1) }}s</div>
+            </div>
+            <div class="col-4 col-md-2">
+                <div class="text-muted small">Rating</div>
+                <div class="fs-5">
+                    {% if comparison_metrics.rating == 'good' %}
+                    <i class="bi bi-check-circle-fill text-success"></i>
+                    {% elif comparison_metrics.rating == 'acceptable' %}
+                    <i class="bi bi-exclamation-circle-fill text-warning"></i>
+                    {% else %}
+                    <i class="bi bi-x-circle-fill text-danger"></i>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% if comparison_metrics.phase_metrics %}
+        <hr class="my-2">
+        <div class="row">
+            <div class="col-md-8">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Phase</th><th>RMS (°C)</th><th>R²</th><th>Rating</th></tr></thead>
+                    <tbody>
+                    {% for phase, pm in comparison_metrics.phase_metrics.items() %}
+                    <tr>
+                        <td>{{ phase|title }}</td>
+                        <td>{{ pm.rms|round(1) }}</td>
+                        <td>{{ pm.r_squared }}</td>
+                        <td>
+                            <span class="badge {% if pm.rating == 'good' %}bg-success{% elif pm.rating == 'acceptable' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                {{ pm.rating|title }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Row 2: Simulation T vs Time per process step -->
 <div class="plot-grid">
     <!-- Heating (Simulation) -->

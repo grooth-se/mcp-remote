@@ -489,6 +489,12 @@ def view(id):
     measured_quenching = [m for m in measured_data if m.process_step == 'quenching']
     measured_tempering = [m for m in measured_data if m.process_step == 'tempering']
 
+    # Compute comparison metrics if measured data exists
+    comparison_metrics = None
+    if measured_data and sim.status == STATUS_COMPLETED:
+        from app.services.comparison_service import ComparisonService
+        comparison_metrics = ComparisonService.compare_simulation(sim)
+
     return render_template(
         'simulation/results.html',
         sim=sim,
@@ -512,7 +518,8 @@ def view(id):
         measured_heating=measured_heating,
         measured_quenching=measured_quenching,
         measured_tempering=measured_tempering,
-        hardness_results=hardness_results
+        hardness_results=hardness_results,
+        comparison_metrics=comparison_metrics
     )
 
 
