@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination, sortable_header %}
 {% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% from "macros/empty_state.html" import render_empty_state %}
 {% block title %}Verifikationer - Familjekontor{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -63,7 +64,7 @@
                 <td><a href="{{ url_for('accounting.view_verification', verification_id=ver.id) }}" class="btn btn-sm btn-outline-primary">Visa</a></td>
             </tr>
             {% else %}
-            <tr><td colspan="8" class="text-center text-muted py-4">Inga verifikationer. <a href="{{ url_for('accounting.new_verification') }}">Skapa ny verifikation</a></td></tr>
+            <tr><td colspan="8">{{ render_empty_state('journal-text', 'Inga verifikationer', 'Skapa din första verifikation för att komma igång.', url_for('accounting.new_verification'), 'Skapa ny verifikation') }}</td></tr>
             {% endfor %}
             {% else %}
             <tr><td colspan="8" class="text-center text-muted py-4">Välj ett räkenskapsår.</td></tr>

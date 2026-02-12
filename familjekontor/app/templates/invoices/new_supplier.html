@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% from "macros/form_field.html" import render_field_inline %}
 {% block title %}Ny leverantör - Familjekontor{% endblock %}
 {% block breadcrumbs %}
 {{ render_breadcrumbs([
@@ -14,18 +15,18 @@
     <form method="POST">
         {{ form.hidden_tag() }}
         <div class="row mb-3">
-            <div class="col-md-8">{{ form.name.label(class="form-label") }}{{ form.name(class="form-control") }}</div>
-            <div class="col-md-4">{{ form.org_number.label(class="form-label") }}{{ form.org_number(class="form-control") }}</div>
+            <div class="col-md-8">{{ form.name.label(class="form-label") }}{{ render_field_inline(form.name, class="form-control") }}</div>
+            <div class="col-md-4">{{ form.org_number.label(class="form-label") }}{{ render_field_inline(form.org_number, class="form-control") }}</div>
         </div>
         <div class="row mb-3">
-            <div class="col-md-4">{{ form.default_account.label(class="form-label") }}{{ form.default_account(class="form-control") }}</div>
-            <div class="col-md-4">{{ form.payment_terms.label(class="form-label") }}{{ form.payment_terms(class="form-control") }}</div>
+            <div class="col-md-4">{{ form.default_account.label(class="form-label") }}{{ render_field_inline(form.default_account, class="form-control") }}</div>
+            <div class="col-md-4">{{ form.payment_terms.label(class="form-label") }}{{ render_field_inline(form.payment_terms, class="form-control") }}</div>
         </div>
         <div class="row mb-3">
-            <div class="col-md-3">{{ form.bankgiro.label(class="form-label") }}{{ form.bankgiro(class="form-control") }}</div>
-            <div class="col-md-3">{{ form.plusgiro.label(class="form-label") }}{{ form.plusgiro(class="form-control") }}</div>
-            <div class="col-md-3">{{ form.iban.label(class="form-label") }}{{ form.iban(class="form-control") }}</div>
-            <div class="col-md-3">{{ form.bic.label(class="form-label") }}{{ form.bic(class="form-control") }}</div>
+            <div class="col-md-3">{{ form.bankgiro.label(class="form-label") }}{{ render_field_inline(form.bankgiro, class="form-control") }}</div>
+            <div class="col-md-3">{{ form.plusgiro.label(class="form-label") }}{{ render_field_inline(form.plusgiro, class="form-control") }}</div>
+            <div class="col-md-3">{{ form.iban.label(class="form-label") }}{{ render_field_inline(form.iban, class="form-control") }}</div>
+            <div class="col-md-3">{{ form.bic.label(class="form-label") }}{{ render_field_inline(form.bic, class="form-control") }}</div>
         </div>
         <div class="d-flex gap-2">{{ form.submit(class="btn btn-primary") }}<a href="{{ url_for('invoices.suppliers') }}" class="btn btn-secondary">Avbryt</a></div>
     </form>

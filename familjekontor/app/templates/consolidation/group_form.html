@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/form_field.html" import render_field_inline %}
 {% block title %}{{ title }} - Familjekontor{% endblock %}
 {% block content %}
 <h2 class="mb-4">{{ title }}</h2>
@@ -13,15 +14,12 @@
                     <div class="mb-3">
                         {{ field.label(class="form-label") }}
                         {% if field.type == 'SelectField' %}
-                        {{ field(class="form-select") }}
+                        {{ render_field_inline(field, class="form-select") }}
                         {% elif field.type == 'TextAreaField' %}
-                        {{ field(class="form-control", rows=3) }}
+                        {{ render_field_inline(field, class="form-control", rows=3) }}
                         {% else %}
-                        {{ field(class="form-control") }}
+                        {{ render_field_inline(field, class="form-control") }}
                         {% endif %}
-                        {% for error in field.errors %}
-                        <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
                     </div>
                     {% endfor %}
                     {{ form.submit(class="btn btn-primary") }}

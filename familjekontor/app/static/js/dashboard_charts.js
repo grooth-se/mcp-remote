@@ -1,11 +1,21 @@
 // Dashboard Charts - Chart.js integration
 
+function showChart(canvasId) {
+    var canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    var container = canvas.parentElement;
+    var loader = container.querySelector('.chart-loading');
+    if (loader) loader.style.display = 'none';
+    canvas.style.display = '';
+}
+
 function initRevenueExpenseChart(canvasId) {
     fetch('/api/revenue-expense-chart')
         .then(r => r.json())
         .then(data => {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
+            showChart(canvasId);
             new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -54,6 +64,7 @@ function initCashFlowChart(canvasId) {
         .then(data => {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
+            showChart(canvasId);
             new Chart(ctx, {
                 type: 'line',
                 data: {

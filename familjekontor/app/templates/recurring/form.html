@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% from "macros/form_field.html" import render_field_inline %}
 {% block title %}{{ 'Redigera' if is_edit else 'Ny' }} återkommande fakturamall - Familjekontor{% endblock %}
 {% block breadcrumbs %}
 {% if is_edit %}
@@ -32,41 +33,41 @@
 
                     <div class="mb-3">
                         {{ form.name.label(class="form-label") }}
-                        {{ form.name(class="form-control", placeholder="t.ex. Månadsavgift Nordic Solutions") }}
+                        {{ render_field_inline(form.name, class="form-control", placeholder="t.ex. Månadsavgift Nordic Solutions") }}
                     </div>
 
                     <div class="mb-3">
                         {{ form.customer_id.label(class="form-label") }}
-                        {{ form.customer_id(class="form-select") }}
+                        {{ render_field_inline(form.customer_id, class="form-select") }}
                     </div>
 
                     <div class="row mb-3">
                         <div class="col-md-4">
                             {{ form.interval.label(class="form-label") }}
-                            {{ form.interval(class="form-select") }}
+                            {{ render_field_inline(form.interval, class="form-select") }}
                         </div>
                         <div class="col-md-4">
                             {{ form.currency.label(class="form-label") }}
-                            {{ form.currency(class="form-select") }}
+                            {{ render_field_inline(form.currency, class="form-select") }}
                         </div>
                         <div class="col-md-4">
                             {{ form.vat_type.label(class="form-label") }}
-                            {{ form.vat_type(class="form-select") }}
+                            {{ render_field_inline(form.vat_type, class="form-select") }}
                         </div>
                     </div>
 
                     <div class="row mb-3">
                         <div class="col-md-4">
                             {{ form.payment_terms.label(class="form-label") }}
-                            {{ form.payment_terms(class="form-control") }}
+                            {{ render_field_inline(form.payment_terms, class="form-control") }}
                         </div>
                         <div class="col-md-4">
                             {{ form.start_date.label(class="form-label") }}
-                            {{ form.start_date(class="form-control", type="date") }}
+                            {{ render_field_inline(form.start_date, class="form-control", type="date") }}
                         </div>
                         <div class="col-md-4">
                             {{ form.end_date.label(class="form-label") }}
-                            {{ form.end_date(class="form-control", type="date") }}
+                            {{ render_field_inline(form.end_date, class="form-control", type="date") }}
                         </div>
                     </div>
 

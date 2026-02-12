@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "macros/pagination.html" import render_pagination %}
+{% from "macros/empty_state.html" import render_empty_state %}
 {% block title %}Återkommande fakturor - Familjekontor{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -25,6 +27,14 @@
 </div>
 {% endif %}
 
+<form class="mb-3" method="GET">
+    <div class="input-group input-group-sm" style="max-width:400px;">
+        <input type="text" name="search" class="form-control" placeholder="Sök mallnamn eller kund..." value="{{ search }}">
+        <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+        {% if search %}<a href="{{ url_for('recurring.recurring_list') }}" class="btn btn-outline-secondary">Rensa</a>{% endif %}
+    </div>
+</form>
+
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
@@ -41,7 +51,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for t in templates %}
+                {% for t in pagination.items %}
                 <tr class="{{ 'table-light text-muted' if not t.active else '' }}">
                     <td>
                         <a href="{{ url_for('recurring.view_recurring', template_id=t.id) }}">{{ t.name }}</a>
@@ -73,17 +83,17 @@
                             {% if t.active %}
                             <form method="post" action="{{ url_for('recurring.generate_single', template_id=t.id) }}" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-outline-success" title="Generera faktura">
+                                <button type="submit" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" title="Generera faktura">
                                     <i class="bi bi-play-fill"></i>
                                 </button>
                             </form>
                             {% endif %}
                             <a href="{{ url_for('recurring.edit_recurring', template_id=t.id) }}"
-                               class="btn btn-sm btn-outline-primary" title="Redigera"><i class="bi bi-pencil"></i></a>
+                               class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Redigera"><i class="bi bi-pencil"></i></a>
                             <form method="post" action="{{ url_for('recurring.toggle_recurring', template_id=t.id) }}" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-outline-{{ 'warning' if t.active else 'success' }}"
-                                        title="{{ 'Pausa' if t.active else 'Aktivera' }}">
+                                        data-bs-toggle="tooltip" title="{{ 'Pausa' if t.active else 'Aktivera' }}">
                                     <i class="bi bi-{{ 'pause' if t.active else 'play' }}"></i>
                                 </button>
                             </form>
@@ -92,9 +102,8 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="text-muted text-center py-4">
-                        Inga återkommande fakturamallar ännu.
-                        <a href="{{ url_for('recurring.new_recurring') }}">Skapa en ny mall</a>.
+                    <td colspan="8">
+                        {{ render_empty_state('arrow-repeat', 'Inga återkommande fakturamallar', 'Skapa en mall för att automatisera fakturering.', url_for('recurring.new_recurring'), 'Skapa ny mall') }}
                     </td>
                 </tr>
                 {% endfor %}
@@ -102,4 +111,5 @@
         </table>
     </div>
 </div>
+{{ render_pagination(pagination, 'recurring.recurring_list', search=search) }}
 {% endblock %}

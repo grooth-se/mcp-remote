@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination, sortable_header %}
+{% from "macros/empty_state.html" import render_empty_state %}
 {% block title %}Kundfakturor - Familjekontor{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -68,7 +69,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="8" class="text-center text-muted py-4">Inga fakturor. <a href="{{ url_for('invoices.new_customer_invoice') }}">Skapa ny kundfaktura</a></td></tr>
+            <tr><td colspan="8">{{ render_empty_state('file-earmark-text', 'Inga kundfakturor', 'Skapa din första kundfaktura.', url_for('invoices.new_customer_invoice'), 'Ny kundfaktura') }}</td></tr>
             {% endfor %}
         </tbody>
     </table>

@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from flask import Blueprint, render_template, redirect, url_for, flash, session
+from flask import Blueprint, render_template, redirect, url_for, flash, session, request
 from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.invoice import Customer, CustomerInvoice
@@ -21,13 +21,25 @@ def recurring_list():
         flash('Välj ett företag först.', 'warning')
         return redirect(url_for('companies.index'))
 
-    templates = RecurringInvoiceTemplate.query.filter_by(
+    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+
+    query = RecurringInvoiceTemplate.query.filter_by(
         company_id=company_id
-    ).order_by(RecurringInvoiceTemplate.active.desc(), RecurringInvoiceTemplate.next_date).all()
+    )
+    if search:
+        query = query.outerjoin(Customer).filter(
+            db.or_(
+                RecurringInvoiceTemplate.name.ilike(f'%{search}%'),
+                Customer.name.ilike(f'%{search}%'),
+            )
+        )
+    query = query.order_by(RecurringInvoiceTemplate.active.desc(), RecurringInvoiceTemplate.next_date)
+    pagination = query.paginate(page=page, per_page=25, error_out=False)
     due_count = get_due_count(company_id)
 
-    return render_template('recurring/list.html', templates=templates, due_count=due_count,
-                           today=date.today())
+    return render_template('recurring/list.html', pagination=pagination, due_count=due_count,
+                           today=date.today(), search=search)
 
 
 @recurring_bp.route('/new', methods=['GET', 'POST'])

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/empty_state.html" import render_empty_state %}
 {% block title %}Dokument - Familjekontor{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -86,7 +87,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="8" class="text-muted">Inga dokument.</td></tr>
+                <tr><td colspan="8">{{ render_empty_state('folder2-open', 'Inga dokument', 'Ladda upp ditt första dokument.', url_for('documents.upload'), 'Ladda upp') }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>

@@ -155,15 +155,27 @@
 <div class="row mb-4">
     <div class="col-md-6">
         <div class="card">
-            <div class="card-body">
-                <canvas id="revenueExpenseChart" height="250"></canvas>
+            <div class="card-body position-relative">
+                <div class="chart-loading text-center py-5">
+                    <div class="spinner-border text-muted" role="status">
+                        <span class="visually-hidden">Laddar...</span>
+                    </div>
+                    <p class="text-muted small mt-2">Laddar diagram...</p>
+                </div>
+                <canvas id="revenueExpenseChart" height="250" style="display:none;"></canvas>
             </div>
         </div>
     </div>
     <div class="col-md-6">
         <div class="card">
-            <div class="card-body">
-                <canvas id="cashFlowChart" height="250"></canvas>
+            <div class="card-body position-relative">
+                <div class="chart-loading text-center py-5">
+                    <div class="spinner-border text-muted" role="status">
+                        <span class="visually-hidden">Laddar...</span>
+                    </div>
+                    <p class="text-muted small mt-2">Laddar diagram...</p>
+                </div>
+                <canvas id="cashFlowChart" height="250" style="display:none;"></canvas>
             </div>
         </div>
     </div>

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination, sortable_header %}
+{% from "macros/empty_state.html" import render_empty_state %}
 {% block title %}Leverantörsfakturor - Familjekontor{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -67,7 +68,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="8" class="text-center text-muted py-4">Inga fakturor. <a href="{{ url_for('invoices.new_supplier_invoice') }}">Skapa ny leverantörsfaktura</a></td></tr>
+            <tr><td colspan="8">{{ render_empty_state('receipt', 'Inga leverantörsfakturor', 'Registrera din första leverantörsfaktura.', url_for('invoices.new_supplier_invoice'), 'Ny leverantörsfaktura') }}</td></tr>
             {% endfor %}
         </tbody>
     </table>

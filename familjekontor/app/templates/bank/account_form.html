@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/form_field.html" import render_field %}
 {% block title %}{{ title }} - Familjekontor{% endblock %}
 {% block content %}
 <h2 class="mb-4">{{ title }}</h2>
@@ -9,30 +10,12 @@
             <div class="card-body">
                 <form method="post">
                     {{ form.hidden_tag() }}
-                    <div class="mb-3">
-                        {{ form.bank_name.label(class="form-label") }}
-                        {{ form.bank_name(class="form-select") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.account_number.label(class="form-label") }}
-                        {{ form.account_number(class="form-control") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.clearing_number.label(class="form-label") }}
-                        {{ form.clearing_number(class="form-control") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.iban.label(class="form-label") }}
-                        {{ form.iban(class="form-control") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.currency.label(class="form-label") }}
-                        {{ form.currency(class="form-select") }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.ledger_account.label(class="form-label") }}
-                        {{ form.ledger_account(class="form-control") }}
-                    </div>
+                    {{ render_field(form.bank_name, class="form-select") }}
+                    {{ render_field(form.account_number) }}
+                    {{ render_field(form.clearing_number) }}
+                    {{ render_field(form.iban) }}
+                    {{ render_field(form.currency, class="form-select") }}
+                    {{ render_field(form.ledger_account) }}
                     {{ form.submit(class="btn btn-primary") }}
                     <a href="{{ url_for('bank.accounts') }}" class="btn btn-outline-secondary">Avbryt</a>
                 </form>

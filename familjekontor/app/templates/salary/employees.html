@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination, sortable_header %}
+{% from "macros/empty_state.html" import render_empty_state %}
 {% block title %}Anställda - Familjekontor{% endblock %}
 {% block content %}
 <div class="row mb-3">
@@ -76,7 +77,7 @@
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7" class="text-center text-muted py-4">Inga anställda registrerade. <a href="{{ url_for('salary.employee_new') }}">Lägg till anställd</a></td></tr>
+                <tr><td colspan="7">{{ render_empty_state('people', 'Inga anställda registrerade', 'Lägg till din första anställd för att hantera löner.', url_for('salary.employee_new'), 'Lägg till anställd') }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
