@@ -348,6 +348,27 @@ class SimulationReportGenerator:
                 p.add_run('Ideal Diameter DI: ').bold = True
                 p.add_run(f"{data['ideal_diameter']:.2f} in")
 
+            # Mechanical properties
+            if data.get('uts_mpa'):
+                self.doc.add_heading('Estimated Mechanical Properties', level=3)
+                table = self.doc.add_table(rows=1, cols=5)
+                table.style = 'Table Grid'
+                headers = ['Position', 'UTS (MPa)', 'YS (MPa)', 'El. (%)', 'Toughness']
+                for i, h in enumerate(headers):
+                    table.rows[0].cells[i].text = h
+                    for run in table.rows[0].cells[i].paragraphs[0].runs:
+                        run.bold = True
+
+                for label, key in positions:
+                    row = table.add_row()
+                    row.cells[0].text = label
+                    row.cells[1].text = f"{data['uts_mpa'].get(key, 0):.0f}" if data['uts_mpa'].get(key) else '-'
+                    row.cells[2].text = f"{data['ys_mpa'].get(key, 0):.0f}" if data['ys_mpa'].get(key) else '-'
+                    row.cells[3].text = f"{data.get('elongation_pct', {}).get(key, 0):.1f}" if data.get('elongation_pct', {}).get(key) else '-'
+                    row.cells[4].text = data.get('toughness_rating', {}).get(key, '-').title()
+
+                self.doc.add_paragraph()
+
     def _create_param_table(self):
         """Create a parameter table with header row."""
         table = self.doc.add_table(rows=1, cols=2)
@@ -772,6 +793,38 @@ class SimulationPDFReportGenerator:
                 self.pdf.cell(0, 7, f"Carbon Equivalent CE(IIW): {data['carbon_equivalent']:.3f}", new_x='LMARGIN', new_y='NEXT')
             if data.get('ideal_diameter'):
                 self.pdf.cell(0, 7, f"Ideal Diameter DI: {data['ideal_diameter']:.2f} in", new_x='LMARGIN', new_y='NEXT')
+
+            # Mechanical properties
+            if data.get('uts_mpa'):
+                self.pdf.ln(5)
+                self.pdf.set_font('Helvetica', 'B', 12)
+                self.pdf.cell(0, 8, 'Estimated Mechanical Properties', new_x='LMARGIN', new_y='NEXT')
+
+                self.pdf.set_font('Helvetica', 'B', 10)
+                self.pdf.set_fill_color(236, 240, 241)
+                self.pdf.cell(35, 7, 'Position', border=1, fill=True)
+                self.pdf.cell(30, 7, 'UTS (MPa)', border=1, fill=True)
+                self.pdf.cell(30, 7, 'YS (MPa)', border=1, fill=True)
+                self.pdf.cell(25, 7, 'El. (%)', border=1, fill=True)
+                self.pdf.cell(0, 7, 'Toughness', border=1, fill=True, new_x='LMARGIN', new_y='NEXT')
+
+                self.pdf.set_font('Helvetica', '', 10)
+                positions = [
+                    ('Center', 'center'),
+                    ('1/3 R', 'one_third'),
+                    ('2/3 R', 'two_thirds'),
+                    ('Surface', 'surface'),
+                ]
+                for label, key in positions:
+                    uts_val = f"{data['uts_mpa'].get(key, 0):.0f}" if data['uts_mpa'].get(key) else '-'
+                    ys_val = f"{data['ys_mpa'].get(key, 0):.0f}" if data['ys_mpa'].get(key) else '-'
+                    el_val = f"{data.get('elongation_pct', {}).get(key, 0):.1f}" if data.get('elongation_pct', {}).get(key) else '-'
+                    tough_val = data.get('toughness_rating', {}).get(key, '-').title()
+                    self.pdf.cell(35, 7, label, border=1)
+                    self.pdf.cell(30, 7, uts_val, border=1)
+                    self.pdf.cell(30, 7, ys_val, border=1)
+                    self.pdf.cell(25, 7, el_val, border=1)
+                    self.pdf.cell(0, 7, tough_val, border=1, new_x='LMARGIN', new_y='NEXT')
 
 
 def generate_simulation_report(simulation) -> bytes:

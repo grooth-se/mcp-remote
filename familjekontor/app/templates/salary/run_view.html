@@ -129,7 +129,7 @@
             <form method="POST" action="{{ url_for('salary.run_approve', run_id=run.id) }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-success"
-                        onclick="return confirm('Godkänn löneköring och skapa verifikation?')">
+                        data-confirm="Godkänn löneköring och skapa verifikation?">
                     <i class="bi bi-check-circle"></i> Godkänn
                 </button>
             </form>

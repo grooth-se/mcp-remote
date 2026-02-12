@@ -769,6 +769,36 @@
                 <hr>
                 <p class="mb-1"><strong>CE(IIW):</strong> {{ '%.3f'|format(hdata.carbon_equivalent) if hdata.carbon_equivalent else '-' }}</p>
                 <p class="mb-0"><strong>DI:</strong> {{ '%.2f'|format(hdata.ideal_diameter) if hdata.ideal_diameter else '-' }} in</p>
+
+                {% if hdata.uts_mpa %}
+                <hr>
+                <h6 class="mt-2"><i class="bi bi-gear-wide-connected"></i> Mechanical Properties</h6>
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>Position</th><th>UTS (MPa)</th><th>YS (MPa)</th><th>El. (%)</th><th>Toughness</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for pos_key, pos_label in [('center','Center'), ('one_third','1/3 R'), ('two_thirds','2/3 R'), ('surface','Surface')] %}
+                        <tr>
+                            <td>{{ pos_label }}</td>
+                            <td class="fw-bold">{{ hdata.uts_mpa[pos_key]|int if hdata.uts_mpa.get(pos_key) else '-' }}</td>
+                            <td>{{ hdata.ys_mpa[pos_key]|int if hdata.ys_mpa.get(pos_key) else '-' }}</td>
+                            <td>{{ '%.1f'|format(hdata.elongation_pct[pos_key]) if hdata.elongation_pct.get(pos_key) else '-' }}</td>
+                            <td>
+                                {% set rating = hdata.toughness_rating.get(pos_key, '') %}
+                                <span class="badge {% if rating == 'good' %}bg-success{% elif rating == 'acceptable' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                    {{ rating|title }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <small class="text-muted">
+                    UTS from HV (&#8776; 3.45 &times; HV). YS ratio adjusted by microstructure. Elongation and toughness are qualitative estimates.
+                </small>
+                {% endif %}
+
                 {% else %}
                 <p class="text-muted">No hardness data available</p>
                 {% endif %}

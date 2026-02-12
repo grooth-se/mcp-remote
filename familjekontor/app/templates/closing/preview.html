@@ -131,7 +131,7 @@
                 <i class="bi bi-arrow-left"></i> Tillbaka
             </a>
             <button type="submit" class="btn btn-danger"
-                    onclick="return confirm('Är du säker på att du vill genomföra bokslutet för {{ fiscal_year.year }}? Detta kan inte ångras.')">
+                    data-confirm="Är du säker på att du vill genomföra bokslutet för {{ fiscal_year.year }}? Detta kan inte ångras.">
                 <i class="bi bi-lock"></i> Genomför bokslut
             </button>
         </form>

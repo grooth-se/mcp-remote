@@ -30,10 +30,10 @@
         <a href="{{ url_for('dashboard.switch_company', company_id=company.id) }}" class="btn btn-primary">
             <i class="bi bi-check-circle"></i> Välj detta företag
         </a>
-        <form method="POST" action="{{ url_for('companies.delete', company_id=company.id) }}" class="d-inline"
-              onsubmit="return confirm('Är du säker på att du vill ta bort {{ company.name }}?')">
+        <form method="POST" action="{{ url_for('companies.delete', company_id=company.id) }}" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-outline-danger">
+            <button type="submit" class="btn btn-outline-danger"
+                    data-confirm="Är du säker på att du vill ta bort {{ company.name }}?">
                 <i class="bi bi-trash"></i> Ta bort
             </button>
         </form>
@@ -172,10 +172,10 @@
                     </td>
                     <td>{{ doc.created_at.strftime('%Y-%m-%d') }}</td>
                     <td>
-                        <form method="POST" action="{{ url_for('companies.delete_certificate', company_id=company.id, doc_id=doc.id) }}" class="d-inline"
-                              onsubmit="return confirm('Ta bort detta dokument?')">
+                        <form method="POST" action="{{ url_for('companies.delete_certificate', company_id=company.id, doc_id=doc.id) }}" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Ta bort">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Ta bort"
+                                    data-confirm="Ta bort detta dokument?">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </form>

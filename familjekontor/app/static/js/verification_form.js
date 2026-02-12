@@ -20,7 +20,7 @@ function addRow() {
         <td><input type="number" step="0.01" name="rows-${idx}-debit" class="form-control form-control-sm debit-input" value="0"></td>
         <td><input type="number" step="0.01" name="rows-${idx}-credit" class="form-control form-control-sm credit-input" value="0"></td>
         <td><input type="text" name="rows-${idx}-description" class="form-control form-control-sm"></td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)" aria-label="Ta bort rad"><i class="bi bi-trash"></i></button></td>
     `;
     tbody.appendChild(tr);
     rowCount++;

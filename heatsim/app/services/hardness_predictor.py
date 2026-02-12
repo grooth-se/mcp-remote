@@ -56,6 +56,11 @@ class HardnessResult:
     carbon_equivalent: float = 0.0
     ideal_diameter: float = 0.0
     composition: Dict[str, float] = field(default_factory=dict)
+    # Mechanical properties
+    uts_mpa: Dict[str, float] = field(default_factory=dict)
+    ys_mpa: Dict[str, float] = field(default_factory=dict)
+    elongation_pct: Dict[str, float] = field(default_factory=dict)
+    toughness_rating: Dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for storage."""
@@ -67,6 +72,10 @@ class HardnessResult:
             'carbon_equivalent': self.carbon_equivalent,
             'ideal_diameter': self.ideal_diameter,
             'composition': self.composition,
+            'uts_mpa': self.uts_mpa,
+            'ys_mpa': self.ys_mpa,
+            'elongation_pct': self.elongation_pct,
+            'toughness_rating': self.toughness_rating,
         }
 
 
@@ -238,6 +247,103 @@ class HardnessPredictor:
 
         return max(hv_composite, 100.0)
 
+    def predict_uts(self, hv: float) -> float:
+        """Estimate ultimate tensile strength from Vickers hardness.
+
+        UTS (MPa) ~ 3.45 * HV for steels (valid range HV 100-700).
+
+        Parameters
+        ----------
+        hv : float
+            Vickers hardness
+
+        Returns
+        -------
+        float
+            Estimated UTS in MPa
+        """
+        return 3.45 * hv
+
+    def predict_ys(self, uts: float, phase_fractions: Dict[str, float]) -> float:
+        """Estimate yield strength from UTS, adjusted by dominant microstructure.
+
+        Martensite-dominant: YS ~ 0.90 * UTS
+        Bainite-dominant: YS ~ 0.85 * UTS
+        Ferrite-pearlite: YS ~ 0.70 * UTS
+
+        Parameters
+        ----------
+        uts : float
+            Ultimate tensile strength in MPa
+        phase_fractions : dict
+            Phase fractions
+
+        Returns
+        -------
+        float
+            Estimated yield strength in MPa
+        """
+        f_m = phase_fractions.get('martensite', 0.0)
+        f_b = phase_fractions.get('bainite', 0.0)
+        if f_m > 0.5:
+            ratio = 0.90
+        elif f_b > 0.3:
+            ratio = 0.85
+        else:
+            ratio = 0.70
+        return ratio * uts
+
+    def predict_elongation(self, phase_fractions: Dict[str, float]) -> float:
+        """Estimate elongation (%) from phase fractions using rule of mixtures.
+
+        Typical elongation by phase:
+        - Ferrite-pearlite: 20-30%
+        - Bainite: 12-20%
+        - Martensite (untempered): 5-12%
+        - Retained austenite: ~20%
+
+        Parameters
+        ----------
+        phase_fractions : dict
+            Phase fractions
+
+        Returns
+        -------
+        float
+            Estimated elongation in percent
+        """
+        f_m = phase_fractions.get('martensite', 0.0)
+        f_b = phase_fractions.get('bainite', 0.0)
+        f_f = phase_fractions.get('ferrite', 0.0)
+        f_p = phase_fractions.get('pearlite', 0.0)
+        f_ra = phase_fractions.get('retained_austenite', 0.0)
+        return f_m * 8.0 + f_b * 16.0 + (f_f + f_p) * 25.0 + f_ra * 20.0
+
+    def predict_toughness_rating(self, phase_fractions: Dict[str, float]) -> str:
+        """Qualitative impact toughness rating based on microstructure.
+
+        High untempered martensite (>80%) is brittle: 'poor'.
+        Mixed microstructure (40-80% martensite): 'acceptable'.
+        Bainite/ferrite-dominated: 'good'.
+
+        Parameters
+        ----------
+        phase_fractions : dict
+            Phase fractions
+
+        Returns
+        -------
+        str
+            'good', 'acceptable', or 'poor'
+        """
+        f_m = phase_fractions.get('martensite', 0.0)
+        if f_m > 0.80:
+            return 'poor'
+        elif f_m > 0.40:
+            return 'acceptable'
+        else:
+            return 'good'
+
     def hv_to_hrc(self, hv: float) -> Optional[float]:
         """Convert Vickers hardness to Rockwell C.
 
@@ -344,6 +450,13 @@ def predict_hardness_profile(
         # Convert to HRC
         hrc = predictor.hv_to_hrc(hv)
         result.hardness_hrc[pos_key] = round(hrc, 1) if hrc else None
+
+        # Mechanical properties
+        uts = predictor.predict_uts(hv)
+        result.uts_mpa[pos_key] = round(uts, 0)
+        result.ys_mpa[pos_key] = round(predictor.predict_ys(uts, phase_dict), 0)
+        result.elongation_pct[pos_key] = round(predictor.predict_elongation(phase_dict), 1)
+        result.toughness_rating[pos_key] = predictor.predict_toughness_rating(phase_dict)
 
     return result
 

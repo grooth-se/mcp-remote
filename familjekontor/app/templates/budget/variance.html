@@ -8,6 +8,14 @@
     </a>
 </div>
 
+{% if variance %}
+<div class="card mb-4">
+    <div class="card-body">
+        <canvas id="varianceChart" height="200" role="img" aria-label="Stapeldiagram: budget vs utfall"></canvas>
+    </div>
+</div>
+{% endif %}
+
 <div class="card">
     <div class="table-responsive">
         <table class="table table-sm mb-0">
@@ -44,8 +52,75 @@
 
 <div class="mt-2">
     <small class="text-muted">
-        <span class="text-danger">Rod</span> = over budget,
-        <span class="text-success">Gron</span> = under budget
+        <span class="text-danger">Röd</span> = över budget,
+        <span class="text-success">Grön</span> = under budget
     </small>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if variance %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    var allData = [
+        {% for item in variance %}
+        {% if item.budget_total != 0 or item.actual_total != 0 %}
+        { label: '{{ item.number }} {{ item.name }}', budget: {{ item.budget_total }}, actual: {{ item.actual_total }} },
+        {% endif %}
+        {% endfor %}
+    ];
+    // Show top 10 by absolute variance
+    allData.sort(function(a, b) { return Math.abs(b.actual - b.budget) - Math.abs(a.actual - a.budget); });
+    var data = allData.slice(0, 10);
+
+    var ctx = document.getElementById('varianceChart');
+    if (ctx && data.length > 0) {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.map(function(d) { return d.label; }),
+                datasets: [
+                    {
+                        label: 'Budget',
+                        data: data.map(function(d) { return d.budget; }),
+                        backgroundColor: 'rgba(13, 110, 253, 0.6)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Utfall',
+                        data: data.map(function(d) { return d.actual; }),
+                        backgroundColor: data.map(function(d) {
+                            return d.actual > d.budget ? 'rgba(220, 53, 69, 0.6)' : 'rgba(25, 135, 84, 0.6)';
+                        }),
+                        borderColor: data.map(function(d) {
+                            return d.actual > d.budget ? 'rgba(220, 53, 69, 1)' : 'rgba(25, 135, 84, 1)';
+                        }),
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' },
+                    title: { display: true, text: 'Topp 10 avvikelser: Budget vs Utfall' }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString('sv-SE') + ' kr';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+})();
+</script>
+{% endif %}
 {% endblock %}

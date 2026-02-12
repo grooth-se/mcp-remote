@@ -1,28 +1,33 @@
 {% macro render_pagination(pagination, endpoint) %}
-{% if pagination.pages > 1 %}
-<nav aria-label="Sidnavigering" class="mt-3">
-    <ul class="pagination justify-content-center mb-0">
-        <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
-            <a class="page-link" href="{{ url_for(endpoint, page=pagination.prev_num, **kwargs) }}">
-                <i class="bi bi-chevron-left"></i>
-            </a>
-        </li>
-        {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-            {% if p %}
-                <li class="page-item {{ 'active' if p == pagination.page }}">
-                    <a class="page-link" href="{{ url_for(endpoint, page=p, **kwargs) }}">{{ p }}</a>
-                </li>
-            {% else %}
-                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
-            {% endif %}
-        {% endfor %}
-        <li class="page-item {{ 'disabled' if not pagination.has_next }}">
-            <a class="page-link" href="{{ url_for(endpoint, page=pagination.next_num, **kwargs) }}">
-                <i class="bi bi-chevron-right"></i>
-            </a>
-        </li>
-    </ul>
-</nav>
+{% if pagination.total > 0 %}
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <small class="text-muted">Visar {{ ((pagination.page - 1) * pagination.per_page) + 1 }}–{{ [pagination.page * pagination.per_page, pagination.total] | min }} av {{ pagination.total }}</small>
+    {% if pagination.pages > 1 %}
+    <nav aria-label="Sidnavigering">
+        <ul class="pagination mb-0">
+            <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+                <a class="page-link" href="{{ url_for(endpoint, page=pagination.prev_num, **kwargs) }}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if p %}
+                    <li class="page-item {{ 'active' if p == pagination.page }}">
+                        <a class="page-link" href="{{ url_for(endpoint, page=p, **kwargs) }}">{{ p }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+                <a class="page-link" href="{{ url_for(endpoint, page=pagination.next_num, **kwargs) }}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
 {% endif %}
 {% endmacro %}
 
