@@ -12,6 +12,7 @@
             </select>
         </form>
         {% if current_fy_id %}
+        <button onclick="window.print()" class="btn btn-sm btn-outline-secondary no-print"><i class="bi bi-printer"></i> Skriv ut</button>
         <a href="{{ url_for('reports.pnl_excel', fiscal_year_id=current_fy_id) }}" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel"></i> Excel</a>
         {% endif %}
     </div>
@@ -25,6 +26,7 @@
 
         {% for section_name, section in report.sections.items() %}
         <h6 class="mt-3">{{ section_name }}</h6>
+        <div class="table-responsive">
         <table class="table table-sm">
             <tbody>
                 {% for account, balance in section.accounts %}
@@ -44,8 +46,10 @@
                 </tr>
             </tfoot>
         </table>
+        </div>
         {% endfor %}
 
+        <div class="table-responsive">
         <table class="table table-sm mt-3">
             <tbody>
                 <tr class="table-primary">
@@ -58,6 +62,7 @@
                 </tr>
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 {% else %}

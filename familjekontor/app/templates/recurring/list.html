@@ -83,17 +83,17 @@
                             {% if t.active %}
                             <form method="post" action="{{ url_for('recurring.generate_single', template_id=t.id) }}" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" title="Generera faktura">
+                                <button type="submit" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" title="Generera faktura" aria-label="Generera faktura">
                                     <i class="bi bi-play-fill"></i>
                                 </button>
                             </form>
                             {% endif %}
                             <a href="{{ url_for('recurring.edit_recurring', template_id=t.id) }}"
-                               class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Redigera"><i class="bi bi-pencil"></i></a>
+                               class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Redigera" aria-label="Redigera"><i class="bi bi-pencil"></i></a>
                             <form method="post" action="{{ url_for('recurring.toggle_recurring', template_id=t.id) }}" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-outline-{{ 'warning' if t.active else 'success' }}"
-                                        data-bs-toggle="tooltip" title="{{ 'Pausa' if t.active else 'Aktivera' }}">
+                                        data-bs-toggle="tooltip" title="{{ 'Pausa' if t.active else 'Aktivera' }}" aria-label="{{ 'Pausa' if t.active else 'Aktivera' }}">
                                     <i class="bi bi-{{ 'pause' if t.active else 'play' }}"></i>
                                 </button>
                             </form>

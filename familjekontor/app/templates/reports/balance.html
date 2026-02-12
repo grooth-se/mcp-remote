@@ -12,6 +12,7 @@
             </select>
         </form>
         {% if current_fy_id %}
+        <button onclick="window.print()" class="btn btn-sm btn-outline-secondary no-print"><i class="bi bi-printer"></i> Skriv ut</button>
         <a href="{{ url_for('reports.balance_excel', fiscal_year_id=current_fy_id) }}" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel"></i> Excel</a>
         {% endif %}
     </div>
@@ -27,6 +28,7 @@
         {% for section_name in ['Anläggningstillgångar', 'Omsättningstillgångar'] %}
         {% set section = report.sections[section_name] %}
         <h6>{{ section_name }}</h6>
+        <div class="table-responsive">
         <table class="table table-sm">
             <tbody>
                 {% for account, balance in section.accounts %}
@@ -46,19 +48,23 @@
                 </tr>
             </tfoot>
         </table>
+        </div>
         {% endfor %}
 
+        <div class="table-responsive">
         <table class="table table-sm">
             <tr class="table-primary">
                 <td><strong>SUMMA TILLGÅNGAR</strong></td>
                 <td class="text-end"><strong>{{ "%.2f"|format(report.total_assets) }}</strong></td>
             </tr>
         </table>
+        </div>
 
         <h5 class="mt-4">EGET KAPITAL OCH SKULDER</h5>
         {% for section_name in ['Eget kapital', 'Långfristiga skulder', 'Kortfristiga skulder'] %}
         {% set section = report.sections[section_name] %}
         <h6>{{ section_name }}</h6>
+        <div class="table-responsive">
         <table class="table table-sm">
             <tbody>
                 {% for account, balance in section.accounts %}
@@ -78,14 +84,17 @@
                 </tr>
             </tfoot>
         </table>
+        </div>
         {% endfor %}
 
+        <div class="table-responsive">
         <table class="table table-sm">
             <tr class="table-info">
                 <td><strong>SUMMA EGET KAPITAL OCH SKULDER</strong></td>
                 <td class="text-end"><strong>{{ "%.2f"|format(report.total_equity_liabilities) }}</strong></td>
             </tr>
         </table>
+        </div>
     </div>
 </div>
 {% else %}

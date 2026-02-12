@@ -32,7 +32,7 @@
                                 <form method="post" action="{{ url_for('consolidation.remove_member', group_id=group.id, company_id=member.company_id) }}"
                                       class="d-inline" onsubmit="return confirm('Ta bort?')">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger" aria-label="Ta bort medlem"><i class="bi bi-x"></i></button>
                                 </form>
                             </td>
                         </tr>

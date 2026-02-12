@@ -95,7 +95,7 @@
                               action="{{ url_for('invoices.delete_line_item', invoice_id=invoice.id, line_id=item.id) }}"
                               class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Ta bort rad"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Ta bort rad" aria-label="Ta bort rad"><i class="bi bi-trash"></i></button>
                         </form>
                     </td>
                 </tr>

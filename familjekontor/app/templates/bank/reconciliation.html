@@ -90,17 +90,17 @@
                     </td>
                     <td>
                         {% if txn.status == 'unmatched' %}
-                        <a href="{{ url_for('bank.match_transaction', txn_id=txn.id) }}" class="btn btn-sm btn-outline-primary" title="Matcha">
+                        <a href="{{ url_for('bank.match_transaction', txn_id=txn.id) }}" class="btn btn-sm btn-outline-primary" title="Matcha" aria-label="Matcha">
                             <i class="bi bi-link-45deg"></i>
                         </a>
                         <form method="post" action="{{ url_for('bank.ignore_transaction', txn_id=txn.id) }}" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-sm btn-outline-secondary" title="Ignorera"><i class="bi bi-eye-slash"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" title="Ignorera" aria-label="Ignorera"><i class="bi bi-eye-slash"></i></button>
                         </form>
                         {% elif txn.status == 'matched' %}
                         <form method="post" action="{{ url_for('bank.unmatch_transaction', txn_id=txn.id) }}" class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-sm btn-outline-danger" title="Ta bort matchning"><i class="bi bi-x-circle"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" title="Ta bort matchning" aria-label="Ta bort matchning"><i class="bi bi-x-circle"></i></button>
                         </form>
                         {% endif %}
                     </td>

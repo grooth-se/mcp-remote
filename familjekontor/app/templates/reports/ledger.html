@@ -14,6 +14,7 @@
             <button class="btn btn-sm btn-primary">Visa</button>
         </form>
         {% if current_fy_id %}
+        <button onclick="window.print()" class="btn btn-sm btn-outline-secondary no-print"><i class="bi bi-printer"></i> Skriv ut</button>
         <a href="{{ url_for('reports.ledger_excel', fiscal_year_id=current_fy_id, account_number=account_number) }}" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel"></i> Excel</a>
         {% endif %}
     </div>

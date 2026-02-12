@@ -41,8 +41,12 @@ body {
 
 /* Report print styles */
 @media print {
-    .navbar, .btn, .form-select, .alert, .no-print {
+    .navbar, .btn, .form-select, .alert, .no-print, .breadcrumb {
         display: none !important;
+    }
+
+    a[href]:after {
+        content: none !important;
     }
 
     .container-fluid {
