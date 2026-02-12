@@ -122,6 +122,15 @@ body {
     margin-bottom: 0;
 }
 
+/* Clickable table rows */
+tr[data-row-link] {
+    cursor: pointer;
+}
+
+tr[data-row-link]:hover td {
+    background-color: #e9ecef;
+}
+
 /* Document drag-and-drop zone */
 .drop-zone {
     border: 2px dashed #ccc;

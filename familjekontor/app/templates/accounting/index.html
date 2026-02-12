@@ -15,6 +15,9 @@
                 {% endfor %}
             </select>
         </form>
+        {% if current_fy_id %}
+        <a href="{{ url_for('accounting.export_csv', fiscal_year_id=current_fy_id, search=search) }}" class="btn btn-outline-secondary btn-sm" data-bs-toggle="tooltip" title="Exportera till CSV"><i class="bi bi-download"></i> CSV</a>
+        {% endif %}
         <a href="{{ url_for('accounting.new_verification') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Ny</a>
     </div>
 </div>
@@ -41,7 +44,7 @@
         <tbody>
             {% if pagination %}
             {% for ver in pagination.items %}
-            <tr>
+            <tr data-row-link="{{ url_for('accounting.view_verification', verification_id=ver.id) }}">
                 <td>{{ ver.verification_number }}</td>
                 <td>{{ ver.verification_date }}</td>
                 <td>{{ ver.description }}</td>

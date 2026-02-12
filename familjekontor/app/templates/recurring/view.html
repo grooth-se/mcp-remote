@@ -14,7 +14,7 @@
     <div class="btn-group">
         <form method="post" action="{{ url_for('recurring.generate_single', template_id=template.id) }}" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-success" {% if not template.active %}disabled{% endif %}>
+            <button type="submit" class="btn btn-success" {% if not template.active %}disabled{% endif %} data-bs-toggle="tooltip" title="Generera ny faktura från mall">
                 <i class="bi bi-play-fill"></i> Generera faktura
             </button>
         </form>
@@ -142,7 +142,7 @@
                               action="{{ url_for('recurring.remove_line_item', template_id=template.id, line_id=item.id) }}"
                               class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Ta bort">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Ta bort rad">
                                 <i class="bi bi-x-lg"></i>
                             </button>
                         </form>

@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify, send_file
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy.orm import joinedload
@@ -198,6 +198,65 @@ def upload_verification_document(verification_id):
         flash('Dokument har laddats upp.', 'success')
 
     return redirect(url_for('accounting.view_verification', verification_id=verification_id))
+
+
+@accounting_bp.route('/export-csv')
+@login_required
+def export_csv():
+    company_id = session.get('active_company_id')
+    if not company_id:
+        return redirect(url_for('companies.index'))
+
+    fiscal_year_id = request.args.get('fiscal_year_id', type=int)
+    search = request.args.get('search', '')
+
+    if not fiscal_year_id:
+        fy = FiscalYear.query.filter_by(
+            company_id=company_id, status='open'
+        ).order_by(FiscalYear.year.desc()).first()
+        if fy:
+            fiscal_year_id = fy.id
+
+    if not fiscal_year_id:
+        flash('Inget räkenskapsår valt.', 'warning')
+        return redirect(url_for('accounting.index'))
+
+    query = Verification.query.filter_by(
+        company_id=company_id, fiscal_year_id=fiscal_year_id
+    )
+    if search:
+        query = query.filter(
+            db.or_(
+                Verification.description.ilike(f'%{search}%'),
+                Verification.verification_number.cast(db.String).ilike(f'%{search}%'),
+            )
+        )
+    verifications = query.order_by(Verification.verification_number).all()
+
+    rows = []
+    for v in verifications:
+        rows.append({
+            'nummer': v.verification_number,
+            'datum': str(v.verification_date),
+            'beskrivning': v.description,
+            'typ': v.verification_type or '',
+            'debet': f'{v.total_debit:.2f}',
+            'kredit': f'{v.total_credit:.2f}',
+        })
+
+    from app.services.csv_export_service import export_csv as do_export
+    columns = [
+        ('nummer', 'Nummer'),
+        ('datum', 'Datum'),
+        ('beskrivning', 'Beskrivning'),
+        ('typ', 'Typ'),
+        ('debet', 'Debet'),
+        ('kredit', 'Kredit'),
+    ]
+    output = do_export(rows, columns)
+    return send_file(output, as_attachment=True,
+                     download_name='verifikationer.csv',
+                     mimetype='text/csv')
 
 
 @accounting_bp.route('/trial-balance')

@@ -13,11 +13,11 @@
     <h2><i class="bi bi-file-earmark-text"></i> {{ invoice.invoice_number }}</h2>
     <div>
         <a href="{{ url_for('invoices.preview_invoice_pdf', invoice_id=invoice.id) }}"
-           class="btn btn-outline-primary" target="_blank">
+           class="btn btn-outline-primary" target="_blank" data-bs-toggle="tooltip" title="Förhandsgranska PDF i ny flik">
             <i class="bi bi-eye"></i> Förhandsgranska PDF
         </a>
         <a href="{{ url_for('invoices.download_invoice_pdf', invoice_id=invoice.id) }}"
-           class="btn btn-outline-success">
+           class="btn btn-outline-success" data-bs-toggle="tooltip" title="Ladda ner PDF-fil">
             <i class="bi bi-download"></i> Ladda ner PDF
         </a>
         <a href="{{ url_for('invoices.customer_invoices') }}" class="btn btn-outline-secondary">Tillbaka</a>
@@ -95,7 +95,7 @@
                               action="{{ url_for('invoices.delete_line_item', invoice_id=invoice.id, line_id=item.id) }}"
                               class="d-inline">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button class="btn btn-sm btn-outline-danger" title="Ta bort"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Ta bort rad"><i class="bi bi-trash"></i></button>
                         </form>
                     </td>
                 </tr>

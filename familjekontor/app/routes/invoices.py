@@ -878,3 +878,103 @@ def download_invoice_pdf(invoice_id):
     else:
         flash('Kunde inte generera PDF.', 'danger')
         return redirect(url_for('invoices.customer_invoice_detail', invoice_id=invoice_id))
+
+
+# === CSV Exports ===
+
+@invoices_bp.route('/supplier-invoices/export-csv')
+@login_required
+def supplier_invoices_csv():
+    company_id = session.get('active_company_id')
+    if not company_id:
+        return redirect(url_for('companies.index'))
+
+    status = request.args.get('status', '')
+    if status and status not in ('pending', 'approved', 'paid', 'cancelled'):
+        status = ''
+    search = request.args.get('search', '')
+
+    query = SupplierInvoice.query.filter_by(company_id=company_id)
+    if status:
+        query = query.filter_by(status=status)
+    if search:
+        query = query.join(Supplier).filter(
+            db.or_(SupplierInvoice.invoice_number.ilike(f'%{search}%'), Supplier.name.ilike(f'%{search}%'))
+        )
+    invoices = query.order_by(SupplierInvoice.due_date.desc()).all()
+
+    rows = []
+    for inv in invoices:
+        rows.append({
+            'leverantor': inv.supplier.name,
+            'fakturanr': inv.invoice_number,
+            'fakturadatum': str(inv.invoice_date),
+            'forfallodatum': str(inv.due_date),
+            'belopp': f'{inv.total_amount:.2f}',
+            'valuta': inv.currency,
+            'status': inv.status,
+        })
+
+    from app.services.csv_export_service import export_csv
+    columns = [
+        ('leverantor', 'Leverantör'),
+        ('fakturanr', 'Fakturanr'),
+        ('fakturadatum', 'Fakturadatum'),
+        ('forfallodatum', 'Förfallodatum'),
+        ('belopp', 'Belopp'),
+        ('valuta', 'Valuta'),
+        ('status', 'Status'),
+    ]
+    output = export_csv(rows, columns)
+    return send_file(output, as_attachment=True,
+                     download_name='leverantorsfakturor.csv',
+                     mimetype='text/csv')
+
+
+@invoices_bp.route('/customer-invoices/export-csv')
+@login_required
+def customer_invoices_csv():
+    company_id = session.get('active_company_id')
+    if not company_id:
+        return redirect(url_for('companies.index'))
+
+    status = request.args.get('status', '')
+    if status and status not in ('draft', 'sent', 'paid', 'overdue', 'cancelled'):
+        status = ''
+    search = request.args.get('search', '')
+
+    query = CustomerInvoice.query.filter_by(company_id=company_id)
+    if status:
+        query = query.filter_by(status=status)
+    if search:
+        query = query.join(Customer).filter(
+            db.or_(CustomerInvoice.invoice_number.ilike(f'%{search}%'), Customer.name.ilike(f'%{search}%'))
+        )
+    invoices = query.order_by(CustomerInvoice.invoice_date.desc()).all()
+
+    rows = []
+    for inv in invoices:
+        rows.append({
+            'kund': inv.customer.name,
+            'fakturanr': inv.invoice_number,
+            'fakturadatum': str(inv.invoice_date),
+            'forfallodatum': str(inv.due_date),
+            'belopp': f'{inv.total_amount:.2f}',
+            'valuta': inv.currency,
+            'status': inv.status,
+        })
+
+    from app.services.csv_export_service import export_csv
+    columns = [
+        ('kund', 'Kund'),
+        ('fakturanr', 'Fakturanr'),
+        ('fakturadatum', 'Fakturadatum'),
+        ('forfallodatum', 'Förfallodatum'),
+        ('belopp', 'Belopp'),
+        ('valuta', 'Valuta'),
+        ('status', 'Status'),
+    ]
+    output = export_csv(rows, columns)
+    return send_file(output, as_attachment=True,
+                     download_name='kundfakturor.csv',
+                     mimetype='text/csv')

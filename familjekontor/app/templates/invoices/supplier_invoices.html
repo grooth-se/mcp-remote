@@ -11,6 +11,7 @@
             <a href="{{ url_for('invoices.supplier_invoices', status='approved') }}" class="btn btn-outline-info {% if status == 'approved' %}active{% endif %}">Godkända</a>
             <a href="{{ url_for('invoices.supplier_invoices', status='paid') }}" class="btn btn-outline-success {% if status == 'paid' %}active{% endif %}">Betalda</a>
         </div>
+        <a href="{{ url_for('invoices.supplier_invoices_csv', status=status, search=search) }}" class="btn btn-outline-secondary btn-sm" data-bs-toggle="tooltip" title="Exportera till CSV"><i class="bi bi-download"></i> CSV</a>
         <a href="{{ url_for('invoices.new_supplier_invoice') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Ny</a>
     </div>
 </div>
@@ -55,12 +56,12 @@
                     {% if inv.status == 'pending' %}
                     <form method="POST" action="{{ url_for('invoices.approve_supplier_invoice', invoice_id=inv.id) }}" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-info">Godkänn</button>
+                        <button class="btn btn-sm btn-outline-info" data-bs-toggle="tooltip" title="Godkänn faktura">Godkänn</button>
                     </form>
                     {% elif inv.status == 'approved' %}
                     <form method="POST" action="{{ url_for('invoices.pay_supplier_invoice', invoice_id=inv.id) }}" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-success" data-confirm="Markera fakturan som betald?">Betala</button>
+                        <button class="btn btn-sm btn-outline-success" data-confirm="Markera fakturan som betald?" data-bs-toggle="tooltip" title="Markera som betald">Betala</button>
                     </form>
                     {% endif %}
                 </td>
