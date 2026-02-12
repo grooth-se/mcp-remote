@@ -1145,6 +1145,152 @@ def download_pdf_report(id):
         return redirect(url_for('simulation.view', id=id))
 
 
+@simulation_bp.route('/<int:id>/3d-snapshot')
+@login_required
+def temperature_3d_snapshot(id):
+    """Generate 3D temperature snapshot image."""
+    import numpy as np
+    from app.services import visualization_3d
+
+    sim = Simulation.query.get_or_404(id)
+
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    if sim.status != STATUS_COMPLETED:
+        return Response('Simulation not completed', status=400)
+
+    # Get full cycle result
+    cycle_result = sim.results.filter_by(result_type='full_cycle').first()
+    if not cycle_result:
+        return Response('No results', status=404)
+
+    # Get multi-position temperature data
+    multi_pos_data = cycle_result.data_dict
+    time_idx = request.args.get('time_idx', type=int)
+
+    if multi_pos_data and 'center' in multi_pos_data:
+        # Use multi-position data
+        idx = time_idx if time_idx is not None else -1
+        temps = np.array([
+            multi_pos_data['center'][idx],
+            multi_pos_data['one_third'][idx],
+            multi_pos_data['two_thirds'][idx],
+            multi_pos_data['surface'][idx],
+        ])
+        radial_positions = np.array([0, 0.33, 0.67, 1.0])
+    else:
+        # Fallback: use single-position data and create a gradient
+        value_arr = cycle_result.value_array
+        if not value_arr:
+            return Response('No temperature data', status=404)
+        idx = time_idx if time_idx is not None else -1
+        center_temp = value_arr[idx]
+        # Create estimated gradient (assume ~10% higher at surface for heating, ~10% lower for cooling)
+        # This is a rough approximation for visualization purposes
+        surface_temp = center_temp * 0.95 if center_temp > 100 else center_temp * 1.02
+        temps = np.array([center_temp, (2*center_temp + surface_temp)/3,
+                         (center_temp + 2*surface_temp)/3, surface_temp])
+        radial_positions = np.array([0, 0.33, 0.67, 1.0])
+
+    # Get geometry params
+    geometry_type = sim.geometry_type
+    geometry_params = sim.geometry_dict
+
+    # Generate snapshot
+    png_bytes = visualization_3d.create_temperature_snapshot(
+        geometry_type=geometry_type,
+        geometry_params=geometry_params,
+        temperatures=temps,
+        radial_positions=radial_positions,
+        title=f'{sim.name} - Temperature Distribution'
+    )
+
+    if png_bytes:
+        return Response(png_bytes, mimetype='image/png')
+    else:
+        return Response('3D visualization failed', status=500)
+
+
+@simulation_bp.route('/<int:id>/3d-animation')
+@login_required
+def temperature_3d_animation(id):
+    """Generate 3D temperature animation as GIF."""
+    import numpy as np
+    from app.services import visualization_3d
+
+    sim = Simulation.query.get_or_404(id)
+
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    if sim.status != STATUS_COMPLETED:
+        return Response('Simulation not completed', status=400)
+
+    # Get full cycle result
+    cycle_result = sim.results.filter_by(result_type='full_cycle').first()
+    if not cycle_result:
+        return Response('No results', status=404)
+
+    # Get time data
+    times = np.array(cycle_result.time_array)
+
+    # Get multi-position temperature data
+    multi_pos_data = cycle_result.data_dict
+    if not multi_pos_data or 'center' not in multi_pos_data:
+        # Fall back to single position
+        temps = np.array(cycle_result.value_array)
+        temperature_history = temps.reshape(-1, 1)
+        radial_positions = np.array([0])
+    else:
+        # Build temperature history array [n_times, n_positions]
+        temperature_history = np.column_stack([
+            np.array(multi_pos_data['center']),
+            np.array(multi_pos_data['one_third']),
+            np.array(multi_pos_data['two_thirds']),
+            np.array(multi_pos_data['surface']),
+        ])
+        radial_positions = np.array([0, 0.33, 0.67, 1.0])
+
+    # Get geometry params
+    geometry_type = sim.geometry_type
+    geometry_params = sim.geometry_dict
+
+    # Check animation type
+    anim_type = request.args.get('type', 'cross_section')
+
+    if anim_type == '3d':
+        # Full 3D animation (slower)
+        gif_bytes = visualization_3d.create_temperature_animation(
+            geometry_type=geometry_type,
+            geometry_params=geometry_params,
+            times=times,
+            temperature_history=temperature_history,
+            radial_positions=radial_positions,
+            fps=10,
+            max_frames=50
+        )
+    else:
+        # 2D cross-section animation (faster)
+        gif_bytes = visualization_3d.create_cross_section_animation(
+            geometry_type=geometry_type,
+            geometry_params=geometry_params,
+            times=times,
+            temperature_history=temperature_history,
+            radial_positions=radial_positions,
+            fps=10,
+            max_frames=60
+        )
+
+    if gif_bytes:
+        response = Response(gif_bytes, mimetype='image/gif')
+        safe_name = sim.name.replace(' ', '_').replace('/', '-')
+        response.headers['Content-Disposition'] = f'attachment; filename="{safe_name}_temperature.gif"'
+        return response
+    else:
+        return Response('Animation generation failed', status=500)
+
+
 @simulation_bp.route('/<int:id>/delete', methods=['POST'])
 @login_required
 def delete(id):

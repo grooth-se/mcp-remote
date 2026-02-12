@@ -21,6 +21,7 @@ from .report_generator import (
     SimulationPDFReportGenerator, generate_simulation_pdf_report
 )
 from . import visualization
+from . import visualization_3d
 from . import comsol
 
 __all__ = [

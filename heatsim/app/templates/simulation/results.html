@@ -655,6 +655,64 @@
 {% endif %}
 
 <!-- ============================================================ -->
+<!-- SECTION 5b: 3D Temperature Visualization -->
+<!-- ============================================================ -->
+{% if sim.status == 'completed' and sim.geometry_type in ['cylinder', 'hollow_cylinder', 'plate'] %}
+<h5 class="mt-4"><i class="bi bi-badge-3d"></i> 3D Temperature Visualization</h5>
+<div class="row mb-3">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-thermometer-sun"></i> Temperature Distribution (Final State)</span>
+                <div class="btn-group btn-group-sm">
+                    <a href="{{ url_for('simulation.temperature_3d_snapshot', id=sim.id) }}"
+                       class="btn btn-outline-primary" target="_blank" title="Open 3D snapshot in new tab">
+                        <i class="bi bi-arrows-fullscreen"></i> Full Size
+                    </a>
+                    <a href="{{ url_for('simulation.temperature_3d_animation', id=sim.id) }}"
+                       class="btn btn-outline-success" title="Download animation GIF">
+                        <i class="bi bi-film"></i> Animation
+                    </a>
+                </div>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('simulation.temperature_3d_snapshot', id=sim.id) }}"
+                     class="img-fluid" alt="3D Temperature Distribution"
+                     style="max-height: 400px;">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Visualization Info
+            </div>
+            <div class="card-body">
+                <p class="small mb-2">
+                    <strong>3D Snapshot</strong> shows the temperature distribution
+                    at the final simulation time step.
+                </p>
+                <ul class="small text-muted mb-2">
+                    <li>Color scale: blue (cold) to red (hot)</li>
+                    <li>Cross-section view for internal structure</li>
+                    <li>Temperature range from min to max</li>
+                </ul>
+                <hr>
+                <p class="small mb-2">
+                    <strong>Animation</strong> shows temperature evolution
+                    throughout the heat treatment cycle.
+                </p>
+                <ul class="small text-muted mb-0">
+                    <li>GIF format (may take a few seconds to generate)</li>
+                    <li>Shows heating, transfer, quenching phases</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
 <!-- SECTION 6: Hardness Prediction -->
 <!-- ============================================================ -->
 {% if hardness_results %}
