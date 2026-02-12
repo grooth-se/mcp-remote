@@ -1,5 +1,13 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Ny verifikation - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Verifikationer', 'url': url_for('accounting.index')},
+    {'title': 'Ny'}
+]) }}
+{% endblock %}
 {% block content %}
 <h2>Ny verifikation <small class="text-muted">{{ fiscal_year.year }}</small></h2>
 <form method="POST" id="verificationForm">

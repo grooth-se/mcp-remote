@@ -31,7 +31,15 @@ def index():
 
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
+    sort = request.args.get('sort', 'verification_number')
+    order = request.args.get('order', 'desc')
     fiscal_years = FiscalYear.query.filter_by(company_id=company_id).order_by(FiscalYear.year.desc()).all()
+
+    ALLOWED_SORTS = {
+        'verification_number': Verification.verification_number,
+        'verification_date': Verification.verification_date,
+        'description': Verification.description,
+    }
 
     pagination = None
     if fiscal_year_id:
@@ -47,15 +55,18 @@ def index():
                     Verification.verification_number.cast(db.String).ilike(f'%{search}%'),
                 )
             )
-        pagination = query.order_by(
-            Verification.verification_number.desc()
-        ).paginate(page=page, per_page=25, error_out=False)
+        sort_col = ALLOWED_SORTS.get(sort)
+        if sort_col is not None:
+            query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+        else:
+            query = query.order_by(Verification.verification_number.desc())
+        pagination = query.paginate(page=page, per_page=25, error_out=False)
 
     return render_template('accounting/index.html',
                            pagination=pagination,
                            fiscal_years=fiscal_years,
                            current_fy_id=fiscal_year_id,
-                           search=search)
+                           search=search, sort=sort, order=order)
 
 
 @accounting_bp.route('/verification/new', methods=['GET', 'POST'])

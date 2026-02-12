@@ -1,17 +1,16 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Förhandsgranska bokslut — {{ fiscal_year.year }}{% endblock %}
 
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Årsbokslut', 'url': url_for('closing.index')},
+    {'title': 'Förhandsgranska ' ~ fiscal_year.year}
+]) }}
+{% endblock %}
+
 {% block content %}
-<div class="row mb-3">
-    <div class="col-12">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ url_for('closing.index') }}">Årsbokslut</a></li>
-                <li class="breadcrumb-item active">Förhandsgranska {{ fiscal_year.year }}</li>
-            </ol>
-        </nav>
-    </div>
-</div>
 
 <div class="row mb-4">
     <div class="col-md-4">

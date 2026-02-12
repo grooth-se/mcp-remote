@@ -28,13 +28,28 @@ def suppliers():
 
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
+    sort = request.args.get('sort', 'name')
+    order = request.args.get('order', 'asc')
+
+    ALLOWED_SORTS = {
+        'name': Supplier.name,
+        'org_number': Supplier.org_number,
+        'payment_terms': Supplier.payment_terms,
+    }
+
     query = Supplier.query.filter_by(company_id=company_id, active=True)
     if search:
         query = query.filter(
             db.or_(Supplier.name.ilike(f'%{search}%'), Supplier.org_number.ilike(f'%{search}%'))
         )
-    pagination = query.order_by(Supplier.name).paginate(page=page, per_page=25, error_out=False)
-    return render_template('invoices/suppliers.html', pagination=pagination, search=search)
+    sort_col = ALLOWED_SORTS.get(sort)
+    if sort_col is not None:
+        query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+    else:
+        query = query.order_by(Supplier.name.asc())
+    pagination = query.paginate(page=page, per_page=25, error_out=False)
+    return render_template('invoices/suppliers.html', pagination=pagination,
+                           search=search, sort=sort, order=order)
 
 
 @invoices_bp.route('/suppliers/new', methods=['GET', 'POST'])
@@ -109,6 +124,16 @@ def supplier_invoices():
         status = ''
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
+    sort = request.args.get('sort', 'due_date')
+    order = request.args.get('order', 'desc')
+
+    ALLOWED_SORTS = {
+        'invoice_number': SupplierInvoice.invoice_number,
+        'invoice_date': SupplierInvoice.invoice_date,
+        'due_date': SupplierInvoice.due_date,
+        'total_amount': SupplierInvoice.total_amount,
+    }
+
     query = SupplierInvoice.query.filter_by(company_id=company_id)
     if status:
         query = query.filter_by(status=status)
@@ -116,9 +141,15 @@ def supplier_invoices():
         query = query.join(Supplier).filter(
             db.or_(SupplierInvoice.invoice_number.ilike(f'%{search}%'), Supplier.name.ilike(f'%{search}%'))
         )
-    pagination = query.order_by(SupplierInvoice.due_date.desc()).paginate(page=page, per_page=25, error_out=False)
+    sort_col = ALLOWED_SORTS.get(sort)
+    if sort_col is not None:
+        query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+    else:
+        query = query.order_by(SupplierInvoice.due_date.desc())
+    pagination = query.paginate(page=page, per_page=25, error_out=False)
 
-    return render_template('invoices/supplier_invoices.html', pagination=pagination, status=status, search=search)
+    return render_template('invoices/supplier_invoices.html', pagination=pagination,
+                           status=status, search=search, sort=sort, order=order)
 
 
 @invoices_bp.route('/supplier-invoices/new', methods=['GET', 'POST'])
@@ -438,13 +469,28 @@ def customers():
 
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
+    sort = request.args.get('sort', 'name')
+    order = request.args.get('order', 'asc')
+
+    ALLOWED_SORTS = {
+        'name': Customer.name,
+        'org_number': Customer.org_number,
+        'payment_terms': Customer.payment_terms,
+    }
+
     query = Customer.query.filter_by(company_id=company_id, active=True)
     if search:
         query = query.filter(
             db.or_(Customer.name.ilike(f'%{search}%'), Customer.org_number.ilike(f'%{search}%'))
         )
-    pagination = query.order_by(Customer.name).paginate(page=page, per_page=25, error_out=False)
-    return render_template('invoices/customers.html', pagination=pagination, search=search)
+    sort_col = ALLOWED_SORTS.get(sort)
+    if sort_col is not None:
+        query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+    else:
+        query = query.order_by(Customer.name.asc())
+    pagination = query.paginate(page=page, per_page=25, error_out=False)
+    return render_template('invoices/customers.html', pagination=pagination,
+                           search=search, sort=sort, order=order)
 
 
 @invoices_bp.route('/customers/new', methods=['GET', 'POST'])
@@ -491,6 +537,16 @@ def customer_invoices():
         status = ''
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
+    sort = request.args.get('sort', 'invoice_date')
+    order = request.args.get('order', 'desc')
+
+    ALLOWED_SORTS = {
+        'invoice_number': CustomerInvoice.invoice_number,
+        'invoice_date': CustomerInvoice.invoice_date,
+        'due_date': CustomerInvoice.due_date,
+        'total_amount': CustomerInvoice.total_amount,
+    }
+
     query = CustomerInvoice.query.filter_by(company_id=company_id)
     if status:
         query = query.filter_by(status=status)
@@ -498,9 +554,15 @@ def customer_invoices():
         query = query.join(Customer).filter(
             db.or_(CustomerInvoice.invoice_number.ilike(f'%{search}%'), Customer.name.ilike(f'%{search}%'))
         )
-    pagination = query.order_by(CustomerInvoice.invoice_date.desc()).paginate(page=page, per_page=25, error_out=False)
+    sort_col = ALLOWED_SORTS.get(sort)
+    if sort_col is not None:
+        query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+    else:
+        query = query.order_by(CustomerInvoice.invoice_date.desc())
+    pagination = query.paginate(page=page, per_page=25, error_out=False)
 
-    return render_template('invoices/customer_invoices.html', pagination=pagination, status=status, search=search)
+    return render_template('invoices/customer_invoices.html', pagination=pagination,
+                           status=status, search=search, sort=sort, order=order)
 
 
 @invoices_bp.route('/customer-invoices/new', methods=['GET', 'POST'])

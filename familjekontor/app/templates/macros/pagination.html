@@ -25,3 +25,19 @@
 </nav>
 {% endif %}
 {% endmacro %}
+
+{% macro sortable_header(title, column, current_sort, current_order, endpoint, class='') %}
+{% set new_order = 'asc' if (current_sort == column and current_order == 'desc') else 'desc' %}
+<th class="{{ class }}">
+    <a href="{{ url_for(endpoint, sort=column, order=new_order, **kwargs) }}" class="text-decoration-none text-dark">
+        {{ title }}
+        {% if current_sort == column %}
+            {% if current_order == 'asc' %}
+            <i class="bi bi-chevron-up"></i>
+            {% else %}
+            <i class="bi bi-chevron-down"></i>
+            {% endif %}
+        {% endif %}
+    </a>
+</th>
+{% endmacro %}

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "macros/pagination.html" import render_pagination %}
+{% from "macros/pagination.html" import render_pagination, sortable_header %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Verifikationer - Familjekontor{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -19,6 +20,8 @@
 </div>
 <form class="mb-3" method="GET">
     {% if current_fy_id %}<input type="hidden" name="fiscal_year_id" value="{{ current_fy_id }}">{% endif %}
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="order" value="{{ order }}">
     <div class="input-group input-group-sm" style="max-width:400px;">
         <input type="text" name="search" class="form-control" placeholder="Sök beskrivning eller nummer..." value="{{ search }}">
         <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
@@ -28,7 +31,12 @@
 <div class="table-responsive">
     <table class="table table-hover">
         <thead>
-            <tr><th>#</th><th>Datum</th><th>Beskrivning</th><th>Typ</th><th class="text-end">Debet</th><th class="text-end">Kredit</th><th><i class="bi bi-paperclip"></i></th><th></th></tr>
+            <tr>
+                {{ sortable_header('#', 'verification_number', sort, order, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
+                {{ sortable_header('Datum', 'verification_date', sort, order, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
+                {{ sortable_header('Beskrivning', 'description', sort, order, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
+                <th>Typ</th><th class="text-end">Debet</th><th class="text-end">Kredit</th><th><i class="bi bi-paperclip"></i></th><th></th>
+            </tr>
         </thead>
         <tbody>
             {% if pagination %}
@@ -61,7 +69,7 @@
     </table>
 </div>
 {% if pagination %}
-{{ render_pagination(pagination, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
+{{ render_pagination(pagination, 'accounting.index', fiscal_year_id=current_fy_id, search=search, sort=sort, order=order) }}
 {% endif %}
 {% endblock %}
 

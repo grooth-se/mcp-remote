@@ -1,5 +1,22 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}{{ 'Redigera' if is_edit else 'Ny' }} återkommande fakturamall - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{% if is_edit %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Återkommande', 'url': url_for('recurring.recurring_list')},
+    {'title': template.name, 'url': url_for('recurring.view_recurring', template_id=template.id)},
+    {'title': 'Redigera'}
+]) }}
+{% else %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Återkommande', 'url': url_for('recurring.recurring_list')},
+    {'title': 'Ny'}
+]) }}
+{% endif %}
+{% endblock %}
 {% block content %}
 <div class="row">
     <div class="col-md-8">

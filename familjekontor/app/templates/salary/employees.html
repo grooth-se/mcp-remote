@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/pagination.html" import render_pagination %}
+{% from "macros/pagination.html" import render_pagination, sortable_header %}
 {% block title %}Anställda - Familjekontor{% endblock %}
 {% block content %}
 <div class="row mb-3">
@@ -24,6 +24,8 @@
 
 <form class="mb-3" method="GET">
     {% if show_inactive %}<input type="hidden" name="show_inactive" value="1">{% endif %}
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="order" value="{{ order }}">
     <div class="input-group input-group-sm" style="max-width:400px;">
         <input type="text" name="search" class="form-control" placeholder="Sök namn..." value="{{ search }}">
         <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
@@ -36,11 +38,11 @@
         <table class="table table-sm mb-0">
             <thead>
                 <tr>
-                    <th>Namn</th>
+                    {{ sortable_header('Namn', 'last_name', sort, order, 'salary.employees', show_inactive='1' if show_inactive else '', search=search) }}
                     <th>Personnummer</th>
                     <th>E-post</th>
-                    <th class="text-end">Månadslön</th>
-                    <th>Pension</th>
+                    {{ sortable_header('Månadslön', 'monthly_salary', sort, order, 'salary.employees', class='text-end', show_inactive='1' if show_inactive else '', search=search) }}
+                    {{ sortable_header('Pension', 'pension_plan', sort, order, 'salary.employees', show_inactive='1' if show_inactive else '', search=search) }}
                     <th>Status</th>
                     <th></th>
                 </tr>
@@ -80,5 +82,5 @@
         </table>
     </div>
 </div>
-{{ render_pagination(pagination, 'salary.employees', show_inactive='1' if show_inactive else '', search=search) }}
+{{ render_pagination(pagination, 'salary.employees', show_inactive='1' if show_inactive else '', search=search, sort=sort, order=order) }}
 {% endblock %}

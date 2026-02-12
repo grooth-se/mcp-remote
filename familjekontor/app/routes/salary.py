@@ -75,6 +75,15 @@ def employees():
     show_inactive = request.args.get('show_inactive', '0') == '1'
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
+    sort = request.args.get('sort', 'last_name')
+    order = request.args.get('order', 'asc')
+
+    ALLOWED_SORTS = {
+        'last_name': Employee.last_name,
+        'monthly_salary': Employee.monthly_salary,
+        'pension_plan': Employee.pension_plan,
+    }
+
     query = Employee.query.filter_by(company_id=company_id)
     if not show_inactive:
         query = query.filter_by(active=True)
@@ -82,11 +91,17 @@ def employees():
         query = query.filter(
             db.or_(Employee.last_name.ilike(f'%{search}%'), Employee.first_name.ilike(f'%{search}%'))
         )
-    pagination = query.order_by(Employee.last_name, Employee.first_name).paginate(page=page, per_page=25, error_out=False)
+    sort_col = ALLOWED_SORTS.get(sort)
+    if sort_col is not None:
+        query = query.order_by(sort_col.desc() if order == 'desc' else sort_col.asc())
+    else:
+        query = query.order_by(Employee.last_name.asc(), Employee.first_name.asc())
+    pagination = query.paginate(page=page, per_page=25, error_out=False)
 
     return render_template('salary/employees.html',
                            pagination=pagination, company=company,
-                           show_inactive=show_inactive, search=search)
+                           show_inactive=show_inactive, search=search,
+                           sort=sort, order=order)
 
 
 @salary_bp.route('/employees/new', methods=['GET', 'POST'])
