@@ -1675,3 +1675,180 @@ def create_jominy_phases_plot(
     plt.close(fig)
 
     return buf.getvalue()
+
+
+# ============================================================
+# Sensitivity Analysis Plots
+# ============================================================
+
+OUTPUT_LABELS = {
+    't8_5': 't₈/₅ (s)',
+    'core_cooling_rate': 'Core Cooling Rate (K/s)',
+    'surface_cooling_rate': 'Surface Cooling Rate (K/s)',
+    'hardness_hv_center': 'Center Hardness (HV)',
+    'hardness_hv_surface': 'Surface Hardness (HV)',
+}
+
+
+def create_tornado_plot(
+    sensitivity_data: dict,
+    output_key: str = 't8_5',
+    title: str = "Sensitivity Analysis"
+) -> bytes:
+    """Generate tornado plot showing parameter impact on a given output.
+
+    Parameters
+    ----------
+    sensitivity_data : dict
+        Result from SensitivityAnalysisResult.to_dict()
+    output_key : str
+        Which output metric to display
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    parameters = sensitivity_data.get('parameters', [])
+    output_label = OUTPUT_LABELS.get(output_key, output_key)
+
+    labels = []
+    low_impacts = []
+    high_impacts = []
+
+    for p in parameters:
+        base_val = p['base_outputs'].get(output_key, 0)
+        if base_val == 0:
+            continue
+        outputs = p['outputs'].get(output_key, [])
+        if not outputs:
+            continue
+
+        pct_changes = [(v - base_val) / base_val * 100 for v in outputs]
+        low_impacts.append(min(pct_changes))
+        high_impacts.append(max(pct_changes))
+        labels.append(p['label'])
+
+    if not labels:
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.text(0.5, 0.5, f'No sensitivity data for {output_label}',
+                ha='center', va='center', transform=ax.transAxes, fontsize=14)
+        ax.set_axis_off()
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+        buf.seek(0)
+        plt.close(fig)
+        return buf.getvalue()
+
+    # Sort by total impact range (largest at top)
+    total_impact = [abs(h - l) for h, l in zip(high_impacts, low_impacts)]
+    sorted_idx = np.argsort(total_impact)
+
+    fig, ax = plt.subplots(figsize=(10, max(3, len(labels) * 0.8 + 1)))
+
+    y_pos = np.arange(len(labels))
+    for i, idx in enumerate(sorted_idx):
+        ax.barh(i, high_impacts[idx], color='#e74c3c', alpha=0.75,
+                height=0.5, align='center', label='Increase' if i == len(sorted_idx) - 1 else None)
+        ax.barh(i, low_impacts[idx], color='#3498db', alpha=0.75,
+                height=0.5, align='center', label='Decrease' if i == len(sorted_idx) - 1 else None)
+
+        # Value annotations
+        if high_impacts[idx] != 0:
+            ax.text(high_impacts[idx] + 0.5, i, f'{high_impacts[idx]:+.1f}%',
+                    va='center', ha='left', fontsize=9)
+        if low_impacts[idx] != 0:
+            ax.text(low_impacts[idx] - 0.5, i, f'{low_impacts[idx]:+.1f}%',
+                    va='center', ha='right', fontsize=9)
+
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels([labels[i] for i in sorted_idx], fontsize=11)
+    ax.set_xlabel(f'% Change in {output_label}', fontsize=12)
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.axvline(x=0, color='black', linewidth=0.8)
+    ax.grid(True, axis='x', alpha=0.3)
+    ax.legend(loc='lower right', fontsize=9)
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_spider_plot(
+    sensitivity_data: dict,
+    title: str = "Parameter Sensitivity Overview"
+) -> bytes:
+    """Generate radar/spider chart showing sensitivity of all outputs to all parameters.
+
+    Each output metric is a separate line on the radar chart; each axis is a parameter.
+
+    Parameters
+    ----------
+    sensitivity_data : dict
+        Result from SensitivityAnalysisResult.to_dict()
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    parameters = sensitivity_data.get('parameters', [])
+    if not parameters:
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.text(0.5, 0.5, 'No sensitivity data', ha='center', va='center',
+                transform=ax.transAxes, fontsize=14)
+        ax.set_axis_off()
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+        buf.seek(0)
+        plt.close(fig)
+        return buf.getvalue()
+
+    param_labels = [p['label'] for p in parameters]
+    n_params = len(param_labels)
+    angles = np.linspace(0, 2 * np.pi, n_params, endpoint=False).tolist()
+    angles += angles[:1]  # Close the polygon
+
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
+
+    colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6']
+    output_keys = ['t8_5', 'hardness_hv_center', 'hardness_hv_surface']
+
+    for i, output_key in enumerate(output_keys):
+        if output_key not in OUTPUT_LABELS:
+            continue
+
+        values = []
+        for p in parameters:
+            base_val = p['base_outputs'].get(output_key, 0)
+            outputs = p['outputs'].get(output_key, [])
+            if base_val == 0 or not outputs:
+                values.append(0)
+                continue
+            pct_changes = [abs((v - base_val) / base_val * 100) for v in outputs]
+            values.append(max(pct_changes))
+
+        values += values[:1]
+        ax.plot(angles, values, 'o-', color=colors[i % len(colors)],
+                linewidth=2, label=OUTPUT_LABELS[output_key], markersize=5)
+        ax.fill(angles, values, color=colors[i % len(colors)], alpha=0.1)
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(param_labels, fontsize=10)
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
+    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1), fontsize=9)
+    ax.set_ylabel('Max % Change', fontsize=10, labelpad=30)
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()

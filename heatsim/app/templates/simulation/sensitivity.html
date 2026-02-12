@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Sensitivity Analysis - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item active">Sensitivity Analysis</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3><i class="bi bi-bar-chart-steps"></i> Sensitivity Analysis</h3>
+    <div>
+        <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Results
+        </a>
+        <form method="post" class="d-inline ms-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-primary btn-sm" id="runBtn">
+                <i class="bi bi-play-fill"></i> {% if sa_data %}Re-run{% else %}Run{% endif %} Analysis
+            </button>
+        </form>
+    </div>
+</div>
+
+<p class="text-muted mb-3">
+    One-at-a-time parameter variation showing impact on key outputs (t₈/₅, cooling rates, hardness).
+    Each parameter is varied from its base value.
+</p>
+
+{% if sa_data %}
+
+<!-- Tornado Plot -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bar-chart-steps"></i> Tornado Plot (Parameter Impact)</span>
+                <select class="form-select form-select-sm w-auto" id="outputSelector" onchange="updateTornado(this.value)">
+                    <option value="t8_5">t₈/₅ Cooling Time</option>
+                    <option value="hardness_hv_center">Center Hardness (HV)</option>
+                    <option value="hardness_hv_surface">Surface Hardness (HV)</option>
+                    <option value="core_cooling_rate">Core Cooling Rate</option>
+                    <option value="surface_cooling_rate">Surface Cooling Rate</option>
+                </select>
+            </div>
+            <div class="card-body text-center">
+                {% if tornado_result and tornado_result.has_plot %}
+                <img id="tornadoImg"
+                     src="{{ url_for('simulation.result_image', id=sim.id, result_id=tornado_result.id) }}"
+                     class="img-fluid" alt="Tornado Plot">
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-info-circle"></i> How to Read</div>
+            <div class="card-body small">
+                <ul class="mb-0">
+                    <li><span class="text-primary fw-bold">Blue bars</span>: effect of decreasing the parameter</li>
+                    <li><span class="text-danger fw-bold">Red bars</span>: effect of increasing the parameter</li>
+                    <li>Longer bars = higher sensitivity</li>
+                    <li>Parameters sorted by total impact</li>
+                </ul>
+            </div>
+        </div>
+        <!-- Spider Plot -->
+        <div class="card">
+            <div class="card-header"><i class="bi bi-diagram-3"></i> Sensitivity Overview</div>
+            <div class="card-body text-center p-2">
+                <img src="{{ url_for('simulation.sensitivity_spider', id=sim.id) }}"
+                     class="img-fluid" alt="Spider Plot">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Base Values -->
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-bullseye"></i> Base Simulation Values</div>
+    <div class="card-body">
+        <div class="row g-3 text-center">
+            {% set base = sa_data.parameters[0].base_outputs if sa_data.parameters else {} %}
+            {% if base.t8_5 %}
+            <div class="col-6 col-md">
+                <div class="text-muted small">t₈/₅</div>
+                <div class="fs-5 fw-bold">{{ base.t8_5|round(2) }} s</div>
+            </div>
+            {% endif %}
+            {% if base.core_cooling_rate %}
+            <div class="col-6 col-md">
+                <div class="text-muted small">Core Cooling Rate</div>
+                <div class="fs-5 fw-bold">{{ base.core_cooling_rate|round(1) }} K/s</div>
+            </div>
+            {% endif %}
+            {% if base.surface_cooling_rate %}
+            <div class="col-6 col-md">
+                <div class="text-muted small">Surface Cooling Rate</div>
+                <div class="fs-5 fw-bold">{{ base.surface_cooling_rate|round(1) }} K/s</div>
+            </div>
+            {% endif %}
+            {% if base.hardness_hv_center %}
+            <div class="col-6 col-md">
+                <div class="text-muted small">Center HV</div>
+                <div class="fs-5 fw-bold">{{ base.hardness_hv_center|round(0)|int }}</div>
+            </div>
+            {% endif %}
+            {% if base.hardness_hv_surface %}
+            <div class="col-6 col-md">
+                <div class="text-muted small">Surface HV</div>
+                <div class="fs-5 fw-bold">{{ base.hardness_hv_surface|round(0)|int }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Results Table -->
+<div class="card">
+    <div class="card-header"><i class="bi bi-table"></i> Detailed Results</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Base Value</th>
+                        <th>Variation</th>
+                        <th>Value</th>
+                        <th>t₈/₅ (s)</th>
+                        <th>HV Center</th>
+                        <th>HV Surface</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for param in sa_data.parameters %}
+                    {% for i in range(param.variations|length) %}
+                    <tr{% if param.variations[i] > 0 %} class="table-danger bg-opacity-10"{% elif param.variations[i] < 0 %} class="table-primary bg-opacity-10"{% endif %}>
+                        {% if i == 0 %}
+                        <td rowspan="{{ param.variations|length }}" class="fw-bold align-middle">{{ param.label }}</td>
+                        <td rowspan="{{ param.variations|length }}" class="align-middle">{{ param.base_value }} {{ param.unit }}</td>
+                        {% endif %}
+                        <td>{{ (param.variations[i] * 100)|round(0)|int }}%</td>
+                        <td>{{ param.actual_values[i]|round(1) }} {{ param.unit }}</td>
+                        <td>{{ param.outputs.t8_5[i]|round(2) if param.outputs.t8_5 else '-' }}</td>
+                        <td>{{ param.outputs.hardness_hv_center[i]|round(0)|int if param.outputs.hardness_hv_center and param.outputs.hardness_hv_center[i] else '-' }}</td>
+                        <td>{{ param.outputs.hardness_hv_surface[i]|round(0)|int if param.outputs.hardness_hv_surface and param.outputs.hardness_hv_surface[i] else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    Click <strong>"Run Analysis"</strong> to perform sensitivity analysis. This re-runs the solver
+    with varied parameters (austenitizing temperature, quench HTC, transfer time, part size,
+    and tempering temperature if applicable). Takes 1-3 minutes depending on simulation complexity.
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateTornado(outputKey) {
+    document.getElementById('tornadoImg').src =
+        '{{ url_for("simulation.sensitivity_tornado", id=sim.id, output_key="__KEY__") }}'.replace('__KEY__', outputKey);
+}
+
+// Submit spinner
+document.getElementById('runBtn')?.closest('form')?.addEventListener('submit', function() {
+    const btn = document.getElementById('runBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Running...';
+});
+</script>
+{% endblock %}

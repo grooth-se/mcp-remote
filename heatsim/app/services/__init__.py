@@ -17,6 +17,7 @@ from .cad_geometry import CADGeometryAnalyzer, CADAnalysisResult, analyze_step_f
 from .hardness_predictor import HardnessPredictor, HardnessResult, predict_hardness_profile
 from .jominy_service import JominySimulator, JominyResult, simulate_jominy_test
 from .comparison_service import ComparisonService, ComparisonMetrics
+from .sensitivity_analysis import SensitivityAnalyzer, SensitivityAnalysisResult
 from .report_generator import (
     SimulationReportGenerator, generate_simulation_report,
     SimulationPDFReportGenerator, generate_simulation_pdf_report

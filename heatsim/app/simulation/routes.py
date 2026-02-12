@@ -1298,6 +1298,105 @@ def temperature_3d_animation(id):
         return Response('Animation generation failed', status=500)
 
 
+@simulation_bp.route('/<int:id>/sensitivity', methods=['GET', 'POST'])
+@login_required
+def sensitivity(id):
+    """Sensitivity analysis for a completed simulation."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    if sim.status != STATUS_COMPLETED:
+        flash('Simulation must be completed before sensitivity analysis.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    existing = sim.results.filter_by(result_type='sensitivity_analysis').first()
+
+    if request.method == 'POST':
+        from app.services.sensitivity_analysis import SensitivityAnalyzer
+        try:
+            if existing:
+                db.session.delete(existing)
+                db.session.flush()
+
+            analyzer = SensitivityAnalyzer(sim)
+            sa_result = analyzer.analyze()
+
+            result = SimulationResult(
+                simulation_id=sim.id,
+                result_type='sensitivity_analysis',
+                phase='full',
+                location='all'
+            )
+            result.set_data(sa_result.to_dict())
+
+            # Generate default tornado plot (t8/5)
+            result.plot_image = visualization.create_tornado_plot(
+                sa_result.to_dict(),
+                output_key='t8_5',
+                title=f'Sensitivity Analysis - {sim.name}'
+            )
+
+            db.session.add(result)
+            db.session.commit()
+
+            flash('Sensitivity analysis completed.', 'success')
+            return redirect(url_for('simulation.sensitivity', id=id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Sensitivity analysis failed: {e}', 'danger')
+
+    sa_data = existing.data_dict if existing else None
+    tornado_result = existing if existing and existing.has_plot else None
+
+    return render_template(
+        'simulation/sensitivity.html',
+        sim=sim,
+        sa_data=sa_data,
+        tornado_result=tornado_result,
+    )
+
+
+@simulation_bp.route('/<int:id>/sensitivity/tornado/<output_key>')
+@login_required
+def sensitivity_tornado(id, output_key):
+    """Serve tornado plot for a specific output metric."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    existing = sim.results.filter_by(result_type='sensitivity_analysis').first()
+    if not existing:
+        return Response('No sensitivity data', status=404)
+
+    plot_bytes = visualization.create_tornado_plot(
+        existing.data_dict,
+        output_key=output_key,
+        title=f'Sensitivity: {output_key} - {sim.name}'
+    )
+    return Response(plot_bytes, mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/sensitivity/spider')
+@login_required
+def sensitivity_spider(id):
+    """Serve spider plot for sensitivity overview."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    existing = sim.results.filter_by(result_type='sensitivity_analysis').first()
+    if not existing:
+        return Response('No sensitivity data', status=404)
+
+    plot_bytes = visualization.create_spider_plot(
+        existing.data_dict,
+        title=f'Sensitivity Overview - {sim.name}'
+    )
+    return Response(plot_bytes, mimetype='image/png')
+
+
 @simulation_bp.route('/<int:id>/delete', methods=['POST'])
 @login_required
 def delete(id):
