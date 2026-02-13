@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">My Profile</li>
+    </ol>
+</nav>
+
+<h2><i class="bi bi-person-circle"></i> My Profile</h2>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Account Information
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted" style="width: 40%">Username</td>
+                            <td class="fw-bold">{{ current_user.username }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Role</td>
+                            <td>
+                                <span class="badge {% if current_user.is_admin %}bg-danger{% else %}bg-primary{% endif %}">
+                                    {{ current_user.role_label }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Account Created</td>
+                            <td>{{ current_user.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Last Login</td>
+                            <td>{{ current_user.last_login.strftime('%Y-%m-%d %H:%M') if current_user.last_login else 'N/A' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-shield-lock"></i> Security
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Manage your account security settings.</p>
+                <a href="{{ url_for('auth.change_password') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-key"></i> Change Password
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

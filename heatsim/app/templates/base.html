@@ -72,6 +72,9 @@
                                 <small>{{ current_user.role_label }}</small>
                             </span></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}">
+                                <i class="bi bi-person"></i> My Profile
+                            </a></li>
                             {% if current_user.is_admin %}
                             <li><a class="dropdown-item" href="{{ url_for('admin.dashboard') }}">
                                 <i class="bi bi-gear"></i> Admin Panel
