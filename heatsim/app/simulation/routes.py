@@ -1304,6 +1304,67 @@ def export_sweep():
     return response
 
 
+# --- Validation Report Routes (Phase 8D) ---
+
+@simulation_bp.route('/<int:id>/validation-report')
+@login_required
+def download_validation_report(id):
+    """Download simulation validation report as Word document."""
+    from app.services.validation_report import generate_validation_report
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+    if sim.status != STATUS_COMPLETED:
+        flash('Report requires a completed simulation.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+    if not sim.measured_data.first():
+        flash('Validation report requires measured data.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    try:
+        report_bytes = generate_validation_report(sim)
+        safe_name = sim.name.replace(' ', '_').replace('/', '-')
+        response = Response(
+            report_bytes,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{safe_name}_validation.docx"'
+        return response
+    except Exception as e:
+        flash(f'Error generating validation report: {str(e)}', 'danger')
+        return redirect(url_for('simulation.view', id=id))
+
+
+@simulation_bp.route('/<int:id>/validation-report/pdf')
+@login_required
+def download_validation_pdf_report(id):
+    """Download simulation validation report as PDF."""
+    from app.services.validation_report import generate_validation_pdf_report
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+    if sim.status != STATUS_COMPLETED:
+        flash('Report requires a completed simulation.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+    if not sim.measured_data.first():
+        flash('Validation report requires measured data.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    try:
+        report_bytes = generate_validation_pdf_report(sim)
+        safe_name = sim.name.replace(' ', '_').replace('/', '-')
+        response = Response(report_bytes, mimetype='application/pdf')
+        response.headers['Content-Disposition'] = f'attachment; filename="{safe_name}_validation.pdf"'
+        return response
+    except Exception as e:
+        flash(f'Error generating validation PDF: {str(e)}', 'danger')
+        return redirect(url_for('simulation.view', id=id))
+
+
 @simulation_bp.route('/<int:id>/3d-snapshot')
 @login_required
 def temperature_3d_snapshot(id):

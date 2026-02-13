@@ -193,6 +193,12 @@
             <a href="{{ url_for('simulation.export_comparison', id=sim.id) }}" class="btn btn-outline-info btn-sm" title="Export comparison metrics CSV">
                 <i class="bi bi-filetype-csv"></i> Metrics
             </a>
+            <a href="{{ url_for('simulation.download_validation_report', id=sim.id) }}" class="btn btn-primary btn-sm" title="Download validation report (Word)">
+                <i class="bi bi-file-earmark-word"></i> Validation
+            </a>
+            <a href="{{ url_for('simulation.download_validation_pdf_report', id=sim.id) }}" class="btn btn-danger btn-sm" title="Download validation report (PDF)">
+                <i class="bi bi-file-earmark-pdf"></i> Validation
+            </a>
             <span class="badge {% if comparison_metrics.rating == 'good' %}bg-success{% elif comparison_metrics.rating == 'acceptable' %}bg-warning text-dark{% else %}bg-danger{% endif %} ms-2">
                 {{ comparison_metrics.rating|title }}
             </span>
