@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}User Management{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Admin</a></li>
+        <li class="breadcrumb-item active">Users</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-people"></i> User Management</h2>
+    <a href="{{ url_for('admin.create_user') }}" class="btn btn-success btn-sm">
+        <i class="bi bi-person-plus"></i> New User
+    </a>
+</div>
+
+<!-- Search & Filter -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <input type="text" name="q" class="form-control form-control-sm"
+                       placeholder="Search by username..." value="{{ q }}">
+            </div>
+            <div class="col-md-3">
+                <select name="role" class="form-select form-select-sm">
+                    <option value="">All Roles</option>
+                    <option value="engineer" {{ 'selected' if role_filter == 'engineer' }}>Materials Engineer</option>
+                    <option value="admin" {{ 'selected' if role_filter == 'admin' }}>Administrator</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> Search</button>
+                {% if q or role_filter %}
+                <a href="{{ url_for('admin.users') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if users %}
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                        <th>Last Login</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td class="fw-bold">{{ user.username }}</td>
+                        <td>
+                            <span class="badge {% if user.is_admin %}bg-danger{% else %}bg-primary{% endif %}">
+                                {{ user.role_label }}
+                            </span>
+                        </td>
+                        <td><small>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</small></td>
+                        <td><small>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</small></td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('admin.edit_user', id=user.id) }}" class="btn btn-outline-primary" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% if user.id != current_user.id %}
+                                <form method="post" action="{{ url_for('admin.delete_user', id=user.id) }}" class="d-inline"
+                                      onsubmit="return confirm('Delete user {{ user.username }}?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <small class="text-muted">{{ pagination.total }} user(s)</small>
+    {% if pagination.pages > 1 %}
+    <nav>
+        <ul class="pagination pagination-sm mb-0">
+            {% if pagination.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('admin.users', page=pagination.prev_num, q=q, role=role_filter) }}">&laquo;</a>
+            </li>
+            {% endif %}
+            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if p %}
+            <li class="page-item {{ 'active' if p == pagination.page }}">
+                <a class="page-link" href="{{ url_for('admin.users', page=p, q=q, role=role_filter) }}">{{ p }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('admin.users', page=pagination.next_num, q=q, role=role_filter) }}">&raquo;</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <h5><i class="bi bi-info-circle"></i> No Users Found</h5>
+    <p class="mb-0">No users match your search criteria.</p>
+</div>
+{% endif %}
+{% endblock %}

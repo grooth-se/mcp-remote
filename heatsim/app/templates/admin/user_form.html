@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit User' if is_edit else 'Create User' }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Admin</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.users') }}">Users</a></li>
+        <li class="breadcrumb-item active">{{ 'Edit' if is_edit else 'New User' }}</li>
+    </ol>
+</nav>
+
+<h2><i class="bi bi-person-{{ 'gear' if is_edit else 'plus' }}"></i> {{ 'Edit User: ' ~ user.username if is_edit else 'Create New User' }}</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <form method="post">
+                    {{ form.hidden_tag() }}
+
+                    {% if not is_edit %}
+                    <div class="mb-3">
+                        {{ form.username.label(class="form-label") }}
+                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else ""), placeholder="Enter username") }}
+                        {% for error in form.username.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        {{ form.role.label(class="form-label") }}
+                        {{ form.role(class="form-select") }}
+                    </div>
+
+                    {% if is_edit %}
+                    <hr>
+                    <p class="text-muted small">Leave password fields empty to keep the current password.</p>
+                    <div class="mb-3">
+                        {{ form.new_password.label(class="form-label") }}
+                        {{ form.new_password(class="form-control" + (" is-invalid" if form.new_password.errors else "")) }}
+                        {% for error in form.new_password.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.confirm_password.label(class="form-label") }}
+                        {{ form.confirm_password(class="form-control" + (" is-invalid" if form.confirm_password.errors else "")) }}
+                        {% for error in form.confirm_password.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="mb-3">
+                        {{ form.password.label(class="form-label") }}
+                        {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
+                        {% for error in form.password.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.confirm_password.label(class="form-label") }}
+                        {{ form.confirm_password(class="form-control" + (" is-invalid" if form.confirm_password.errors else "")) }}
+                        {% for error in form.confirm_password.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex gap-2">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {% if is_edit %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> User Info
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr><td class="text-muted">Username</td><td class="fw-bold">{{ user.username }}</td></tr>
+                        <tr><td class="text-muted">Role</td><td>{{ user.role_label }}</td></tr>
+                        <tr><td class="text-muted">Created</td><td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+                        <tr><td class="text-muted">Last Login</td><td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -72,6 +72,12 @@
                                 <small>{{ current_user.role_label }}</small>
                             </span></li>
                             <li><hr class="dropdown-divider"></li>
+                            {% if current_user.is_admin %}
+                            <li><a class="dropdown-item" href="{{ url_for('admin.dashboard') }}">
+                                <i class="bi bi-gear"></i> Admin Panel
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% endif %}
                             <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">
                                 <i class="bi bi-box-arrow-right"></i> Logout
                             </a></li>

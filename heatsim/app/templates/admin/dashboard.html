@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Admin</li>
+    </ol>
+</nav>
+
+<h2><i class="bi bi-gear"></i> Admin Dashboard</h2>
+
+<!-- Stat Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="text-muted small">Users</div>
+                <div class="fs-3 fw-bold">{{ user_count }}</div>
+                <a href="{{ url_for('admin.users') }}" class="small text-decoration-none">Manage</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="text-muted small">Simulations</div>
+                <div class="fs-3 fw-bold">{{ sim_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="text-muted small">Steel Grades</div>
+                <div class="fs-3 fw-bold">{{ grade_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="text-muted small">Weld Projects</div>
+                <div class="fs-3 fw-bold">{{ weld_count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Links -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <a href="{{ url_for('admin.users') }}" class="btn btn-outline-primary w-100">
+            <i class="bi bi-people"></i> User Management
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{{ url_for('admin.create_user') }}" class="btn btn-outline-success w-100">
+            <i class="bi bi-person-plus"></i> Create User
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary w-100">
+            <i class="bi bi-house"></i> Main Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Recent Logins -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-clock-history"></i> Recent Logins
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Last Login</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in recent_logins %}
+                <tr>
+                    <td class="fw-bold">{{ user.username }}</td>
+                    <td>
+                        <span class="badge {% if user.is_admin %}bg-danger{% else %}bg-primary{% endif %}">
+                            {{ user.role_label }}
+                        </span>
+                    </td>
+                    <td><small>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '-' }}</small></td>
+                    <td><small class="text-muted">{{ user.created_at.strftime('%Y-%m-%d') }}</small></td>
+                </tr>
+                {% endfor %}
+                {% if not recent_logins %}
+                <tr><td colspan="4" class="text-center text-muted py-3">No login activity yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
