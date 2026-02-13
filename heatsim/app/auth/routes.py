@@ -5,7 +5,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from app.extensions import db
 from . import auth_bp
 from .forms import LoginForm
-from app.models import User
+from app.models import User, AuditLog
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -25,6 +25,7 @@ def login():
         user.update_last_login()
         db.session.commit()
 
+        AuditLog.log('login')
         flash(f'Welcome, {user.username}!', 'success')
 
         next_page = request.args.get('next')
@@ -39,6 +40,7 @@ def login():
 @login_required
 def logout():
     """Log out current user."""
+    AuditLog.log('logout')
     logout_user()
     flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))

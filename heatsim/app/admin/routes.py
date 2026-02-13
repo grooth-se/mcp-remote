@@ -5,7 +5,7 @@ from flask_login import current_user
 from . import admin_bp
 from .forms import CreateUserForm, EditUserForm
 from app.extensions import db
-from app.models import User, Simulation, SteelGrade, WeldProject, admin_required
+from app.models import User, Simulation, SteelGrade, WeldProject, admin_required, AuditLog
 
 
 @admin_bp.route('/')
@@ -21,6 +21,10 @@ def dashboard():
         User.last_login.isnot(None)
     ).order_by(User.last_login.desc()).limit(10).all()
 
+    recent_activity = AuditLog.query.order_by(
+        AuditLog.timestamp.desc()
+    ).limit(10).all()
+
     return render_template(
         'admin/dashboard.html',
         user_count=user_count,
@@ -28,6 +32,7 @@ def dashboard():
         grade_count=grade_count,
         weld_count=weld_count,
         recent_logins=recent_logins,
+        recent_activity=recent_activity,
     )
 
 
@@ -70,6 +75,8 @@ def create_user():
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
+        AuditLog.log('create_user', resource_type='user',
+                      resource_id=user.id, resource_name=user.username)
         flash(f'User "{user.username}" created.', 'success')
         return redirect(url_for('admin.users'))
 
@@ -89,6 +96,8 @@ def edit_user(id):
             user.set_password(form.new_password.data)
             flash(f'Password reset for "{user.username}".', 'info')
         db.session.commit()
+        AuditLog.log('update_user', resource_type='user',
+                      resource_id=user.id, resource_name=user.username)
         flash(f'User "{user.username}" updated.', 'success')
         return redirect(url_for('admin.users'))
 
@@ -108,5 +117,7 @@ def delete_user(id):
     username = user.username
     db.session.delete(user)
     db.session.commit()
+    AuditLog.log('delete_user', resource_type='user',
+                  resource_name=username)
     flash(f'User "{username}" deleted.', 'success')
     return redirect(url_for('admin.users'))

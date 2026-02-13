@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import SteelGrade, PhaseDiagram, MeasuredData, HeatTreatmentTemplate
+from app.models import SteelGrade, PhaseDiagram, MeasuredData, HeatTreatmentTemplate, AuditLog
 from app.models.simulation import (
     Simulation, SimulationResult,
     STATUS_DRAFT, STATUS_READY, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
@@ -123,6 +123,8 @@ def new():
 
         db.session.add(sim)
         db.session.commit()
+        AuditLog.log('create_simulation', resource_type='simulation',
+                      resource_id=sim.id, resource_name=sim.name)
 
         flash(f'Simulation "{sim.name}" created.', 'success')
         return redirect(url_for('simulation.setup', id=sim.id))
@@ -554,6 +556,8 @@ def run(id):
         sim.started_at = datetime.utcnow()
         sim.error_message = None
         db.session.commit()
+        AuditLog.log('run_simulation', resource_type='simulation',
+                      resource_id=sim.id, resource_name=sim.name)
 
         # Build geometry (use equivalent geometry for CAD types)
         if sim.geometry_type == GEOMETRY_CAD:
@@ -1623,6 +1627,8 @@ def delete(id):
     name = sim.name
     db.session.delete(sim)
     db.session.commit()
+    AuditLog.log('delete_simulation', resource_type='simulation',
+                  resource_name=name)
 
     flash(f'Simulation "{name}" deleted.', 'success')
     return redirect(url_for('simulation.index'))
