@@ -24,6 +24,7 @@ from .report_generator import (
 )
 from .data_export import DataExporter
 from .snapshot_service import SnapshotService
+from .material_change_tracker import MaterialChangeTracker
 from . import visualization
 from . import visualization_3d
 from . import comsol
@@ -84,8 +85,9 @@ __all__ = [
     'ComparisonMetrics',
     # Phase 8 services - Data export
     'DataExporter',
-    # Phase 10 services - Snapshots
+    # Phase 10 services - Snapshots & Change Tracking
     'SnapshotService',
+    'MaterialChangeTracker',
     # Phase 3 services - Visualization
     'visualization',
     # Phase 4 services - COMSOL integration

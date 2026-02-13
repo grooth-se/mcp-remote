@@ -38,6 +38,7 @@ from .weld_project import (
 )
 from .measured_data import MeasuredData
 from .snapshot import SimulationSnapshot
+from .material_changelog import MaterialChangeLog
 from .system_setting import SystemSetting
 from .audit_log import (
     AuditLog,
@@ -86,6 +87,8 @@ __all__ = [
     'MeasuredData',
     # Snapshot versioning
     'SimulationSnapshot',
+    # Material change log
+    'MaterialChangeLog',
     # System settings
     'SystemSetting',
     # Audit log

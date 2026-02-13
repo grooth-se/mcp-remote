@@ -16,6 +16,7 @@ from app.models import (
     PHASES, PHASE_LABELS,
 )
 from app.services import PropertyEvaluator, PropertyPlotter, ExcelImporter, seed_standard_grades, seed_standard_compositions
+from app.services.material_change_tracker import MaterialChangeTracker
 
 from . import materials_bp
 from .forms import (
@@ -123,9 +124,16 @@ def edit(id):
             flash('Another steel grade with this designation and source exists.', 'danger')
             return render_template('materials/edit.html', form=form, grade=grade)
 
+        changes = MaterialChangeTracker.detect_changes(grade, {
+            'designation': form.designation.data,
+            'data_source': form.data_source.data,
+            'description': form.description.data,
+        })
         grade.designation = form.designation.data
         grade.data_source = form.data_source.data
         grade.description = form.description.data
+        if changes:
+            MaterialChangeTracker.log_update('steel_grade', grade.id, grade.id, changes)
         db.session.commit()
 
         flash(f'Steel grade {grade.designation} updated successfully.', 'success')
@@ -206,11 +214,21 @@ def properties(id):
 
         if existing:
             # Update existing
+            changes = MaterialChangeTracker.detect_changes(existing, {
+                'property_type': prop_type,
+                'units': form.units.data,
+                'dependencies': form.dependencies.data,
+                'notes': form.notes.data,
+            })
+            if existing.data_dict != data:
+                changes['data'] = (existing.data_dict, data)
             existing.property_type = prop_type
             existing.units = form.units.data
             existing.dependencies = form.dependencies.data
             existing.notes = form.notes.data
             existing.set_data(data)
+            if changes:
+                MaterialChangeTracker.log_update('material_property', existing.id, grade.id, changes)
             flash(f'Property {prop_name} updated.', 'success')
         else:
             # Create new
@@ -224,6 +242,8 @@ def properties(id):
             )
             prop.set_data(data)
             db.session.add(prop)
+            db.session.flush()
+            MaterialChangeTracker.log_create('material_property', prop, grade.id)
             flash(f'Property {prop_name} created.', 'success')
 
         db.session.commit()
@@ -248,6 +268,7 @@ def delete_property(id, prop_id):
         return redirect(url_for('materials.properties', id=id))
 
     name = prop.property_name
+    MaterialChangeTracker.log_delete('material_property', prop.id, id, name)
     db.session.delete(prop)
     db.session.commit()
 
@@ -341,6 +362,10 @@ def phase_diagram(id):
             image_data = form.source_image.data.read()
 
         if existing:
+            # Track changes before update
+            changes = MaterialChangeTracker.detect_changes(existing, {
+                'diagram_type': form.diagram_type.data,
+            })
             # Update existing
             existing.diagram_type = form.diagram_type.data
             existing.set_temps(temps)
@@ -348,6 +373,8 @@ def phase_diagram(id):
                 existing.set_curves(curves)
             if image_data:
                 existing.source_image = image_data
+            if changes:
+                MaterialChangeTracker.log_update('phase_diagram', existing.id, grade.id, changes)
             flash('Phase diagram updated.', 'success')
         else:
             # Create new
@@ -360,6 +387,8 @@ def phase_diagram(id):
             if curves:
                 diagram.set_curves(curves)
             db.session.add(diagram)
+            db.session.flush()
+            MaterialChangeTracker.log_create('phase_diagram', diagram, grade.id)
             flash('Phase diagram created.', 'success')
 
         db.session.commit()
@@ -394,6 +423,7 @@ def delete_phase_diagram(id):
     diagram = grade.phase_diagrams.first()
 
     if diagram:
+        MaterialChangeTracker.log_delete('phase_diagram', diagram.id, grade.id, f'{diagram.diagram_type} diagram')
         db.session.delete(diagram)
         db.session.commit()
         flash('Phase diagram deleted.', 'success')
@@ -438,6 +468,14 @@ def phase_properties(id):
             expansion_coeff = form.thermal_expansion_coeff.data * 1e-6
 
         if existing:
+            # Track changes before update
+            changes = MaterialChangeTracker.detect_changes(existing, {
+                'relative_density': form.relative_density.data,
+                'thermal_expansion_coeff': expansion_coeff,
+                'expansion_type': form.expansion_type.data,
+                'reference_temperature': form.reference_temperature.data,
+                'notes': form.notes.data,
+            })
             # Update existing
             existing.relative_density = form.relative_density.data
             existing.thermal_expansion_coeff = expansion_coeff
@@ -449,6 +487,8 @@ def phase_properties(id):
                 existing.set_expansion_data(expansion_data)
             existing.reference_temperature = form.reference_temperature.data
             existing.notes = form.notes.data
+            if changes:
+                MaterialChangeTracker.log_update('phase_property', existing.id, grade.id, changes)
             flash(f'Phase property for {PHASE_LABELS[form.phase.data]} updated.', 'success')
         else:
             # Create new
@@ -466,6 +506,8 @@ def phase_properties(id):
                     expansion_data['value'] = [v * 1e-6 for v in expansion_data['value']]
                 pp.set_expansion_data(expansion_data)
             db.session.add(pp)
+            db.session.flush()
+            MaterialChangeTracker.log_create('phase_property', pp, grade.id)
             flash(f'Phase property for {PHASE_LABELS[form.phase.data]} created.', 'success')
 
         db.session.commit()
@@ -491,6 +533,7 @@ def delete_phase_property(id, pp_id):
         return redirect(url_for('materials.phase_properties', id=id))
 
     phase_label = pp.phase_label
+    MaterialChangeTracker.log_delete('phase_property', pp.id, id, phase_label)
     db.session.delete(pp)
     db.session.commit()
 
@@ -530,6 +573,25 @@ def composition(id):
 
     if form.validate_on_submit():
         if existing:
+            # Track changes before update
+            field_values = {
+                'carbon': form.carbon.data,
+                'manganese': form.manganese.data or 0.0,
+                'silicon': form.silicon.data or 0.0,
+                'chromium': form.chromium.data or 0.0,
+                'nickel': form.nickel.data or 0.0,
+                'molybdenum': form.molybdenum.data or 0.0,
+                'vanadium': form.vanadium.data or 0.0,
+                'tungsten': form.tungsten.data or 0.0,
+                'copper': form.copper.data or 0.0,
+                'phosphorus': form.phosphorus.data or 0.0,
+                'sulfur': form.sulfur.data or 0.0,
+                'nitrogen': form.nitrogen.data or 0.0,
+                'boron': form.boron.data or 0.0,
+                'source': form.source.data,
+                'notes': form.notes.data,
+            }
+            changes = MaterialChangeTracker.detect_changes(existing, field_values)
             # Update existing
             existing.carbon = form.carbon.data
             existing.manganese = form.manganese.data or 0.0
@@ -546,6 +608,8 @@ def composition(id):
             existing.boron = form.boron.data or 0.0
             existing.source = form.source.data
             existing.notes = form.notes.data
+            if changes:
+                MaterialChangeTracker.log_update('composition', existing.id, grade.id, changes)
             flash('Composition updated.', 'success')
         else:
             # Create new
@@ -568,6 +632,8 @@ def composition(id):
                 notes=form.notes.data
             )
             db.session.add(comp)
+            db.session.flush()
+            MaterialChangeTracker.log_create('composition', comp, grade.id)
             flash('Composition created.', 'success')
 
         db.session.commit()
@@ -589,6 +655,7 @@ def delete_composition(id):
     comp = grade.composition
 
     if comp:
+        MaterialChangeTracker.log_delete('composition', comp.id, grade.id, 'composition')
         db.session.delete(comp)
         db.session.commit()
         flash('Composition deleted.', 'success')
@@ -596,6 +663,41 @@ def delete_composition(id):
         flash('No composition to delete.', 'warning')
 
     return redirect(url_for('materials.view', id=id))
+
+
+# ============================================================================
+# Change History
+# ============================================================================
+
+@materials_bp.route('/<int:id>/history')
+@login_required
+def grade_history(id):
+    """View change history for a steel grade."""
+    grade = SteelGrade.query.get_or_404(id)
+    from app.models import MaterialChangeLog
+    page = request.args.get('page', 1, type=int)
+
+    query = MaterialChangeLog.query.filter_by(
+        steel_grade_id=grade.id
+    ).order_by(MaterialChangeLog.changed_at.desc())
+
+    pagination = query.paginate(page=page, per_page=50, error_out=False)
+
+    entity_type_labels = {
+        'steel_grade': 'Steel Grade',
+        'material_property': 'Material Property',
+        'phase_diagram': 'Phase Diagram',
+        'composition': 'Composition',
+        'phase_property': 'Phase Property',
+    }
+
+    return render_template(
+        'materials/history.html',
+        grade=grade,
+        entries=pagination.items,
+        pagination=pagination,
+        entity_type_labels=entity_type_labels,
+    )
 
 
 # ============================================================================

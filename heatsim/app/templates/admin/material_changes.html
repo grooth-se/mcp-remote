@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Material Changes{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Admin</a></li>
+        <li class="breadcrumb-item active">Material Changes</li>
+    </ol>
+</nav>
+
+<h2><i class="bi bi-clock-history"></i> Material Change Log</h2>
+
+<!-- Filters -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label small mb-0">Entity Type</label>
+                <select name="entity_type" class="form-select form-select-sm">
+                    <option value="">All Types</option>
+                    {% for key, label in entity_type_labels.items() %}
+                    <option value="{{ key }}" {{ 'selected' if entity_type_filter == key }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-0">Steel Grade</label>
+                <select name="grade" class="form-select form-select-sm">
+                    <option value="">All Grades</option>
+                    {% for g in grades %}
+                    <option value="{{ g.id }}" {{ 'selected' if grade_filter == g.id|string }}>{{ g.designation }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small mb-0">Action</label>
+                <select name="action" class="form-select form-select-sm">
+                    <option value="">All</option>
+                    <option value="create" {{ 'selected' if action_filter == 'create' }}>Create</option>
+                    <option value="update" {{ 'selected' if action_filter == 'update' }}>Update</option>
+                    <option value="delete" {{ 'selected' if action_filter == 'delete' }}>Delete</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small mb-0">User</label>
+                <select name="user" class="form-select form-select-sm">
+                    <option value="">All Users</option>
+                    {% for u in usernames %}
+                    <option value="{{ u }}" {{ 'selected' if user_filter == u }}>{{ u }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small mb-0">From</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label small mb-0">To</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filter</button>
+                {% if entity_type_filter or grade_filter or action_filter or user_filter or date_from or date_to %}
+                <a href="{{ url_for('admin.material_changes') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if entries %}
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Entity</th>
+                        <th>Grade</th>
+                        <th>Field</th>
+                        <th>Old Value</th>
+                        <th>New Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    <tr>
+                        <td><small>{{ entry.changed_at.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
+                        <td class="fw-bold">{{ entry.changed_by_username or 'system' }}</td>
+                        <td>
+                            <span class="badge bg-{{ entry.action_badge }}">{{ entry.action }}</span>
+                        </td>
+                        <td>
+                            <small>{{ entity_type_labels.get(entry.entity_type, entry.entity_type) }}</small>
+                        </td>
+                        <td>
+                            {% if grade_map.get(entry.steel_grade_id) %}
+                            <a href="{{ url_for('materials.view', id=entry.steel_grade_id) }}">
+                                {{ grade_map[entry.steel_grade_id] }}
+                            </a>
+                            {% else %}
+                            <small class="text-muted">#{{ entry.steel_grade_id }}</small>
+                            {% endif %}
+                        </td>
+                        <td><small class="text-muted">{{ entry.field_name or '-' }}</small></td>
+                        <td>
+                            {% if entry.old_value_parsed is not none %}
+                            <small class="text-danger">{{ entry.old_value_parsed }}</small>
+                            {% else %}
+                            <small class="text-muted">-</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if entry.new_value_parsed is not none %}
+                            <small class="text-success">{{ entry.new_value_parsed }}</small>
+                            {% else %}
+                            <small class="text-muted">-</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <small class="text-muted">{{ pagination.total }} entries</small>
+    {% if pagination.pages > 1 %}
+    <nav>
+        <ul class="pagination pagination-sm mb-0">
+            {% if pagination.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('admin.material_changes', page=pagination.prev_num, entity_type=entity_type_filter, grade=grade_filter, action=action_filter, user=user_filter, date_from=date_from, date_to=date_to) }}">&laquo;</a>
+            </li>
+            {% endif %}
+            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if p %}
+            <li class="page-item {{ 'active' if p == pagination.page }}">
+                <a class="page-link" href="{{ url_for('admin.material_changes', page=p, entity_type=entity_type_filter, grade=grade_filter, action=action_filter, user=user_filter, date_from=date_from, date_to=date_to) }}">{{ p }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('admin.material_changes', page=pagination.next_num, entity_type=entity_type_filter, grade=grade_filter, action=action_filter, user=user_filter, date_from=date_from, date_to=date_to) }}">&raquo;</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <h5><i class="bi bi-info-circle"></i> No Changes</h5>
+    <p class="mb-0">No material change log entries match your filters.</p>
+</div>
+{% endif %}
+{% endblock %}
