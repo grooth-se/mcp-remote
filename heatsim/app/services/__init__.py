@@ -26,6 +26,8 @@ from .data_export import DataExporter
 from .snapshot_service import SnapshotService
 from .snapshot_diff import SnapshotDiffService
 from .material_change_tracker import MaterialChangeTracker
+from .lineage_service import LineageService
+from .compliance_report import ComplianceReportGenerator
 from . import visualization
 from . import visualization_3d
 from . import comsol
@@ -86,10 +88,12 @@ __all__ = [
     'ComparisonMetrics',
     # Phase 8 services - Data export
     'DataExporter',
-    # Phase 10 services - Snapshots, Diff & Change Tracking
+    # Phase 10 services - Snapshots, Diff, Change Tracking & Lineage
     'SnapshotService',
     'SnapshotDiffService',
     'MaterialChangeTracker',
+    'LineageService',
+    'ComplianceReportGenerator',
     # Phase 3 services - Visualization
     'visualization',
     # Phase 4 services - COMSOL integration

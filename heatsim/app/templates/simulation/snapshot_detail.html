@@ -19,8 +19,14 @@
         </span>
     </h2>
     <div class="btn-group btn-group-sm">
+        <a href="{{ url_for('simulation.lineage', id=sim.id, version=snapshot.version) }}" class="btn btn-outline-dark">
+            <i class="bi bi-diagram-3"></i> Lineage
+        </a>
+        <a href="{{ url_for('simulation.compliance_report', id=sim.id, version=snapshot.version) }}" class="btn btn-outline-primary">
+            <i class="bi bi-file-earmark-word"></i> Compliance
+        </a>
         <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Back to Results
+            <i class="bi bi-arrow-left"></i> Back
         </a>
     </div>
 </div>

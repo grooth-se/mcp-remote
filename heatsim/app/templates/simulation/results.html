@@ -71,6 +71,11 @@
         <a href="{{ url_for('simulation.run_history', id=sim.id) }}" class="btn btn-outline-secondary btn-sm" title="Run history">
             <i class="bi bi-clock-history"></i>
         </a>
+        {% if latest_snapshot %}
+        <a href="{{ url_for('simulation.lineage', id=sim.id, version=latest_snapshot.version) }}" class="btn btn-outline-dark btn-sm" title="Data lineage">
+            <i class="bi bi-diagram-3"></i>
+        </a>
+        {% endif %}
         <a href="{{ url_for('simulation.parameter_sweep', id=sim.id) }}" class="btn btn-outline-info btn-sm" title="Parameter sweep">
             <i class="bi bi-sliders"></i>
         </a>

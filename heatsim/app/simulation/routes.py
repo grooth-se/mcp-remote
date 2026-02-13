@@ -693,6 +693,96 @@ def restore_snapshot(id, version):
     return redirect(url_for('simulation.view', id=id))
 
 
+@simulation_bp.route('/<int:id>/lineage')
+@login_required
+def lineage(id):
+    """View data lineage tree for a simulation snapshot."""
+    sim = Simulation.query.get_or_404(id)
+    version = request.args.get('version', type=int)
+
+    if version:
+        snapshot = SimulationSnapshot.query.filter_by(
+            simulation_id=id, version=version
+        ).first_or_404()
+    else:
+        snapshot = sim.snapshots.filter_by(status='completed').first()
+
+    if not snapshot:
+        flash('No completed snapshots available for lineage view.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    from app.services.lineage_service import LineageService
+    lineage_tree = LineageService.build_lineage(snapshot)
+    drifts = LineageService.check_drift(snapshot)
+
+    return render_template(
+        'simulation/lineage.html',
+        sim=sim,
+        snapshot=snapshot,
+        lineage=lineage_tree,
+        drifts=drifts,
+    )
+
+
+@simulation_bp.route('/<int:id>/compliance-report')
+@login_required
+def compliance_report(id):
+    """Download Word compliance document for a snapshot."""
+    sim = Simulation.query.get_or_404(id)
+    version = request.args.get('version', type=int)
+
+    if version:
+        snapshot = SimulationSnapshot.query.filter_by(
+            simulation_id=id, version=version
+        ).first_or_404()
+    else:
+        snapshot = sim.snapshots.filter_by(status='completed').first()
+
+    if not snapshot:
+        flash('No completed snapshot available.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    from app.services.compliance_report import ComplianceReportGenerator
+    generator = ComplianceReportGenerator(snapshot)
+    doc_bytes = generator.generate()
+
+    filename = f'{sim.name}_compliance_v{snapshot.version}.docx'.replace(' ', '_')
+    return Response(
+        doc_bytes,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+
+@simulation_bp.route('/<int:id>/drift-check')
+@login_required
+def drift_check(id):
+    """JSON API for drift indicators."""
+    sim = Simulation.query.get_or_404(id)
+    version = request.args.get('version', type=int)
+
+    if version:
+        snapshot = SimulationSnapshot.query.filter_by(
+            simulation_id=id, version=version
+        ).first_or_404()
+    else:
+        snapshot = sim.snapshots.filter_by(status='completed').first()
+
+    if not snapshot:
+        return {'error': 'No snapshot found'}, 404
+
+    from app.services.lineage_service import LineageService
+    drifts = LineageService.check_drift(snapshot)
+
+    return {
+        'simulation_id': sim.id,
+        'version': snapshot.version,
+        'has_drift': len(drifts) > 0,
+        'drift_count': len(drifts),
+        'drifts': drifts,
+    }
+
+
 @simulation_bp.route('/<int:id>/run', methods=['POST'])
 @login_required
 def run(id):
