@@ -64,6 +64,7 @@ def create_app(config_name='default'):
     from .simulation import simulation_bp
     from .welding import welding_bp
     from .ht_templates import ht_templates_bp
+    from .measured import measured_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -71,6 +72,7 @@ def create_app(config_name='default'):
     app.register_blueprint(simulation_bp, url_prefix='/simulation')
     app.register_blueprint(welding_bp, url_prefix='/welding')
     app.register_blueprint(ht_templates_bp, url_prefix='/templates')
+    app.register_blueprint(measured_bp, url_prefix='/measured')
 
     # Create database tables
     with app.app_context():

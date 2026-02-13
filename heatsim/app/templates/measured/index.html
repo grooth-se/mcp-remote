@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Measured Data{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Measured Data</li>
+    </ol>
+</nav>
+
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-clipboard-data"></i> Measured Data</h2>
+    </div>
+</div>
+
+<!-- Search & Filter -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <input type="text" name="q" class="form-control form-control-sm"
+                       placeholder="Search by name, simulation, or filename..." value="{{ q }}">
+            </div>
+            <div class="col-md-3">
+                <select name="step" class="form-select form-select-sm">
+                    <option value="">All Process Steps</option>
+                    <option value="heating" {{ 'selected' if step == 'heating' }}>Heating</option>
+                    <option value="quenching" {{ 'selected' if step == 'quenching' }}>Quenching</option>
+                    <option value="tempering" {{ 'selected' if step == 'tempering' }}>Tempering</option>
+                    <option value="full" {{ 'selected' if step == 'full' }}>Full Cycle</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i> Search</button>
+                {% if q or step %}
+                <a href="{{ url_for('measured.index') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if datasets %}
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Simulation</th>
+                        <th>Process Step</th>
+                        <th>Channels</th>
+                        <th>Points</th>
+                        <th>Duration</th>
+                        <th>Uploaded</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for md in datasets %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('measured.view', data_id=md.id) }}" class="fw-bold text-decoration-none">
+                                {{ md.name|truncate(30) }}
+                            </a>
+                            {% if md.filename %}
+                            <br><small class="text-muted">{{ md.filename|truncate(40) }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('simulation.view', id=md.simulation_id) }}" class="text-decoration-none">
+                                {{ md.simulation.name|truncate(25) }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="badge {% if md.process_step == 'heating' %}bg-warning text-dark{% elif md.process_step == 'quenching' %}bg-info{% elif md.process_step == 'tempering' %}bg-secondary{% else %}bg-primary{% endif %}">
+                                {{ (md.process_step or 'full')|title }}
+                            </span>
+                        </td>
+                        <td>{{ md.num_channels }}</td>
+                        <td>{{ md.num_points }}</td>
+                        <td>
+                            {% if md.duration_seconds %}
+                            {{ md.duration_seconds|round(0)|int }}s
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ md.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('measured.view', data_id=md.id) }}" class="btn btn-outline-primary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <form method="post" action="{{ url_for('measured.delete', data_id=md.id) }}" class="d-inline"
+                                      onsubmit="return confirm('Delete this measured data?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <small class="text-muted">{{ pagination.total }} dataset(s)</small>
+    {% if pagination.pages > 1 %}
+    <nav>
+        <ul class="pagination pagination-sm mb-0">
+            {% if pagination.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('measured.index', page=pagination.prev_num, q=q, step=step) }}">&laquo;</a>
+            </li>
+            {% endif %}
+            {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if p %}
+            <li class="page-item {{ 'active' if p == pagination.page }}">
+                <a class="page-link" href="{{ url_for('measured.index', page=p, q=q, step=step) }}">{{ p }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+            {% endfor %}
+            {% if pagination.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('measured.index', page=pagination.next_num, q=q, step=step) }}">&raquo;</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <h5><i class="bi bi-info-circle"></i> No Measured Data</h5>
+    <p class="mb-2">No thermocouple data has been uploaded yet. Upload data from a simulation's view page.</p>
+    <a href="{{ url_for('simulation.index') }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-thermometer-half"></i> Go to Simulations
+    </a>
+</div>
+{% endif %}
+{% endblock %}
