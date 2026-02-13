@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Run History - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item active">Run History</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-clock-history"></i> Run History</h2>
+    <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Results
+    </a>
+</div>
+
+{% if snapshots %}
+<form id="compareForm" method="get" action="{{ url_for('simulation.compare_runs', id=sim.id) }}">
+    <div class="alert alert-info py-2 d-none" id="compareBar">
+        <div class="d-flex align-items-center justify-content-between">
+            <span><strong id="compareCount">0</strong> versions selected for comparison</span>
+            <button type="submit" class="btn btn-sm btn-primary" id="compareBtn" disabled>
+                <i class="bi bi-layout-split"></i> Compare Selected
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 40px;">Compare</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Started</th>
+                        <th>Duration</th>
+                        <th>t8/5</th>
+                        <th>Surface HV</th>
+                        <th>Center HV</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for snap in snapshots %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="form-check-input compare-check"
+                                   name="v{{ loop.index0 }}" value="{{ snap.version }}">
+                        </td>
+                        <td>
+                            <a href="{{ url_for('simulation.snapshot_detail', id=sim.id, version=snap.version) }}"
+                               class="fw-bold text-decoration-none">
+                                v{{ snap.version }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if snap.status == 'completed' else 'danger' if snap.status == 'failed' else 'secondary' }}">
+                                {{ snap.status or 'unknown' }}
+                            </span>
+                        </td>
+                        <td>
+                            <small>{{ snap.started_at.strftime('%Y-%m-%d %H:%M') if snap.started_at else '-' }}</small>
+                        </td>
+                        <td>
+                            <small>{{ '%.1f s'|format(snap.duration_seconds) if snap.duration_seconds else '-' }}</small>
+                        </td>
+                        <td>
+                            {% if snap.t_800_500 %}
+                            <small>{{ snap.t_800_500|round(2) }} s</small>
+                            {% else %}
+                            <small class="text-muted">-</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if snap.predicted_hardness_surface %}
+                            <small>{{ snap.predicted_hardness_surface|round(0)|int }} HV</small>
+                            {% else %}
+                            <small class="text-muted">-</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if snap.predicted_hardness_center %}
+                            <small>{{ snap.predicted_hardness_center|round(0)|int }} HV</small>
+                            {% else %}
+                            <small class="text-muted">-</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('simulation.snapshot_detail', id=sim.id, version=snap.version) }}"
+                                   class="btn btn-outline-primary" title="View snapshot">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if snap.status == 'completed' %}
+                                <form method="post" action="{{ url_for('simulation.restore_snapshot', id=sim.id, version=snap.version) }}"
+                                      class="d-inline" onsubmit="return confirm('Restore configuration from v{{ snap.version }}? This will overwrite the current simulation config.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-warning" title="Restore this config">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
+
+<div class="mt-3 text-muted small">
+    {{ snapshots|length }} run(s) total
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <h5><i class="bi bi-info-circle"></i> No Runs Yet</h5>
+    <p class="mb-0">This simulation has not been run yet. Run it to create the first snapshot.</p>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checks = document.querySelectorAll('.compare-check');
+    const bar = document.getElementById('compareBar');
+    const count = document.getElementById('compareCount');
+    const btn = document.getElementById('compareBtn');
+    const form = document.getElementById('compareForm');
+
+    function updateCompare() {
+        const selected = document.querySelectorAll('.compare-check:checked');
+        const n = selected.length;
+        count.textContent = n;
+
+        if (n > 0) {
+            bar.classList.remove('d-none');
+        } else {
+            bar.classList.add('d-none');
+        }
+
+        btn.disabled = n !== 2;
+    }
+
+    checks.forEach(cb => cb.addEventListener('change', updateCompare));
+
+    form.addEventListener('submit', function(e) {
+        const selected = document.querySelectorAll('.compare-check:checked');
+        if (selected.length !== 2) {
+            e.preventDefault();
+            return;
+        }
+        // Build v1 and v2 params
+        const versions = Array.from(selected).map(cb => cb.value);
+        e.preventDefault();
+        window.location.href = form.action + '?v1=' + versions[0] + '&v2=' + versions[1];
+    });
+});
+</script>
+{% endblock %}

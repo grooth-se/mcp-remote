@@ -50,6 +50,7 @@
                         <th>Geometry</th>
                         <th>Status</th>
                         <th>t₈/₅</th>
+                        <th>Runs</th>
                         <th>Created</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -80,6 +81,16 @@
                             <small>{{ t85.t_800_500|round(1) }}s</small>
                             {% else %}
                             <small class="text-muted">-</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set run_count = sim.snapshots.count() %}
+                            {% if run_count > 0 %}
+                            <a href="{{ url_for('simulation.run_history', id=sim.id) }}" class="badge bg-info text-decoration-none">
+                                {{ run_count }}
+                            </a>
+                            {% else %}
+                            <small class="text-muted">0</small>
                             {% endif %}
                         </td>
                         <td>

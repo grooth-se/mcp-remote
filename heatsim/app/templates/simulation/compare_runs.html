@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Compare v{{ snap1.version }} vs v{{ snap2.version }} - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.run_history', id=sim.id) }}">History</a></li>
+        <li class="breadcrumb-item active">Compare v{{ snap1.version }} vs v{{ snap2.version }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-layout-split"></i> Compare Runs</h2>
+    <a href="{{ url_for('simulation.run_history', id=sim.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to History
+    </a>
+</div>
+
+<!-- Version Headers -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="card border-primary">
+            <div class="card-body py-2">
+                <strong>v{{ snap1.version }}</strong>
+                <span class="badge bg-{{ 'success' if snap1.status == 'completed' else 'danger' }}">{{ snap1.status }}</span>
+                <small class="text-muted ms-2">{{ snap1.started_at.strftime('%Y-%m-%d %H:%M') if snap1.started_at else '-' }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-warning">
+            <div class="card-body py-2">
+                <strong>v{{ snap2.version }}</strong>
+                <span class="badge bg-{{ 'success' if snap2.status == 'completed' else 'danger' }}">{{ snap2.status }}</span>
+                <small class="text-muted ms-2">{{ snap2.started_at.strftime('%Y-%m-%d %H:%M') if snap2.started_at else '-' }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Metrics -->
+{% if summary_diffs %}
+<div class="card mb-3">
+    <div class="card-header"><i class="bi bi-speedometer2"></i> Result Metrics</div>
+    <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Metric</th>
+                    <th>v{{ snap1.version }}</th>
+                    <th>v{{ snap2.version }}</th>
+                    <th>Delta</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in summary_diffs %}
+                <tr>
+                    <td class="fw-bold">{{ m.label }}</td>
+                    <td>{{ m.val1 }}</td>
+                    <td>{{ m.val2 }}</td>
+                    <td>
+                        {% if m.delta != '-' %}
+                        <span class="text-{{ 'danger' if m.delta.startswith('+') or m.delta.startswith('-') else 'muted' }}">
+                            {{ m.delta }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Overlay Plot -->
+{% if snap1.status == 'completed' and snap2.status == 'completed' %}
+<div class="card mb-3">
+    <div class="card-header"><i class="bi bi-graph-up"></i> Cooling Curve Overlay</div>
+    <div class="card-body text-center">
+        <img src="{{ url_for('simulation.compare_runs_overlay', id=sim.id, v1=snap1.version, v2=snap2.version) }}"
+             class="img-fluid" alt="Overlay Plot" style="max-height: 400px;">
+    </div>
+</div>
+{% endif %}
+
+<!-- Config Diff -->
+<div class="card mb-3">
+    <div class="card-header">
+        <i class="bi bi-gear"></i> Configuration Diff
+        <small class="text-muted ms-2">(only changed rows highlighted)</small>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Parameter</th>
+                    <th>v{{ snap1.version }}</th>
+                    <th>v{{ snap2.version }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in config_diffs %}
+                <tr class="{{ 'table-warning' if d.changed else '' }}">
+                    <td class="text-muted">{{ d.label }}</td>
+                    <td>
+                        {% if d.changed %}
+                        <span class="text-danger">{{ d.val1 if d.val1 is not none else '-' }}</span>
+                        {% else %}
+                        {{ d.val1 if d.val1 is not none else '-' }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if d.changed %}
+                        <span class="text-success">{{ d.val2 if d.val2 is not none else '-' }}</span>
+                        {% else %}
+                        {{ d.val2 if d.val2 is not none else '-' }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Material Diff -->
+{% if material_diffs %}
+<div class="card mb-3">
+    <div class="card-header"><i class="bi bi-database"></i> Material Data Diff</div>
+    <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Property</th>
+                    <th>v{{ snap1.version }}</th>
+                    <th>v{{ snap2.version }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in material_diffs %}
+                <tr class="table-warning">
+                    <td class="text-muted">{{ d.label }}</td>
+                    <td><span class="text-danger">{{ d.val1 if d.val1 is not none else '-' }}</span></td>
+                    <td><span class="text-success">{{ d.val2 if d.val2 is not none else '-' }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

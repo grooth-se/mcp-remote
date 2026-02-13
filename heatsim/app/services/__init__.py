@@ -24,6 +24,7 @@ from .report_generator import (
 )
 from .data_export import DataExporter
 from .snapshot_service import SnapshotService
+from .snapshot_diff import SnapshotDiffService
 from .material_change_tracker import MaterialChangeTracker
 from . import visualization
 from . import visualization_3d
@@ -85,8 +86,9 @@ __all__ = [
     'ComparisonMetrics',
     # Phase 8 services - Data export
     'DataExporter',
-    # Phase 10 services - Snapshots & Change Tracking
+    # Phase 10 services - Snapshots, Diff & Change Tracking
     'SnapshotService',
+    'SnapshotDiffService',
     'MaterialChangeTracker',
     # Phase 3 services - Visualization
     'visualization',

@@ -557,6 +557,142 @@ def snapshot_detail(id, version):
     )
 
 
+@simulation_bp.route('/<int:id>/history')
+@login_required
+def run_history(id):
+    """Browse all run snapshots for a simulation."""
+    sim = Simulation.query.get_or_404(id)
+    snapshots = sim.snapshots.all()  # ordered by version desc
+    return render_template(
+        'simulation/history.html',
+        sim=sim,
+        snapshots=snapshots,
+    )
+
+
+@simulation_bp.route('/<int:id>/compare-runs')
+@login_required
+def compare_runs(id):
+    """Compare two run snapshots side-by-side."""
+    sim = Simulation.query.get_or_404(id)
+    v1 = request.args.get('v1', type=int)
+    v2 = request.args.get('v2', type=int)
+
+    if not v1 or not v2:
+        flash('Please select two versions to compare.', 'warning')
+        return redirect(url_for('simulation.run_history', id=id))
+
+    snap1 = SimulationSnapshot.query.filter_by(simulation_id=id, version=v1).first_or_404()
+    snap2 = SimulationSnapshot.query.filter_by(simulation_id=id, version=v2).first_or_404()
+
+    from app.services.snapshot_diff import SnapshotDiffService
+    config_diffs = SnapshotDiffService.diff_configs(snap1, snap2)
+    material_diffs = SnapshotDiffService.diff_materials(snap1, snap2)
+    summary_diffs = SnapshotDiffService.summary_comparison(snap1, snap2)
+
+    return render_template(
+        'simulation/compare_runs.html',
+        sim=sim,
+        snap1=snap1,
+        snap2=snap2,
+        config_diffs=config_diffs,
+        material_diffs=material_diffs,
+        summary_diffs=summary_diffs,
+    )
+
+
+@simulation_bp.route('/<int:id>/compare-runs/overlay-plot')
+@login_required
+def compare_runs_overlay(id):
+    """Generate overlay cooling curve plot for two snapshots."""
+    sim = Simulation.query.get_or_404(id)
+    v1 = request.args.get('v1', type=int)
+    v2 = request.args.get('v2', type=int)
+
+    if not v1 or not v2:
+        return Response('Missing version parameters', status=400)
+
+    snap1 = SimulationSnapshot.query.filter_by(simulation_id=id, version=v1).first_or_404()
+    snap2 = SimulationSnapshot.query.filter_by(simulation_id=id, version=v2).first_or_404()
+
+    # Get full_cycle results for both snapshots
+    results1 = SimulationResult.query.filter_by(
+        snapshot_id=snap1.id, result_type='full_cycle'
+    ).all()
+    results2 = SimulationResult.query.filter_by(
+        snapshot_id=snap2.id, result_type='full_cycle'
+    ).all()
+
+    import io
+    import json
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for r in results1:
+        try:
+            data = json.loads(r.result_data)
+            times = data.get('time', [])
+            temps = data.get('temperature', [])
+            if times and temps:
+                ax.plot(times, temps, '-', alpha=0.8,
+                        label=f'v{v1} {r.position or "center"}')
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    for r in results2:
+        try:
+            data = json.loads(r.result_data)
+            times = data.get('time', [])
+            temps = data.get('temperature', [])
+            if times and temps:
+                ax.plot(times, temps, '--', alpha=0.8,
+                        label=f'v{v2} {r.position or "center"}')
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Temperature (°C)')
+    ax.set_title(f'{sim.name}: v{v1} vs v{v2}')
+    ax.legend(loc='best', fontsize='small')
+    ax.grid(True, alpha=0.3)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=120, bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+
+    return Response(buf.getvalue(), mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/restore/<int:version>', methods=['POST'])
+@login_required
+def restore_snapshot(id, version):
+    """Copy snapshot config back to simulation, set status=READY."""
+    sim = Simulation.query.get_or_404(id)
+
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    snapshot = SimulationSnapshot.query.filter_by(
+        simulation_id=id, version=version
+    ).first_or_404()
+
+    sim.geometry_type = snapshot.geometry_type
+    sim.geometry_config = snapshot.geometry_config
+    sim.heat_treatment_config = snapshot.heat_treatment_config
+    sim.solver_config = snapshot.solver_config
+    sim.boundary_conditions = snapshot.boundary_conditions
+    sim.status = STATUS_READY
+
+    db.session.commit()
+    flash(f'Configuration restored from v{version}. Simulation is ready to run.', 'success')
+    return redirect(url_for('simulation.view', id=id))
+
+
 @simulation_bp.route('/<int:id>/run', methods=['POST'])
 @login_required
 def run(id):
