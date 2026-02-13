@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Admin</a></li>
+        <li class="breadcrumb-item active">Settings</li>
+    </ol>
+</nav>
+
+<h2><i class="bi bi-sliders"></i> System Settings</h2>
+
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% for group in groups %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <i class="{{ group.icon }}"></i> {{ group.group }}
+        </div>
+        <div class="card-body">
+            {% for s in group.settings %}
+            <div class="mb-3 row">
+                <label class="col-sm-4 col-form-label">
+                    {{ s.label }}
+                    {% if s.description %}
+                    <br><small class="text-muted">{{ s.description }}</small>
+                    {% endif %}
+                </label>
+                <div class="col-sm-8">
+                    {% if s.type == 'bool' %}
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" name="{{ s.key }}"
+                               id="{{ s.key }}" {{ 'checked' if s.value == true or s.value == 'true' }}>
+                        <label class="form-check-label" for="{{ s.key }}">Enabled</label>
+                    </div>
+                    {% elif s.type == 'int' %}
+                    <input type="number" class="form-control" name="{{ s.key }}" value="{{ s.value }}">
+                    {% else %}
+                    <input type="text" class="form-control" name="{{ s.key }}" value="{{ s.value }}">
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save Settings
+        </button>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

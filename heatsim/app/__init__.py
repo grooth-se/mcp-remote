@@ -1,6 +1,7 @@
 """Flask application factory."""
 import os
-from flask import Flask
+from flask import Flask, render_template, request as flask_request
+from flask_login import current_user
 from config import config
 
 from .extensions import db, login_manager, migrate, csrf
@@ -79,5 +80,23 @@ def create_app(config_name='default'):
     # Create database tables
     with app.app_context():
         db.create_all()
+
+    # Maintenance mode handler
+    @app.before_request
+    def check_maintenance_mode():
+        from .models import SystemSetting
+        # Whitelist: auth routes, static files, admin routes
+        endpoint = flask_request.endpoint or ''
+        if (endpoint.startswith('auth.') or endpoint.startswith('admin.')
+                or endpoint == 'static'):
+            return None
+        if SystemSetting.get('maintenance_mode', False):
+            if current_user.is_authenticated and current_user.is_admin:
+                return None
+            message = SystemSetting.get(
+                'maintenance_message',
+                'The system is currently under maintenance. Please try again later.'
+            )
+            return render_template('maintenance.html', message=message), 503
 
     return app
