@@ -166,6 +166,7 @@ def setup(id):
             geometry_form.outer_radius.data = geom.get('outer_radius', 0.05) * 1000
             geometry_form.length.data = geom.get('length', 0.1) * 1000
 
+        solver_form.solver_type.data = solver.get('solver_type', 'builtin')
         solver_form.n_nodes.data = solver.get('n_nodes', 51)
         solver_form.dt.data = solver.get('dt', 0.1)
         solver_form.max_time.data = solver.get('max_time', 1800)
@@ -211,6 +212,7 @@ def setup(id):
             dt = float(request.form.get('dt', 0.1))
 
         solver_config = {
+            'solver_type': request.form.get('solver_type', 'builtin'),
             'n_nodes': int(request.form.get('n_nodes', 51)),
             'dt': dt,
             'max_time': max_time,
@@ -491,6 +493,11 @@ def view(id):
     # Hardness prediction results
     hardness_results = [r for r in results if r.result_type == 'hardness_prediction']
 
+    # COMSOL VTK results
+    vtk_snapshots = [r for r in results if r.result_type == 'vtk_snapshot']
+    vtk_animations = [r for r in results if r.result_type == 'vtk_animation']
+    vtk_animation = vtk_animations[0] if vtk_animations else None
+
     # Get measured TC data for comparison, grouped by process step
     measured_data = sim.measured_data.all()
     measured_heating = [m for m in measured_data if m.process_step == 'heating']
@@ -536,6 +543,8 @@ def view(id):
         measured_quenching=measured_quenching,
         measured_tempering=measured_tempering,
         hardness_results=hardness_results,
+        vtk_snapshots=vtk_snapshots,
+        vtk_animation=vtk_animation,
         comparison_metrics=comparison_metrics,
         all_measured_channels=all_measured_channels,
     )
@@ -809,6 +818,51 @@ def run(id):
         AuditLog.log('run_simulation', resource_type='simulation',
                       resource_id=sim.id, resource_name=sim.name)
 
+        # Check solver type: COMSOL or built-in
+        solver_type = sim.solver_dict.get('solver_type', 'builtin')
+
+        if solver_type == 'comsol':
+            # ---------- COMSOL 3D FEM path ----------
+            from app.services.comsol import (
+                COMSOLClient, MockCOMSOLClient, COMSOLNotAvailableError,
+                HeatTreatmentSolver, MockHeatTreatmentSolver,
+                HeatTreatmentResultsExtractor
+            )
+
+            # Try real COMSOL, fall back to mock
+            try:
+                client = COMSOLClient()
+                if not client.is_available:
+                    raise COMSOLNotAvailableError("mph not available")
+                comsol_solver = HeatTreatmentSolver(client, sim, snapshot)
+                current_app.logger.info("Using real COMSOL solver")
+            except (COMSOLNotAvailableError, Exception):
+                current_app.logger.info("COMSOL not available, using mock solver")
+                comsol_solver = MockHeatTreatmentSolver(sim, snapshot)
+
+            # Run COMSOL/mock solver
+            solver_results = comsol_solver.solve()
+
+            # Extract and store results as SimulationResult records
+            extractor = HeatTreatmentResultsExtractor(sim, snapshot)
+            extractor.extract_and_store(solver_results, db_session=db.session)
+
+            # Update simulation status
+            sim.status = STATUS_COMPLETED
+            sim.completed_at = datetime.utcnow()
+
+            # Update snapshot with summary
+            summary = solver_results.get('summary', {})
+            snapshot.t_800_500 = summary.get('t_800_500')
+            SnapshotService.finalize_snapshot(snapshot, 'completed')
+            new_results = SimulationResult.query.filter_by(snapshot_id=snapshot.id).all()
+            SnapshotService.update_summary(snapshot, new_results)
+            db.session.commit()
+
+            flash('COMSOL simulation completed successfully!', 'success')
+            return redirect(url_for('simulation.view', id=id))
+
+        # ---------- Built-in 1D FDM path ----------
         # Build geometry (use equivalent geometry for CAD types)
         if sim.geometry_type == GEOMETRY_CAD:
             # For CAD geometry, use the equivalent type and params (already in meters)
@@ -1191,6 +1245,125 @@ def result_image(id, result_id):
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
+    return response
+
+
+@simulation_bp.route('/<int:id>/comsol-3d-snapshot/<int:result_id>')
+@login_required
+def comsol_3d_snapshot(id, result_id):
+    """Render 3D temperature snapshot as PNG from VTK file."""
+    import numpy as np
+
+    result = SimulationResult.query.get_or_404(result_id)
+    if result.simulation_id != id or result.result_type != 'vtk_snapshot':
+        return '', 404
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    data = result.data_dict
+    vtk_path = data.get('vtk_path', '')
+
+    import os
+    if not os.path.exists(vtk_path):
+        return Response('VTK file not found', status=404)
+
+    try:
+        import pyvista as pv
+        mesh = pv.read(vtk_path)
+
+        # Render with PyVista
+        pv.global_theme.background = 'white'
+        plotter = pv.Plotter(off_screen=True, window_size=(800, 600))
+
+        temps = mesh['Temperature'] if 'Temperature' in mesh.point_data else None
+        if temps is not None:
+            clim = (float(np.min(temps)), float(np.max(temps)))
+            plotter.add_mesh(
+                mesh, scalars='Temperature', cmap='coolwarm', clim=clim,
+                show_scalar_bar=True,
+                scalar_bar_args={'title': 'Temperature (°C)', 'vertical': True},
+                smooth_shading=True
+            )
+        else:
+            plotter.add_mesh(mesh, color='lightblue', smooth_shading=True)
+
+        plotter.add_text(f't = {data.get("timestep_index", "?")}', position='upper_left', font_size=12)
+        plotter.view_isometric()
+        plotter.camera.elevation = 25
+        plotter.camera.azimuth = 45
+        plotter.add_axes()
+
+        img = plotter.screenshot(return_img=True)
+        plotter.close()
+
+        from PIL import Image
+        import io
+        pil_img = Image.fromarray(img)
+        buf = io.BytesIO()
+        pil_img.save(buf, format='PNG')
+        buf.seek(0)
+
+        return Response(buf.getvalue(), mimetype='image/png')
+
+    except ImportError:
+        return Response('PyVista not available for rendering', status=500)
+    except Exception as e:
+        current_app.logger.error(f'3D snapshot render failed: {e}')
+        return Response(f'Render failed: {e}', status=500)
+
+
+@simulation_bp.route('/<int:id>/comsol-3d-timelapse/<int:result_id>')
+@login_required
+def comsol_3d_timelapse(id, result_id):
+    """Serve GIF timelapse animation."""
+    result = SimulationResult.query.get_or_404(result_id)
+    if result.simulation_id != id or result.result_type != 'vtk_animation':
+        return '', 404
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    data = result.data_dict
+    animation_path = data.get('animation_path', '')
+
+    import os
+    if not os.path.exists(animation_path):
+        return Response('Animation file not found', status=404)
+
+    with open(animation_path, 'rb') as f:
+        animation_data = f.read()
+
+    return Response(animation_data, mimetype='image/gif')
+
+
+@simulation_bp.route('/<int:id>/vtk-download/<int:result_id>')
+@login_required
+def vtk_download(id, result_id):
+    """Download raw VTK file."""
+    result = SimulationResult.query.get_or_404(result_id)
+    if result.simulation_id != id or result.result_type != 'vtk_snapshot':
+        return '', 404
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    data = result.data_dict
+    vtk_path = data.get('vtk_path', '')
+
+    import os
+    if not os.path.exists(vtk_path):
+        return Response('VTK file not found', status=404)
+
+    filename = data.get('filename', 'temperature.vtk')
+    with open(vtk_path, 'rb') as f:
+        vtk_data = f.read()
+
+    response = Response(vtk_data, mimetype='application/octet-stream')
+    response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
 

@@ -3,7 +3,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import (
     StringField, TextAreaField, SelectField, FloatField,
-    IntegerField, BooleanField, SubmitField
+    IntegerField, BooleanField, SubmitField, RadioField
 )
 from wtforms.validators import DataRequired, Optional, NumberRange, Length
 
@@ -376,6 +376,14 @@ class TemperingPhaseForm(FlaskForm):
 
 class SolverForm(FlaskForm):
     """Form for solver configuration."""
+    solver_type = RadioField(
+        'Solver Type',
+        choices=[
+            ('builtin', 'Built-in 1D FDM'),
+            ('comsol', 'COMSOL 3D FEM'),
+        ],
+        default='builtin'
+    )
     n_nodes = IntegerField(
         'Number of Nodes',
         validators=[DataRequired(), NumberRange(min=11, max=201)],

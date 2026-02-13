@@ -21,6 +21,12 @@
                 v{{ latest_snapshot.version }}
             </a>
             {% endif %}
+            {% set solver = sim.solver_dict %}
+            {% if solver.get('solver_type') == 'comsol' %}
+            <span class="badge bg-primary" title="COMSOL 3D FEM solver"><i class="bi bi-gpu-card"></i> COMSOL 3D</span>
+            {% else %}
+            <span class="badge bg-secondary" title="Built-in 1D FDM solver"><i class="bi bi-calculator"></i> 1D FDM</span>
+            {% endif %}
         </h2>
         {% if sim.description %}
         <small class="text-muted">{{ sim.description }}</small>
@@ -863,6 +869,109 @@
 {% endif %}
 
 <!-- ============================================================ -->
+<!-- SECTION 5c: COMSOL 3D Temperature Field (VTK results) -->
+<!-- ============================================================ -->
+{% if vtk_snapshots %}
+<h5 class="mt-4">
+    <i class="bi bi-gpu-card"></i> COMSOL 3D Temperature Field
+    <span class="badge bg-primary fs-6">COMSOL 3D</span>
+</h5>
+
+<!-- Phase Tabs -->
+{% set vtk_phases = vtk_snapshots|groupby('phase') %}
+<ul class="nav nav-tabs mb-3" id="vtkPhaseTabs" role="tablist">
+    {% for phase_name, snapshots in vtk_phases %}
+    <li class="nav-item" role="presentation">
+        <button class="nav-tab-btn nav-link {% if loop.first %}active{% endif %}" id="vtk-{{ phase_name }}-tab"
+                data-bs-toggle="tab" data-bs-target="#vtk-{{ phase_name }}" type="button" role="tab">
+            {{ phase_name|title }} ({{ snapshots|length }})
+        </button>
+    </li>
+    {% endfor %}
+</ul>
+
+<div class="tab-content" id="vtkPhaseContent">
+    {% for phase_name, snapshots in vtk_phases %}
+    <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="vtk-{{ phase_name }}" role="tabpanel">
+        <div class="row mb-3">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-thermometer-sun"></i> 3D Temperature — {{ phase_name|title }}</span>
+                        <div>
+                            <select class="form-select form-select-sm d-inline-block" style="width:auto;"
+                                    onchange="updateVtkSnapshot(this, '{{ phase_name }}')">
+                                {% for snap in snapshots %}
+                                {% set snap_data = snap.data_dict %}
+                                <option value="{{ snap.id }}" {% if loop.first %}selected{% endif %}>
+                                    Timestep {{ snap_data.get('timestep_index', loop.index0) }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body text-center" id="vtk-img-{{ phase_name }}">
+                        {% set first_snap = snapshots[0] %}
+                        <img src="{{ url_for('simulation.comsol_3d_snapshot', id=sim.id, result_id=first_snap.id) }}"
+                             class="img-fluid" alt="3D Temperature"
+                             style="max-height: 450px;" id="vtk-img-tag-{{ phase_name }}">
+                    </div>
+                    <div class="card-footer">
+                        <div class="btn-group btn-group-sm">
+                            {% for snap in snapshots %}
+                            {% set snap_data = snap.data_dict %}
+                            <a href="{{ url_for('simulation.vtk_download', id=sim.id, result_id=snap.id) }}"
+                               class="btn btn-outline-secondary" title="Download VTK t{{ snap_data.get('timestep_index', loop.index0) }}">
+                                <i class="bi bi-download"></i> t{{ snap_data.get('timestep_index', loop.index0) }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-info-circle"></i> COMSOL 3D Info</div>
+                    <div class="card-body">
+                        <p class="small mb-2">
+                            <strong>{{ snapshots|length }}</strong> VTK snapshots for {{ phase_name|title }} phase.
+                        </p>
+                        <ul class="small text-muted mb-2">
+                            <li>Full 3D temperature field on mesh</li>
+                            <li>Download VTK for ParaView viewing</li>
+                            <li>Color scale: blue (cold) to red (hot)</li>
+                        </ul>
+                        {% if vtk_animation %}
+                        <hr>
+                        <p class="small mb-1"><strong>Timelapse Animation</strong></p>
+                        <a href="{{ url_for('simulation.comsol_3d_timelapse', id=sim.id, result_id=vtk_animation.id) }}"
+                           class="btn btn-outline-success btn-sm" target="_blank">
+                            <i class="bi bi-film"></i> View Animation (GIF)
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if vtk_animation %}
+<div class="card mb-3">
+    <div class="card-header">
+        <i class="bi bi-film"></i> Heat Treatment Timelapse
+    </div>
+    <div class="card-body text-center">
+        <img src="{{ url_for('simulation.comsol_3d_timelapse', id=sim.id, result_id=vtk_animation.id) }}"
+             class="img-fluid" alt="Heat Treatment Animation"
+             style="max-height: 500px;">
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+<!-- ============================================================ -->
 <!-- SECTION 6: Hardness Prediction -->
 <!-- ============================================================ -->
 {% if hardness_results %}
@@ -1105,6 +1214,16 @@ function switchCCT(view) {
         img.src = img.dataset.multi;
     } else {
         img.src = img.dataset.center;
+    }
+}
+
+// VTK snapshot selector
+function updateVtkSnapshot(select, phaseName) {
+    const resultId = select.value;
+    const imgTag = document.getElementById('vtk-img-tag-' + phaseName);
+    if (imgTag) {
+        const baseUrl = '{{ url_for("simulation.comsol_3d_snapshot", id=sim.id, result_id=0) }}';
+        imgTag.src = baseUrl.replace('/0', '/' + resultId) + '?_t=' + Date.now();
     }
 }
 
