@@ -1152,6 +1152,149 @@ def download_pdf_report(id):
         return redirect(url_for('simulation.view', id=id))
 
 
+# --- Data Export Routes (Phase 8B) ---
+
+@simulation_bp.route('/<int:id>/export/csv')
+@login_required
+def export_csv(id):
+    """Export simulation temperature results as CSV."""
+    from app.services.data_export import DataExporter
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+    if sim.status != STATUS_COMPLETED:
+        flash('Export is only available for completed simulations.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    csv_data = DataExporter.export_simulation_csv(sim)
+    if not csv_data:
+        flash('No temperature data to export.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    safe_name = sim.name.replace(' ', '_').replace('/', '-')
+    response = Response(csv_data, mimetype='text/csv')
+    response.headers['Content-Disposition'] = f'attachment; filename="{safe_name}_temperature.csv"'
+    return response
+
+
+@simulation_bp.route('/<int:id>/export/excel')
+@login_required
+def export_excel(id):
+    """Export simulation data as Excel workbook."""
+    from app.services.data_export import DataExporter
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+    if sim.status != STATUS_COMPLETED:
+        flash('Export is only available for completed simulations.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    try:
+        excel_bytes = DataExporter.export_simulation_excel(sim)
+        safe_name = sim.name.replace(' ', '_').replace('/', '-')
+        response = Response(
+            excel_bytes,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{safe_name}_data.xlsx"'
+        return response
+    except Exception as e:
+        flash(f'Error generating Excel export: {str(e)}', 'danger')
+        return redirect(url_for('simulation.view', id=id))
+
+
+@simulation_bp.route('/<int:id>/export/measured-csv')
+@login_required
+def export_measured_csv(id):
+    """Export measured data linked to this simulation as CSV."""
+    from app.services.data_export import DataExporter
+    from app.models.measured_data import MeasuredData
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    # Get the most recent measured data for this simulation
+    md = sim.measured_data.order_by(MeasuredData.uploaded_at.desc()).first()
+    if not md:
+        flash('No measured data found for this simulation.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    csv_data = DataExporter.export_measured_csv(md)
+    if not csv_data:
+        flash('No data to export.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    safe_name = md.name.replace(' ', '_').replace('/', '-')
+    response = Response(csv_data, mimetype='text/csv')
+    response.headers['Content-Disposition'] = f'attachment; filename="{safe_name}_measured.csv"'
+    return response
+
+
+@simulation_bp.route('/<int:id>/export/comparison')
+@login_required
+def export_comparison(id):
+    """Export comparison metrics between simulation and measured data as CSV."""
+    from app.services.data_export import DataExporter
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+    if sim.status != STATUS_COMPLETED:
+        flash('Export is only available for completed simulations.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    csv_data = DataExporter.export_comparison_csv(sim)
+    if not csv_data:
+        flash('No comparison data to export.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    safe_name = sim.name.replace(' ', '_').replace('/', '-')
+    response = Response(csv_data, mimetype='text/csv')
+    response.headers['Content-Disposition'] = f'attachment; filename="{safe_name}_comparison.csv"'
+    return response
+
+
+@simulation_bp.route('/export/sweep')
+@login_required
+def export_sweep():
+    """Export sweep/comparison summary for multiple simulations as CSV."""
+    from app.services.data_export import DataExporter
+
+    ids_param = request.args.get('ids', '')
+    if not ids_param:
+        flash('No simulations selected.', 'warning')
+        return redirect(url_for('simulation.index'))
+
+    try:
+        sim_ids = [int(x) for x in ids_param.split(',')]
+    except ValueError:
+        flash('Invalid simulation IDs.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    # Verify access
+    for sid in sim_ids:
+        sim = Simulation.query.get(sid)
+        if not sim or sim.user_id != current_user.id:
+            flash('Access denied.', 'danger')
+            return redirect(url_for('simulation.index'))
+
+    csv_data = DataExporter.export_sweep_summary_csv(sim_ids)
+    if not csv_data:
+        flash('No data to export.', 'warning')
+        return redirect(url_for('simulation.index'))
+
+    response = Response(csv_data, mimetype='text/csv')
+    response.headers['Content-Disposition'] = 'attachment; filename="sweep_summary.csv"'
+    return response
+
+
 @simulation_bp.route('/<int:id>/3d-snapshot')
 @login_required
 def temperature_3d_snapshot(id):
