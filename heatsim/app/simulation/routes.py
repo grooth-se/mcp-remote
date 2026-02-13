@@ -491,9 +491,17 @@ def view(id):
 
     # Compute comparison metrics if measured data exists
     comparison_metrics = None
+    all_measured_channels = []
     if measured_data and sim.status == STATUS_COMPLETED:
         from app.services.comparison_service import ComparisonService
         comparison_metrics = ComparisonService.compare_simulation(sim)
+        # Collect unique channel names across all measured datasets
+        seen = set()
+        for md in measured_data:
+            for ch in md.available_channels:
+                if ch not in seen:
+                    seen.add(ch)
+                    all_measured_channels.append(ch)
 
     return render_template(
         'simulation/results.html',
@@ -519,7 +527,8 @@ def view(id):
         measured_quenching=measured_quenching,
         measured_tempering=measured_tempering,
         hardness_results=hardness_results,
-        comparison_metrics=comparison_metrics
+        comparison_metrics=comparison_metrics,
+        all_measured_channels=all_measured_channels,
     )
 
 
@@ -2588,5 +2597,80 @@ def measured_absorbed_power_plot_step(id, step):
         cp_func=get_cp_at_temp,
         title=f'Measured Absorbed Power ({step.title()})',
         phase_name=step
+    )
+    return Response(plot_data, mimetype='image/png')
+
+
+# --- Phase 8C: Enhanced Comparison View ---
+
+@simulation_bp.route('/<int:id>/preview-tc-data', methods=['POST'])
+@login_required
+def preview_tc_data(id):
+    """AJAX endpoint: preview uploaded TC CSV before saving."""
+    import json as json_mod
+    from app.services.tc_preview import generate_preview
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response(json_mod.dumps({'valid': False, 'message': 'Access denied'}),
+                        mimetype='application/json', status=403)
+
+    if 'tc_file' not in request.files:
+        return Response(json_mod.dumps({'valid': False, 'message': 'No file'}),
+                        mimetype='application/json')
+
+    file = request.files['tc_file']
+    if not file.filename or not file.filename.endswith('.csv'):
+        return Response(json_mod.dumps({'valid': False, 'message': 'Please select a CSV file'}),
+                        mimetype='application/json')
+
+    content = file.read().decode('utf-8')
+    result = generate_preview(content)
+    return Response(json_mod.dumps(result), mimetype='application/json')
+
+
+@simulation_bp.route('/<int:id>/comparison-plot-channel/<channel>')
+@login_required
+def comparison_plot_channel(id, channel):
+    """Generate comparison plot for a specific measured channel vs simulation."""
+    import numpy as np
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    cycle = sim.results.filter_by(result_type='full_cycle').first()
+    if not cycle:
+        return Response('No simulation results', status=404)
+
+    # Find first measured dataset with this channel
+    measured_list = sim.measured_data.all()
+    md_match = None
+    for md in measured_list:
+        if channel in md.available_channels:
+            md_match = md
+            break
+    if not md_match:
+        return Response('Channel not found', status=404)
+
+    sim_times = np.array(cycle.time_array)
+    sim_temps = np.array(cycle.data_dict.get('center', cycle.value_array))
+    meas_times = np.array(md_match.get_channel_times(channel))
+    meas_temps = np.array(md_match.get_channel_data(channel))
+
+    # Optional time offset
+    offset = request.args.get('offset', 0, type=float)
+    if offset:
+        meas_times = meas_times + offset
+
+    plot_data = visualization.create_comparison_plot(
+        sim_times=sim_times,
+        sim_temps=sim_temps,
+        measured_data=[{
+            'name': f'{md_match.name} - {channel}',
+            'times': meas_times,
+            'temps': meas_temps,
+        }],
+        title=f'Simulation vs {channel} (offset={offset:.0f}s)'
     )
     return Response(plot_data, mimetype='image/png')

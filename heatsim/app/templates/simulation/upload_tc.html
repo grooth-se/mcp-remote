@@ -21,7 +21,7 @@
                 <i class="bi bi-upload"></i> Upload CSV File
             </div>
             <div class="card-body">
-                <form method="post" enctype="multipart/form-data">
+                <form method="post" enctype="multipart/form-data" id="uploadForm">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                     <div class="mb-3">
@@ -48,9 +48,29 @@
 
                     <div class="mb-3">
                         <label class="form-label">TC Logger CSV File</label>
-                        <input type="file" name="tc_file" class="form-control" accept=".csv" required>
+                        <input type="file" name="tc_file" id="tcFileInput" class="form-control" accept=".csv" required>
                         <div class="form-text">
                             Supported format: semicolon-separated CSV with columns: date, time, sensor, value
+                        </div>
+                    </div>
+
+                    <!-- Preview area -->
+                    <div id="previewArea" class="d-none mb-3">
+                        <div class="card border-info">
+                            <div class="card-header py-1">
+                                <small><i class="bi bi-eye"></i> Preview</small>
+                            </div>
+                            <div class="card-body p-2">
+                                <div id="previewLoading" class="text-center py-2 d-none">
+                                    <div class="spinner-border spinner-border-sm text-info" role="status"></div>
+                                    <small class="ms-1">Parsing file...</small>
+                                </div>
+                                <div id="previewError" class="alert alert-danger py-1 mb-0 d-none"></div>
+                                <div id="previewContent" class="d-none">
+                                    <img id="previewPlot" class="img-fluid mb-2" alt="Preview plot">
+                                    <div id="previewStats" class="small"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -111,4 +131,65 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('tcFileInput');
+    const previewArea = document.getElementById('previewArea');
+    const previewLoading = document.getElementById('previewLoading');
+    const previewError = document.getElementById('previewError');
+    const previewContent = document.getElementById('previewContent');
+    const previewPlot = document.getElementById('previewPlot');
+    const previewStats = document.getElementById('previewStats');
+
+    fileInput.addEventListener('change', function() {
+        if (!this.files || !this.files[0]) return;
+
+        previewArea.classList.remove('d-none');
+        previewLoading.classList.remove('d-none');
+        previewError.classList.add('d-none');
+        previewContent.classList.add('d-none');
+
+        const formData = new FormData();
+        formData.append('tc_file', this.files[0]);
+        formData.append('csrf_token', '{{ csrf_token() }}');
+
+        fetch('{{ url_for("simulation.preview_tc_data", id=sim.id) }}', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(r => r.json())
+        .then(data => {
+            previewLoading.classList.add('d-none');
+            if (data.valid) {
+                previewContent.classList.remove('d-none');
+                previewPlot.src = 'data:image/png;base64,' + data.plot_base64;
+
+                let statsHtml = '<strong>' + data.message + '</strong>';
+                if (data.duration_seconds) {
+                    statsHtml += ' &middot; Duration: ' + data.duration_seconds.toFixed(0) + 's';
+                }
+                if (data.statistics) {
+                    statsHtml += '<table class="table table-sm mt-1 mb-0"><thead><tr><th>Ch</th><th>Min</th><th>Max</th><th>Avg</th></tr></thead><tbody>';
+                    for (const [ch, st] of Object.entries(data.statistics)) {
+                        statsHtml += '<tr><td>' + ch + '</td><td>' + st.min.toFixed(1) + '</td><td>' + st.max.toFixed(1) + '</td><td>' + st.avg.toFixed(1) + '</td></tr>';
+                    }
+                    statsHtml += '</tbody></table>';
+                }
+                previewStats.innerHTML = statsHtml;
+            } else {
+                previewError.classList.remove('d-none');
+                previewError.textContent = data.message;
+            }
+        })
+        .catch(err => {
+            previewLoading.classList.add('d-none');
+            previewError.classList.remove('d-none');
+            previewError.textContent = 'Preview failed: ' + err.message;
+        });
+    });
+});
+</script>
 {% endblock %}

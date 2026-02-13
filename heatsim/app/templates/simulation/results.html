@@ -261,6 +261,41 @@
 </div>
 {% endif %}
 
+<!-- Channel Comparison Controls (when measured data exists) -->
+{% if comparison_metrics and all_measured_channels %}
+<div class="card mb-3">
+    <div class="card-header py-2">
+        <i class="bi bi-sliders2"></i> Channel Comparison
+    </div>
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small">Channel</label>
+                <select id="compChannel" class="form-select form-select-sm">
+                    {% for ch in all_measured_channels %}
+                    <option value="{{ ch }}">{{ ch }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small">Time Offset: <span id="offsetLabel">0</span>s</label>
+                <input type="range" id="compOffset" class="form-range" min="-60" max="60" step="1" value="0">
+            </div>
+            <div class="col-md-3">
+                <button id="compUpdateBtn" class="btn btn-sm btn-primary w-100">
+                    <i class="bi bi-arrow-clockwise"></i> Update
+                </button>
+            </div>
+        </div>
+        <div class="text-center mt-2">
+            <img id="compPlotImg"
+                 src="{{ url_for('simulation.comparison_plot_channel', id=sim.id, channel=all_measured_channels[0]) }}"
+                 class="img-fluid" alt="Channel comparison" style="max-height: 400px;">
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Row 2: Simulation T vs Time per process step -->
 <div class="plot-grid">
     <!-- Heating (Simulation) -->
@@ -1052,5 +1087,27 @@ function switchCCT(view) {
         img.src = img.dataset.center;
     }
 }
+
+// Channel comparison controls
+(function() {
+    const channelSel = document.getElementById('compChannel');
+    const offsetSlider = document.getElementById('compOffset');
+    const offsetLabel = document.getElementById('offsetLabel');
+    const updateBtn = document.getElementById('compUpdateBtn');
+    const plotImg = document.getElementById('compPlotImg');
+
+    if (!channelSel || !plotImg) return;
+
+    offsetSlider.addEventListener('input', function() {
+        offsetLabel.textContent = this.value;
+    });
+
+    updateBtn.addEventListener('click', function() {
+        const ch = channelSel.value;
+        const offset = offsetSlider.value;
+        const baseUrl = '{{ url_for("simulation.comparison_plot_channel", id=sim.id, channel="__CH__") }}'.replace('__CH__', ch);
+        plotImg.src = baseUrl + '?offset=' + offset + '&_t=' + Date.now();
+    });
+})();
 </script>
 {% endblock %}
