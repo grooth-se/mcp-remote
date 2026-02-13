@@ -15,6 +15,12 @@
         <h2 class="mb-0">
             {{ sim.name }}
             <span class="badge {{ sim.status_badge_class }}">{{ sim.status }}</span>
+            {% if latest_snapshot %}
+            <a href="{{ url_for('simulation.snapshot_detail', id=sim.id, version=latest_snapshot.version) }}"
+               class="badge bg-info text-decoration-none" title="View snapshot details">
+                v{{ latest_snapshot.version }}
+            </a>
+            {% endif %}
         </h2>
         {% if sim.description %}
         <small class="text-muted">{{ sim.description }}</small>

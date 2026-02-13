@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Snapshot v{{ snapshot.version }} - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item active">Snapshot v{{ snapshot.version }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>
+        <i class="bi bi-camera"></i> Snapshot v{{ snapshot.version }}
+        <span class="badge bg-{{ 'success' if snapshot.status == 'completed' else 'danger' if snapshot.status == 'failed' else 'secondary' }} fs-6">
+            {{ snapshot.status or 'unknown' }}
+        </span>
+    </h2>
+    <div class="btn-group btn-group-sm">
+        <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Results
+        </a>
+    </div>
+</div>
+
+<!-- Run Metadata -->
+<div class="card mb-3">
+    <div class="card-header"><i class="bi bi-clock-history"></i> Run Metadata</div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <small class="text-muted">Started</small>
+                <div>{{ snapshot.started_at.strftime('%Y-%m-%d %H:%M:%S') if snapshot.started_at else '-' }}</div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Completed</small>
+                <div>{{ snapshot.completed_at.strftime('%Y-%m-%d %H:%M:%S') if snapshot.completed_at else '-' }}</div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Duration</small>
+                <div>{{ '%.1f s'|format(snapshot.duration_seconds) if snapshot.duration_seconds else '-' }}</div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">t8/5</small>
+                <div>{{ '%.2f s'|format(snapshot.t_800_500) if snapshot.t_800_500 else '-' }}</div>
+            </div>
+        </div>
+        {% if snapshot.predicted_hardness_surface or snapshot.predicted_hardness_center %}
+        <div class="row mt-2">
+            <div class="col-md-3">
+                <small class="text-muted">Surface Hardness</small>
+                <div>{{ '%.0f HV'|format(snapshot.predicted_hardness_surface) if snapshot.predicted_hardness_surface else '-' }}</div>
+            </div>
+            <div class="col-md-3">
+                <small class="text-muted">Center Hardness</small>
+                <div>{{ '%.0f HV'|format(snapshot.predicted_hardness_center) if snapshot.predicted_hardness_center else '-' }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Geometry Config -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-bounding-box"></i> Geometry</div>
+            <div class="card-body">
+                <p class="mb-1"><strong>Type:</strong> {{ snapshot.geometry_type }}</p>
+                {% if snapshot.cad_filename %}
+                <p class="mb-1"><strong>CAD File:</strong> {{ snapshot.cad_filename }}</p>
+                {% if snapshot.cad_equivalent_type %}
+                <p class="mb-1"><strong>Equivalent:</strong> {{ snapshot.cad_equivalent_type }}</p>
+                {% endif %}
+                {% endif %}
+                {% set geo = snapshot.geometry_dict %}
+                {% if geo %}
+                <table class="table table-sm mb-0 mt-2">
+                    <tbody>
+                        {% for key, val in geo.items() %}
+                        <tr>
+                            <td class="text-muted">{{ key }}</td>
+                            <td>{{ '%.4f m'|format(val) if val is number else val }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Solver Config -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-gear"></i> Solver Config</div>
+            <div class="card-body">
+                {% set solver = snapshot.solver_dict %}
+                {% if solver %}
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr><td class="text-muted">Nodes</td><td>{{ solver.get('n_nodes', '-') }}</td></tr>
+                        <tr><td class="text-muted">Time Step</td><td>{{ solver.get('dt', '-') }} s</td></tr>
+                        <tr><td class="text-muted">Max Time</td><td>{{ solver.get('max_time', '-') }} s</td></tr>
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">No solver config recorded.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Heat Treatment Config -->
+{% set ht = snapshot.ht_config %}
+{% if ht %}
+<div class="card mt-3">
+    <div class="card-header"><i class="bi bi-thermometer-half"></i> Heat Treatment Config</div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for phase_name in ['heating', 'transfer', 'quenching', 'tempering'] %}
+            {% set phase = ht.get(phase_name, {}) %}
+            {% if phase.get('enabled', False) %}
+            <div class="col-md-3">
+                <h6 class="text-uppercase text-muted small">{{ phase_name }}</h6>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for key, val in phase.items() %}
+                        {% if key != 'enabled' %}
+                        <tr>
+                            <td class="text-muted small">{{ key.replace('_', ' ').title() }}</td>
+                            <td class="small">{{ val }}</td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Material Data -->
+<div class="card mt-3">
+    <div class="card-header"><i class="bi bi-database"></i> Material: {{ snapshot.steel_grade_designation }} ({{ snapshot.steel_grade_data_source }})</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <!-- Composition -->
+            {% set comp = snapshot.composition_dict %}
+            {% if comp %}
+            <div class="col-md-4">
+                <h6 class="text-muted small">Composition (wt%)</h6>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for elem, val in comp.items() %}
+                        {% if val and val > 0 %}
+                        <tr><td class="text-muted">{{ elem }}</td><td>{{ '%.4f'|format(val) }}</td></tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <!-- Phase Diagram -->
+            {% set pd = snapshot.phase_diagram_dict %}
+            {% if pd and pd.get('transformation_temps') %}
+            <div class="col-md-4">
+                <h6 class="text-muted small">Transformation Temps</h6>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for key, val in pd.transformation_temps.items() %}
+                        <tr><td class="text-muted">{{ key }}</td><td>{{ val }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <!-- Properties -->
+            {% set props = snapshot.material_props_dict %}
+            {% if props %}
+            <div class="col-md-4">
+                <h6 class="text-muted small">Properties ({{ props|length }})</h6>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for p in props %}
+                        <tr>
+                            <td class="text-muted">{{ p.name }}</td>
+                            <td>{{ p.type }}{% if p.units %} ({{ p.units }}){% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -23,6 +23,7 @@ from .report_generator import (
     SimulationPDFReportGenerator, generate_simulation_pdf_report
 )
 from .data_export import DataExporter
+from .snapshot_service import SnapshotService
 from . import visualization
 from . import visualization_3d
 from . import comsol
@@ -83,6 +84,8 @@ __all__ = [
     'ComparisonMetrics',
     # Phase 8 services - Data export
     'DataExporter',
+    # Phase 10 services - Snapshots
+    'SnapshotService',
     # Phase 3 services - Visualization
     'visualization',
     # Phase 4 services - COMSOL integration

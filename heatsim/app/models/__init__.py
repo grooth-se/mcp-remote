@@ -37,6 +37,7 @@ from .weld_project import (
     RESULT_TYPES, RESULT_THERMAL_CYCLE, RESULT_TEMPERATURE_FIELD, RESULT_COOLING_RATE, RESULT_LINE_PROFILE,
 )
 from .measured_data import MeasuredData
+from .snapshot import SimulationSnapshot
 from .system_setting import SystemSetting
 from .audit_log import (
     AuditLog,
@@ -83,6 +84,8 @@ __all__ = [
     'RESULT_TYPES', 'RESULT_THERMAL_CYCLE', 'RESULT_TEMPERATURE_FIELD', 'RESULT_COOLING_RATE', 'RESULT_LINE_PROFILE',
     # Measured data models
     'MeasuredData',
+    # Snapshot versioning
+    'SimulationSnapshot',
     # System settings
     'SystemSetting',
     # Audit log

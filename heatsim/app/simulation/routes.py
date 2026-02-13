@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import SteelGrade, PhaseDiagram, MeasuredData, HeatTreatmentTemplate, AuditLog
+from app.models import SteelGrade, PhaseDiagram, MeasuredData, HeatTreatmentTemplate, AuditLog, SimulationSnapshot
 from app.models.simulation import (
     Simulation, SimulationResult,
     STATUS_DRAFT, STATUS_READY, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
@@ -457,7 +457,13 @@ def save_as_template(id):
 def view(id):
     """View simulation details and results."""
     sim = Simulation.query.get_or_404(id)
-    results = sim.results.all()
+
+    # Get results from latest completed snapshot (or all if no snapshots)
+    latest_snapshot = sim.snapshots.filter_by(status='completed').first()
+    if latest_snapshot:
+        results = SimulationResult.query.filter_by(snapshot_id=latest_snapshot.id).all()
+    else:
+        results = sim.results.all()
 
     # Group results by type
     cooling_curves = [r for r in results if r.result_type in ('cooling_curve', 'full_cycle', 'heating_curve')]
@@ -509,6 +515,7 @@ def view(id):
         'simulation/results.html',
         sim=sim,
         results=results,
+        latest_snapshot=latest_snapshot,
         cooling_curves=cooling_curves,
         profiles=profiles,
         phases=phases,
@@ -534,6 +541,22 @@ def view(id):
     )
 
 
+@simulation_bp.route('/<int:id>/snapshot/<int:version>')
+@login_required
+def snapshot_detail(id, version):
+    """View immutable snapshot of simulation run inputs."""
+    sim = Simulation.query.get_or_404(id)
+    snapshot = SimulationSnapshot.query.filter_by(
+        simulation_id=id, version=version
+    ).first_or_404()
+
+    return render_template(
+        'simulation/snapshot_detail.html',
+        sim=sim,
+        snapshot=snapshot,
+    )
+
+
 @simulation_bp.route('/<int:id>/run', methods=['POST'])
 @login_required
 def run(id):
@@ -549,8 +572,9 @@ def run(id):
         return redirect(url_for('simulation.view', id=id))
 
     try:
-        # Clear previous results
-        SimulationResult.query.filter_by(simulation_id=sim.id).delete()
+        # Create immutable snapshot of all inputs
+        from app.services.snapshot_service import SnapshotService
+        snapshot = SnapshotService.create_snapshot(sim)
 
         sim.status = STATUS_RUNNING
         sim.started_at = datetime.utcnow()
@@ -614,6 +638,7 @@ def run(id):
         # Store full heat treatment cycle result
         cycle_result = SimulationResult(
             simulation_id=sim.id,
+            snapshot_id=snapshot.id,
             result_type='full_cycle',
             phase='full',
             location='center',
@@ -703,6 +728,7 @@ def run(id):
 
                 pr = SimulationResult(
                     simulation_id=sim.id,
+                    snapshot_id=snapshot.id,
                     result_type='cooling_curve' if phase_result.phase_name in ('quenching', 'transfer', 'cooling') else 'heating_curve',
                     phase=phase_result.phase_name,
                     location='center',
@@ -725,6 +751,7 @@ def run(id):
         # Store temperature profile result
         profile_result = SimulationResult(
             simulation_id=sim.id,
+            snapshot_id=snapshot.id,
             result_type='temperature_profile',
             phase='full',
             location='all'
@@ -754,6 +781,7 @@ def run(id):
 
             phase_result = SimulationResult(
                 simulation_id=sim.id,
+                snapshot_id=snapshot.id,
                 result_type='phase_fraction',
                 phase='full',
                 location='center'
@@ -778,6 +806,7 @@ def run(id):
                 # Store hardness result
                 hardness_sim_result = SimulationResult(
                     simulation_id=sim.id,
+                    snapshot_id=snapshot.id,
                     result_type='hardness_prediction',
                     phase='full',
                     location='all'
@@ -795,6 +824,7 @@ def run(id):
         # Cooling rate plot
         rate_result = SimulationResult(
             simulation_id=sim.id,
+            snapshot_id=snapshot.id,
             result_type='cooling_rate',
             phase='full',
             location='all'
@@ -820,6 +850,7 @@ def run(id):
                 # dT/dt vs Time plot
                 dtdt_time_result = SimulationResult(
                     simulation_id=sim.id,
+                    snapshot_id=snapshot.id,
                     result_type='dTdt_vs_time',
                     phase=phase_result.phase_name,
                     location='all'
@@ -835,6 +866,7 @@ def run(id):
                 # dT/dt vs Temperature plot
                 dtdt_temp_result = SimulationResult(
                     simulation_id=sim.id,
+                    snapshot_id=snapshot.id,
                     result_type='dTdt_vs_temp',
                     phase=phase_result.phase_name,
                     location='all'
@@ -882,6 +914,7 @@ def run(id):
                 # Create absorbed power plot
                 power_result = SimulationResult(
                     simulation_id=sim.id,
+                    snapshot_id=snapshot.id,
                     result_type='absorbed_power',
                     phase=phase_result.phase_name,
                     location='all'
@@ -898,6 +931,11 @@ def run(id):
 
         sim.status = STATUS_COMPLETED
         sim.completed_at = datetime.utcnow()
+
+        # Finalize snapshot with summary metrics
+        SnapshotService.finalize_snapshot(snapshot, 'completed')
+        new_results = SimulationResult.query.filter_by(snapshot_id=snapshot.id).all()
+        SnapshotService.update_summary(snapshot, new_results)
         db.session.commit()
 
         flash('Simulation completed successfully!', 'success')
@@ -905,6 +943,8 @@ def run(id):
     except Exception as e:
         sim.status = STATUS_FAILED
         sim.error_message = str(e)
+        if snapshot:
+            SnapshotService.finalize_snapshot(snapshot, 'failed', str(e))
         db.session.commit()
         flash(f'Simulation failed: {str(e)}', 'danger')
 
@@ -2015,8 +2055,9 @@ def batch_delete():
 
 def _run_simulation(sim):
     """Internal helper to run a single simulation (used by batch_run)."""
-    # Clear previous results
-    SimulationResult.query.filter_by(simulation_id=sim.id).delete()
+    # Create immutable snapshot
+    from app.services.snapshot_service import SnapshotService
+    snapshot = SnapshotService.create_snapshot(sim)
 
     sim.status = STATUS_RUNNING
     sim.started_at = datetime.utcnow()
@@ -2077,6 +2118,7 @@ def _run_simulation(sim):
         # Store full cycle result
         cycle_result = SimulationResult(
             simulation_id=sim.id,
+            snapshot_id=snapshot.id,
             result_type='full_cycle',
             phase='full',
             location='center',
@@ -2161,6 +2203,7 @@ def _run_simulation(sim):
 
             phase_result = SimulationResult(
                 simulation_id=sim.id,
+                snapshot_id=snapshot.id,
                 result_type='phase_fraction',
                 phase='full',
                 location='center'
@@ -2184,6 +2227,7 @@ def _run_simulation(sim):
 
                 hardness_sim_result = SimulationResult(
                     simulation_id=sim.id,
+                    snapshot_id=snapshot.id,
                     result_type='hardness_prediction',
                     phase='full',
                     location='all'
@@ -2199,11 +2243,16 @@ def _run_simulation(sim):
 
         sim.status = STATUS_COMPLETED
         sim.completed_at = datetime.utcnow()
+        SnapshotService.finalize_snapshot(snapshot, 'completed')
+        new_results = SimulationResult.query.filter_by(snapshot_id=snapshot.id).all()
+        SnapshotService.update_summary(snapshot, new_results)
         db.session.commit()
 
     except Exception as e:
         sim.status = STATUS_FAILED
         sim.error_message = str(e)
+        if snapshot:
+            SnapshotService.finalize_snapshot(snapshot, 'failed', str(e))
         db.session.commit()
         raise
 

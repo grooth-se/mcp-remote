@@ -450,6 +450,7 @@ class SimulationResult(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     simulation_id = db.Column(db.Integer, db.ForeignKey('simulations.id'), nullable=False)
+    snapshot_id = db.Column(db.Integer, db.ForeignKey('simulation_snapshots.id'), nullable=True)
 
     # Result type: 'cooling_curve', 'temperature_profile', 'phase_fraction', 'cooling_rate', 'full_cycle'
     result_type = db.Column(db.Text, nullable=False)
