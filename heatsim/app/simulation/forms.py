@@ -437,3 +437,74 @@ class ParameterSweepForm(FlaskForm):
                         validators=[DataRequired(), NumberRange(min=2, max=20)])
     run_immediately = BooleanField('Run Simulations Immediately', default=False)
     submit = SubmitField('Create Parameter Sweep')
+
+
+class ProcessOptimizationForm(FlaskForm):
+    """Form for process optimization setup."""
+
+    # Objective
+    objective_output = SelectField('Objective Output', choices=[
+        ('hardness_hv_center', 'Center Hardness (HV)'),
+        ('hardness_hv_surface', 'Surface Hardness (HV)'),
+        ('t8_5', 't₈/₅ Cooling Time (s)'),
+        ('martensite', 'Martensite Fraction (%)'),
+        ('core_cooling_rate', 'Core Cooling Rate (°C/s)'),
+        ('surface_cooling_rate', 'Surface Cooling Rate (°C/s)'),
+    ], validators=[DataRequired()])
+
+    objective_direction = SelectField('Objective Type', choices=[
+        ('target', 'Target Value'),
+        ('minimize', 'Minimize'),
+        ('maximize', 'Maximize'),
+    ], validators=[DataRequired()])
+
+    target_value = FloatField('Target Value', validators=[Optional()])
+
+    # Optimizer settings
+    method = SelectField('Method', choices=[
+        ('nelder-mead', 'Nelder-Mead (Fast, Local Search)'),
+        ('differential_evolution', 'Differential Evolution (Global Search)'),
+    ], default='nelder-mead')
+
+    max_iterations = IntegerField(
+        'Maximum Iterations', default=30,
+        validators=[DataRequired(), NumberRange(min=5, max=50)]
+    )
+
+    # Parameters to optimize (checkbox + min/max bounds)
+    opt_aust_temp = BooleanField('Austenitizing Temperature')
+    opt_aust_temp_min = FloatField('Min', validators=[Optional()], default=750)
+    opt_aust_temp_max = FloatField('Max', validators=[Optional()], default=1100)
+
+    opt_quench_temp = BooleanField('Quench Media Temperature')
+    opt_quench_temp_min = FloatField('Min', validators=[Optional()], default=0)
+    opt_quench_temp_max = FloatField('Max', validators=[Optional()], default=80)
+
+    opt_quench_duration = BooleanField('Quench Duration')
+    opt_quench_duration_min = FloatField('Min', validators=[Optional()], default=30)
+    opt_quench_duration_max = FloatField('Max', validators=[Optional()], default=3600)
+
+    opt_temper_temp = BooleanField('Tempering Temperature')
+    opt_temper_temp_min = FloatField('Min', validators=[Optional()], default=100)
+    opt_temper_temp_max = FloatField('Max', validators=[Optional()], default=700)
+
+    opt_temper_hold = BooleanField('Tempering Hold Time')
+    opt_temper_hold_min = FloatField('Min', validators=[Optional()], default=30)
+    opt_temper_hold_max = FloatField('Max', validators=[Optional()], default=480)
+
+    # Optional constraint
+    constraint_enabled = BooleanField('Add Output Constraint')
+    constraint_output = SelectField('Constraint Output', choices=[
+        ('hardness_hv_center', 'Center Hardness (HV)'),
+        ('hardness_hv_surface', 'Surface Hardness (HV)'),
+        ('t8_5', 't₈/₅ Cooling Time (s)'),
+        ('martensite', 'Martensite Fraction (%)'),
+    ], validators=[Optional()])
+    constraint_operator = SelectField('Constraint', choices=[
+        ('gte', '≥'),
+        ('lte', '≤'),
+    ], validators=[Optional()])
+    constraint_value = FloatField('Value', validators=[Optional()])
+
+    create_best_sim = BooleanField('Create simulation with best parameters', default=True)
+    submit = SubmitField('Run Optimization')

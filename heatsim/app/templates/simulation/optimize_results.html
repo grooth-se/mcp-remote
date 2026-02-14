@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Optimization Results - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+        <li class="breadcrumb-item active">Optimization Results</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3><i class="bi bi-bullseye"></i> Optimization Results</h3>
+    <div>
+        <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Results
+        </a>
+        <a href="{{ url_for('simulation.optimize', id=sim.id) }}" class="btn btn-outline-success btn-sm ms-2">
+            <i class="bi bi-arrow-repeat"></i> Re-optimize
+        </a>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-2">
+                <div class="text-muted small">Best Objective</div>
+                <div class="fs-4 fw-bold text-success">{{ opt_data.best_objective|round(2) }}</div>
+                <div class="text-muted small">
+                    {{ output_defs.get(opt_data.objective.output_key, {}).get('label', opt_data.objective.output_key) }}
+                    {% if opt_data.objective.direction == 'target' %} (target: {{ opt_data.objective.target_value }}){% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-2">
+                <div class="text-muted small">Evaluations</div>
+                <div class="fs-4 fw-bold">{{ opt_data.total_evaluations }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-2">
+                <div class="text-muted small">Elapsed Time</div>
+                <div class="fs-4 fw-bold">{{ opt_data.elapsed_seconds }}s</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-2">
+                <div class="text-muted small">Status</div>
+                <div class="fs-4">
+                    {% if opt_data.status == 'completed' %}
+                    <span class="badge bg-success">Completed</span>
+                    {% elif opt_data.status == 'max_iterations' %}
+                    <span class="badge bg-warning text-dark">Max Iterations</span>
+                    {% else %}
+                    <span class="badge bg-danger">{{ opt_data.status|title }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Plots Row -->
+<div class="row mb-4">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-graph-up"></i> Convergence</div>
+            <div class="card-body text-center p-2">
+                <img src="{{ url_for('simulation.optimize_convergence_plot', id=sim.id) }}"
+                     class="img-fluid" alt="Convergence Plot">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-sliders"></i> Parameter Trajectories</div>
+            <div class="card-body text-center p-2">
+                <img src="{{ url_for('simulation.optimize_parameter_plot', id=sim.id) }}"
+                     class="img-fluid" alt="Parameter Trajectory Plot">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Best Parameters -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-gear"></i> Best Parameters</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Optimal Value</th>
+                            <th>Bounds</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in opt_data.parameters %}
+                        <tr>
+                            <td>{{ p.label }}</td>
+                            <td class="fw-bold text-success">
+                                {{ opt_data.best_parameters.get(p.key, '-')|round(1) }} {{ p.unit }}
+                            </td>
+                            <td class="text-muted">{{ p.min_value }} &ndash; {{ p.max_value }} {{ p.unit }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-clipboard-data"></i> Best Outputs</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Output</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, val in opt_data.best_outputs.items() %}
+                        <tr{% if key == opt_data.objective.output_key %} class="table-success"{% endif %}>
+                            <td>
+                                {{ output_defs.get(key, {}).get('label', key) }}
+                                {% if key == opt_data.objective.output_key %}
+                                <i class="bi bi-bullseye text-success" title="Optimization target"></i>
+                                {% endif %}
+                            </td>
+                            <td class="fw-bold">
+                                {{ val|round(2) }} {{ output_defs.get(key, {}).get('unit', '') }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Constraints -->
+{% if opt_data.constraints %}
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-shield-check"></i> Constraints</div>
+    <div class="card-body">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr><th>Output</th><th>Condition</th><th>Achieved</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+                {% for c in opt_data.constraints %}
+                {% set achieved = opt_data.best_outputs.get(c.output_key, 0) %}
+                {% set met = (c.operator == 'gte' and achieved >= c.value) or (c.operator == 'lte' and achieved <= c.value) %}
+                <tr>
+                    <td>{{ output_defs.get(c.output_key, {}).get('label', c.output_key) }}</td>
+                    <td>{{ '≥' if c.operator == 'gte' else '≤' }} {{ c.value }}</td>
+                    <td>{{ achieved|round(2) }}</td>
+                    <td>
+                        {% if met %}
+                        <span class="badge bg-success">Met</span>
+                        {% else %}
+                        <span class="badge bg-danger">Violated</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Iteration History (collapsible) -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-ol"></i> Iteration History</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#iterationCollapse">
+            Show/Hide
+        </button>
+    </div>
+    <div class="collapse" id="iterationCollapse">
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="sticky-top bg-white">
+                        <tr>
+                            <th>#</th>
+                            {% for p in opt_data.parameters %}
+                            <th>{{ p.label }}</th>
+                            {% endfor %}
+                            <th>Objective</th>
+                            <th>{{ output_defs.get(opt_data.objective.output_key, {}).get('label', 'Target') }}</th>
+                            <th>Feasible</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for it in opt_data.iterations %}
+                        <tr class="{{ 'table-success' if it.objective_value == opt_data.best_objective else '' }}">
+                            <td>{{ it.iteration }}</td>
+                            {% for p in opt_data.parameters %}
+                            <td>{{ it.parameters.get(p.key, '-') }}</td>
+                            {% endfor %}
+                            <td>{{ it.objective_value }}</td>
+                            <td>{{ it.outputs.get(opt_data.objective.output_key, '-') }}</td>
+                            <td>
+                                {% if it.is_feasible %}
+                                <i class="bi bi-check-circle text-success"></i>
+                                {% else %}
+                                <i class="bi bi-x-circle text-danger"></i>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

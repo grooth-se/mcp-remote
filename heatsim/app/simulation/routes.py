@@ -33,7 +33,7 @@ from . import simulation_bp
 from .forms import (
     SimulationForm, GeometryForm, SolverForm,
     HeatingPhaseForm, TransferPhaseForm, QuenchingPhaseForm, TemperingPhaseForm,
-    ParameterSweepForm
+    ParameterSweepForm, ProcessOptimizationForm
 )
 
 
@@ -3208,3 +3208,255 @@ def comparison_plot_channel(id, channel):
         title=f'Simulation vs {channel} (offset={offset:.0f}s)'
     )
     return Response(plot_data, mimetype='image/png')
+
+
+# ---------------------------------------------------------------------------
+# Process Optimization
+# ---------------------------------------------------------------------------
+
+def _create_optimized_simulation(base_sim, opt_result):
+    """Clone simulation with optimal parameters applied."""
+    import copy as _copy
+
+    new_sim = Simulation(
+        name=f"{base_sim.name} (Optimized)",
+        description=f"Optimized from simulation #{base_sim.id}",
+        steel_grade_id=base_sim.steel_grade_id,
+        user_id=base_sim.user_id,
+        geometry_type=base_sim.geometry_type,
+        geometry_config=base_sim.geometry_config,
+        heat_treatment_config=_copy.deepcopy(base_sim.heat_treatment_config),
+        solver_config=base_sim.solver_config,
+        process_type=base_sim.process_type,
+        initial_temperature=base_sim.initial_temperature,
+        ambient_temperature=base_sim.ambient_temperature,
+        boundary_conditions=base_sim.boundary_conditions,
+        status=STATUS_READY,
+    )
+
+    # Copy CAD geometry fields
+    if base_sim.geometry_type == GEOMETRY_CAD:
+        new_sim.cad_filename = base_sim.cad_filename
+        new_sim.cad_file_path = base_sim.cad_file_path
+        new_sim.cad_analysis = base_sim.cad_analysis
+        new_sim.cad_equivalent_type = base_sim.cad_equivalent_type
+
+    # Apply best parameters to HT config
+    from app.services.optimization_service import OptimizationService
+    svc = OptimizationService(base_sim)
+    ht_config = _copy.deepcopy(base_sim.ht_config or {})
+    geom_config = _copy.deepcopy(base_sim.geometry_dict or {})
+    for key, value in opt_result['best_parameters'].items():
+        svc._apply_params_to_config(key, value, ht_config, geom_config)
+    new_sim.heat_treatment_config = ht_config
+    new_sim.geometry_config = geom_config
+
+    return new_sim
+
+
+@simulation_bp.route('/<int:id>/optimize', methods=['GET', 'POST'])
+@login_required
+def optimize(id):
+    """Process optimization setup and execution."""
+    import json
+
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    if sim.status != STATUS_COMPLETED:
+        flash('Simulation must be completed before optimization.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
+
+    form = ProcessOptimizationForm()
+
+    # Pre-populate bounds from current config
+    ht = sim.ht_config or {}
+    if request.method == 'GET':
+        heating = ht.get('heating', {})
+        quenching = ht.get('quenching', {})
+        tempering = ht.get('tempering', {})
+
+        if heating.get('target_temperature'):
+            v = heating['target_temperature']
+            form.opt_aust_temp_min.data = max(750, v - 100)
+            form.opt_aust_temp_max.data = min(1100, v + 100)
+
+        if quenching.get('media_temperature') is not None:
+            v = quenching['media_temperature']
+            form.opt_quench_temp_min.data = max(0, v - 30)
+            form.opt_quench_temp_max.data = min(200, v + 30)
+
+        if quenching.get('duration'):
+            v = quenching['duration']
+            form.opt_quench_duration_min.data = max(30, v * 0.5)
+            form.opt_quench_duration_max.data = min(7200, v * 2)
+
+        if tempering.get('temperature'):
+            v = tempering['temperature']
+            form.opt_temper_temp_min.data = max(100, v - 100)
+            form.opt_temper_temp_max.data = min(700, v + 100)
+
+        if tempering.get('hold_time'):
+            v = tempering['hold_time']
+            form.opt_temper_hold_min.data = max(30, v * 0.5)
+            form.opt_temper_hold_max.data = min(480, v * 2)
+
+    if form.validate_on_submit():
+        from app.services.optimization_service import (
+            OptimizationService, OptimizationParameter, OptimizationObjective,
+            OptimizationConstraint, PARAMETER_DEFINITIONS, OUTPUT_DEFINITIONS
+        )
+
+        # Build objective
+        objective = OptimizationObjective(
+            output_key=form.objective_output.data,
+            direction=form.objective_direction.data,
+            target_value=form.target_value.data or 0.0,
+        )
+
+        # Build parameters list
+        parameters = []
+        param_map = {
+            'opt_aust_temp': 'heating.target_temperature',
+            'opt_quench_temp': 'quenching.media_temperature',
+            'opt_quench_duration': 'quenching.duration',
+            'opt_temper_temp': 'tempering.temperature',
+            'opt_temper_hold': 'tempering.hold_time',
+        }
+        for form_key, param_key in param_map.items():
+            checkbox = getattr(form, form_key)
+            if checkbox.data:
+                defn = PARAMETER_DEFINITIONS[param_key]
+                min_field = getattr(form, f'{form_key}_min')
+                max_field = getattr(form, f'{form_key}_max')
+                parameters.append(OptimizationParameter(
+                    key=param_key,
+                    label=defn['label'],
+                    unit=defn['unit'],
+                    min_value=min_field.data or defn['default_min'],
+                    max_value=max_field.data or defn['default_max'],
+                ))
+
+        if not parameters:
+            flash('Select at least one parameter to optimize.', 'warning')
+            return render_template('simulation/optimize.html', form=form, sim=sim)
+
+        # Build constraints
+        constraints = []
+        if form.constraint_enabled.data and form.constraint_output.data:
+            constraints.append(OptimizationConstraint(
+                output_key=form.constraint_output.data,
+                operator=form.constraint_operator.data,
+                value=form.constraint_value.data or 0.0,
+            ))
+
+        # Run optimization
+        try:
+            optimizer = OptimizationService(sim)
+            opt_result = optimizer.optimize(
+                objective=objective,
+                parameters=parameters,
+                constraints=constraints,
+                method=form.method.data,
+                max_iterations=form.max_iterations.data or 30,
+            )
+
+            # Delete previous optimization result if exists
+            existing = sim.results.filter_by(result_type='optimization').first()
+            if existing:
+                db.session.delete(existing)
+                db.session.flush()
+
+            # Store result
+            result = SimulationResult(
+                simulation_id=sim.id,
+                result_type='optimization',
+                phase='full',
+                location='all',
+            )
+            result.set_data(opt_result.to_dict())
+
+            # Generate convergence plot as preview
+            result.plot_image = visualization.create_convergence_plot(
+                opt_result.to_dict()
+            )
+
+            db.session.add(result)
+
+            # Optionally create simulation with best parameters
+            if form.create_best_sim.data and opt_result.best_parameters:
+                best_sim = _create_optimized_simulation(sim, opt_result.to_dict())
+                db.session.add(best_sim)
+                db.session.flush()
+                flash(f'Optimized simulation created: "{best_sim.name}" (#{best_sim.id}).', 'info')
+
+            db.session.commit()
+            flash(f'Optimization completed: {opt_result.total_evaluations} evaluations '
+                  f'in {opt_result.elapsed_seconds:.1f}s.', 'success')
+            return redirect(url_for('simulation.optimize_results', id=id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Optimization failed: {e}', 'danger')
+
+    return render_template('simulation/optimize.html', form=form, sim=sim)
+
+
+@simulation_bp.route('/<int:id>/optimize/results')
+@login_required
+def optimize_results(id):
+    """Display optimization results."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
+
+    existing = sim.results.filter_by(result_type='optimization').first()
+    if not existing:
+        flash('No optimization results found. Run optimization first.', 'warning')
+        return redirect(url_for('simulation.optimize', id=id))
+
+    from app.services.optimization_service import OUTPUT_DEFINITIONS, PARAMETER_DEFINITIONS
+    opt_data = existing.data_dict
+
+    return render_template(
+        'simulation/optimize_results.html',
+        sim=sim,
+        opt_data=opt_data,
+        output_defs=OUTPUT_DEFINITIONS,
+        param_defs=PARAMETER_DEFINITIONS,
+    )
+
+
+@simulation_bp.route('/<int:id>/optimize/convergence-plot')
+@login_required
+def optimize_convergence_plot(id):
+    """Serve convergence plot PNG."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    existing = sim.results.filter_by(result_type='optimization').first()
+    if not existing:
+        return Response('No optimization data', status=404)
+
+    plot_bytes = visualization.create_convergence_plot(existing.data_dict)
+    return Response(plot_bytes, mimetype='image/png')
+
+
+@simulation_bp.route('/<int:id>/optimize/parameter-plot')
+@login_required
+def optimize_parameter_plot(id):
+    """Serve parameter trajectory plot PNG."""
+    sim = Simulation.query.get_or_404(id)
+    if sim.user_id != current_user.id:
+        return Response('Access denied', status=403)
+
+    existing = sim.results.filter_by(result_type='optimization').first()
+    if not existing:
+        return Response('No optimization data', status=404)
+
+    plot_bytes = visualization.create_parameter_trajectory_plot(existing.data_dict)
+    return Response(plot_bytes, mimetype='image/png')

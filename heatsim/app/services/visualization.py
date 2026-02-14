@@ -1852,3 +1852,155 @@ def create_spider_plot(
     buf.seek(0)
     plt.close(fig)
     return buf.getvalue()
+
+
+# ============================================================================
+# Optimization Plots
+# ============================================================================
+
+def create_convergence_plot(opt_data: dict, title: str = 'Optimization Convergence') -> bytes:
+    """Create convergence plot for optimization results.
+
+    Parameters
+    ----------
+    opt_data : dict
+        Optimization result dictionary (from OptimizationResult.to_dict()).
+    title : str
+        Plot title.
+
+    Returns
+    -------
+    bytes
+        PNG image data.
+    """
+    iterations = opt_data.get('iterations', [])
+    if not iterations:
+        return b''
+
+    iters = [it['iteration'] for it in iterations]
+    obj_values = [it['objective_value'] for it in iterations]
+    feasible = [it['is_feasible'] for it in iterations]
+
+    # Running best
+    running_best = []
+    best = float('inf')
+    for obj, feas in zip(obj_values, feasible):
+        if feas and obj < best:
+            best = obj
+        running_best.append(best if best < float('inf') else obj)
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    # Scatter: feasible vs infeasible
+    feas_x = [x for x, f in zip(iters, feasible) if f]
+    feas_y = [y for y, f in zip(obj_values, feasible) if f]
+    infeas_x = [x for x, f in zip(iters, feasible) if not f]
+    infeas_y = [y for y, f in zip(obj_values, feasible) if not f]
+
+    if feas_x:
+        ax.scatter(feas_x, feas_y, c='#2196F3', s=40, zorder=3,
+                   label='Feasible', alpha=0.7)
+    if infeas_x:
+        ax.scatter(infeas_x, infeas_y, c='#f44336', s=40, zorder=3,
+                   marker='x', label='Infeasible', alpha=0.7)
+
+    # Running best line
+    ax.plot(iters, running_best, 'g-', linewidth=2, label='Best so far', zorder=2)
+
+    # Mark overall best
+    if feas_x:
+        best_idx = feas_y.index(min(feas_y))
+        ax.scatter([feas_x[best_idx]], [feas_y[best_idx]], c='gold',
+                   s=200, marker='*', zorder=4, edgecolors='black',
+                   linewidths=1, label='Best')
+
+    # Objective info
+    obj_info = opt_data.get('objective', {})
+    direction = obj_info.get('direction', '')
+    output_key = obj_info.get('output_key', '')
+    if direction == 'target':
+        target = obj_info.get('target_value', 0)
+        ax.set_ylabel(f'|{output_key} - {target}|', fontsize=11)
+    elif direction == 'maximize':
+        ax.set_ylabel(f'-{output_key} (maximizing)', fontsize=11)
+    else:
+        ax.set_ylabel(f'{output_key}', fontsize=11)
+
+    ax.set_xlabel('Evaluation', fontsize=11)
+    ax.set_title(title, fontsize=13, fontweight='bold')
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=130, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_parameter_trajectory_plot(
+    opt_data: dict,
+    title: str = 'Parameter Trajectory'
+) -> bytes:
+    """Create parameter trajectory plot.
+
+    Parameters
+    ----------
+    opt_data : dict
+        Optimization result dictionary.
+    title : str
+        Plot title.
+
+    Returns
+    -------
+    bytes
+        PNG image data.
+    """
+    iterations = opt_data.get('iterations', [])
+    param_defs = opt_data.get('parameters', [])
+    if not iterations or not param_defs:
+        return b''
+
+    n_params = len(param_defs)
+    fig, axes = plt.subplots(n_params, 1, figsize=(10, 3 * n_params), squeeze=False)
+
+    for i, pdef in enumerate(param_defs):
+        ax = axes[i, 0]
+        key = pdef['key']
+
+        x = [it['iteration'] for it in iterations]
+        y = [it['parameters'].get(key, 0) for it in iterations]
+
+        ax.plot(x, y, 'o-', color='#2196F3', markersize=4, linewidth=1.5, alpha=0.7)
+
+        # Bounds
+        ax.axhline(pdef['min_value'], color='red', linestyle='--',
+                    alpha=0.5, label=f"Min: {pdef['min_value']}")
+        ax.axhline(pdef['max_value'], color='red', linestyle='--',
+                    alpha=0.5, label=f"Max: {pdef['max_value']}")
+
+        # Mark best
+        best_params = opt_data.get('best_parameters', {})
+        if key in best_params:
+            best_val = best_params[key]
+            ax.axhline(best_val, color='green', linestyle='-',
+                        alpha=0.8, linewidth=2, label=f'Best: {best_val:.1f}')
+
+        ax.set_ylabel(f"{pdef['label']} ({pdef['unit']})", fontsize=10)
+        ax.legend(fontsize=8, loc='upper right')
+        ax.grid(True, alpha=0.3)
+
+        if i == 0:
+            ax.set_title(title, fontsize=13, fontweight='bold')
+        if i == n_params - 1:
+            ax.set_xlabel('Evaluation', fontsize=11)
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=130, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
