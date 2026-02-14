@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Preheat Calculator - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.view', id=project.id) }}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item active">Preheat Calculator</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-thermometer-half"></i> Preheat Calculator</h2>
+        <p class="text-muted">EN 1011-2 preheat assessment for <strong>{{ project.name }}</strong></p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Parameters Form -->
+    <div class="col-md-3">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Parameters</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.plate_thickness_mm.label(class="form-label") }}
+                        {{ form.plate_thickness_mm(class="form-control", step="1") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.hydrogen_level.label(class="form-label") }}
+                        {{ form.hydrogen_level(class="form-select") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.restraint.label(class="form-label") }}
+                        {{ form.restraint(class="form-select") }}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-calculator"></i> Calculate
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Project Info -->
+        <div class="card">
+            <div class="card-header"><h6 class="mb-0">Weld Parameters</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td>Heat Input</td><td>{{ project.default_heat_input }} kJ/mm</td></tr>
+                    <tr><td>Preheat (set)</td><td>{{ project.preheat_temperature }}°C</td></tr>
+                    <tr><td>Steel</td><td>{{ project.steel_grade.display_name if project.steel_grade else 'N/A' }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="col-md-9">
+        {% if preheat_data %}
+        <!-- CE Value Cards -->
+        <div class="row g-3 mb-4">
+            {% set ce_items = [
+                ('CE(IIW)', preheat_data.ce_iiw, 0.35, 0.45),
+                ('Pcm', preheat_data.ce_pcm, 0.20, 0.30),
+                ('CEN', preheat_data.ce_cen, 0.35, 0.45),
+            ] %}
+            {% for name, val, t_low, t_high in ce_items %}
+            <div class="col-md-4">
+                <div class="card text-center
+                    {% if val < t_low %}border-success{% elif val < t_high %}border-warning{% else %}border-danger{% endif %}">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">{{ name }}</h6>
+                        <h2 class="card-title
+                            {% if val < t_low %}text-success{% elif val < t_high %}text-warning{% else %}text-danger{% endif %}">
+                            {{ "%.3f"|format(val) }}
+                        </h2>
+                        <small class="text-muted">
+                            {% if val < t_low %}Low{% elif val < t_high %}Moderate{% else %}High{% endif %}
+                            (thresholds: {{ t_low }} / {{ t_high }})
+                        </small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Preheat Recommendation -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card text-center border-primary">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Recommended Preheat (EN 1011-2)</h6>
+                        <h1 class="card-title text-primary">{{ "%.0f"|format(preheat_data.preheat_en1011_2) }}°C</h1>
+                        <small class="text-muted">{{ preheat_data.preheat_method }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card text-center
+                    {% if preheat_data.cracking_risk == 'low' %}border-success
+                    {% elif preheat_data.cracking_risk == 'medium' %}border-warning
+                    {% else %}border-danger{% endif %}">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Cracking Risk Assessment</h6>
+                        <h2 class="card-title
+                            {% if preheat_data.cracking_risk == 'low' %}text-success
+                            {% elif preheat_data.cracking_risk == 'medium' %}text-warning
+                            {% else %}text-danger{% endif %}">
+                            {{ preheat_data.cracking_risk|upper }}
+                        </h2>
+                        {% if project.preheat_temperature < preheat_data.preheat_en1011_2 %}
+                        <div class="alert alert-warning mt-2 mb-0">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Project preheat ({{ project.preheat_temperature }}°C) is below recommendation.
+                        </div>
+                        {% elif project.preheat_temperature >= preheat_data.preheat_en1011_2 %}
+                        <div class="alert alert-success mt-2 mb-0">
+                            <i class="bi bi-check-circle"></i>
+                            Project preheat ({{ project.preheat_temperature }}°C) meets recommendation.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Risk Notes -->
+        {% if preheat_data.cracking_notes %}
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Risk Assessment Notes</h5></div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    {% for note in preheat_data.cracking_notes %}
+                    <li>{{ note }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Preheat Summary Plot -->
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Summary Chart</h5></div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('welding.plot', id=project.id, plot_type='preheat_summary') }}"
+                     class="img-fluid" alt="Preheat Summary"
+                     onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+            </div>
+        </div>
+
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Click <strong>Calculate</strong> to assess preheat requirements per EN 1011-2.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Navigation -->
+<div class="d-flex gap-2 mt-3">
+    <a href="{{ url_for('welding.view', id=project.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Project
+    </a>
+    <a href="{{ url_for('welding.haz_analysis', id=project.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-layers"></i> HAZ Analysis
+    </a>
+</div>
+{% endblock %}

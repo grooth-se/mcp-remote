@@ -343,16 +343,19 @@ class MockSequentialSolver(SequentialSolver):
                          prev_temps: Dict[str, float],
                          global_time: float,
                          db_session=None) -> List['WeldResult']:
-        """Generate mock results for a string."""
+        """Generate Rosenthal-based results for a string.
+
+        Uses the analytical Rosenthal solution for physically correct
+        thermal cycles instead of simple exponential decay.
+        """
         from app.models.weld_project import (
             WeldResult, STRING_RUNNING, STRING_COMPLETED,
             RESULT_THERMAL_CYCLE, RESULT_COOLING_RATE
         )
         import numpy as np
-        import json
         import time
 
-        logger.info(f"Mock simulating string {string.string_number}")
+        logger.info(f"Mock simulating string {string.string_number} (Rosenthal)")
 
         string.status = STRING_RUNNING
         string.started_at = datetime.utcnow()
@@ -360,69 +363,96 @@ class MockSequentialSolver(SequentialSolver):
         if db_session:
             db_session.commit()
 
-        # Simulate some processing time
-        time.sleep(0.5)
+        # Brief processing delay
+        time.sleep(0.3)
 
         results = []
 
-        # Generate thermal cycle result
-        t_solid = string.effective_solidification_temp
-        t_ambient = string.project.preheat_temperature if string.project else 20.0
+        # Build Rosenthal solver from project/string parameters
+        try:
+            from app.services.rosenthal_solver import RosenthalSolver
+            solver = RosenthalSolver.from_weld_project(string.project, string)
+        except Exception as e:
+            logger.warning(f"Rosenthal solver init failed, using fallback: {e}")
+            return self._simulate_string_fallback(string, db_session)
 
-        # Time array (0 to duration)
-        times = np.linspace(0, string.simulation_duration, 100)
+        # Generate thermal cycles at multiple positions
+        positions = {
+            'centerline': 0.001,  # 1mm from weld center
+            'cghaz': 0.003,       # 3mm — typically CGHAZ
+            'fghaz': 0.006,       # 6mm — FGHAZ region
+            'ichaz': 0.010,       # 10mm — ICHAZ region
+        }
 
-        # Temperature: exponential decay from solidification temp
-        tau = 30.0  # Time constant
-        temps = t_ambient + (t_solid - t_ambient) * np.exp(-times / tau)
+        duration = string.simulation_duration
 
-        # Find t8/5 (time to cool from 800 to 500 C)
-        t_800_idx = np.argmax(temps < 800) if np.any(temps < 800) else -1
-        t_500_idx = np.argmax(temps < 500) if np.any(temps < 500) else -1
-        t_800_500 = times[t_500_idx] - times[t_800_idx] if t_800_idx >= 0 and t_500_idx >= 0 else None
+        for loc_name, y_m in positions.items():
+            times, temps = solver.thermal_cycle_at_point(
+                y=y_m, z=0.0, duration=duration, n_points=200
+            )
 
-        # Cooling rate
-        cooling_rates = -np.gradient(temps, times)
-        max_cooling_rate = np.max(cooling_rates)
+            peak_temp = float(np.max(temps))
+            t_800_500 = solver.t8_5_at_point(y_m, z=0.0)
 
-        # Create thermal cycle result
-        cycle_result = WeldResult(
-            project_id=string.project_id,
-            string_id=string.id,
-            result_type=RESULT_THERMAL_CYCLE,
-            location=f'string_{string.string_number}_center',
-            peak_temperature=float(t_solid),
-            t_800_500=float(t_800_500) if t_800_500 else None,
-            cooling_rate_max=float(max_cooling_rate),
+            # Cooling rate
+            dt = np.diff(times)
+            dt[dt == 0] = 1e-6
+            cooling_rates = -np.diff(temps) / dt
+            max_cooling_rate = float(np.max(cooling_rates)) if len(cooling_rates) > 0 else 0.0
+
+            # Cooling rate in 800-500 range
+            temp_mid = 0.5 * (temps[:-1] + temps[1:])
+            mask_800_500 = (temp_mid > 500) & (temp_mid < 800)
+            cr_800_500 = float(np.mean(cooling_rates[mask_800_500])) if np.any(mask_800_500) else None
+
+            # Phase prediction
+            phases = self._estimate_phases_from_rosenthal(t_800_500, string.project)
+
+            # Hardness prediction
+            hardness = self._predict_hardness(t_800_500, phases, string.project)
+
+            # Create thermal cycle result
+            cycle_result = WeldResult(
+                project_id=string.project_id,
+                string_id=string.id,
+                result_type=RESULT_THERMAL_CYCLE,
+                location=f'string_{string.string_number}_{loc_name}',
+                peak_temperature=peak_temp,
+                t_800_500=float(t_800_500) if t_800_500 else None,
+                cooling_rate_max=max_cooling_rate,
+                cooling_rate_800_500=cr_800_500,
+                hardness_hv=hardness,
+            )
+            cycle_result.set_time_data(times.tolist())
+            cycle_result.set_temperature_data(temps.tolist())
+            cycle_result.set_phase_fractions(phases)
+
+            results.append(cycle_result)
+
+        # Create a single cooling rate result (from centerline)
+        times_cl, temps_cl = solver.thermal_cycle_at_point(
+            y=0.001, z=0.0, duration=duration, n_points=200
         )
-        cycle_result.set_time_data(times.tolist())
-        cycle_result.set_temperature_data(temps.tolist())
+        dt_cl = np.diff(times_cl)
+        dt_cl[dt_cl == 0] = 1e-6
+        cr_cl = -np.diff(temps_cl) / dt_cl
+        temp_mid_cl = 0.5 * (temps_cl[:-1] + temps_cl[1:])
 
-        # Estimate phase fractions based on cooling rate
-        phases = self._estimate_phases(t_800_500)
-        cycle_result.set_phase_fractions(phases)
-
-        results.append(cycle_result)
-
-        # Create cooling rate result
         rate_result = WeldResult(
             project_id=string.project_id,
             string_id=string.id,
             result_type=RESULT_COOLING_RATE,
             location=f'string_{string.string_number}_center',
-            cooling_rate_max=float(max_cooling_rate),
-            cooling_rate_800_500=float(np.mean(cooling_rates[(temps > 500) & (temps < 800)]))
-            if np.any((temps > 500) & (temps < 800)) else None,
+            cooling_rate_max=float(np.max(cr_cl)) if len(cr_cl) > 0 else 0.0,
         )
-        rate_result.set_time_data(temps.tolist())  # Use temp as x-axis
-        rate_result.set_temperature_data(cooling_rates.tolist())  # dT/dt as y
-
+        rate_result.set_time_data(temp_mid_cl.tolist())
+        rate_result.set_temperature_data(cr_cl.tolist())
         results.append(rate_result)
 
         # Mark string complete
         string.status = STRING_COMPLETED
         string.completed_at = datetime.utcnow()
-        string.calculated_initial_temp = float(t_solid)
+        string.calculated_initial_temp = float(np.max(temps_cl))
 
         if db_session:
             for r in results:
@@ -431,8 +461,88 @@ class MockSequentialSolver(SequentialSolver):
 
         return results
 
-    def _estimate_phases(self, t_800_500: Optional[float]) -> dict:
-        """Estimate phase fractions from t8/5 cooling time.
+    def _simulate_string_fallback(self, string: 'WeldString', db_session=None) -> list:
+        """Fallback exponential-decay simulation when Rosenthal fails."""
+        from app.models.weld_project import (
+            WeldResult, STRING_COMPLETED,
+            RESULT_THERMAL_CYCLE
+        )
+        import numpy as np
+
+        t_solid = string.effective_solidification_temp
+        t_ambient = string.project.preheat_temperature if string.project else 20.0
+
+        times = np.linspace(0, string.simulation_duration, 100)
+        tau = 30.0
+        temps = t_ambient + (t_solid - t_ambient) * np.exp(-times / tau)
+
+        t_800_idx = np.argmax(temps < 800) if np.any(temps < 800) else -1
+        t_500_idx = np.argmax(temps < 500) if np.any(temps < 500) else -1
+        t_800_500 = times[t_500_idx] - times[t_800_idx] if t_800_idx >= 0 and t_500_idx >= 0 else None
+
+        cycle_result = WeldResult(
+            project_id=string.project_id,
+            string_id=string.id,
+            result_type=RESULT_THERMAL_CYCLE,
+            location=f'string_{string.string_number}_center',
+            peak_temperature=float(t_solid),
+            t_800_500=float(t_800_500) if t_800_500 else None,
+        )
+        cycle_result.set_time_data(times.tolist())
+        cycle_result.set_temperature_data(temps.tolist())
+        phases = self._estimate_phases_from_rosenthal(t_800_500, string.project)
+        cycle_result.set_phase_fractions(phases)
+
+        string.status = STRING_COMPLETED
+        string.completed_at = datetime.utcnow()
+
+        if db_session:
+            db_session.add(cycle_result)
+            db_session.commit()
+
+        return [cycle_result]
+
+    def _estimate_phases_from_rosenthal(self, t_800_500: Optional[float], project) -> dict:
+        """Estimate phase fractions using PhaseTracker if available."""
+        try:
+            from app.services.phase_tracker import PhaseTracker
+            import numpy as np
+
+            phase_diagram = None
+            if project and project.steel_grade:
+                phase_diagram = getattr(project.steel_grade, 'phase_diagram', None)
+
+            tracker = PhaseTracker(phase_diagram)
+
+            if t_800_500 and t_800_500 > 0:
+                result = tracker.predict_phases(
+                    np.array([0, t_800_500]),
+                    np.array([800, 500]),
+                    t8_5=t_800_500,
+                )
+                return result.to_dict()
+        except Exception:
+            pass
+
+        # Fallback simple estimation
+        return self._estimate_phases_simple(t_800_500)
+
+    def _predict_hardness(self, t_800_500: Optional[float], phases: dict, project) -> Optional[float]:
+        """Predict hardness using HardnessPredictor if composition available."""
+        try:
+            if project and project.steel_grade:
+                composition = getattr(project.steel_grade, 'composition', None)
+                if composition:
+                    from app.services.hardness_predictor import HardnessPredictor
+                    predictor = HardnessPredictor(composition)
+                    t85 = t_800_500 if t_800_500 and t_800_500 > 0 else 5.0
+                    return predictor.predict_hardness(phases, t85)
+        except Exception:
+            pass
+        return None
+
+    def _estimate_phases_simple(self, t_800_500: Optional[float]) -> dict:
+        """Simple phase estimation fallback.
 
         Parameters
         ----------
@@ -447,22 +557,13 @@ class MockSequentialSolver(SequentialSolver):
         if t_800_500 is None:
             return {'martensite': 1.0, 'bainite': 0.0, 'ferrite': 0.0, 'pearlite': 0.0}
 
-        # Simplified CCT-based estimation
-        # Very fast cooling -> martensite
-        # Medium cooling -> bainite
-        # Slow cooling -> ferrite/pearlite
-
         if t_800_500 < 5:
-            # Very fast - mostly martensite
             return {'martensite': 0.95, 'bainite': 0.05, 'ferrite': 0.0, 'pearlite': 0.0}
         elif t_800_500 < 20:
-            # Fast - martensite + bainite
             m_frac = max(0, 0.95 - (t_800_500 - 5) * 0.05)
             return {'martensite': m_frac, 'bainite': 1 - m_frac, 'ferrite': 0.0, 'pearlite': 0.0}
         elif t_800_500 < 60:
-            # Medium - bainite dominant
             b_frac = max(0.3, 0.8 - (t_800_500 - 20) * 0.01)
             return {'martensite': 0.1, 'bainite': b_frac, 'ferrite': 0.9 - b_frac, 'pearlite': 0.0}
         else:
-            # Slow - ferrite/pearlite
             return {'martensite': 0.0, 'bainite': 0.1, 'ferrite': 0.6, 'pearlite': 0.3}

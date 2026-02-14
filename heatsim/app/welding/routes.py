@@ -20,7 +20,8 @@ from app.models.weld_project import (
 from app.models.material import SteelGrade
 
 from .forms import (
-    WeldProjectForm, WeldStringForm, QuickAddStringsForm, RunSimulationForm
+    WeldProjectForm, WeldStringForm, QuickAddStringsForm, RunSimulationForm,
+    HAZAnalysisForm, PreheatForm,
 )
 from . import welding_bp
 
@@ -462,11 +463,199 @@ def plot(id, plot_type):
     elif plot_type == 'summary':
         img_data = viz.create_summary_table_image(project, results)
 
+    # HAZ and Preheat plots (Phase 14)
+    if plot_type == 'haz_cross_section':
+        haz_data = _get_haz_data(project)
+        if haz_data:
+            from app.services.visualization import create_haz_cross_section_plot
+            img_data = create_haz_cross_section_plot(haz_data)
+
+    elif plot_type == 'peak_temp_profile':
+        haz_data = _get_haz_data(project)
+        if haz_data:
+            from app.services.visualization import create_peak_temperature_profile_plot
+            img_data = create_peak_temperature_profile_plot(
+                haz_data['distances_mm'],
+                haz_data['peak_temperatures'],
+                haz_data.get('zone_boundaries'),
+            )
+
+    elif plot_type == 'hardness_traverse':
+        haz_data = _get_haz_data(project)
+        if haz_data:
+            from app.services.visualization import create_hardness_traverse_plot
+            img_data = create_hardness_traverse_plot(
+                haz_data['distances_mm'],
+                haz_data['hardness_profile'],
+                haz_data.get('zone_boundaries'),
+            )
+
+    elif plot_type == 'haz_thermal_cycles':
+        haz_data = _get_haz_data(project)
+        if haz_data and haz_data.get('thermal_cycles'):
+            from app.services.visualization import create_haz_thermal_cycle_comparison_plot
+            img_data = create_haz_thermal_cycle_comparison_plot(
+                haz_data['thermal_cycles'],
+                title=f'{project.name} - HAZ Thermal Cycles',
+            )
+
+    elif plot_type == 'preheat_summary':
+        preheat_data = _get_preheat_data(project)
+        if preheat_data:
+            from app.services.visualization import create_preheat_summary_plot
+            img_data = create_preheat_summary_plot(preheat_data)
+
     if img_data:
         from io import BytesIO
         return send_file(BytesIO(img_data), mimetype='image/png')
 
     return jsonify({'error': 'Plot generation failed'}), 500
+
+
+def _get_haz_data(project: WeldProject) -> dict:
+    """Compute HAZ analysis data for a project (cached in session-like manner)."""
+    try:
+        from app.services.rosenthal_solver import RosenthalSolver
+        from app.services.haz_predictor import HAZPredictor
+
+        solver = RosenthalSolver.from_weld_project(project)
+
+        composition = None
+        phase_diagram = None
+        if project.steel_grade:
+            composition = getattr(project.steel_grade, 'composition', None)
+            phase_diagram = getattr(project.steel_grade, 'phase_diagram', None)
+
+        predictor = HAZPredictor(solver, composition, phase_diagram)
+        result = predictor.predict()
+        return result.to_dict()
+    except Exception as e:
+        logger.warning(f"HAZ analysis failed: {e}")
+        return {}
+
+
+def _get_preheat_data(project: WeldProject) -> dict:
+    """Compute preheat data for a project."""
+    try:
+        if not project.steel_grade or not getattr(project.steel_grade, 'composition', None):
+            return {}
+
+        from app.services.preheat_calculator import PreheatCalculator
+        calc = PreheatCalculator(project.steel_grade.composition)
+        result = calc.calculate(
+            heat_input=project.default_heat_input,
+            thickness=20.0,
+            hydrogen='B',
+            restraint='medium',
+        )
+        return result.to_dict()
+    except Exception as e:
+        logger.warning(f"Preheat calculation failed: {e}")
+        return {}
+
+
+@welding_bp.route('/<int:id>/haz', methods=['GET', 'POST'])
+@login_required
+def haz_analysis(id):
+    """HAZ analysis page."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    form = HAZAnalysisForm()
+    haz_data = None
+    passes_limit = None
+
+    if form.validate_on_submit() or request.method == 'GET':
+        try:
+            from app.services.rosenthal_solver import RosenthalSolver
+            from app.services.haz_predictor import HAZPredictor
+
+            solver = RosenthalSolver.from_weld_project(project)
+
+            composition = None
+            phase_diagram = None
+            if project.steel_grade:
+                composition = getattr(project.steel_grade, 'composition', None)
+                phase_diagram = getattr(project.steel_grade, 'phase_diagram', None)
+
+            predictor = HAZPredictor(solver, composition, phase_diagram)
+
+            max_dist = form.max_distance_mm.data or 20.0
+            n_pts = form.n_points.data or 50
+            z_m = (form.depth_z_mm.data or 0.0) / 1000.0
+            hardness_limit = form.hardness_limit.data or 350.0
+
+            result = predictor.predict(
+                n_points=n_pts,
+                max_distance_mm=max_dist,
+                z=z_m,
+                hardness_limit=hardness_limit,
+            )
+            haz_data = result.to_dict()
+            passes_limit = result.passes_hardness_limit(hardness_limit)
+
+        except Exception as e:
+            flash(f'HAZ analysis error: {e}', 'danger')
+            logger.exception("HAZ analysis failed")
+
+    return render_template(
+        'welding/haz.html',
+        project=project,
+        form=form,
+        haz_data=haz_data,
+        passes_limit=passes_limit,
+    )
+
+
+@welding_bp.route('/<int:id>/preheat', methods=['GET', 'POST'])
+@login_required
+def preheat(id):
+    """Preheat calculator page."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    form = PreheatForm()
+    preheat_data = None
+
+    if not project.steel_grade or not getattr(project.steel_grade, 'composition', None):
+        flash('Steel grade with composition data is required for preheat calculation.', 'warning')
+        return redirect(url_for('welding.view', id=id))
+
+    if form.validate_on_submit() or request.method == 'GET':
+        try:
+            from app.services.preheat_calculator import PreheatCalculator
+
+            calc = PreheatCalculator(project.steel_grade.composition)
+
+            thickness = form.plate_thickness_mm.data or 20.0
+            hydrogen = form.hydrogen_level.data or 'B'
+            restraint = form.restraint.data or 'medium'
+
+            result = calc.calculate(
+                heat_input=project.default_heat_input,
+                thickness=thickness,
+                hydrogen=hydrogen,
+                restraint=restraint,
+                applied_preheat=project.preheat_temperature,
+            )
+            preheat_data = result.to_dict()
+
+        except Exception as e:
+            flash(f'Preheat calculation error: {e}', 'danger')
+            logger.exception("Preheat calculation failed")
+
+    return render_template(
+        'welding/preheat.html',
+        project=project,
+        form=form,
+        preheat_data=preheat_data,
+    )
 
 
 @welding_bp.route('/<int:id>/animation')

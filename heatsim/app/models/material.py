@@ -559,6 +559,35 @@ class SteelComposition(db.Model):
         return C + Si/30 + (Mn + Cu + Cr)/20 + Ni/60 + Mo/15 + V/10 + 5*B
 
     @property
+    def carbon_equivalent_cen(self) -> float:
+        """Calculate CEN carbon equivalent (Yurioka formula).
+
+        CEN = C + A(C) × [Si/24 + Mn/6 + Cu/15 + Ni/20 + (Cr+Mo+Nb+V)/5 + 5B]
+        A(C) = 0.75 + 0.25 × tanh(20 × (C - 0.12))
+
+        Returns
+        -------
+        float
+            Carbon equivalent (CEN formula)
+        """
+        import math
+        C = self.carbon or 0.0
+        Si = self.silicon or 0.0
+        Mn = self.manganese or 0.0
+        Cu = self.copper or 0.0
+        Cr = self.chromium or 0.0
+        Ni = self.nickel or 0.0
+        Mo = self.molybdenum or 0.0
+        V = self.vanadium or 0.0
+        Nb = self.niobium or 0.0
+        B = self.boron or 0.0
+
+        A_C = 0.75 + 0.25 * math.tanh(20 * (C - 0.12))
+        alloy_term = (Si/24 + Mn/6 + Cu/15 + Ni/20 +
+                      (Cr + Mo + Nb + V)/5 + 5*B)
+        return C + A_C * alloy_term
+
+    @property
     def ideal_diameter_di(self) -> float:
         """Calculate Grossmann ideal critical diameter (DI).
 

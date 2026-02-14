@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}HAZ Analysis - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.view', id=project.id) }}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item active">HAZ Analysis</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-layers"></i> Heat-Affected Zone Analysis</h2>
+        <p class="text-muted">Rosenthal analytical solution for <strong>{{ project.name }}</strong></p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Parameters Form -->
+    <div class="col-md-3">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Parameters</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.max_distance_mm.label(class="form-label") }}
+                        {{ form.max_distance_mm(class="form-control", step="1") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.n_points.label(class="form-label") }}
+                        {{ form.n_points(class="form-control") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.depth_z_mm.label(class="form-label") }}
+                        {{ form.depth_z_mm(class="form-control", step="0.5") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.hardness_limit.label(class="form-label") }}
+                        {{ form.hardness_limit(class="form-control", step="10") }}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-calculator"></i> Analyze
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Project Info -->
+        <div class="card">
+            <div class="card-header"><h6 class="mb-0">Weld Parameters</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td>Process</td><td>{{ project.process_label }}</td></tr>
+                    <tr><td>Heat Input</td><td>{{ project.default_heat_input }} kJ/mm</td></tr>
+                    <tr><td>Travel Speed</td><td>{{ project.default_travel_speed }} mm/s</td></tr>
+                    <tr><td>Preheat</td><td>{{ project.preheat_temperature }}°C</td></tr>
+                    <tr><td>Steel</td><td>{{ project.steel_grade.display_name if project.steel_grade else 'N/A' }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="col-md-9">
+        {% if haz_data %}
+        <!-- Summary Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card text-center border-danger">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Fusion Zone</h6>
+                        <h3 class="card-title text-danger">{{ "%.1f"|format(haz_data.fusion_zone_width) }} mm</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center border-warning">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Total HAZ</h6>
+                        <h3 class="card-title text-warning">{{ "%.1f"|format(haz_data.total_haz_width) }} mm</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Max Hardness</h6>
+                        <h3 class="card-title">{{ "%.0f"|format(haz_data.hardness_profile|max) }} HV</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center {% if passes_limit %}border-success{% else %}border-danger{% endif %}">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Hardness Check</h6>
+                        {% if passes_limit %}
+                        <h3 class="card-title text-success"><i class="bi bi-check-circle"></i> PASS</h3>
+                        {% else %}
+                        <h3 class="card-title text-danger"><i class="bi bi-x-circle"></i> FAIL</h3>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Zone Details Table -->
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Zone Details</h5></div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Zone</th>
+                            <th>Width (mm)</th>
+                            <th>Boundary (mm)</th>
+                            <th>Hardness (HV)</th>
+                            <th>Phases</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge" style="background-color: #FF8800">CGHAZ</span></td>
+                            <td>{{ "%.1f"|format(haz_data.cghaz_width) }}</td>
+                            <td>{{ "%.1f"|format(haz_data.zone_boundaries.get('fusion', 0)) }} — {{ "%.1f"|format(haz_data.zone_boundaries.get('cghaz', 0)) }}</td>
+                            <td>{{ "%.0f"|format(haz_data.zone_hardness.get('cghaz', 0)) if haz_data.zone_hardness.get('cghaz') else '-' }}</td>
+                            <td>
+                                {% if haz_data.zone_phases.get('cghaz') %}
+                                {% set ph = haz_data.zone_phases.cghaz %}
+                                M:{{ "%.0f"|format(ph.get('martensite', 0) * 100) }}%
+                                B:{{ "%.0f"|format(ph.get('bainite', 0) * 100) }}%
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge" style="background-color: #CCAA00">FGHAZ</span></td>
+                            <td>{{ "%.1f"|format(haz_data.fghaz_width) }}</td>
+                            <td>{{ "%.1f"|format(haz_data.zone_boundaries.get('cghaz', 0)) }} — {{ "%.1f"|format(haz_data.zone_boundaries.get('fghaz', 0)) }}</td>
+                            <td>{{ "%.0f"|format(haz_data.zone_hardness.get('fghaz', 0)) if haz_data.zone_hardness.get('fghaz') else '-' }}</td>
+                            <td>
+                                {% if haz_data.zone_phases.get('fghaz') %}
+                                {% set ph = haz_data.zone_phases.fghaz %}
+                                M:{{ "%.0f"|format(ph.get('martensite', 0) * 100) }}%
+                                B:{{ "%.0f"|format(ph.get('bainite', 0) * 100) }}%
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge" style="background-color: #88CC00">ICHAZ</span></td>
+                            <td>{{ "%.1f"|format(haz_data.ichaz_width) }}</td>
+                            <td>{{ "%.1f"|format(haz_data.zone_boundaries.get('fghaz', 0)) }} — {{ "%.1f"|format(haz_data.zone_boundaries.get('ichaz', 0)) }}</td>
+                            <td>{{ "%.0f"|format(haz_data.zone_hardness.get('ichaz', 0)) if haz_data.zone_hardness.get('ichaz') else '-' }}</td>
+                            <td>
+                                {% if haz_data.zone_phases.get('ichaz') %}
+                                {% set ph = haz_data.zone_phases.ichaz %}
+                                M:{{ "%.0f"|format(ph.get('martensite', 0) * 100) }}%
+                                B:{{ "%.0f"|format(ph.get('bainite', 0) * 100) }}%
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Plots -->
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">HAZ Cross-Section</h5></div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('welding.plot', id=project.id, plot_type='haz_cross_section') }}"
+                             class="img-fluid" alt="HAZ Cross-Section"
+                             onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Peak Temperature Profile</h5></div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('welding.plot', id=project.id, plot_type='peak_temp_profile') }}"
+                             class="img-fluid" alt="Peak Temperature Profile"
+                             onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Hardness Traverse</h5></div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('welding.plot', id=project.id, plot_type='hardness_traverse') }}"
+                             class="img-fluid" alt="Hardness Traverse"
+                             onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0">HAZ Thermal Cycle Comparison</h5></div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('welding.plot', id=project.id, plot_type='haz_thermal_cycles') }}"
+                             class="img-fluid" alt="HAZ Thermal Cycles"
+                             onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Click <strong>Analyze</strong> to run HAZ prediction using the Rosenthal analytical solution.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Navigation -->
+<div class="d-flex gap-2 mt-3">
+    <a href="{{ url_for('welding.view', id=project.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Project
+    </a>
+    <a href="{{ url_for('welding.preheat', id=project.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-thermometer-half"></i> Preheat Calculator
+    </a>
+    {% if project.status == 'completed' %}
+    <a href="{{ url_for('welding.results', id=project.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-graph-up"></i> Simulation Results
+    </a>
+    {% endif %}
+</div>
+{% endblock %}

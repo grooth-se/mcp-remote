@@ -1940,6 +1940,438 @@ def create_convergence_plot(opt_data: dict, title: str = 'Optimization Convergen
     return buf.getvalue()
 
 
+# ============================================================================
+# HAZ & Preheat Visualization (Phase 14)
+# ============================================================================
+
+# Zone colors for HAZ diagrams
+HAZ_ZONE_COLORS = {
+    'fusion': '#FF4444',       # Red
+    'cghaz': '#FF8800',        # Orange
+    'fghaz': '#FFCC00',        # Yellow
+    'ichaz': '#88CC00',        # Yellow-green
+    'base_metal': '#4488FF',   # Blue
+}
+
+
+def create_haz_cross_section_plot(haz_data: dict) -> bytes:
+    """Generate HAZ cross-section diagram with colored zone regions.
+
+    Parameters
+    ----------
+    haz_data : dict
+        HAZ result dictionary with zone widths and boundaries
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    boundaries = haz_data.get('zone_boundaries', {})
+    fz = boundaries.get('fusion', 0)
+    cghaz = boundaries.get('cghaz', 0)
+    fghaz = boundaries.get('fghaz', 0)
+    ichaz = boundaries.get('ichaz', 0)
+
+    total_width = max(ichaz * 1.3, 15)  # mm, with margin
+    y_height = 8  # mm height for visualization
+
+    # Draw zones as colored rectangles (symmetric about centerline)
+    zones = [
+        ('Fusion Zone', 0, fz, HAZ_ZONE_COLORS['fusion']),
+        ('CGHAZ', fz, cghaz, HAZ_ZONE_COLORS['cghaz']),
+        ('FGHAZ', cghaz, fghaz, HAZ_ZONE_COLORS['fghaz']),
+        ('ICHAZ', fghaz, ichaz, HAZ_ZONE_COLORS['ichaz']),
+        ('Base Metal', ichaz, total_width, HAZ_ZONE_COLORS['base_metal']),
+    ]
+
+    for name, x_start, x_end, color in zones:
+        if x_end <= x_start:
+            continue
+        width = x_end - x_start
+
+        # Right side
+        rect_r = plt.Rectangle((x_start, 0), width, y_height,
+                                facecolor=color, edgecolor='black',
+                                linewidth=0.8, alpha=0.7)
+        ax.add_patch(rect_r)
+
+        # Left side (mirror)
+        rect_l = plt.Rectangle((-x_end, 0), width, y_height,
+                                facecolor=color, edgecolor='black',
+                                linewidth=0.8, alpha=0.7)
+        ax.add_patch(rect_l)
+
+        # Label (right side only)
+        mid_x = (x_start + x_end) / 2
+        if width > 1.0:
+            ax.text(mid_x, y_height / 2, name, ha='center', va='center',
+                    fontsize=9, fontweight='bold', rotation=0)
+            ax.text(mid_x, y_height * 0.15,
+                    f'{width:.1f} mm', ha='center', va='bottom',
+                    fontsize=8, color='#333333')
+
+    # Weld center line
+    ax.axvline(x=0, color='red', linewidth=2, linestyle='--', label='Weld Center')
+
+    # Dimension annotations
+    if ichaz > 0:
+        y_dim = y_height + 0.8
+        ax.annotate('', xy=(-ichaz, y_dim), xytext=(ichaz, y_dim),
+                    arrowprops=dict(arrowstyle='<->', color='black', lw=1.5))
+        ax.text(0, y_dim + 0.3,
+                f'Total HAZ = {haz_data.get("total_haz_width", 0):.1f} mm',
+                ha='center', va='bottom', fontsize=11, fontweight='bold')
+
+    ax.set_xlim(-total_width, total_width)
+    ax.set_ylim(-0.5, y_height + 2.5)
+    ax.set_xlabel('Distance from Weld Center (mm)', fontsize=12)
+    ax.set_title('HAZ Cross-Section', fontsize=14)
+    ax.set_aspect('equal')
+    ax.grid(True, alpha=0.2)
+
+    # Remove y-axis ticks (it's a schematic)
+    ax.set_yticks([])
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_peak_temperature_profile_plot(
+    distances: List[float],
+    peak_temps: List[float],
+    zone_boundaries: Optional[dict] = None
+) -> bytes:
+    """Generate peak temperature vs distance from weld center.
+
+    Parameters
+    ----------
+    distances : list
+        Distances from weld center (mm)
+    peak_temps : list
+        Peak temperatures at each distance (°C)
+    zone_boundaries : dict, optional
+        Zone boundary distances {zone_name: distance_mm}
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.plot(distances, peak_temps, 'b-', linewidth=2.5, label='Peak Temperature')
+
+    # Add zone shading
+    if zone_boundaries:
+        fz = zone_boundaries.get('fusion', 0)
+        cghaz = zone_boundaries.get('cghaz', 0)
+        fghaz = zone_boundaries.get('fghaz', 0)
+        ichaz = zone_boundaries.get('ichaz', 0)
+        x_max = max(distances) if distances else 20
+
+        zone_fills = [
+            (0, fz, HAZ_ZONE_COLORS['fusion'], 'FZ'),
+            (fz, cghaz, HAZ_ZONE_COLORS['cghaz'], 'CGHAZ'),
+            (cghaz, fghaz, HAZ_ZONE_COLORS['fghaz'], 'FGHAZ'),
+            (fghaz, ichaz, HAZ_ZONE_COLORS['ichaz'], 'ICHAZ'),
+            (ichaz, x_max, HAZ_ZONE_COLORS['base_metal'], 'BM'),
+        ]
+
+        for x_start, x_end, color, label in zone_fills:
+            if x_end > x_start:
+                ax.axvspan(x_start, x_end, alpha=0.15, color=color, label=label)
+
+    # Reference temperature lines
+    ref_temps = [
+        (1500, 'Solidus', 'red'),
+        (1100, 'Grain Growth', '#FF8800'),
+        (900, 'Ac3', '#888800'),
+        (727, 'Ac1', 'green'),
+    ]
+    for temp, label, color in ref_temps:
+        ax.axhline(y=temp, color=color, linestyle=':', linewidth=1, alpha=0.6)
+        ax.text(max(distances) * 0.95, temp + 20, label,
+                ha='right', fontsize=8, color=color)
+
+    ax.set_xlabel('Distance from Weld Center (mm)', fontsize=12)
+    ax.set_ylabel('Peak Temperature (°C)', fontsize=12)
+    ax.set_title('Peak Temperature Profile', fontsize=14)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    ax.legend(loc='upper right', fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_hardness_traverse_plot(
+    distances: List[float],
+    hardness: List[float],
+    zone_boundaries: Optional[dict] = None,
+    limit_hv: float = 350.0
+) -> bytes:
+    """Generate hardness traverse plot (HV vs distance).
+
+    Parameters
+    ----------
+    distances : list
+        Distances from weld center (mm)
+    hardness : list
+        Hardness values (HV) at each distance
+    zone_boundaries : dict, optional
+        Zone boundary distances
+    limit_hv : float
+        Maximum acceptable hardness (HV)
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.plot(distances, hardness, 'ko-', linewidth=2, markersize=4, label='Hardness')
+
+    # Limit line
+    ax.axhline(y=limit_hv, color='red', linestyle='--', linewidth=2,
+               label=f'Limit = {limit_hv:.0f} HV')
+
+    # Color points above limit
+    distances_arr = np.array(distances)
+    hardness_arr = np.array(hardness)
+    above = hardness_arr > limit_hv
+    if np.any(above):
+        ax.scatter(distances_arr[above], hardness_arr[above],
+                  color='red', s=60, zorder=5, label='Exceeds Limit')
+
+    # Add zone shading
+    if zone_boundaries:
+        fz = zone_boundaries.get('fusion', 0)
+        cghaz = zone_boundaries.get('cghaz', 0)
+        fghaz = zone_boundaries.get('fghaz', 0)
+        ichaz = zone_boundaries.get('ichaz', 0)
+
+        zone_fills = [
+            (0, fz, HAZ_ZONE_COLORS['fusion'], 'FZ'),
+            (fz, cghaz, HAZ_ZONE_COLORS['cghaz'], 'CGHAZ'),
+            (cghaz, fghaz, HAZ_ZONE_COLORS['fghaz'], 'FGHAZ'),
+            (fghaz, ichaz, HAZ_ZONE_COLORS['ichaz'], 'ICHAZ'),
+        ]
+        for x_start, x_end, color, label in zone_fills:
+            if x_end > x_start:
+                ax.axvspan(x_start, x_end, alpha=0.1, color=color)
+
+    # Pass/fail annotation
+    max_hv = max(hardness) if hardness else 0
+    if max_hv > limit_hv:
+        ax.text(0.02, 0.98, f'FAIL: Max HV = {max_hv:.0f}',
+                transform=ax.transAxes, fontsize=12, fontweight='bold',
+                color='red', va='top',
+                bbox=dict(boxstyle='round', facecolor='#FFE0E0', alpha=0.9))
+    else:
+        ax.text(0.02, 0.98, f'PASS: Max HV = {max_hv:.0f}',
+                transform=ax.transAxes, fontsize=12, fontweight='bold',
+                color='green', va='top',
+                bbox=dict(boxstyle='round', facecolor='#E0FFE0', alpha=0.9))
+
+    ax.set_xlabel('Distance from Weld Center (mm)', fontsize=12)
+    ax.set_ylabel('Hardness (HV)', fontsize=12)
+    ax.set_title('Hardness Traverse', fontsize=14)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=100)
+    ax.legend(loc='upper right', fontsize=9)
+    ax.grid(True, alpha=0.3)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_haz_thermal_cycle_comparison_plot(
+    thermal_cycles: dict,
+    title: str = "HAZ Thermal Cycle Comparison"
+) -> bytes:
+    """Generate overlaid thermal cycles at different HAZ zone positions.
+
+    Parameters
+    ----------
+    thermal_cycles : dict
+        {zone_label: {'times': [...], 'temps': [...]}}
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    cycle_colors = {
+        'centerline': '#FF0000',
+        'cghaz': '#FF8800',
+        'fghaz': '#CCAA00',
+        'ichaz': '#44AA00',
+        'base_metal': '#0044FF',
+    }
+
+    cycle_labels = {
+        'centerline': 'Weld Center',
+        'cghaz': 'CGHAZ',
+        'fghaz': 'FGHAZ',
+        'ichaz': 'ICHAZ',
+        'base_metal': 'Base Metal',
+    }
+
+    for zone, data in thermal_cycles.items():
+        times = np.array(data['times'])
+        temps = np.array(data['temps'])
+        color = cycle_colors.get(zone, 'gray')
+        label = cycle_labels.get(zone, zone.replace('_', ' ').title())
+
+        ax.plot(times, temps, color=color, linewidth=2, label=label)
+
+    # Reference lines
+    ax.axhline(y=800, color='gray', linestyle=':', alpha=0.5, linewidth=1)
+    ax.text(0.01, 0.60, '800°C', transform=ax.transAxes, fontsize=8, color='gray')
+    ax.axhline(y=500, color='gray', linestyle=':', alpha=0.5, linewidth=1)
+    ax.text(0.01, 0.30, '500°C', transform=ax.transAxes, fontsize=8, color='gray')
+
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Temperature (°C)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.legend(loc='upper right', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_preheat_summary_plot(preheat_data: dict) -> bytes:
+    """Generate preheat calculation summary visualization.
+
+    Shows CE values as bars with threshold coloring and preheat/risk text.
+
+    Parameters
+    ----------
+    preheat_data : dict
+        PreheatResult.to_dict() output
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5),
+                                    gridspec_kw={'width_ratios': [3, 2]})
+
+    # Left: CE bar chart
+    ce_values = {
+        'CE(IIW)': preheat_data.get('ce_iiw', 0),
+        'Pcm': preheat_data.get('ce_pcm', 0),
+        'CEN': preheat_data.get('ce_cen', 0),
+    }
+
+    thresholds = {
+        'CE(IIW)': [0.35, 0.45],
+        'Pcm': [0.20, 0.30],
+        'CEN': [0.35, 0.45],
+    }
+
+    names = list(ce_values.keys())
+    values = list(ce_values.values())
+
+    colors = []
+    for name, val in zip(names, values):
+        t_low, t_high = thresholds[name]
+        if val < t_low:
+            colors.append('#2ecc71')  # Green
+        elif val < t_high:
+            colors.append('#f39c12')  # Orange
+        else:
+            colors.append('#e74c3c')  # Red
+
+    bars = ax1.bar(names, values, color=colors, edgecolor='black', width=0.5)
+
+    for bar, val in zip(bars, values):
+        height = bar.get_height()
+        ax1.annotate(f'{val:.3f}',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 5), textcoords="offset points",
+                    ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+    ax1.set_ylabel('Carbon Equivalent', fontsize=12)
+    ax1.set_title('Carbon Equivalent Values', fontsize=13)
+    ax1.set_ylim(0, max(values) * 1.3 if values else 0.6)
+    ax1.grid(True, axis='y', alpha=0.3)
+
+    # Right: Preheat info text
+    ax2.set_axis_off()
+
+    preheat_temp = preheat_data.get('preheat_en1011_2', 0)
+    risk = preheat_data.get('cracking_risk', 'unknown')
+    thickness = preheat_data.get('plate_thickness_mm', 0)
+    hi = preheat_data.get('heat_input_kj_mm', 0)
+    hydrogen = preheat_data.get('hydrogen_level', 'B')
+
+    risk_colors = {'low': '#2ecc71', 'medium': '#f39c12', 'high': '#e74c3c'}
+    risk_color = risk_colors.get(risk, 'gray')
+
+    text_lines = [
+        f'Recommended Preheat:  {preheat_temp:.0f}°C',
+        f'',
+        f'Plate Thickness:  {thickness:.0f} mm',
+        f'Heat Input:  {hi:.2f} kJ/mm',
+        f'Hydrogen Level:  {hydrogen}',
+        f'',
+        f'Cracking Risk:  {risk.upper()}',
+    ]
+
+    y_pos = 0.9
+    for line in text_lines:
+        if 'Cracking Risk' in line:
+            ax2.text(0.1, y_pos, line, transform=ax2.transAxes,
+                    fontsize=13, fontweight='bold', color=risk_color, va='top')
+        elif 'Recommended Preheat' in line:
+            ax2.text(0.1, y_pos, line, transform=ax2.transAxes,
+                    fontsize=14, fontweight='bold', va='top')
+        else:
+            ax2.text(0.1, y_pos, line, transform=ax2.transAxes,
+                    fontsize=11, va='top')
+        y_pos -= 0.12
+
+    # Add border box
+    ax2.add_patch(plt.Rectangle((0.05, 0.05), 0.9, 0.9,
+                                 transform=ax2.transAxes,
+                                 fill=False, edgecolor='gray',
+                                 linewidth=1.5, linestyle='--'))
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
 def create_parameter_trajectory_plot(
     opt_data: dict,
     title: str = 'Parameter Trajectory'

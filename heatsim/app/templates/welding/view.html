@@ -34,6 +34,12 @@
                 <i class="bi bi-hourglass-split"></i> Progress
             </a>
             {% endif %}
+            <a href="{{ url_for('welding.haz_analysis', id=project.id) }}" class="btn btn-outline-info">
+                <i class="bi bi-layers"></i> HAZ Analysis
+            </a>
+            <a href="{{ url_for('welding.preheat', id=project.id) }}" class="btn btn-outline-info">
+                <i class="bi bi-thermometer-half"></i> Preheat
+            </a>
         </div>
     </div>
 </div>

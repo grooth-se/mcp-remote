@@ -197,6 +197,65 @@ class QuickAddStringsForm(FlaskForm):
     )
 
 
+class HAZAnalysisForm(FlaskForm):
+    """Form for HAZ analysis parameters."""
+
+    max_distance_mm = FloatField(
+        'Max Distance from Weld Center (mm)',
+        validators=[DataRequired(), NumberRange(min=5, max=100)],
+        default=20.0
+    )
+
+    n_points = IntegerField(
+        'Number of Sample Points',
+        validators=[DataRequired(), NumberRange(min=10, max=200)],
+        default=50
+    )
+
+    depth_z_mm = FloatField(
+        'Depth Below Surface (mm)',
+        validators=[Optional(), NumberRange(min=0, max=50)],
+        default=0.0
+    )
+
+    hardness_limit = FloatField(
+        'Hardness Limit (HV)',
+        validators=[DataRequired(), NumberRange(min=200, max=600)],
+        default=350.0
+    )
+
+
+class PreheatForm(FlaskForm):
+    """Form for preheat calculation parameters."""
+
+    plate_thickness_mm = FloatField(
+        'Plate Thickness (mm)',
+        validators=[DataRequired(), NumberRange(min=3, max=200)],
+        default=20.0
+    )
+
+    hydrogen_level = SelectField(
+        'Hydrogen Level',
+        choices=[
+            ('A', 'A — Very Low (≤5 ml/100g)'),
+            ('B', 'B — Low (≤10 ml/100g)'),
+            ('C', 'C — Medium (≤15 ml/100g)'),
+            ('D', 'D — High (≤20 ml/100g)'),
+        ],
+        default='B'
+    )
+
+    restraint = SelectField(
+        'Restraint Level',
+        choices=[
+            ('low', 'Low — free joint'),
+            ('medium', 'Medium — moderate restraint'),
+            ('high', 'High — rigid structure'),
+        ],
+        default='medium'
+    )
+
+
 class RunSimulationForm(FlaskForm):
     """Form for starting simulation."""
 

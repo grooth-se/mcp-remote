@@ -29,6 +29,9 @@ from .snapshot_diff import SnapshotDiffService
 from .material_change_tracker import MaterialChangeTracker
 from .lineage_service import LineageService
 from .compliance_report import ComplianceReportGenerator
+from .rosenthal_solver import RosenthalSolver, RosenthalParams
+from .haz_predictor import HAZPredictor, HAZResult
+from .preheat_calculator import PreheatCalculator, PreheatResult
 from . import visualization
 from . import visualization_3d
 from . import comsol
@@ -98,6 +101,13 @@ __all__ = [
     # Phase 13 services - Process optimization
     'OptimizationService',
     'OptimizationResult',
+    # Phase 14 services - Welding simulation improvements
+    'RosenthalSolver',
+    'RosenthalParams',
+    'HAZPredictor',
+    'HAZResult',
+    'PreheatCalculator',
+    'PreheatResult',
     # Phase 3 services - Visualization
     'visualization',
     # Phase 4 services - COMSOL integration
