@@ -89,6 +89,7 @@ class HAZResult:
             'zone_phases': self.zone_phases,
             'zone_hardness': self.zone_hardness,
             'zone_boundaries': self.zone_boundaries,
+            'thermal_cycles': self.thermal_cycles,
         }
 
     def max_hardness(self) -> float:

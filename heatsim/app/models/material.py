@@ -579,7 +579,7 @@ class SteelComposition(db.Model):
         Ni = self.nickel or 0.0
         Mo = self.molybdenum or 0.0
         V = self.vanadium or 0.0
-        Nb = self.niobium or 0.0
+        Nb = getattr(self, 'niobium', 0.0) or 0.0
         B = self.boron or 0.0
 
         A_C = 0.75 + 0.25 * math.tanh(20 * (C - 0.12))

@@ -103,7 +103,7 @@ class PreheatCalculator:
         self.Ni = composition.nickel or 0.0
         self.Mo = composition.molybdenum or 0.0
         self.V = composition.vanadium or 0.0
-        self.Nb = composition.niobium or 0.0
+        self.Nb = getattr(composition, 'niobium', 0.0) or 0.0
         self.B = composition.boron or 0.0
 
     @property
