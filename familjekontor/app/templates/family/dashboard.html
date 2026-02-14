@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+
+{% block title %}Familjeöversikt{% endblock %}
+
+{% block content %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Familjeöversikt'},
+]) }}
+
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-house-heart"></i> Familjeöversikt</h2>
+        <p class="text-muted">Aggregerad vy över alla aktiva bolag</p>
+    </div>
+</div>
+
+<!-- KPI Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Total kassa</h6>
+                <h3 class="mb-0">{{ data.total_cash | sek(0) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Antal bolag</h6>
+                <h3 class="mb-0">{{ data.company_count }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Intäkter YTD</h6>
+                <h3 class="mb-0 text-success">{{ data.total_revenue_ytd | sek(0) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Kostnader YTD</h6>
+                <h3 class="mb-0 text-danger">{{ data.total_expenses_ytd | sek(0) }} kr</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Per-Company Mini-Cards -->
+<div class="row g-3 mb-4">
+    {% for pc in data.per_company %}
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="card-title mb-0">{{ pc.company.name }}</h6>
+                    <span class="badge bg-secondary">{{ pc.company.company_type }}</span>
+                </div>
+                <div class="small text-muted mb-2">{{ pc.company.org_number }}</div>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="small text-muted">Kassa</div>
+                        <div class="fw-bold">{{ pc.cash | sek(0) }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Intäkter</div>
+                        <div class="fw-bold text-success">{{ pc.revenue | sek(0) }}</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Kostnader</div>
+                        <div class="fw-bold text-danger">{{ pc.expenses | sek(0) }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Revenue/Expense Chart -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Intäkter & kostnader per månad</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="revenueTrendChart" height="300"></canvas>
+    </div>
+</div>
+
+<!-- Health Indicators Table -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-heart-pulse"></i> Finansiell hälsa</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Bolag</th>
+                        <th class="text-center">Status</th>
+                        {% for ratio_name in ['Rörelsemarginal', 'Balanslikviditet', 'Soliditet'] %}
+                        <th class="text-end">{{ ratio_name }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in health %}
+                    <tr>
+                        <td>{{ h.company.name }}</td>
+                        <td class="text-center">
+                            {% if h.overall_status == 'danger' %}
+                            <span class="badge bg-danger">Kritisk</span>
+                            {% elif h.overall_status == 'warning' %}
+                            <span class="badge bg-warning text-dark">Varning</span>
+                            {% else %}
+                            <span class="badge bg-success">Bra</span>
+                            {% endif %}
+                        </td>
+                        {% for r in h.ratios %}
+                        <td class="text-end">
+                            {% if r.value is not none %}
+                            <span class="badge bg-{{ 'danger' if r.status == 'danger' else ('warning text-dark' if r.status == 'warning' else 'success') }}">
+                                {{ "%.1f"|format(r.value) }}{% if 'margin' in r.name or 'ratio' in r.name %}%{% endif %}
+                            </span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                        {% if h.ratios | length < 3 %}
+                            {% for _ in range(3 - h.ratios | length) %}
+                            <td class="text-end"><span class="text-muted">-</span></td>
+                            {% endfor %}
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Navigation Links -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <a href="{{ url_for('family.cashflow') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-water fs-1 text-primary"></i>
+                <h6 class="mt-2">Kassaflöde</h6>
+                <p class="small text-muted mb-0">Jämför kassaflöde mellan bolag</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{{ url_for('family.wealth') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-gem fs-1 text-primary"></i>
+                <h6 class="mt-2">Förmögenhet</h6>
+                <p class="small text-muted mb-0">Total familjeförmögenhet</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{{ url_for('family.alerts') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-bell fs-1 text-primary"></i>
+                <h6 class="mt-2">Notiser</h6>
+                <p class="small text-muted mb-0">Alla notiser och deadlines</p>
+            </div>
+        </a>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('{{ url_for("family.api_revenue_trend") }}')
+        .then(r => r.json())
+        .then(data => {
+            const colors = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#20c997'];
+            const datasets = [];
+
+            // Stacked bars per company
+            data.datasets.forEach((ds, i) => {
+                const color = colors[i % colors.length];
+                datasets.push({
+                    label: ds.company_name + ' Intäkter',
+                    data: ds.revenue,
+                    backgroundColor: color + '99',
+                    stack: 'revenue',
+                });
+                datasets.push({
+                    label: ds.company_name + ' Kostnader',
+                    data: ds.expenses.map(v => -v),
+                    backgroundColor: color + '44',
+                    stack: 'expenses',
+                });
+            });
+
+            new Chart(document.getElementById('revenueTrendChart'), {
+                type: 'bar',
+                data: { labels: data.labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, ticks: { callback: v => v.toLocaleString('sv-SE') + ' kr' } },
+                    },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+                },
+            });
+        });
+});
+</script>
+{% endblock %}

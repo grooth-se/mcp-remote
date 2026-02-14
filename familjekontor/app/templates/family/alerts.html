@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+
+{% block title %}Notiser - Familjeöversikt{% endblock %}
+
+{% block content %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Familjeöversikt', 'url': url_for('family.index')},
+    {'title': 'Notiser & Deadlines'},
+]) }}
+
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-bell"></i> Notiser & Deadlines</h2>
+        <p class="text-muted">Alla notiser och deadlines över samtliga bolag</p>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Olästa notiser</h6>
+                <h3 class="mb-0 {{ 'text-danger' if alert_data.total_unread > 0 else 'text-success' }}">
+                    {{ alert_data.total_unread }}
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Försenade deadlines</h6>
+                <h3 class="mb-0 {{ 'text-danger' if deadlines.overdue else 'text-success' }}">
+                    {{ deadlines.overdue | length }}
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Kommande deadlines (30 dagar)</h6>
+                <h3 class="mb-0">{{ deadlines.upcoming | length }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- Deadlines -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-calendar-check"></i> Deadlines</h5>
+            </div>
+            <div class="card-body">
+                {% if deadlines.overdue %}
+                <h6 class="text-danger mb-2">Försenade</h6>
+                <div class="list-group mb-3">
+                    {% for d in deadlines.overdue %}
+                    <div class="list-group-item list-group-item-danger d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold">{{ d.description }}</div>
+                            <small class="text-muted">{{ d.company.name }} &middot; {{ d.due_date.strftime('%Y-%m-%d') }}</small>
+                        </div>
+                        <span class="badge bg-danger">Försenad</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if deadlines.upcoming %}
+                <h6 class="text-muted mb-2">Kommande</h6>
+                <div class="list-group">
+                    {% for d in deadlines.upcoming %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold">{{ d.description }}</div>
+                            <small class="text-muted">{{ d.company.name }} &middot; {{ d.due_date.strftime('%Y-%m-%d') }}</small>
+                        </div>
+                        <span class="badge bg-secondary">{{ d.due_date.strftime('%d %b') }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if not deadlines.overdue and not deadlines.upcoming %}
+                <p class="text-muted text-center mb-0">Inga deadlines</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-bell"></i> Senaste notiser</h5>
+            </div>
+            <div class="card-body">
+                {% if alert_data.notifications %}
+                <div class="list-group">
+                    {% for n in alert_data.notifications %}
+                    <div class="list-group-item {{ '' if n.read else 'list-group-item-light' }}">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <i class="bi {{ n.icon }}"></i>
+                                <strong>{{ n.title }}</strong>
+                                {% if not n.read %}
+                                <span class="badge bg-primary ms-1">Ny</span>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                        {% if n.message %}
+                        <small class="text-muted">{{ n.message }}</small>
+                        {% endif %}
+                        <small class="d-block text-muted">{{ n.company.name }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">Inga notiser</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Feed -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-activity"></i> Aktivitet</h5>
+    </div>
+    <div class="card-body">
+        {% if activity %}
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Tidpunkt</th>
+                        <th>Bolag</th>
+                        <th>Händelse</th>
+                        <th>Typ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in activity %}
+                    <tr>
+                        <td><small>{{ a.timestamp.strftime('%Y-%m-%d %H:%M') }}</small></td>
+                        <td>{{ a.company_name }}</td>
+                        <td>
+                            {% if a.action == 'create' %}
+                            <span class="badge bg-success">Skapad</span>
+                            {% elif a.action == 'update' %}
+                            <span class="badge bg-warning text-dark">Ändrad</span>
+                            {% elif a.action == 'delete' %}
+                            <span class="badge bg-danger">Borttagen</span>
+                            {% elif a.action == 'approve' %}
+                            <span class="badge bg-info">Godkänd</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ a.action }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ a.entity_type }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center mb-0">Ingen aktivitet</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+
+{% block title %}Förmögenhet - Familjeöversikt{% endblock %}
+
+{% block content %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Familjeöversikt', 'url': url_for('family.index')},
+    {'title': 'Förmögenhet'},
+]) }}
+
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-gem"></i> Familjeförmögenhet</h2>
+        <p class="text-muted">Total förmögenhet och tillgångsallokering</p>
+    </div>
+</div>
+
+<!-- Net Worth Card -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-primary">
+            <div class="card-body text-center py-4">
+                <h6 class="card-subtitle text-muted mb-2">Total familjeförmögenhet (eget kapital)</h6>
+                <h2 class="mb-0 {{ 'text-success' if data.net_worth >= 0 else 'text-danger' }}">
+                    {{ data.net_worth | sek(0) }} kr
+                </h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center py-4">
+                <h6 class="card-subtitle text-muted mb-2">Utdelningsinkomster</h6>
+                <h2 class="mb-0 text-success">{{ data.total_dividends | sek(0) }} kr</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Kassa</h6>
+                <h4 class="mb-0">{{ data.total_cash | sek(0) }} kr</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Värdepapper</h6>
+                <h4 class="mb-0">{{ data.total_investments | sek(0) }} kr</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Anläggningstillgångar</h6>
+                <h4 class="mb-0">{{ data.total_fixed_assets | sek(0) }} kr</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Totala tillgångar</h6>
+                <h4 class="mb-0">{{ data.total_assets | sek(0) }} kr</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Asset Allocation Doughnut -->
+<div class="row g-3 mb-4">
+    <div class="col-md-5">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Tillgångsallokering</h5>
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                <canvas id="allocationChart" width="300" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-table"></i> Per bolag</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Bolag</th>
+                                <th class="text-end">Eget kapital</th>
+                                <th class="text-end">Investeringar</th>
+                                <th class="text-end">Kassa</th>
+                                <th class="text-end">Totala tillgångar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pc in data.per_company %}
+                            <tr>
+                                <td>{{ pc.company.name }}</td>
+                                <td class="text-end">{{ pc.equity | sek(0) }}</td>
+                                <td class="text-end">{{ pc.investments | sek(0) }}</td>
+                                <td class="text-end">{{ pc.cash | sek(0) }}</td>
+                                <td class="text-end">{{ pc.total_assets | sek(0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td>Totalt</td>
+                                <td class="text-end">{{ data.total_equity | sek(0) }}</td>
+                                <td class="text-end">{{ data.total_investments | sek(0) }}</td>
+                                <td class="text-end">{{ data.total_cash | sek(0) }}</td>
+                                <td class="text-end">{{ data.total_assets | sek(0) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dividend Income -->
+{% if data.per_company %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-cash-coin"></i> Utdelningsinkomster per bolag</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Bolag</th>
+                        <th class="text-end">Utdelningar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pc in data.per_company %}
+                    {% if pc.dividends > 0 %}
+                    <tr>
+                        <td>{{ pc.company.name }}</td>
+                        <td class="text-end text-success">{{ pc.dividends | sek(0) }} kr</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td>Totalt</td>
+                        <td class="text-end text-success">{{ data.total_dividends | sek(0) }} kr</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const alloc = {{ data.allocation | tojson }};
+    const labels = ['Kassa', 'Värdepapper', 'Anläggningstillgångar'];
+    const values = [alloc['kassa'], alloc['värdepapper'], alloc['fastigheter']];
+
+    if (values.some(v => v > 0)) {
+        new Chart(document.getElementById('allocationChart'), {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: ['#198754', '#0d6efd', '#ffc107'],
+                    borderWidth: 2,
+                }],
+            },
+            options: {
+                responsive: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12 } },
+                    tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + '%' } },
+                },
+            },
+        });
+    } else {
+        document.getElementById('allocationChart').parentElement.innerHTML =
+            '<p class="text-muted text-center">Ingen data tillgänglig</p>';
+    }
+});
+</script>
+{% endblock %}

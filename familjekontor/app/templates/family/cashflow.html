@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+
+{% block title %}Kassaflöde - Familjeöversikt{% endblock %}
+
+{% block content %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Familjeöversikt', 'url': url_for('family.index')},
+    {'title': 'Kassaflöde'},
+]) }}
+
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-water"></i> Kassaflöde</h2>
+        <p class="text-muted">Jämförelse av kassaflöde mellan bolag</p>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+{% set total_net = data.totals.cash_flow | sum %}
+{% set months = data.labels | length %}
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Nettokassaflöde YTD</h6>
+                <h3 class="mb-0 {{ 'text-success' if total_net >= 0 else 'text-danger' }}">
+                    {{ total_net | sek(0) }} kr
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Genomsnitt per månad</h6>
+                <h3 class="mb-0">{{ (total_net / months if months > 0 else 0) | sek(0) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted mb-2">Antal bolag</h6>
+                <h3 class="mb-0">{{ data.per_company | length }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cash Position Timeline -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Kassaposition över tid</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="cashPositionChart" height="300"></canvas>
+    </div>
+</div>
+
+<!-- Monthly Cash Flow Comparison -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-bar-chart-steps"></i> Månatligt kassaflöde per bolag</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="cashflowComparisonChart" height="300"></canvas>
+    </div>
+</div>
+
+<!-- Per-Company Table -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-table"></i> Kassaflöde per bolag</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Bolag</th>
+                        <th class="text-end">Totalt kassaflöde</th>
+                        <th class="text-end">Aktuellt saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pc in data.per_company %}
+                    <tr>
+                        <td>{{ pc.company_name }}</td>
+                        <td class="text-end {{ 'text-success' if pc.cash_flow | sum >= 0 else 'text-danger' }}">
+                            {{ pc.cash_flow | sum | sek(0) }} kr
+                        </td>
+                        <td class="text-end">
+                            {{ (pc.balance[-1] if pc.balance else 0) | sek(0) }} kr
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td>Totalt</td>
+                        <td class="text-end">{{ total_net | sek(0) }} kr</td>
+                        <td class="text-end">
+                            {{ (data.totals.balance[-1] if data.totals.balance else 0) | sek(0) }} kr
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const colors = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#20c997'];
+
+    // Cash Position (line chart)
+    fetch('{{ url_for("family.api_cash_position") }}')
+        .then(r => r.json())
+        .then(data => {
+            const datasets = data.per_company.map((pc, i) => ({
+                label: pc.company_name,
+                data: pc.balance,
+                borderColor: colors[i % colors.length],
+                backgroundColor: 'transparent',
+                tension: 0.3,
+                borderWidth: 2,
+            }));
+            datasets.push({
+                label: 'Totalt',
+                data: data.totals.balance,
+                borderColor: '#212529',
+                backgroundColor: 'transparent',
+                borderWidth: 3,
+                tension: 0.3,
+            });
+
+            new Chart(document.getElementById('cashPositionChart'), {
+                type: 'line',
+                data: { labels: data.labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { ticks: { callback: v => v.toLocaleString('sv-SE') + ' kr' } } },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+                },
+            });
+        });
+
+    // Cash Flow Comparison (grouped bars)
+    fetch('{{ url_for("family.api_cashflow_comparison") }}')
+        .then(r => r.json())
+        .then(data => {
+            const datasets = data.per_company.map((pc, i) => ({
+                label: pc.company_name,
+                data: pc.cash_flow,
+                backgroundColor: colors[i % colors.length] + '99',
+            }));
+
+            new Chart(document.getElementById('cashflowComparisonChart'), {
+                type: 'bar',
+                data: { labels: data.labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { ticks: { callback: v => v.toLocaleString('sv-SE') + ' kr' } } },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+                },
+            });
+        });
+});
+</script>
+{% endblock %}

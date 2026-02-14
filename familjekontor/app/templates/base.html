@@ -35,6 +35,12 @@
                         <a class="nav-link {% if request.endpoint and request.endpoint.startswith('dashboard.') %}active{% endif %}" href="{{ url_for('dashboard.index') }}"><i class="bi bi-house"></i> Start</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('family.') %}active{% endif %}"
+                           href="{{ url_for('family.index') }}">
+                            <i class="bi bi-house-heart"></i> Översikt
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint and request.endpoint.startswith('companies.') %}active{% endif %}" href="{{ url_for('companies.index') }}"><i class="bi bi-building"></i> Företag</a>
                     </li>
                     <li class="nav-item dropdown">

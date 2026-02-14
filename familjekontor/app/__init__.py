@@ -59,6 +59,7 @@ def create_app(config_name=None):
     from app.routes.notifications import notification_bp
     from app.routes.batch import batch_bp
     from app.routes.favorites import favorites_bp
+    from app.routes.family import family_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -91,6 +92,7 @@ def create_app(config_name=None):
     app.register_blueprint(notification_bp, url_prefix='/notifications')
     app.register_blueprint(batch_bp, url_prefix='/batch')
     app.register_blueprint(favorites_bp, url_prefix='/favorites')
+    app.register_blueprint(family_bp, url_prefix='/family')
 
     # Jinja2 globals and filters
     from datetime import datetime
