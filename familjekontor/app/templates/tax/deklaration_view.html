@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}Deklaration {{ tr.return_type|upper }} {{ tr.tax_year }} - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2><i class="bi bi-file-earmark-text"></i> Inkomstdeklaration {{ tr.return_type|upper }} — {{ tr.tax_year }}</h2>
+        <p class="text-muted mb-0">{{ tr.company.name }} ({{ tr.company.org_number }})</p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if tr.status == 'draft' %}
+        <a href="{{ url_for('tax.deklaration_edit', return_id=tr.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil"></i> Redigera justeringar
+        </a>
+        <form method="post" action="{{ url_for('tax.deklaration_refresh', return_id=tr.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat"></i> Uppdatera från bokföring</button>
+        </form>
+        {% endif %}
+        <a href="{{ url_for('tax.deklaration_ink_view', return_id=tr.id) }}" class="btn btn-outline-info">
+            <i class="bi bi-file-earmark-ruled"></i> INK-formulär
+        </a>
+        <a href="{{ url_for('tax.deklaration_ink_pdf', return_id=tr.id) }}" class="btn btn-outline-danger">
+            <i class="bi bi-filetype-pdf"></i> INK PDF
+        </a>
+        <a href="{{ url_for('tax.deklaration_sru_export', return_id=tr.id) }}" class="btn btn-outline-dark">
+            <i class="bi bi-file-code"></i> SRU-fil
+        </a>
+        <a href="{{ url_for('tax.deklaration_export', return_id=tr.id) }}" class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+        </a>
+        <a href="{{ url_for('tax.deklaration_index') }}" class="btn btn-outline-secondary">Tillbaka</a>
+    </div>
+</div>
+
+{# Status badge #}
+<div class="mb-4">
+    {% if tr.status == 'draft' %}
+    <span class="badge bg-warning text-dark fs-6">Utkast</span>
+    {% elif tr.status == 'submitted' %}
+    <span class="badge bg-primary fs-6">Inlämnad {{ tr.submitted_at.strftime('%Y-%m-%d') if tr.submitted_at }}</span>
+    {% elif tr.status == 'approved' %}
+    <span class="badge bg-success fs-6">Godkänd</span>
+    {% endif %}
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        {# P&L Section #}
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-journal-text"></i> Resultat från bokföringen</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td>Nettoomsättning</td>
+                            <td class="text-end">{{ tr.net_revenue|sek }}</td>
+                        </tr>
+                        <tr>
+                            <td>Övriga rörelseintäkter</td>
+                            <td class="text-end">{{ tr.other_operating_income|sek }}</td>
+                        </tr>
+                        <tr>
+                            <td>Rörelsekostnader</td>
+                            <td class="text-end text-danger">-{{ tr.operating_expenses|sek }}</td>
+                        </tr>
+                        <tr>
+                            <td>Avskrivningar (bokförda)</td>
+                            <td class="text-end text-danger">-{{ tr.depreciation_booked|sek }}</td>
+                        </tr>
+                        <tr>
+                            <td>Finansiella intäkter</td>
+                            <td class="text-end">{{ tr.financial_income|sek }}</td>
+                        </tr>
+                        <tr>
+                            <td>Finansiella kostnader</td>
+                            <td class="text-end text-danger">-{{ tr.financial_expenses|sek }}</td>
+                        </tr>
+                        <tr class="table-active fw-bold">
+                            <td>Årets resultat</td>
+                            <td class="text-end">{{ tr.net_income|sek }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {# Adjustments Section #}
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-sliders"></i> Skattemässiga justeringar</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-success">+ Ej avdragsgilla kostnader</td>
+                            <td class="text-end">{{ tr.non_deductible_expenses|sek }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-danger">- Ej skattepliktiga intäkter</td>
+                            <td class="text-end">{{ tr.non_taxable_income|sek }}</td>
+                        </tr>
+                        <tr>
+                            <td>Skillnad avskrivning (bokförd vs skattemässig)</td>
+                            <td class="text-end">{{ tr.depreciation_tax_diff|sek }}</td>
+                        </tr>
+                        {% if tr.other_adjustments_add > 0 %}
+                        <tr>
+                            <td class="text-success">+ Övriga justeringar (tillkommer)</td>
+                            <td class="text-end">{{ tr.other_adjustments_add|sek }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if tr.other_adjustments_deduct > 0 %}
+                        <tr>
+                            <td class="text-danger">- Övriga justeringar (avgår)</td>
+                            <td class="text-end">{{ tr.other_adjustments_deduct|sek }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {# Custom Adjustment Lines #}
+        {% if tr.adjustments or tr.status == 'draft' %}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between">
+                <span><i class="bi bi-list-check"></i> Detaljerade justeringar</span>
+                <span class="badge bg-secondary">{{ tr.adjustments|length }}</span>
+            </div>
+            {% if tr.adjustments %}
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Typ</th>
+                            <th>Beskrivning</th>
+                            <th>SRU</th>
+                            <th class="text-end">Belopp</th>
+                            {% if tr.status == 'draft' %}<th></th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for adj in tr.adjustments %}
+                        <tr>
+                            <td>
+                                {% if adj.adjustment_type == 'add' %}
+                                <span class="badge bg-success">Tillkommer</span>
+                                {% else %}
+                                <span class="badge bg-danger">Avgår</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ adj.description }}</td>
+                            <td>{{ adj.sru_code or '-' }}</td>
+                            <td class="text-end">{{ adj.amount|sek }}</td>
+                            {% if tr.status == 'draft' %}
+                            <td>
+                                <form method="post" action="{{ url_for('tax.deklaration_remove_adjustment', adjustment_id=adj.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-sm btn-outline-danger" title="Ta bort"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+            {% if tr.status == 'draft' %}
+            <div class="card-body border-top">
+                <form method="post" action="{{ url_for('tax.deklaration_add_adjustment', return_id=tr.id) }}" class="row g-2 align-items-end">
+                    {{ adj_form.hidden_tag() }}
+                    <div class="col-auto">
+                        {{ adj_form.adjustment_type(class="form-select form-select-sm") }}
+                    </div>
+                    <div class="col">
+                        {{ adj_form.description(class="form-control form-control-sm", placeholder="Beskrivning") }}
+                    </div>
+                    <div class="col-auto">
+                        {{ adj_form.amount(class="form-control form-control-sm", placeholder="Belopp", style="width:120px") }}
+                    </div>
+                    <div class="col-auto">
+                        {{ adj_form.sru_code(class="form-control form-control-sm", placeholder="SRU", style="width:80px") }}
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i> Lägg till</button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {# Taxable Income Section #}
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white"><i class="bi bi-calculator"></i> Beskattningsbart resultat</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td>Skattemässigt resultat före underskottsavdrag</td>
+                            <td class="text-end fw-bold">{{ tr.taxable_income_before_deficit|sek }}</td>
+                        </tr>
+                        {% if tr.previous_deficit > 0 %}
+                        <tr>
+                            <td class="text-danger">- Underskott föregående år</td>
+                            <td class="text-end">{{ tr.previous_deficit|sek }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr class="table-success fw-bold">
+                            <td>Beskattningsbart resultat</td>
+                            <td class="text-end">{{ tr.taxable_income|sek }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        {# Tax Summary Card #}
+        <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary text-white"><i class="bi bi-cash-coin"></i> Beräknad skatt</div>
+            <div class="card-body text-center">
+                <h1 class="display-5 mb-2">{{ tr.calculated_tax|sek }}</h1>
+                <p class="text-muted">Skattesats: {{ (tr.tax_rate * 100)|round(1) }}%</p>
+                {% if tr.return_type == 'ink4' %}
+                <div class="alert alert-info mb-0">
+                    <small>Handelsbolag betalar ingen bolagsskatt. Resultatet fördelas på delägare.</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Actions Card #}
+        {% if tr.status == 'draft' %}
+        <div class="card mb-4">
+            <div class="card-header">Åtgärder</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('tax.deklaration_submit', return_id=tr.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-primary w-100 mb-2" onclick="return confirm('Markera deklarationen som inlämnad?')">
+                        <i class="bi bi-send"></i> Markera som inlämnad
+                    </button>
+                </form>
+                <small class="text-muted">Efter inlämning kan deklarationen inte längre redigeras.</small>
+            </div>
+        </div>
+        {% elif tr.status == 'submitted' %}
+        <div class="card mb-4">
+            <div class="card-header">Åtgärder</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('tax.deklaration_approve', return_id=tr.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-success w-100">
+                        <i class="bi bi-check-circle"></i> Markera som godkänd
+                    </button>
+                </form>
+                <small class="text-muted">Bekräfta efter godkännande från Skatteverket.</small>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Notes #}
+        {% if tr.notes %}
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-sticky"></i> Anteckningar</div>
+            <div class="card-body">
+                <p class="mb-0">{{ tr.notes }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Info Card #}
+        <div class="card">
+            <div class="card-header"><i class="bi bi-info-circle"></i> Information</div>
+            <div class="card-body small">
+                <dl class="row mb-0">
+                    <dt class="col-6">Typ</dt>
+                    <dd class="col-6">{{ tr.return_type_label }}</dd>
+                    <dt class="col-6">Räkenskapsår</dt>
+                    <dd class="col-6">{{ tr.fiscal_year.start_date }} — {{ tr.fiscal_year.end_date }}</dd>
+                    <dt class="col-6">Skapad</dt>
+                    <dd class="col-6">{{ tr.created_at.strftime('%Y-%m-%d') }}</dd>
+                    {% if tr.submitted_at %}
+                    <dt class="col-6">Inlämnad</dt>
+                    <dd class="col-6">{{ tr.submitted_at.strftime('%Y-%m-%d') }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

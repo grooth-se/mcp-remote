@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Periodjämförelse - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Periodjämförelse'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-arrow-left-right"></i> Periodjämförelse</h2>
+</div>
+
+<form method="get" class="row g-2 mb-4 align-items-end">
+    <div class="col-auto">
+        <label class="form-label form-label-sm">Period A</label>
+        <select name="fy_a" class="form-select form-select-sm">
+            <option value="">Välj...</option>
+            {% for fy in fiscal_years %}
+            <option value="{{ fy.id }}" {% if fy.id == fy_a_id %}selected{% endif %}>
+                {{ fy.year }} ({{ fy.start_date }} - {{ fy.end_date }})
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label form-label-sm">Period B</label>
+        <select name="fy_b" class="form-select form-select-sm">
+            <option value="">Välj...</option>
+            {% for fy in fiscal_years %}
+            <option value="{{ fy.id }}" {% if fy.id == fy_b_id %}selected{% endif %}>
+                {{ fy.year }} ({{ fy.start_date }} - {{ fy.end_date }})
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label form-label-sm">Rapporttyp</label>
+        <select name="report_type" class="form-select form-select-sm">
+            <option value="pnl" {% if report_type == 'pnl' %}selected{% endif %}>Resultaträkning</option>
+            <option value="balance" {% if report_type == 'balance' %}selected{% endif %}>Balansräkning</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary">Jämför</button>
+    </div>
+</form>
+
+{% if comparison %}
+<div class="card">
+    <div class="card-header">
+        {{ 'Resultaträkning' if comparison.report_type == 'pnl' else 'Balansräkning' }} —
+        {{ comparison.fy_a.year }} vs {{ comparison.fy_b.year }}
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Konto</th>
+                    <th></th>
+                    <th class="text-end">{{ comparison.fy_a.year }}</th>
+                    <th class="text-end">{{ comparison.fy_b.year }}</th>
+                    <th class="text-end">Förändring</th>
+                    <th class="text-end">%</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for section_name, section in comparison.sections.items() %}
+                <tr class="table-light">
+                    <td colspan="6"><strong>{{ section_name }}</strong></td>
+                </tr>
+                {% for row in section.rows %}
+                {% if row.amount_a|abs > 0.01 or row.amount_b|abs > 0.01 %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('comparison.drilldown', account_number=row.account_number, fiscal_year_id=fy_a_id) }}">
+                            {{ row.account_number }}
+                        </a>
+                    </td>
+                    <td>{{ row.account_name }}</td>
+                    <td class="text-end">{{ row.amount_a|sek }}</td>
+                    <td class="text-end">{{ row.amount_b|sek }}</td>
+                    <td class="text-end {% if row.change > 0 %}text-success{% elif row.change < 0 %}text-danger{% endif %}">
+                        {{ row.change|sek }}
+                    </td>
+                    <td class="text-end">
+                        {% if row.change_pct is not none %}
+                        <span class="{% if row.change_pct > 0 %}text-success{% elif row.change_pct < 0 %}text-danger{% endif %}">
+                            {{ row.change_pct }}%
+                        </span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+                <tr class="table-secondary">
+                    <td colspan="2"><strong>Summa {{ section_name }}</strong></td>
+                    <td class="text-end"><strong>{{ section.total_a|sek }}</strong></td>
+                    <td class="text-end"><strong>{{ section.total_b|sek }}</strong></td>
+                    <td class="text-end"><strong class="{% if section.total_change > 0 %}text-success{% elif section.total_change < 0 %}text-danger{% endif %}">{{ section.total_change|sek }}</strong></td>
+                    <td class="text-end">
+                        {% if section.total_change_pct is not none %}
+                        <strong>{{ section.total_change_pct }}%</strong>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+
+                {% if comparison.report_type == 'pnl' %}
+                {% for key, label in [('gross_profit', 'Bruttovinst'), ('operating_result', 'Rörelseresultat'), ('result_before_tax', 'Resultat före skatt')] %}
+                {% set s = comparison[key] %}
+                <tr class="table-primary">
+                    <td colspan="2"><strong>{{ label }}</strong></td>
+                    <td class="text-end"><strong>{{ s.amount_a|sek }}</strong></td>
+                    <td class="text-end"><strong>{{ s.amount_b|sek }}</strong></td>
+                    <td class="text-end"><strong class="{% if s.change > 0 %}text-success{% elif s.change < 0 %}text-danger{% endif %}">{{ s.change|sek }}</strong></td>
+                    <td class="text-end">
+                        {% if s.change_pct is not none %}<strong>{{ s.change_pct }}%</strong>{% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                {% for key, label in [('total_assets', 'Summa tillgångar'), ('total_equity_liabilities', 'Summa eget kapital och skulder')] %}
+                {% set s = comparison[key] %}
+                <tr class="table-primary">
+                    <td colspan="2"><strong>{{ label }}</strong></td>
+                    <td class="text-end"><strong>{{ s.amount_a|sek }}</strong></td>
+                    <td class="text-end"><strong>{{ s.amount_b|sek }}</strong></td>
+                    <td class="text-end"><strong class="{% if s.change > 0 %}text-success{% elif s.change < 0 %}text-danger{% endif %}">{{ s.change|sek }}</strong></td>
+                    <td class="text-end">
+                        {% if s.change_pct is not none %}<strong>{{ s.change_pct }}%</strong>{% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% elif fy_a_id and fy_b_id %}
+<div class="alert alert-info">Inga data att jämföra.</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Välj två perioder att jämföra.
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}{{ holding.name }} - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Investeringar', 'url': url_for('investments.index')},
+    {'title': holding.portfolio.name, 'url': url_for('investments.portfolio_view', portfolio_id=holding.portfolio.id)},
+    {'title': holding.name}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2>{{ holding.name }}
+            {% if holding.ticker %}<small class="text-muted">({{ holding.ticker }})</small>{% endif %}
+        </h2>
+        <p class="text-muted mb-0">
+            {{ holding.instrument_type_label }}
+            {% if holding.isin %} — ISIN: {{ holding.isin }}{% endif %}
+        </p>
+    </div>
+    {% if holding.active and not current_user.is_readonly %}
+    <a href="{{ url_for('investments.price_update', holding_id=holding.id) }}" class="btn btn-outline-primary"><i class="bi bi-currency-exchange"></i> Uppdatera pris</a>
+    {% endif %}
+</div>
+
+{# Summary #}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Antal</h6>
+                <h4>{{ "%.2f"|format(holding.quantity) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">GAV (snitt)</h6>
+                <h4>{{ holding.average_cost|sek(2) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Anskaffning</h6>
+                <h4>{{ holding.total_cost|sek(0) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Marknadsvärde</h6>
+                <h4>{% if holding.current_value %}{{ holding.current_value|sek(0) }}{% else %}-{% endif %}</h4>
+                {% if holding.last_price_date %}
+                <small class="text-muted">{{ holding.last_price_date.strftime('%Y-%m-%d') }}</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if holding.unrealized_gain is not none %}
+<div class="alert {% if holding.unrealized_gain >= 0 %}alert-success{% else %}alert-danger{% endif %} text-center">
+    Orealiserad vinst/förlust: <strong>{{ holding.unrealized_gain|sek }}</strong>
+</div>
+{% endif %}
+
+{# Transactions #}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">Transaktionshistorik</h5></div>
+    <div class="card-body">
+        {% if transactions %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Typ</th>
+                        <th class="text-end">Antal</th>
+                        <th class="text-end">Kurs</th>
+                        <th class="text-end">Belopp</th>
+                        <th class="text-end">Courtage</th>
+                        <th class="text-end">Realiserat</th>
+                        <th>Anteckning</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td>{{ tx.transaction_date.strftime('%Y-%m-%d') }}</td>
+                        <td><span class="badge bg-secondary">{{ tx.transaction_type_label }}</span></td>
+                        <td class="text-end">{% if tx.quantity %}{{ "%.2f"|format(tx.quantity) }}{% else %}-{% endif %}</td>
+                        <td class="text-end">{% if tx.price_per_unit %}{{ tx.price_per_unit|sek(2) }}{% else %}-{% endif %}</td>
+                        <td class="text-end">{{ tx.amount_sek|sek }}</td>
+                        <td class="text-end">{% if tx.commission %}{{ tx.commission|sek }}{% else %}-{% endif %}</td>
+                        <td class="text-end">
+                            {% if tx.realized_gain is not none %}
+                            <span class="{% if tx.realized_gain >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ tx.realized_gain|sek }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ tx.note or '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Inga transaktioner.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

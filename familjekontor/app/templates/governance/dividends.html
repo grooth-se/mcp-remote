@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Utdelningar - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Utdelningar'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-cash-coin"></i> Utdelningar</h2>
+    {% if not current_user.is_readonly %}
+    <a href="{{ url_for('governance.dividend_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Nytt utdelningsbeslut</a>
+    {% endif %}
+</div>
+
+{% if dividends %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Beslutsdatum</th>
+                <th>Räkenskapsår</th>
+                <th class="text-end">Totalt belopp</th>
+                <th class="text-end">Per aktie</th>
+                <th>Aktieslag</th>
+                <th>Utbetalningsdag</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in dividends %}
+            <tr>
+                <td>{{ d.decision_date.strftime('%Y-%m-%d') }}</td>
+                <td>{{ d.fiscal_year.year }}</td>
+                <td class="text-end"><strong>{{ d.total_amount|sek }}</strong></td>
+                <td class="text-end">{% if d.amount_per_share %}{{ d.amount_per_share|sek(4) }}{% else %}-{% endif %}</td>
+                <td>{% if d.share_class %}{{ d.share_class.name }}{% else %}Alla{% endif %}</td>
+                <td>{% if d.payment_date %}{{ d.payment_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
+                <td>
+                    {% if d.status == 'betald' %}
+                    <span class="badge bg-success">Betald</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">Beslutad</span>
+                    {% endif %}
+                </td>
+                <td class="text-end">
+                    {% if d.status == 'beslutad' and not current_user.is_readonly %}
+                    <form method="POST" action="{{ url_for('governance.dividend_pay', dividend_id=d.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-success btn-sm"
+                                onclick="return confirm('Betala utdelning {{ d.total_amount|sek }}?')">
+                            <i class="bi bi-cash"></i> Betala
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if d.verification %}
+                    <a href="{{ url_for('accounting.view_verification', verification_id=d.verification.id) }}" class="btn btn-outline-secondary btn-sm" title="Visa verifikation">
+                        <i class="bi bi-journal-text"></i>
+                    </a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">Inga utdelningsbeslut registrerade.</div>
+{% endif %}
+{% endblock %}

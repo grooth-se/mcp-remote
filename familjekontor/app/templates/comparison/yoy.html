@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Flerårsöversikt - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-graph-up-arrow"></i> Flerårsöversikt</h2>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2">
+            <select name="fiscal_year_id" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                {% for fy in fiscal_years %}
+                <option value="{{ fy.id }}" {% if fy.id == current_fy_id %}selected{% endif %}>
+                    {{ fy.year }}
+                </option>
+                {% endfor %}
+            </select>
+            <select name="num_years" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                <option value="3" {% if num_years == 3 %}selected{% endif %}>3 år</option>
+                <option value="5" {% if num_years == 5 %}selected{% endif %}>5 år</option>
+            </select>
+        </form>
+    </div>
+</div>
+
+{% if yoy %}
+<div class="row mb-4">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Resultatutveckling</div>
+            <div class="card-body">
+                <canvas id="yoyChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Nyckeltal per år</div>
+            <div class="card-body">
+                <canvas id="summaryChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Resultaträkning — flerårsöversikt</div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Post</th>
+                    {% for fy in yoy.years %}
+                    <th class="text-end">{{ fy.year }}</th>
+                    <th class="text-end text-muted small">%</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for name, values in yoy.sections.items() %}
+                <tr>
+                    <td>{{ name }}</td>
+                    {% for i in range(values|length) %}
+                    <td class="text-end">{{ values[i]|sek }}</td>
+                    <td class="text-end text-muted small">
+                        {% if yoy.section_changes[name][i] is not none %}
+                        <span class="{% if yoy.section_changes[name][i] > 0 %}text-success{% elif yoy.section_changes[name][i] < 0 %}text-danger{% endif %}">
+                            {{ yoy.section_changes[name][i] }}%
+                        </span>
+                        {% else %}-{% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+
+                {% for key, label in [('gross_profit', 'Bruttovinst'), ('operating_result', 'Rörelseresultat'), ('result_before_tax', 'Resultat före skatt')] %}
+                <tr class="table-primary">
+                    <td><strong>{{ label }}</strong></td>
+                    {% for i in range(yoy.summaries[key]|length) %}
+                    <td class="text-end"><strong>{{ yoy.summaries[key][i]|sek }}</strong></td>
+                    <td class="text-end text-muted small">
+                        {% if yoy.summary_changes[key][i] is not none %}
+                        <strong class="{% if yoy.summary_changes[key][i] > 0 %}text-success{% elif yoy.summary_changes[key][i] < 0 %}text-danger{% endif %}">
+                            {{ yoy.summary_changes[key][i] }}%
+                        </strong>
+                        {% else %}-{% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Välj ett räkenskapsår.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if yoy %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var apiUrl = '{{ url_for("comparison.api_yoy_chart", fiscal_year_id=current_fy_id, num_years=num_years) }}';
+    fetch(apiUrl)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var colors = [
+                'rgba(25, 135, 84, 0.7)',
+                'rgba(220, 53, 69, 0.7)',
+                'rgba(13, 110, 253, 0.7)',
+                'rgba(255, 193, 7, 0.7)',
+                'rgba(108, 117, 125, 0.7)',
+                'rgba(111, 66, 193, 0.7)',
+                'rgba(32, 201, 151, 0.7)',
+            ];
+
+            // Section chart
+            var datasets = [];
+            var i = 0;
+            for (var name in data.sections) {
+                datasets.push({
+                    label: name,
+                    data: data.sections[name],
+                    backgroundColor: colors[i % colors.length],
+                });
+                i++;
+            }
+            new Chart(document.getElementById('yoyChart'), {
+                type: 'bar',
+                data: { labels: data.labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+                    scales: { y: { title: { display: true, text: 'SEK' } } }
+                }
+            });
+
+            // Summary chart
+            var summaryDs = [];
+            var summaryColors = { gross_profit: '#198754', operating_result: '#0d6efd', result_before_tax: '#dc3545' };
+            var summaryLabels = { gross_profit: 'Bruttovinst', operating_result: 'Rörelseresultat', result_before_tax: 'Resultat före skatt' };
+            for (var key in data.summaries) {
+                summaryDs.push({
+                    label: summaryLabels[key] || key,
+                    data: data.summaries[key],
+                    borderColor: summaryColors[key] || '#6c757d',
+                    backgroundColor: 'transparent',
+                    tension: 0.3,
+                    pointRadius: 4,
+                });
+            }
+            new Chart(document.getElementById('summaryChart'), {
+                type: 'line',
+                data: { labels: data.labels, datasets: summaryDs },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } },
+                    scales: { y: { title: { display: true, text: 'SEK' } } }
+                }
+            });
+        });
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Avskrivningskörningar - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Anläggningstillgångar', 'url': url_for('assets.index')},
+    {'title': 'Avskrivningar'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-arrow-down-circle"></i> Avskrivningskörningar</h5>
+        <a href="{{ url_for('assets.depreciation_new') }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> Ny körning
+        </a>
+    </div>
+    <div class="card-body">
+        {% if runs %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        <th class="text-end">Totalbelopp</th>
+                        <th>Poster</th>
+                        <th>Status</th>
+                        <th>Verifikation</th>
+                        <th>Åtgärder</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in runs %}
+                    <tr>
+                        <td>{{ run.period_date.strftime('%Y-%m') }}</td>
+                        <td class="text-end">{{ run.total_amount|sek }}</td>
+                        <td>{{ run.entries|length }}</td>
+                        <td>
+                            {% if run.status == 'pending' %}
+                            <span class="badge bg-warning text-dark">Ej bokförd</span>
+                            {% elif run.status == 'posted' %}
+                            <span class="badge bg-success">Bokförd</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if run.verification %}
+                            <a href="{{ url_for('accounting.view_verification', verification_id=run.verification.id) }}">
+                                #{{ run.verification.verification_number }}
+                            </a>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if run.status == 'pending' %}
+                            <form method="POST" action="{{ url_for('assets.depreciation_post', run_id=run.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-success"
+                                        onclick="return confirm('Bokför avskrivningskörningen?')">
+                                    <i class="bi bi-check-lg"></i> Bokför
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">Inga avskrivningskörningar ännu.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

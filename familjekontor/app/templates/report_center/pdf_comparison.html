@@ -1,0 +1,57 @@
+{% extends "report_center/pdf_base.html" %}
+{% block content %}
+<div class="header">
+    <div class="company">{{ company.name }}</div>
+    <div class="subtitle">Periodjämförelse — {{ comparison.fy_a.year }} vs {{ comparison.fy_b.year }}</div>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Post</th>
+            <th class="text-end">{{ comparison.fy_a.year }}</th>
+            <th class="text-end">{{ comparison.fy_b.year }}</th>
+            <th class="text-end">Förändring</th>
+            <th class="text-end">%</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for section_name, section in comparison.sections.items() %}
+        <tr class="section-header">
+            <td colspan="5">{{ section_name }}</td>
+        </tr>
+        {% for row in section.rows %}
+        {% if row.amount_a|abs > 0.01 or row.amount_b|abs > 0.01 %}
+        <tr>
+            <td>{{ row.account_number }} {{ row.account_name }}</td>
+            <td class="text-end">{{ "%.2f"|format(row.amount_a) }}</td>
+            <td class="text-end">{{ "%.2f"|format(row.amount_b) }}</td>
+            <td class="text-end">{{ "%.2f"|format(row.change) }}</td>
+            <td class="text-end">{% if row.change_pct is not none %}{{ row.change_pct }}%{% else %}-{% endif %}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+        <tr class="total-row">
+            <td>Summa {{ section_name }}</td>
+            <td class="text-end">{{ "%.2f"|format(section.total_a) }}</td>
+            <td class="text-end">{{ "%.2f"|format(section.total_b) }}</td>
+            <td class="text-end">{{ "%.2f"|format(section.total_change) }}</td>
+            <td class="text-end">{% if section.total_change_pct is not none %}{{ section.total_change_pct }}%{% else %}-{% endif %}</td>
+        </tr>
+        {% endfor %}
+
+        {% if comparison.report_type == 'pnl' %}
+        {% for key, label in [('gross_profit', 'Bruttovinst'), ('operating_result', 'Rörelseresultat'), ('result_before_tax', 'Resultat före skatt')] %}
+        {% set s = comparison[key] %}
+        <tr class="summary-row">
+            <td>{{ label }}</td>
+            <td class="text-end">{{ "%.2f"|format(s.amount_a) }}</td>
+            <td class="text-end">{{ "%.2f"|format(s.amount_b) }}</td>
+            <td class="text-end">{{ "%.2f"|format(s.change) }}</td>
+            <td class="text-end">{% if s.change_pct is not none %}{{ s.change_pct }}%{% else %}-{% endif %}</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+    </tbody>
+</table>
+{% endblock %}

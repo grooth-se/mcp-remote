@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}AI Assistent - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-robot"></i> AI Assistent</h2>
+        <p class="text-muted mb-0">Ställ frågor om din ekonomi på naturligt språk</p>
+    </div>
+    <div>
+        {% if ai_status.available %}
+        <span class="badge bg-success"><i class="bi bi-check-circle"></i> Ollama aktiv ({{ ai_status.model }})</span>
+        {% elif ai_status.enabled %}
+        <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Ollama ej tillgänglig</span>
+        {% else %}
+        <span class="badge bg-secondary"><i class="bi bi-dash-circle"></i> AI inaktiverad</span>
+        {% endif %}
+        <a href="{{ url_for('ai.status') }}" class="btn btn-sm btn-outline-secondary ms-2">
+            <i class="bi bi-gear"></i> Status
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div id="chat-messages" class="mb-3" style="min-height: 300px; max-height: 500px; overflow-y: auto;">
+                    <div class="text-muted text-center py-5" id="chat-placeholder">
+                        <i class="bi bi-chat-dots" style="font-size: 2rem;"></i>
+                        <p class="mt-2">Ställ en fråga om din ekonomi...</p>
+                    </div>
+                </div>
+                <form id="query-form" class="d-flex gap-2">
+                    <input type="text" id="query-input" class="form-control"
+                           placeholder="T.ex. &quot;Vad är årets resultat?&quot; eller &quot;Hur mycket har vi betalat i moms?&quot;"
+                           autocomplete="off">
+                    <button type="submit" class="btn btn-primary" id="send-btn">
+                        <i class="bi bi-send"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-header"><i class="bi bi-lightbulb"></i> Exempelfrågor</div>
+            <div class="list-group list-group-flush">
+                <a href="#" class="list-group-item list-group-item-action example-query" data-query="Vad är årets resultat?">
+                    Vad är årets resultat?
+                </a>
+                <a href="#" class="list-group-item list-group-item-action example-query" data-query="Hur ser balansräkningen ut?">
+                    Hur ser balansräkningen ut?
+                </a>
+                <a href="#" class="list-group-item list-group-item-action example-query" data-query="Hur mycket moms har vi att betala?">
+                    Hur mycket moms har vi att betala?
+                </a>
+                <a href="#" class="list-group-item list-group-item-action example-query" data-query="Vilka fakturor har förfallit?">
+                    Vilka fakturor har förfallit?
+                </a>
+                <a href="#" class="list-group-item list-group-item-action example-query" data-query="Hur är likviditeten?">
+                    Hur är likviditeten?
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><i class="bi bi-info-circle"></i> Om AI-assistenten</div>
+            <div class="card-body small">
+                <p>Assistenten kan hjälpa dig med frågor om:</p>
+                <ul class="mb-2">
+                    <li>Resultaträkning och balansräkning</li>
+                    <li>Moms och skatter</li>
+                    <li>Löner och personalfrågor</li>
+                    <li>Fakturor och betalningar</li>
+                    <li>Kassaflöde och likviditet</li>
+                </ul>
+                {% if not ai_status.available %}
+                <div class="alert alert-info mb-0">
+                    <small>
+                        <strong>Tips:</strong> AI-funktionen ger bättre svar med Ollama aktiverad.
+                        Utan Ollama ges förenklade svar med hänvisning till rätt rapport.
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('query-form');
+    const input = document.getElementById('query-input');
+    const messages = document.getElementById('chat-messages');
+    const placeholder = document.getElementById('chat-placeholder');
+    const sendBtn = document.getElementById('send-btn');
+
+    function addMessage(text, isUser) {
+        if (placeholder) placeholder.style.display = 'none';
+        const div = document.createElement('div');
+        div.className = 'mb-3 d-flex ' + (isUser ? 'justify-content-end' : 'justify-content-start');
+        const bubble = document.createElement('div');
+        bubble.className = 'p-3 rounded-3 ' + (isUser ? 'bg-primary text-white' : 'bg-light');
+        bubble.style.maxWidth = '80%';
+        bubble.textContent = text;
+        div.appendChild(bubble);
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function sendQuery(query) {
+        addMessage(query, true);
+        sendBtn.disabled = true;
+        input.disabled = true;
+
+        try {
+            const resp = await fetch('{{ url_for("ai.query") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query: query}),
+            });
+            const data = await resp.json();
+            addMessage(data.answer || 'Inget svar tillgängligt.', false);
+        } catch (err) {
+            addMessage('Ett fel uppstod. Försök igen.', false);
+        }
+
+        sendBtn.disabled = false;
+        input.disabled = false;
+        input.focus();
+    }
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const query = input.value.trim();
+        if (!query) return;
+        input.value = '';
+        sendQuery(query);
+    });
+
+    document.querySelectorAll('.example-query').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            e.preventDefault();
+            sendQuery(this.dataset.query);
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Nytt aktieinnehav - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Aktiebok', 'url': url_for('governance.shares')},
+    {'title': 'Nytt innehav'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-plus-lg"></i> Registrera aktieinnehav</h2>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="POST" data-unsaved-warning>
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Aktieägare <span class="text-danger">*</span></label>
+                    <select name="shareholder_id" class="form-select searchable-select" required>
+                        <option value="">-- Välj aktieägare --</option>
+                        {% for sh in shareholders %}
+                        <option value="{{ sh.id }}">{{ sh.name }}{% if sh.personal_or_org_number %} ({{ sh.personal_or_org_number }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">{{ form.share_class_id.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.share_class_id(class="form-select") }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">{{ form.shares.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.shares(class="form-control") }}
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">{{ form.acquired_date.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.acquired_date(class="form-control", type="date") }}
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">{{ form.acquisition_type.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.acquisition_type(class="form-select") }}
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">{{ form.price_per_share.label.text }}</label>
+                    {{ form.price_per_share(class="form-control") }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <label class="form-label">{{ form.note.label.text }}</label>
+                    {{ form.note(class="form-control", rows="2") }}
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('governance.shares') }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "report_center/pdf_base.html" %}
+{% block content %}
+<div class="header">
+    <div class="company">{{ company.name }}</div>
+    <div class="subtitle">Kassaflödesanalys {{ fiscal_year.start_date }} — {{ fiscal_year.end_date }}</div>
+</div>
+
+<table>
+    <tr class="section-header"><td colspan="2">DEN LÖPANDE VERKSAMHETEN</td></tr>
+    <tr>
+        <td>Resultat före skatt</td>
+        <td class="text-end">{{ "%.2f"|format(cf.operating.result_before_tax) }}</td>
+    </tr>
+    {% for adj in cf.operating.adjustments %}
+    <tr>
+        <td style="padding-left: 10mm">{{ adj.label }}</td>
+        <td class="text-end">{{ "%.2f"|format(adj.amount) }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="total-row">
+        <td>Kassaflöde löpande verksamhet</td>
+        <td class="text-end">{{ "%.2f"|format(cf.operating.total) }}</td>
+    </tr>
+
+    <tr class="section-header"><td colspan="2">INVESTERINGSVERKSAMHETEN</td></tr>
+    {% for item in cf.investing.line_items %}
+    <tr>
+        <td style="padding-left: 10mm">{{ item.label }}</td>
+        <td class="text-end">{{ "%.2f"|format(item.amount) }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="total-row">
+        <td>Kassaflöde investeringar</td>
+        <td class="text-end">{{ "%.2f"|format(cf.investing.total) }}</td>
+    </tr>
+
+    <tr class="section-header"><td colspan="2">FINANSIERINGSVERKSAMHETEN</td></tr>
+    {% for item in cf.financing.line_items %}
+    <tr>
+        <td style="padding-left: 10mm">{{ item.label }}</td>
+        <td class="text-end">{{ "%.2f"|format(item.amount) }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="total-row">
+        <td>Kassaflöde finansiering</td>
+        <td class="text-end">{{ "%.2f"|format(cf.financing.total) }}</td>
+    </tr>
+
+    <tr class="summary-row">
+        <td>ÅRETS KASSAFLÖDE</td>
+        <td class="text-end">{{ "%.2f"|format(cf.total_cash_flow) }}</td>
+    </tr>
+    <tr>
+        <td>Likvida medel vid årets början</td>
+        <td class="text-end">{{ "%.2f"|format(cf.opening_cash) }}</td>
+    </tr>
+    <tr>
+        <td>Likvida medel vid årets slut</td>
+        <td class="text-end">{{ "%.2f"|format(cf.closing_cash) }}</td>
+    </tr>
+</table>
+{% endblock %}

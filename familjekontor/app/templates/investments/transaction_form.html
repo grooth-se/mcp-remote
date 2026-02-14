@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Ny transaktion - {{ portfolio.name }}{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Investeringar', 'url': url_for('investments.index')},
+    {'title': portfolio.name, 'url': url_for('investments.portfolio_view', portfolio_id=portfolio.id)},
+    {'title': 'Ny transaktion'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-plus-lg"></i> Ny transaktion — {{ portfolio.name }}</h2>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="POST" data-unsaved-warning>
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.transaction_type.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.transaction_type(class="form-select", id="txType") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.transaction_date.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.transaction_date(class="form-control", type="date") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.amount.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.amount(class="form-control") }}
+                </div>
+            </div>
+
+            <div id="instrumentFields">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">{{ form.name.label.text }}</label>
+                        {{ form.name(class="form-control", placeholder="T.ex. Investor B") }}
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">{{ form.isin.label.text }}</label>
+                        {{ form.isin(class="form-control") }}
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">{{ form.ticker.label.text }}</label>
+                        {{ form.ticker(class="form-control") }}
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">{{ form.instrument_type.label.text }}</label>
+                        {{ form.instrument_type(class="form-select") }}
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">{{ form.commission.label.text }}</label>
+                        {{ form.commission(class="form-control") }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">{{ form.quantity.label.text }}</label>
+                        {{ form.quantity(class="form-control") }}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">{{ form.price_per_unit.label.text }}</label>
+                        {{ form.price_per_unit(class="form-control") }}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">{{ form.currency.label.text }}</label>
+                        {{ form.currency(class="form-control") }}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">{{ form.exchange_rate.label.text }}</label>
+                        {{ form.exchange_rate(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">{{ form.note.label.text }}</label>
+                {{ form.note(class="form-control", rows="2") }}
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('investments.portfolio_view', portfolio_id=portfolio.id) }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('txType').addEventListener('change', function() {
+    var fields = document.getElementById('instrumentFields');
+    var noInstrument = ['insattning', 'uttag', 'avgift', 'ranta'];
+    fields.style.display = noInstrument.includes(this.value) ? 'none' : 'block';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Ny bolagsstämma - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Bolagsstämmor', 'url': url_for('governance.agm_list')},
+    {'title': 'Ny stämma'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-journal-bookmark"></i> Ny bolagsstämma</h2>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="POST" data-unsaved-warning>
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.meeting_date.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.meeting_date(class="form-control", type="date") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.meeting_type.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.meeting_type(class="form-select") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.fiscal_year_id.label.text }}</label>
+                    {{ form.fiscal_year_id(class="form-select") }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">{{ form.chairman.label.text }}</label>
+                    {{ form.chairman(class="form-control") }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">{{ form.minutes_taker.label.text }}</label>
+                    {{ form.minutes_taker(class="form-control") }}
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.attendees.label.text }}</label>
+                {{ form.attendees(class="form-control", rows="3", placeholder="En person per rad") }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.resolutions.label.text }}</label>
+                {{ form.resolutions(class="form-control", rows="6", placeholder="Protokollerade beslut") }}
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('governance.agm_list') }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

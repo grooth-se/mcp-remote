@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<style>
+    @page {
+        size: A4;
+        margin: 20mm 15mm;
+        @bottom-center {
+            content: "Sida " counter(page) " av " counter(pages);
+            font-size: 8pt;
+            color: #999;
+        }
+    }
+    body {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-size: 10pt;
+        line-height: 1.5;
+        color: #333;
+    }
+    h1 { font-size: 18pt; margin-bottom: 4pt; }
+    h2 { font-size: 14pt; margin-top: 18pt; margin-bottom: 8pt; border-bottom: 1px solid #ccc; padding-bottom: 4pt; }
+    h3 { font-size: 11pt; margin-top: 12pt; margin-bottom: 4pt; }
+
+    .title-page {
+        text-align: center;
+        padding-top: 120px;
+    }
+    .title-page h1 { font-size: 24pt; }
+    .title-page .org-nr { font-size: 12pt; color: #666; }
+    .title-page .period { font-size: 11pt; color: #666; margin-top: 10pt; }
+    .page-break { page-break-before: always; }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 12pt;
+    }
+    th, td {
+        padding: 3pt 6pt;
+        text-align: left;
+        font-size: 9pt;
+    }
+    th { font-weight: bold; }
+    .text-end { text-align: right; }
+    .section-header { background: #f0f0f0; font-weight: bold; }
+    .section-total { background: #e8e8e8; font-style: italic; }
+    .grand-total { background: #d0d8e8; font-weight: bold; }
+    .indent { padding-left: 16pt; }
+    .spacer td { height: 8pt; }
+
+    .overview-table th { border-bottom: 2px solid #333; }
+    .overview-table td { border-bottom: 1px solid #ddd; }
+
+    .signature-line {
+        border-bottom: 1px solid #666;
+        width: 250px;
+        margin-top: 40pt;
+        margin-bottom: 4pt;
+    }
+    .pre-line { white-space: pre-line; }
+</style>
+</head>
+<body>
+
+{# Title page #}
+<div class="title-page">
+    <h1>{{ company.name }}</h1>
+    <p class="org-nr">Org.nr {{ company.org_number }}</p>
+    <br><br>
+    <h1>Årsredovisning</h1>
+    <p class="period">för räkenskapsåret {{ fy.start_date.strftime('%Y-%m-%d') }} – {{ fy.end_date.strftime('%Y-%m-%d') }}</p>
+    {% if company.street_address %}
+    <p style="margin-top: 60pt; font-size: 9pt; color: #999;">
+        {{ company.street_address }}, {{ company.postal_code }} {{ company.city }}
+    </p>
+    {% endif %}
+</div>
+
+{# Förvaltningsberättelse #}
+<div class="page-break"></div>
+<h2>Förvaltningsberättelse</h2>
+
+<p>Styrelsen för {{ company.name }} ({{ company.org_number }}) avger härmed årsredovisning
+för räkenskapsåret {{ fy.start_date.strftime('%Y-%m-%d') }} – {{ fy.end_date.strftime('%Y-%m-%d') }}.</p>
+
+{% if report.verksamhet %}
+<h3>Verksamheten</h3>
+<p class="pre-line">{{ report.verksamhet }}</p>
+{% endif %}
+
+{% if report.vasentliga_handelser %}
+<h3>Väsentliga händelser under räkenskapsåret</h3>
+<p class="pre-line">{{ report.vasentliga_handelser }}</p>
+{% endif %}
+
+{% if report.handelser_efter_fy %}
+<h3>Väsentliga händelser efter räkenskapsårets slut</h3>
+<p class="pre-line">{{ report.handelser_efter_fy }}</p>
+{% endif %}
+
+{% if report.framtida_utveckling %}
+<h3>Förväntad framtida utveckling</h3>
+<p class="pre-line">{{ report.framtida_utveckling }}</p>
+{% endif %}
+
+{% if report.resultatdisposition and company.company_type == 'AB' %}
+<h3>Resultatdisposition</h3>
+<p class="pre-line">{{ report.resultatdisposition }}</p>
+{% endif %}
+
+{# Flerårsöversikt #}
+{% if overview %}
+<h3>Flerårsöversikt</h3>
+<table class="overview-table">
+    <thead>
+        <tr>
+            <th></th>
+            {% for row in overview %}
+            <th class="text-end">{{ row.year }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td>Nettoomsättning (tkr)</td>{% for row in overview %}<td class="text-end">{{ "%.0f"|format(row.revenue / 1000) }}</td>{% endfor %}</tr>
+        <tr><td>Resultat före skatt (tkr)</td>{% for row in overview %}<td class="text-end">{{ "%.0f"|format(row.result_before_tax / 1000) }}</td>{% endfor %}</tr>
+        <tr><td>Balansomslutning (tkr)</td>{% for row in overview %}<td class="text-end">{{ "%.0f"|format(row.total_assets / 1000) }}</td>{% endfor %}</tr>
+        <tr><td>Eget kapital (tkr)</td>{% for row in overview %}<td class="text-end">{{ "%.0f"|format(row.equity / 1000) }}</td>{% endfor %}</tr>
+    </tbody>
+</table>
+{% endif %}
+
+{# Resultaträkning #}
+<div class="page-break"></div>
+<h2>Resultaträkning</h2>
+<p style="font-size: 9pt; color: #666;">{{ fy.start_date.strftime('%Y-%m-%d') }} – {{ fy.end_date.strftime('%Y-%m-%d') }}</p>
+
+<table>
+    {% for section_name, section in pnl.sections.items() %}
+    <tr class="section-header"><td colspan="2">{{ section_name }}</td></tr>
+    {% for account, balance in section.accounts %}
+    {% if balance|abs > 0.01 %}
+    <tr><td class="indent">{{ account.account_number }} {{ account.name }}</td><td class="text-end">{{ "%.2f"|format(balance) }}</td></tr>
+    {% endif %}
+    {% endfor %}
+    <tr class="section-total"><td>Summa {{ section_name }}</td><td class="text-end">{{ "%.2f"|format(section.total) }}</td></tr>
+    <tr class="spacer"><td colspan="2"></td></tr>
+    {% endfor %}
+    <tr class="grand-total"><td>Rörelseresultat</td><td class="text-end">{{ "%.2f"|format(pnl.operating_result) }}</td></tr>
+    <tr class="grand-total"><td>Resultat före skatt</td><td class="text-end">{{ "%.2f"|format(pnl.result_before_tax) }}</td></tr>
+</table>
+
+{# Balansräkning #}
+<div class="page-break"></div>
+<h2>Balansräkning</h2>
+<p style="font-size: 9pt; color: #666;">Per {{ fy.end_date.strftime('%Y-%m-%d') }}</p>
+
+<table>
+    <tr class="grand-total"><td colspan="2">TILLGÅNGAR</td></tr>
+    {% for section_name in ['Anläggningstillgångar', 'Omsättningstillgångar'] %}
+    {% set section = bs.sections[section_name] %}
+    <tr class="section-header"><td colspan="2">{{ section_name }}</td></tr>
+    {% for account, balance in section.accounts %}
+    {% if balance|abs > 0.01 %}
+    <tr><td class="indent">{{ account.account_number }} {{ account.name }}</td><td class="text-end">{{ "%.2f"|format(balance) }}</td></tr>
+    {% endif %}
+    {% endfor %}
+    <tr class="section-total"><td>Summa {{ section_name }}</td><td class="text-end">{{ "%.2f"|format(section.total) }}</td></tr>
+    <tr class="spacer"><td colspan="2"></td></tr>
+    {% endfor %}
+    <tr class="grand-total"><td>SUMMA TILLGÅNGAR</td><td class="text-end">{{ "%.2f"|format(bs.total_assets) }}</td></tr>
+
+    <tr class="spacer"><td colspan="2"></td></tr>
+    <tr class="grand-total"><td colspan="2">EGET KAPITAL OCH SKULDER</td></tr>
+    {% for section_name in ['Eget kapital', 'Långfristiga skulder', 'Kortfristiga skulder'] %}
+    {% set section = bs.sections[section_name] %}
+    <tr class="section-header"><td colspan="2">{{ section_name }}</td></tr>
+    {% for account, balance in section.accounts %}
+    {% if balance|abs > 0.01 %}
+    <tr><td class="indent">{{ account.account_number }} {{ account.name }}</td><td class="text-end">{{ "%.2f"|format(balance) }}</td></tr>
+    {% endif %}
+    {% endfor %}
+    <tr class="section-total"><td>Summa {{ section_name }}</td><td class="text-end">{{ "%.2f"|format(section.total) }}</td></tr>
+    <tr class="spacer"><td colspan="2"></td></tr>
+    {% endfor %}
+    <tr class="grand-total"><td>SUMMA EGET KAPITAL OCH SKULDER</td><td class="text-end">{{ "%.2f"|format(bs.total_equity_liabilities) }}</td></tr>
+</table>
+
+{# Noter #}
+<div class="page-break"></div>
+<h2>Noter</h2>
+
+{% if report.redovisningsprinciper %}
+<h3>Not 1 — Redovisningsprinciper</h3>
+<p class="pre-line">{{ report.redovisningsprinciper }}</p>
+{% endif %}
+
+<h3>Not 2 — Medelantal anställda</h3>
+<p>Medelantal anställda under räkenskapsåret: {{ avg_employees }}</p>
+
+{% if asset_note %}
+<h3>Not 3 — Anläggningstillgångar</h3>
+<table>
+    <thead>
+        <tr>
+            <th></th>
+            <th class="text-end">Ingående</th>
+            <th class="text-end">Inköp</th>
+            <th class="text-end">Avyttringar</th>
+            <th class="text-end">Avskrivningar</th>
+            <th class="text-end">Utgående</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cat_label, data in asset_note.items() %}
+        <tr>
+            <td>{{ cat_label }}</td>
+            <td class="text-end">{{ "%.0f"|format(data.opening) }}</td>
+            <td class="text-end">{{ "%.0f"|format(data.purchases) }}</td>
+            <td class="text-end">{{ "%.0f"|format(data.disposals) }}</td>
+            <td class="text-end">{{ "%.0f"|format(data.depreciation) }}</td>
+            <td class="text-end"><strong>{{ "%.0f"|format(data.closing) }}</strong></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% set note_offset = 3 if asset_note else 2 %}
+{% for note in extra_notes %}
+<h3>Not {{ loop.index + note_offset }}</h3>
+<p class="pre-line">{{ note }}</p>
+{% endfor %}
+
+{# Underskrifter #}
+<div class="page-break"></div>
+<h2>Underskrifter</h2>
+
+{% if report.signing_location or report.signing_date %}
+<p>
+    {% if report.signing_location %}{{ report.signing_location }}{% endif %}
+    {% if report.signing_date %} den {{ report.signing_date.strftime('%Y-%m-%d') }}{% endif %}
+</p>
+{% endif %}
+
+{% for member in board_members %}
+<div>
+    <div class="signature-line">&nbsp;</div>
+    <strong>{{ member }}</strong>
+</div>
+{% endfor %}
+
+</body>
+</html>

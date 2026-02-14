@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Nytt utdelningsbeslut - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Utdelningar', 'url': url_for('governance.dividends')},
+    {'title': 'Nytt beslut'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-cash-coin"></i> Nytt utdelningsbeslut</h2>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="POST" data-unsaved-warning>
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.fiscal_year_id.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.fiscal_year_id(class="form-select") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.decision_date.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.decision_date(class="form-control", type="date") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.share_class_id.label.text }}</label>
+                    {{ form.share_class_id(class="form-select") }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.total_amount.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.total_amount(class="form-control") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.amount_per_share.label.text }}</label>
+                    {{ form.amount_per_share(class="form-control") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.record_date.label.text }}</label>
+                    {{ form.record_date(class="form-control", type="date") }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.payment_date.label.text }}</label>
+                    {{ form.payment_date(class="form-control", type="date") }}
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('governance.dividends') }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

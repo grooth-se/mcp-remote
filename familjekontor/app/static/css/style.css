@@ -181,3 +181,144 @@ tr[data-row-link]:hover td {
     content: " *";
     color: #dc3545;
 }
+
+/* Choices.js Bootstrap 5 overrides */
+.choices {
+    margin-bottom: 0;
+    font-size: 0.85rem;
+}
+
+.choices__inner {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    min-height: auto;
+    padding: 0.25rem 0.5rem;
+    font-size: inherit;
+}
+
+.choices__inner:focus-within {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.choices__list--dropdown .choices__item--selectable,
+.choices__list[aria-expanded] .choices__item--selectable {
+    padding-right: 1rem;
+}
+
+.choices__list--dropdown .choices__item--selectable.is-highlighted,
+.choices__list[aria-expanded] .choices__item--selectable.is-highlighted {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+.choices__input {
+    font-size: inherit;
+    background-color: transparent;
+}
+
+.choices[data-type*="select-one"] .choices__inner {
+    padding-bottom: 0.25rem;
+}
+
+.choices[data-type*="select-one"]::after {
+    border-color: #6c757d transparent transparent;
+}
+
+@media print {
+    .choices { display: none !important; }
+}
+
+/* Global search (Phase 7A) */
+#global-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1050;
+}
+
+#global-search-results .search-category {
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #6c757d;
+    padding: 0.5rem 1rem 0.25rem;
+}
+
+#global-search-results .search-item {
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+}
+
+#global-search-results .search-item:hover,
+#global-search-results .search-item.active {
+    background-color: #e9ecef;
+}
+
+#global-search-results .search-item .search-title {
+    font-weight: 500;
+}
+
+#global-search-results .search-item .search-subtitle {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* Notification center (Phase 7B) */
+#notification-dropdown .notification-item {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+}
+
+#notification-dropdown .notification-item:hover {
+    background-color: #f8f9fa;
+}
+
+#notification-dropdown .notification-item.unread {
+    background-color: #f0f7ff;
+}
+
+#notification-dropdown .notification-time {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* Batch operations (Phase 7C) */
+#batch-toolbar {
+    display: none;
+    background-color: #e9ecef;
+    border-radius: 0.375rem;
+    padding: 0.4rem 0.75rem;
+}
+
+.batch-check-cell {
+    width: 32px;
+    text-align: center;
+}
+
+.batch-check-cell input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* Sticky table headers (Phase 7E) */
+.table-sticky-header thead th {
+    position: sticky;
+    top: 0;
+    background-color: #fff;
+    z-index: 10;
+    box-shadow: 0 1px 0 #dee2e6;
+}
+
+/* Column visibility dropdown (Phase 7E) */
+.col-visibility-dropdown .dropdown-menu {
+    min-width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.col-visibility-dropdown .dropdown-item label {
+    cursor: pointer;
+    margin-bottom: 0;
+}

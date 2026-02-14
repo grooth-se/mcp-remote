@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Kassaflödesanalys - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Kassaflödesanalys'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-water"></i> Kassaflödesanalys</h2>
+    <div class="d-flex gap-2">
+        <form method="get">
+            <select name="fiscal_year_id" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                {% for fy in fiscal_years %}
+                <option value="{{ fy.id }}" {% if fy.id == current_fy_id %}selected{% endif %}>
+                    {{ fy.year }} ({{ fy.start_date }} - {{ fy.end_date }})
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+        {% if cf %}
+        <a href="{{ url_for('cashflow.excel_export', fiscal_year_id=current_fy_id) }}" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{% if cf %}
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Löpande verksamhet</h6>
+                <h4 class="{% if cf.operating.total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ cf.operating.total|sek }} kr
+                </h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Investeringar</h6>
+                <h4 class="{% if cf.investing.total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ cf.investing.total|sek }} kr
+                </h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Finansiering</h6>
+                <h4 class="{% if cf.financing.total >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ cf.financing.total|sek }} kr
+                </h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Årets kassaflöde</h6>
+                <h4 class="{% if cf.total_cash_flow >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ cf.total_cash_flow|sek }} kr
+                </h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Cash Flow Statement -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Kassaflödesanalys (indirekt metod)</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr class="table-light">
+                            <td colspan="2"><strong>DEN LÖPANDE VERKSAMHETEN</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Resultat före skatt</td>
+                            <td class="text-end">{{ cf.operating.result_before_tax|sek }}</td>
+                        </tr>
+                        {% for adj in cf.operating.adjustments %}
+                        <tr>
+                            <td class="ps-4">{{ adj.label }}</td>
+                            <td class="text-end">{{ adj.amount|sek }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="table-secondary">
+                            <td><strong>Kassaflöde löpande verksamhet</strong></td>
+                            <td class="text-end"><strong>{{ cf.operating.total|sek }}</strong></td>
+                        </tr>
+
+                        <tr class="table-light">
+                            <td colspan="2"><strong>INVESTERINGSVERKSAMHETEN</strong></td>
+                        </tr>
+                        {% for item in cf.investing.line_items %}
+                        <tr>
+                            <td class="ps-4">{{ item.label }}</td>
+                            <td class="text-end">{{ item.amount|sek }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not cf.investing.line_items %}
+                        <tr><td class="ps-4 text-muted" colspan="2">Inga poster</td></tr>
+                        {% endif %}
+                        <tr class="table-secondary">
+                            <td><strong>Kassaflöde investeringar</strong></td>
+                            <td class="text-end"><strong>{{ cf.investing.total|sek }}</strong></td>
+                        </tr>
+
+                        <tr class="table-light">
+                            <td colspan="2"><strong>FINANSIERINGSVERKSAMHETEN</strong></td>
+                        </tr>
+                        {% for item in cf.financing.line_items %}
+                        <tr>
+                            <td class="ps-4">{{ item.label }}</td>
+                            <td class="text-end">{{ item.amount|sek }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not cf.financing.line_items %}
+                        <tr><td class="ps-4 text-muted" colspan="2">Inga poster</td></tr>
+                        {% endif %}
+                        <tr class="table-secondary">
+                            <td><strong>Kassaflöde finansiering</strong></td>
+                            <td class="text-end"><strong>{{ cf.financing.total|sek }}</strong></td>
+                        </tr>
+
+                        <tr class="table-primary">
+                            <td><strong>ÅRETS KASSAFLÖDE</strong></td>
+                            <td class="text-end"><strong>{{ cf.total_cash_flow|sek }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Likvida medel vid årets början</td>
+                            <td class="text-end">{{ cf.opening_cash|sek }}</td>
+                        </tr>
+                        <tr>
+                            <td>Likvida medel vid årets slut</td>
+                            <td class="text-end">{{ cf.closing_cash|sek }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Chart -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Månadsvis kassaflöde</div>
+            <div class="card-body">
+                <canvas id="monthlyCFChart" height="350"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Välj ett räkenskapsår för att se kassaflödesanalys.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if cf %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var apiUrl = '{{ url_for("cashflow.api_monthly", fiscal_year_id=current_fy_id) }}';
+    fetch(apiUrl)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var m = data.monthly;
+            var ctx = document.getElementById('monthlyCFChart');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: m.labels,
+                    datasets: [
+                        {
+                            label: 'Löpande',
+                            data: m.operating,
+                            backgroundColor: 'rgba(25, 135, 84, 0.6)',
+                            stack: 'cf',
+                        },
+                        {
+                            label: 'Investering',
+                            data: m.investing,
+                            backgroundColor: 'rgba(255, 193, 7, 0.6)',
+                            stack: 'cf',
+                        },
+                        {
+                            label: 'Finansiering',
+                            data: m.financing,
+                            backgroundColor: 'rgba(13, 110, 253, 0.6)',
+                            stack: 'cf',
+                        },
+                        {
+                            label: 'Ackumulerat',
+                            data: m.cumulative,
+                            type: 'line',
+                            borderColor: 'rgb(220, 53, 69)',
+                            backgroundColor: 'transparent',
+                            tension: 0.3,
+                            pointRadius: 3,
+                            yAxisID: 'y',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12 } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    return ctx.dataset.label + ': ' + (ctx.parsed.y || 0).toLocaleString('sv-SE') + ' kr';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, title: { display: true, text: 'SEK' } }
+                    }
+                }
+            });
+        });
+});
+</script>
+{% endif %}
+{% endblock %}

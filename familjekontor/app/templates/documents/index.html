@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% from "macros/empty_state.html" import render_empty_state %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Dokument - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Dokument'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-folder2-open"></i> Dokument</h2>
@@ -25,72 +32,84 @@
     </div>
 </div>
 
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-sm mb-0">
-            <thead>
-                <tr>
-                    <th></th><th>Filnamn</th><th>Typ</th><th>Beskrivning</th>
-                    <th>Giltig från</th><th>Giltig till</th><th>Uppladdad</th><th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for doc in pagination.items %}
-                <tr>
-                    <td>
-                        {% if doc.mime_type and 'pdf' in doc.mime_type %}
-                        <i class="bi bi-file-earmark-pdf text-danger"></i>
-                        {% elif doc.mime_type and 'image' in doc.mime_type %}
-                        <i class="bi bi-file-earmark-image text-success"></i>
-                        {% elif doc.mime_type and 'spreadsheet' in doc.mime_type or doc.mime_type and 'excel' in doc.mime_type %}
-                        <i class="bi bi-file-earmark-excel text-success"></i>
-                        {% elif doc.mime_type and 'word' in doc.mime_type %}
-                        <i class="bi bi-file-earmark-word text-primary"></i>
-                        {% else %}
-                        <i class="bi bi-file-earmark text-secondary"></i>
-                        {% endif %}
-                    </td>
-                    <td><a href="{{ url_for('documents.view', doc_id=doc.id) }}">{{ doc.file_name }}</a></td>
-                    <td>
-                        {% if doc.document_type == 'certificate' %}
-                        <span class="badge bg-info">Registreringsdokument</span>
-                        {% elif doc.document_type == 'faktura' %}
-                        <span class="badge bg-warning">Faktura</span>
-                        {% elif doc.document_type == 'avtal' %}
-                        <span class="badge bg-primary">Avtal</span>
-                        {% elif doc.document_type == 'intyg' %}
-                        <span class="badge bg-success">Intyg</span>
-                        {% elif doc.document_type == 'arsredovisning' %}
-                        <span class="badge bg-dark">Årsredovisning</span>
-                        {% elif doc.document_type == 'kvitto' %}
-                        <span class="badge bg-secondary">Kvitto</span>
-                        {% else %}
-                        <span class="badge bg-secondary">{{ doc.document_type or '-' }}</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ doc.description or '-' }}</td>
-                    <td>{{ doc.valid_from or '-' }}</td>
-                    <td>
-                        {% if doc.expiry_date %}
-                            {% if doc.expiry_date < today %}
-                            <span class="text-danger fw-bold">{{ doc.expiry_date }}</span>
+<div class="batch-container">
+    <div class="d-flex gap-2 mb-2 align-items-center" id="batch-toolbar">
+        <span class="badge bg-primary" id="batch-count">0</span> <span class="small">markerade</span>
+        <button class="btn btn-sm btn-outline-danger" data-batch-action="delete"
+                data-batch-url="{{ url_for('batch.delete_documents') }}"
+                data-batch-confirm="Vill du ta bort de markerade dokumenten?"><i class="bi bi-trash"></i> Ta bort</button>
+        <button class="btn btn-sm btn-outline-secondary" data-batch-action="export"
+                data-batch-url="{{ url_for('batch.export_documents') }}"><i class="bi bi-download"></i> Exportera CSV</button>
+    </div>
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 table-sticky-header">
+                <thead>
+                    <tr>
+                        <th class="batch-check-cell"><input type="checkbox" id="batch-select-all" class="form-check-input"></th>
+                        <th></th><th>Filnamn</th><th>Typ</th><th>Beskrivning</th>
+                        <th>Giltig från</th><th>Giltig till</th><th>Uppladdad</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in pagination.items %}
+                    <tr>
+                        <td class="batch-check-cell"><input type="checkbox" class="form-check-input batch-checkbox" value="{{ doc.id }}"></td>
+                        <td>
+                            {% if doc.mime_type and 'pdf' in doc.mime_type %}
+                            <i class="bi bi-file-earmark-pdf text-danger"></i>
+                            {% elif doc.mime_type and 'image' in doc.mime_type %}
+                            <i class="bi bi-file-earmark-image text-success"></i>
+                            {% elif doc.mime_type and 'spreadsheet' in doc.mime_type or doc.mime_type and 'excel' in doc.mime_type %}
+                            <i class="bi bi-file-earmark-excel text-success"></i>
+                            {% elif doc.mime_type and 'word' in doc.mime_type %}
+                            <i class="bi bi-file-earmark-word text-primary"></i>
                             {% else %}
-                            {{ doc.expiry_date }}
+                            <i class="bi bi-file-earmark text-secondary"></i>
                             {% endif %}
-                        {% else %}-{% endif %}
-                    </td>
-                    <td>{{ doc.created_at.strftime('%Y-%m-%d') if doc.created_at else '-' }}</td>
-                    <td>
-                        <a href="{{ url_for('documents.download', doc_id=doc.id) }}" class="btn btn-sm btn-outline-secondary" title="Ladda ner">
-                            <i class="bi bi-download"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="8">{{ render_empty_state('folder2-open', 'Inga dokument', 'Ladda upp ditt första dokument.', url_for('documents.upload'), 'Ladda upp') }}</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        </td>
+                        <td><a href="{{ url_for('documents.view', doc_id=doc.id) }}">{{ doc.file_name }}</a></td>
+                        <td>
+                            {% if doc.document_type == 'certificate' %}
+                            <span class="badge bg-info">Registreringsdokument</span>
+                            {% elif doc.document_type == 'faktura' %}
+                            <span class="badge bg-warning">Faktura</span>
+                            {% elif doc.document_type == 'avtal' %}
+                            <span class="badge bg-primary">Avtal</span>
+                            {% elif doc.document_type == 'intyg' %}
+                            <span class="badge bg-success">Intyg</span>
+                            {% elif doc.document_type == 'arsredovisning' %}
+                            <span class="badge bg-dark">Årsredovisning</span>
+                            {% elif doc.document_type == 'kvitto' %}
+                            <span class="badge bg-secondary">Kvitto</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ doc.document_type or '-' }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ doc.description or '-' }}</td>
+                        <td>{{ doc.valid_from or '-' }}</td>
+                        <td>
+                            {% if doc.expiry_date %}
+                                {% if doc.expiry_date < today %}
+                                <span class="text-danger fw-bold">{{ doc.expiry_date }}</span>
+                                {% else %}
+                                {{ doc.expiry_date }}
+                                {% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ doc.created_at.strftime('%Y-%m-%d') if doc.created_at else '-' }}</td>
+                        <td>
+                            <a href="{{ url_for('documents.download', doc_id=doc.id) }}" class="btn btn-sm btn-outline-secondary" title="Ladda ner">
+                                <i class="bi bi-download"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="10">{{ render_empty_state('folder2-open', 'Inga dokument', 'Ladda upp ditt första dokument.', url_for('documents.upload'), 'Ladda upp') }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 

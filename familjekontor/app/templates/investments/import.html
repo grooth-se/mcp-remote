@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Importera - {{ portfolio.name }}{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Investeringar', 'url': url_for('investments.index')},
+    {'title': portfolio.name, 'url': url_for('investments.portfolio_view', portfolio_id=portfolio.id)},
+    {'title': 'Importera'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-upload"></i> Importera Nordnet CSV — {{ portfolio.name }}</h2>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">
+                <label class="form-label">{{ form.csv_file.label.text }} <span class="text-danger">*</span></label>
+                {{ form.csv_file(class="form-control") }}
+                <small class="text-muted">Exportera transaktioner från Nordnet som CSV-fil.</small>
+            </div>
+            {% if not preview %}
+            <button type="submit" name="action" value="preview" class="btn btn-outline-primary"><i class="bi bi-eye"></i> Förhandsgranska</button>
+            {% endif %}
+            <a href="{{ url_for('investments.portfolio_view', portfolio_id=portfolio.id) }}" class="btn btn-outline-secondary">Avbryt</a>
+        </form>
+    </div>
+</div>
+
+{% if preview %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">Förhandsgranskning — {{ preview|length }} transaktioner</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Typ</th>
+                        <th>Värdepapper</th>
+                        <th class="text-end">Antal</th>
+                        <th class="text-end">Kurs</th>
+                        <th class="text-end">Belopp</th>
+                        <th class="text-end">Courtage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in preview %}
+                    <tr>
+                        <td>{{ tx.transaction_date.strftime('%Y-%m-%d') }}</td>
+                        <td><span class="badge bg-secondary">{{ tx_labels.get(tx.transaction_type, tx.transaction_type) }}</span></td>
+                        <td>{{ tx.name }}</td>
+                        <td class="text-end">{% if tx.quantity %}{{ "%.2f"|format(tx.quantity) }}{% else %}-{% endif %}</td>
+                        <td class="text-end">{% if tx.price_per_unit %}{{ "%.2f"|format(tx.price_per_unit) }}{% else %}-{% endif %}</td>
+                        <td class="text-end">{{ "%.2f"|format(tx.amount) }}</td>
+                        <td class="text-end">{% if tx.commission %}{{ "%.2f"|format(tx.commission) }}{% else %}-{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <form method="POST" enctype="multipart/form-data" class="mt-3">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">
+                {{ form.csv_file(class="form-control") }}
+                <small class="text-muted">Ladda upp samma fil igen för att bekräfta import.</small>
+            </div>
+            <button type="submit" name="action" value="confirm" class="btn btn-success"><i class="bi bi-check-lg"></i> Bekräfta import</button>
+            <a href="{{ url_for('investments.portfolio_view', portfolio_id=portfolio.id) }}" class="btn btn-outline-secondary">Avbryt</a>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

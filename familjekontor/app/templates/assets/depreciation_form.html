@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Ny avskrivningskörning - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Anläggningstillgångar', 'url': url_for('assets.index')},
+    {'title': 'Avskrivningar', 'url': url_for('assets.depreciation_list')},
+    {'title': 'Ny körning'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-plus-lg"></i> Ny avskrivningskörning</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">
+            Generera en avskrivningskörning som beräknar månadsavskrivningar för alla aktiva tillgångar.
+            Körningen skapas som ett utkast — du kan bokföra den efteråt.
+        </p>
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label required-field">{{ form.period_date.label.text }}</label>
+                    {{ form.period_date(class="form-control") }}
+                    <small class="text-muted">Välj månadens slutdatum, t.ex. 2025-01-31.</small>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('assets.depreciation_list') }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

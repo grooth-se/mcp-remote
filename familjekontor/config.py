@@ -19,6 +19,13 @@ class Config:
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
     RATELIMIT_ENABLED = True
 
+    # AI / Ollama settings
+    OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'http://localhost:11434')
+    OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3.2')
+    OLLAMA_ENABLED = os.environ.get('OLLAMA_ENABLED', 'false').lower() == 'true'
+    OLLAMA_TIMEOUT = int(os.environ.get('OLLAMA_TIMEOUT', '30'))
+    TESSERACT_CMD = os.environ.get('TESSERACT_CMD', 'tesseract')
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -36,6 +43,7 @@ class TestingConfig(Config):
     )
     WTF_CSRF_ENABLED = False
     RATELIMIT_ENABLED = False
+    OLLAMA_ENABLED = False
 
 
 config = {

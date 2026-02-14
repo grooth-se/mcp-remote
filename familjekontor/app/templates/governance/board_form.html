@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}{% if edit %}Redigera{% else %}Ny{% endif %} styrelseledamot - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Styrelse', 'url': url_for('governance.board')},
+    {'title': 'Redigera' if edit else 'Ny ledamot'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2>{% if edit %}Redigera {{ member.name }}{% else %}<i class="bi bi-person-plus"></i> Ny styrelseledamot{% endif %}</h2>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="POST" data-unsaved-warning>
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">{{ form.name.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.name(class="form-control", placeholder="Fullständigt namn") }}
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">{{ form.role.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.role(class="form-select") }}
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">{{ form.personal_number.label.text }}</label>
+                    {{ form.personal_number(class="form-control", placeholder="YYYYMMDD-XXXX") }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.title.label.text }}</label>
+                    {{ form.title(class="form-control") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.appointed_date.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.appointed_date(class="form-control", type="date") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.end_date.label.text }}</label>
+                    {{ form.end_date(class="form-control", type="date") }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.appointed_by.label.text }}</label>
+                    {{ form.appointed_by(class="form-control", placeholder="T.ex. Årsstämma 2025") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.email.label.text }}</label>
+                    {{ form.email(class="form-control", type="email") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.phone.label.text }}</label>
+                    {{ form.phone(class="form-control") }}
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('governance.board') }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

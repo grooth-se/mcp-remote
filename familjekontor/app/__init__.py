@@ -46,6 +46,19 @@ def create_app(config_name=None):
     from app.routes.closing import closing_bp
     from app.routes.currency import currency_bp
     from app.routes.recurring import recurring_bp
+    from app.routes.annual_report import annual_report_bp
+    from app.routes.assets import assets_bp
+    from app.routes.governance import governance_bp
+    from app.routes.investments import investments_bp
+    from app.routes.ai_assistant import ai_bp
+    from app.routes.ratios import ratios_bp
+    from app.routes.cashflow import cashflow_bp
+    from app.routes.comparison import comparison_bp
+    from app.routes.arap import arap_bp
+    from app.routes.report_center import report_center_bp
+    from app.routes.notifications import notification_bp
+    from app.routes.batch import batch_bp
+    from app.routes.favorites import favorites_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -65,6 +78,19 @@ def create_app(config_name=None):
     app.register_blueprint(closing_bp, url_prefix='/closing')
     app.register_blueprint(currency_bp, url_prefix='/currency')
     app.register_blueprint(recurring_bp, url_prefix='/invoices/recurring')
+    app.register_blueprint(annual_report_bp, url_prefix='/annual-report')
+    app.register_blueprint(assets_bp, url_prefix='/assets')
+    app.register_blueprint(governance_bp, url_prefix='/governance')
+    app.register_blueprint(investments_bp, url_prefix='/investments')
+    app.register_blueprint(ai_bp, url_prefix='/ai')
+    app.register_blueprint(ratios_bp, url_prefix='/ratios')
+    app.register_blueprint(cashflow_bp, url_prefix='/cashflow')
+    app.register_blueprint(comparison_bp, url_prefix='/comparison')
+    app.register_blueprint(arap_bp, url_prefix='/arap')
+    app.register_blueprint(report_center_bp, url_prefix='/report-center')
+    app.register_blueprint(notification_bp, url_prefix='/notifications')
+    app.register_blueprint(batch_bp, url_prefix='/batch')
+    app.register_blueprint(favorites_bp, url_prefix='/favorites')
 
     # Jinja2 globals and filters
     from datetime import datetime

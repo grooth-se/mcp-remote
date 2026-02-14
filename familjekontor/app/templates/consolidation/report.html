@@ -1,12 +1,21 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Koncernrapport - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Koncernrapporter', 'url': url_for('consolidation.index')},
+    {'title': group.name, 'url': url_for('consolidation.view_group', group_id=group.id)},
+    {'title': 'Rapport'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-diagram-3"></i> Koncernrapport: {{ group.name }}</h2>
     <div>
         {% if report %}
         <a href="{{ url_for('consolidation.report_excel', group_id=group.id,
-                    year=form.fiscal_year_year.data, type=report.report_type) }}"
+                    year=form.fiscal_year_year.data, type=report.report_type if report.report_type is defined else 'pnl') }}"
            class="btn btn-outline-success">
             <i class="bi bi-file-earmark-excel"></i> Exportera Excel
         </a>
@@ -40,7 +49,6 @@
     <div class="card-body">
         {% if report.report_type == 'pnl' %}
         <h4>Koncern Resultaträkning</h4>
-
         <table class="table table-sm">
             <thead>
                 <tr><th>Avsnitt</th><th class="text-end">Koncerntotal</th></tr>
@@ -67,17 +75,47 @@
                     <td>Koncernelimineringar</td>
                     <td class="text-end text-danger">-{{ report.elimination_total|sek(0) }} kr</td>
                 </tr>
-                <tr class="table-warning">
-                    <td><strong>Justerat resultat</strong></td>
-                    <td class="text-end"><strong>{{ report.adjusted_result|sek(0) }} kr</strong></td>
+                {% endif %}
+                {% if report.goodwill_amortization %}
+                <tr>
+                    <td>Goodwill-avskrivning</td>
+                    <td class="text-end text-danger">-{{ report.goodwill_amortization|sek(0) }} kr</td>
                 </tr>
                 {% endif %}
+                {% if report.minority_pnl %}
+                <tr>
+                    <td>Minoritetsintresse i årets resultat</td>
+                    <td class="text-end text-warning">-{{ report.minority_pnl|sek(0) }} kr</td>
+                </tr>
+                {% endif %}
+                <tr class="table-warning">
+                    <td><strong>Koncernens resultat</strong></td>
+                    <td class="text-end"><strong>{{ report.adjusted_result|sek(0) }} kr</strong></td>
+                </tr>
             </tfoot>
         </table>
 
-        {% else %}
-        <h4>Koncern Balansräkning</h4>
+        {% if report.minority_details %}
+        <h5 class="mt-4">Minoritetsintresse</h5>
+        <table class="table table-sm">
+            <thead>
+                <tr><th>Företag</th><th>Ägarandel</th><th>Minoritet %</th><th class="text-end">Resultatandel</th></tr>
+            </thead>
+            <tbody>
+                {% for m in report.minority_details %}
+                <tr>
+                    <td>{{ m.company.name }}</td>
+                    <td>{{ "%.1f"|format(m.ownership_pct) }}%</td>
+                    <td>{{ "%.1f"|format(m.minority_pct) }}%</td>
+                    <td class="text-end">{{ m.minority_pnl|sek(0) }} kr</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
 
+        {% elif report.report_type == 'balance' %}
+        <h4>Koncern Balansräkning</h4>
         <table class="table table-sm">
             <thead>
                 <tr><th>Avsnitt</th><th class="text-end">Koncerntotal</th></tr>
@@ -89,6 +127,12 @@
                     <td class="text-end">{{ section.total|sek(0) }} kr</td>
                 </tr>
                 {% endfor %}
+                {% if report.remaining_goodwill %}
+                <tr>
+                    <td class="ps-4"><em>varav goodwill</em></td>
+                    <td class="text-end"><em>{{ report.remaining_goodwill|sek(0) }} kr</em></td>
+                </tr>
+                {% endif %}
             </tbody>
             <tfoot>
                 <tr class="table-light">
@@ -99,25 +143,92 @@
                     <td><strong>Summa EK + skulder</strong></td>
                     <td class="text-end"><strong>{{ report.total_equity_liabilities|sek(0) }} kr</strong></td>
                 </tr>
+                {% if report.minority_equity %}
+                <tr>
+                    <td>Minoritetsintresse (eget kapital)</td>
+                    <td class="text-end">{{ report.minority_equity|sek(0) }} kr</td>
+                </tr>
+                {% endif %}
+            </tfoot>
+        </table>
+
+        {% else %}
+        {# Cash Flow #}
+        <h4>Koncern Kassaflödesanalys</h4>
+        <table class="table table-sm">
+            <thead>
+                <tr><th>Post</th><th class="text-end">Belopp</th></tr>
+            </thead>
+            <tbody>
+                <tr class="table-light"><td colspan="2"><strong>Den löpande verksamheten</strong></td></tr>
+                <tr>
+                    <td>Resultat före skatt</td>
+                    <td class="text-end">{{ report.result_before_tax|sek(0) }} kr</td>
+                </tr>
+                <tr>
+                    <td>Avskrivningar</td>
+                    <td class="text-end">{{ report.depreciation|sek(0) }} kr</td>
+                </tr>
+                <tr>
+                    <td>Förändring rörelsekapital</td>
+                    <td class="text-end">{{ report.working_capital_adj|sek(0) }} kr</td>
+                </tr>
+                <tr class="table-primary">
+                    <td><strong>Kassaflöde från rörelsen</strong></td>
+                    <td class="text-end"><strong>{{ report.operating|sek(0) }} kr</strong></td>
+                </tr>
+
+                <tr class="table-light"><td colspan="2"><strong>Investeringsverksamheten</strong></td></tr>
+                <tr>
+                    <td>Förändring anläggningstillgångar</td>
+                    <td class="text-end">{{ report.fixed_assets_change|sek(0) }} kr</td>
+                </tr>
+                <tr class="table-primary">
+                    <td><strong>Kassaflöde från investeringar</strong></td>
+                    <td class="text-end"><strong>{{ report.investing|sek(0) }} kr</strong></td>
+                </tr>
+
+                <tr class="table-light"><td colspan="2"><strong>Finansieringsverksamheten</strong></td></tr>
+                <tr>
+                    <td>Förändring eget kapital</td>
+                    <td class="text-end">{{ report.equity_change|sek(0) }} kr</td>
+                </tr>
+                <tr>
+                    <td>Förändring långfristiga skulder</td>
+                    <td class="text-end">{{ report.lt_debt_change|sek(0) }} kr</td>
+                </tr>
+                <tr class="table-primary">
+                    <td><strong>Kassaflöde från finansiering</strong></td>
+                    <td class="text-end"><strong>{{ report.financing|sek(0) }} kr</strong></td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr class="table-warning">
+                    <td><strong>Periodens kassaflöde</strong></td>
+                    <td class="text-end"><strong>{{ report.total_cash_flow|sek(0) }} kr</strong></td>
+                </tr>
             </tfoot>
         </table>
         {% endif %}
 
         {# Per-company breakdown #}
+        {% if report.members is defined %}
         <h5 class="mt-4">Per företag</h5>
         <table class="table table-sm">
             <thead>
-                <tr><th>Företag</th><th>Ägarandel</th></tr>
+                <tr><th>Företag</th><th>Ägarandel</th><th>Metod</th></tr>
             </thead>
             <tbody>
                 {% for m in report.members %}
                 <tr>
                     <td>{{ m.company.name }}</td>
                     <td>{{ m.ownership_pct }}%</td>
+                    <td>{{ m.get('consolidation_method', '-') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% endif %}
     </div>
 </div>
 {% endif %}

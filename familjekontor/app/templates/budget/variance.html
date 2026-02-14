@@ -1,5 +1,14 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Avvikelseanalys - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Bolagsstyrning'},
+    {'title': 'Budget', 'url': url_for('budget.index')},
+    {'title': 'Avvikelse'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-bar-chart-line"></i> Avvikelseanalys {{ fy.year if fy else '' }}</h2>

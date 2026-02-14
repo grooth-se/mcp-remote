@@ -1,0 +1,36 @@
+{% extends "report_center/pdf_base.html" %}
+{% block content %}
+<div class="header">
+    <div class="company">{{ company.name }}</div>
+    <div class="subtitle">Nyckeltal {{ fiscal_year.start_date }} — {{ fiscal_year.end_date }}</div>
+</div>
+
+{% for section_name, section_ratios in ratios.items() %}
+<h3>{{ section_name }}</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Nyckeltal</th>
+            <th class="text-end">Värde</th>
+            <th>Beskrivning</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ratio in section_ratios %}
+        <tr>
+            <td>{{ ratio.label }}</td>
+            <td class="text-end">
+                {% if ratio.value is not none %}
+                    {% if ratio.format == 'pct' %}{{ "%.1f"|format(ratio.value) }}%
+                    {% elif ratio.format == 'times' %}{{ "%.2f"|format(ratio.value) }}x
+                    {% else %}{{ "%.0f"|format(ratio.value) }}
+                    {% endif %}
+                {% else %}-{% endif %}
+            </td>
+            <td>{{ ratio.description }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endfor %}
+{% endblock %}

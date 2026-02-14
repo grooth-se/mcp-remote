@@ -50,7 +50,7 @@
                 <tbody id="rowsBody">
                     <tr class="ver-row" data-index="0">
                         <td>
-                            <select name="rows-0-account_id" class="form-select form-select-sm">
+                            <select name="rows-0-account_id" class="form-select form-select-sm searchable-select">
                                 <option value="">-- Välj konto --</option>
                                 {% for acc in accounts %}
                                 <option value="{{ acc.id }}">{{ acc.account_number }} {{ acc.name }}</option>
@@ -64,7 +64,7 @@
                     </tr>
                     <tr class="ver-row" data-index="1">
                         <td>
-                            <select name="rows-1-account_id" class="form-select form-select-sm">
+                            <select name="rows-1-account_id" class="form-select form-select-sm searchable-select">
                                 <option value="">-- Välj konto --</option>
                                 {% for acc in accounts %}
                                 <option value="{{ acc.id }}">{{ acc.account_number }} {{ acc.name }}</option>

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Inkomstdeklaration - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Skatt', 'url': url_for('tax.index')},
+    {'title': 'Inkomstdeklaration'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-file-earmark-text"></i> Inkomstdeklaration</h2>
+        <p class="text-muted mb-0">{{ company.name }}</p>
+    </div>
+    <a href="{{ url_for('tax.deklaration_new') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Ny deklaration
+    </a>
+</div>
+
+{% if returns %}
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Beskattningsår</th>
+                    <th>Typ</th>
+                    <th class="text-end">Årets resultat</th>
+                    <th class="text-end">Beskattningsbart resultat</th>
+                    <th class="text-end">Beräknad skatt</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tr in returns %}
+                <tr>
+                    <td><strong>{{ tr.tax_year }}</strong></td>
+                    <td><span class="badge bg-info">{{ tr.return_type|upper }}</span></td>
+                    <td class="text-end">{{ tr.net_income|sek }}</td>
+                    <td class="text-end">{{ tr.taxable_income|sek }}</td>
+                    <td class="text-end">{{ tr.calculated_tax|sek }}</td>
+                    <td>
+                        {% if tr.status == 'draft' %}
+                        <span class="badge bg-warning text-dark">Utkast</span>
+                        {% elif tr.status == 'submitted' %}
+                        <span class="badge bg-primary">Inlämnad</span>
+                        {% elif tr.status == 'approved' %}
+                        <span class="badge bg-success">Godkänd</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('tax.deklaration_view', return_id=tr.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> Visa
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body text-center text-muted py-5">
+        <i class="bi bi-file-earmark-text" style="font-size: 3rem;"></i>
+        <p class="mt-3">Inga deklarationer har skapats.</p>
+        <a href="{{ url_for('tax.deklaration_new') }}" class="btn btn-primary">Skapa deklaration</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

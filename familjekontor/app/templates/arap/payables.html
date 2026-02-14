@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Leverantörsskulder - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-receipt"></i> Leverantörsskulder — åldersanalys</h2>
+    <a href="{{ url_for('arap.index') }}" class="btn btn-sm btn-outline-secondary">Tillbaka</a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Leverantör</th>
+                    <th class="text-end">Aktuell</th>
+                    <th class="text-end">1-30 dagar</th>
+                    <th class="text-end">31-60 dagar</th>
+                    <th class="text-end">61-90 dagar</th>
+                    <th class="text-end">90+ dagar</th>
+                    <th class="text-end">Totalt</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in ap.rows %}
+                <tr class="{% if row['90_plus'] > 0 %}table-danger{% elif row['61_90'] > 0 %}table-warning{% endif %}">
+                    <td>{{ row.supplier_name }}</td>
+                    <td class="text-end">{{ row.current|sek }}</td>
+                    <td class="text-end">{{ row['1_30']|sek }}</td>
+                    <td class="text-end">{{ row['31_60']|sek }}</td>
+                    <td class="text-end">{{ row['61_90']|sek }}</td>
+                    <td class="text-end">{{ row['90_plus']|sek }}</td>
+                    <td class="text-end"><strong>{{ row.total|sek }}</strong></td>
+                </tr>
+                {% endfor %}
+                {% if not ap.rows %}
+                <tr><td colspan="7" class="text-muted text-center">Inga utestående leverantörsskulder</td></tr>
+                {% endif %}
+            </tbody>
+            {% if ap.rows %}
+            <tfoot>
+                <tr class="table-secondary">
+                    <td><strong>Totalt</strong></td>
+                    <td class="text-end"><strong>{{ ap.totals.current|sek }}</strong></td>
+                    <td class="text-end"><strong>{{ ap.totals['1_30']|sek }}</strong></td>
+                    <td class="text-end"><strong>{{ ap.totals['31_60']|sek }}</strong></td>
+                    <td class="text-end"><strong>{{ ap.totals['61_90']|sek }}</strong></td>
+                    <td class="text-end"><strong>{{ ap.totals['90_plus']|sek }}</strong></td>
+                    <td class="text-end"><strong>{{ ap.totals.total|sek }}</strong></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endblock %}

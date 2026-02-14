@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Aktiebok - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Aktiebok'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-pie-chart"></i> Aktiebok</h2>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('governance.share_register') }}" class="btn btn-outline-secondary"><i class="bi bi-printer"></i> Aktiebok (utskrift)</a>
+        {% if not current_user.is_readonly %}
+        <div class="dropdown">
+            <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-plus-lg"></i> Lägg till
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('governance.share_class_new') }}">Nytt aktieslag</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('governance.shareholder_new') }}">Ny aktieägare</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('governance.holding_new') }}">Nytt innehav</a></li>
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# Share Classes #}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">Aktieslag</h5></div>
+    <div class="card-body">
+        {% if share_classes %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Aktieslag</th>
+                        <th class="text-end">Röster/aktie</th>
+                        <th class="text-end">Kvotvärde</th>
+                        <th class="text-end">Totalt antal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sc in share_classes %}
+                    <tr>
+                        <td><strong>{{ sc.name }}</strong></td>
+                        <td class="text-end">{{ sc.votes_per_share }}</td>
+                        <td class="text-end">{% if sc.par_value %}{{ sc.par_value|sek }}{% else %}-{% endif %}</td>
+                        <td class="text-end">{{ "{:,}".format(sc.total_shares).replace(",", " ") }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Inga aktieslag registrerade. <a href="{{ url_for('governance.share_class_new') }}">Skapa ett aktieslag</a>.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# Ownership Summary #}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">Ägaröversikt</h5></div>
+    <div class="card-body">
+        {% if ownership %}
+        <div class="row">
+            <div class="col-md-8">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Aktieägare</th>
+                                <th class="text-end">Aktier</th>
+                                <th class="text-end">Ägarandel</th>
+                                <th class="text-end">Röster</th>
+                                <th class="text-end">Röstandel</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in ownership %}
+                            <tr>
+                                <td>
+                                    <strong>{{ row.shareholder.name }}</strong>
+                                    {% if row.shareholder.is_company %}<span class="badge bg-info">Juridisk person</span>{% endif %}
+                                </td>
+                                <td class="text-end">{{ "{:,}".format(row.total_shares).replace(",", " ") }}</td>
+                                <td class="text-end">{{ row.pct }} %</td>
+                                <td class="text-end">{{ "{:,}".format(row.total_votes).replace(",", " ") }}</td>
+                                <td class="text-end">{{ row.vote_pct }} %</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <canvas id="ownershipChart" height="250"></canvas>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Inga aktieinnehav registrerade.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if ownership %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('ownershipChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: {{ ownership|map(attribute='shareholder')|map(attribute='name')|list|tojson }},
+            datasets: [{
+                data: {{ ownership|map(attribute='pct')|list|tojson }},
+                backgroundColor: ['#0d6efd','#198754','#ffc107','#dc3545','#6610f2','#0dcaf0','#fd7e14','#6c757d']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12 } },
+                title: { display: true, text: 'Ägarfördelning (%)' }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

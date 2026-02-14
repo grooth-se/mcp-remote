@@ -1,5 +1,14 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Momsrapporter - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Skatt', 'url': url_for('tax.index')},
+    {'title': 'Momsrapporter'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="row mb-4">
     <div class="col">

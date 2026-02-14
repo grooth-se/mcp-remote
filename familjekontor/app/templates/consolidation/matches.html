@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Koncerninterna matchningar - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Koncernrapporter', 'url': url_for('consolidation.index')},
+    {'title': group.name, 'url': url_for('consolidation.view_group', group_id=group.id)},
+    {'title': 'Matchningar'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-search"></i> Koncerninterna matchningar</h2>
+    <div>
+        <form method="post" action="{{ url_for('consolidation.detect_matches', group_id=group.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-primary"><i class="bi bi-arrow-repeat"></i> Sök matchningar</button>
+        </form>
+        <a href="{{ url_for('consolidation.view_group', group_id=group.id) }}" class="btn btn-outline-secondary">Tillbaka</a>
+    </div>
+</div>
+
+{# Pending matches #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-clock"></i> Föreslagna matchningar</span>
+        <span class="badge bg-warning text-dark">{{ pending|length }}</span>
+    </div>
+    {% if pending %}
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Företag A</th>
+                    <th>Företag B</th>
+                    <th>Typ</th>
+                    <th class="text-end">Belopp</th>
+                    <th>Beskrivning</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in pending %}
+                <tr>
+                    <td>{{ m.company_a.name }}</td>
+                    <td>{{ m.company_b.name }}</td>
+                    <td><span class="badge bg-info">{{ m.match_type or '-' }}</span></td>
+                    <td class="text-end">{{ m.amount|sek }}</td>
+                    <td>{{ m.description or '-' }}</td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <form method="post" action="{{ url_for('consolidation.confirm_match', match_id=m.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-sm btn-success" title="Bekräfta"><i class="bi bi-check-lg"></i></button>
+                            </form>
+                            <form method="post" action="{{ url_for('consolidation.reject_match', match_id=m.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-sm btn-outline-danger" title="Avvisa"><i class="bi bi-x-lg"></i></button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body">
+        <p class="text-muted mb-0">Inga föreslagna matchningar. Klicka "Sök matchningar" för att söka.</p>
+    </div>
+    {% endif %}
+</div>
+
+{# Confirmed matches #}
+{% if confirmed %}
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-check-circle"></i> Bekräftade matchningar
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Företag A</th>
+                    <th>Företag B</th>
+                    <th>Typ</th>
+                    <th class="text-end">Belopp</th>
+                    <th>Beskrivning</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in confirmed %}
+                <tr>
+                    <td>{{ m.company_a.name }}</td>
+                    <td>{{ m.company_b.name }}</td>
+                    <td><span class="badge bg-success">{{ m.match_type or '-' }}</span></td>
+                    <td class="text-end">{{ m.amount|sek }}</td>
+                    <td>{{ m.description or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

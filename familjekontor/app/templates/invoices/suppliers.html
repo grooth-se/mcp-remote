@@ -1,6 +1,14 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination, sortable_header %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Leverantörer - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Bokföring', 'url': url_for('accounting.index')},
+    {'title': 'Leverantörer'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>Leverantörer</h2>

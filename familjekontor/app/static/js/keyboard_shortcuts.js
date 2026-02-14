@@ -24,6 +24,29 @@ document.addEventListener('keydown', function(e) {
         }
     }
 
+    // Ctrl+K / Cmd+K — focus global search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        var searchInput = document.getElementById('global-search-input');
+        if (searchInput) {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+        }
+    }
+
+    // / — focus global search (when not in an input)
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        var tag = document.activeElement.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && !document.activeElement.isContentEditable) {
+            var searchInput2 = document.getElementById('global-search-input');
+            if (searchInput2) {
+                e.preventDefault();
+                searchInput2.focus();
+                searchInput2.select();
+            }
+        }
+    }
+
     // Alt+N — navigate to "Ny" (new)
     if (e.altKey && e.key === 'n') {
         var links = document.querySelectorAll('a.btn-primary');

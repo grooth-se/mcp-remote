@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from flask import (Blueprint, render_template, redirect, url_for, flash,
                    request, session, send_file, jsonify)
+from app.services.csv_export_service import export_csv
 from flask_login import login_required, current_user
 from app.extensions import db, limiter
 from app.models.document import Document
@@ -247,3 +248,34 @@ def delete(doc_id):
     document_service.delete_document(doc_id, current_user.id)
     flash('Dokument har tagits bort.', 'success')
     return redirect(url_for('documents.index'))
+
+
+@documents_bp.route('/export-csv')
+@login_required
+def export_csv_route():
+    company_id = _get_company_id()
+    if not company_id:
+        return redirect(url_for('dashboard.index'))
+    docs = Document.query.filter_by(company_id=company_id).order_by(
+        Document.created_at.desc()
+    ).all()
+    rows = [
+        {
+            'file_name': d.file_name or '',
+            'type': d.document_type or '',
+            'description': d.description or '',
+            'created': d.created_at.strftime('%Y-%m-%d') if d.created_at else '',
+            'expiry': str(d.expiry_date) if d.expiry_date else '',
+        }
+        for d in docs
+    ]
+    columns = [
+        ('file_name', 'Filnamn'),
+        ('type', 'Dokumenttyp'),
+        ('description', 'Beskrivning'),
+        ('created', 'Skapad'),
+        ('expiry', 'Upphör'),
+    ]
+    output = export_csv(rows, columns)
+    return send_file(output, mimetype='text/csv',
+                     as_attachment=True, download_name='dokument.csv')

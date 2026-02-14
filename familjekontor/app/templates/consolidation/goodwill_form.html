@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Registrera förvärv - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Koncernrapporter', 'url': url_for('consolidation.index')},
+    {'title': group.name, 'url': url_for('consolidation.view_group', group_id=group.id)},
+    {'title': 'Registrera förvärv'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-building-add"></i> Registrera förvärv</h2>
+<p class="text-muted">Registrera ett företagsförvärv med beräkning av goodwill (K2: max 5 år avskrivning).</p>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="post">
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    {{ form.company_id.label(class="form-label") }}
+                    {{ form.company_id(class="form-select") }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.acquisition_date.label(class="form-label") }}
+                    {{ form.acquisition_date(class="form-control", type="date") }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    {{ form.purchase_price.label(class="form-label") }}
+                    {{ form.purchase_price(class="form-control") }}
+                    <div class="form-text">Totalt betalat belopp för aktierna</div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.net_assets_at_acquisition.label(class="form-label") }}
+                    {{ form.net_assets_at_acquisition(class="form-control") }}
+                    <div class="form-text">Eget kapital vid förvärvstidpunkten</div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.amortization_period_months.label(class="form-label") }}
+                    {{ form.amortization_period_months(class="form-control") }}
+                    <div class="form-text">K2: max 60 månader</div>
+                </div>
+            </div>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                Goodwill = Köpeskilling - (Nettotillgångar x Ägarandel).
+                Avskrivs linjärt över vald period.
+            </div>
+            {{ form.submit(class="btn btn-primary") }}
+            <a href="{{ url_for('consolidation.view_group', group_id=group.id) }}" class="btn btn-outline-secondary">Avbryt</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

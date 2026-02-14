@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Styrelse - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Styrelse'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-people"></i> Styrelse</h2>
+    <div class="d-flex gap-2">
+        {% if show_all %}
+        <a href="{{ url_for('governance.board') }}" class="btn btn-outline-secondary btn-sm">Visa aktiva</a>
+        {% else %}
+        <a href="{{ url_for('governance.board', all='1') }}" class="btn btn-outline-secondary btn-sm">Visa alla</a>
+        {% endif %}
+        {% if not current_user.is_readonly %}
+        <a href="{{ url_for('governance.board_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Ny ledamot</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if members %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Namn</th>
+                <th>Roll</th>
+                <th>Titel</th>
+                <th>Tillträde</th>
+                <th>Avgång</th>
+                <th>E-post</th>
+                <th>Telefon</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in members %}
+            <tr>
+                <td><strong>{{ m.name }}</strong></td>
+                <td>
+                    <span class="badge {% if m.role == 'ordforande' %}bg-primary{% elif m.role == 'vd' %}bg-info{% elif m.role == 'revisor' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                        {{ m.role_label }}
+                    </span>
+                </td>
+                <td>{{ m.title or '' }}</td>
+                <td>{{ m.appointed_date.strftime('%Y-%m-%d') }}</td>
+                <td>
+                    {% if m.end_date %}
+                    {{ m.end_date.strftime('%Y-%m-%d') }}
+                    {% else %}
+                    <span class="text-success">Aktiv</span>
+                    {% endif %}
+                </td>
+                <td>{{ m.email or '' }}</td>
+                <td>{{ m.phone or '' }}</td>
+                <td class="text-end">
+                    {% if not current_user.is_readonly %}
+                    <a href="{{ url_for('governance.board_edit', member_id=m.id) }}" class="btn btn-outline-secondary btn-sm" title="Redigera"><i class="bi bi-pencil"></i></a>
+                    {% if m.is_active %}
+                    <form method="POST" action="{{ url_for('governance.board_end', member_id=m.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-warning btn-sm" title="Avsluta uppdrag"
+                                onclick="return confirm('Avsluta uppdraget för {{ m.name }}?')">
+                            <i class="bi bi-x-circle"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">Inga styrelseledamöter registrerade.</div>
+{% endif %}
+{% endblock %}

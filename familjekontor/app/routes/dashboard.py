@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, session, redirect, url_for, jsonify
-from flask_login import login_required
+from flask import Blueprint, render_template, session, redirect, url_for, jsonify, request
+from flask_login import login_required, current_user
 from app.extensions import limiter
 from app.services.company_service import get_company_summary
 from app.models.accounting import Verification
@@ -24,7 +24,16 @@ def index():
     multi_company = None
     recurring_due = 0
 
+    # Seed default favorites on first visit
+    from app.services.favorite_service import seed_default_favorites, get_user_favorites
+    seed_default_favorites(current_user.id)
+    user_favorites = get_user_favorites(current_user.id)
+
     if company_id:
+        # Generate notifications on dashboard load (on-demand)
+        from app.services.notification_service import generate_notifications
+        generate_notifications(current_user.id, company_id)
+
         summary = get_company_summary(company_id)
 
         if summary and summary['active_fiscal_year']:
@@ -68,7 +77,8 @@ def index():
                            salary_overview=salary_overview,
                            fy_progress=fy_progress,
                            multi_company=multi_company,
-                           recurring_due=recurring_due)
+                           recurring_due=recurring_due,
+                           user_favorites=user_favorites)
 
 
 @dashboard_bp.route('/switch-company/<int:company_id>')
@@ -110,3 +120,16 @@ def api_cash_flow_chart():
     from app.services.dashboard_service import get_cash_flow_data
     data = get_cash_flow_data(company_id, summary['active_fiscal_year'].id)
     return jsonify(data)
+
+
+@dashboard_bp.route('/api/search')
+@login_required
+@limiter.limit("60 per minute")
+def api_search():
+    query = request.args.get('q', '').strip()
+    company_id = session.get('active_company_id')
+    if not company_id or len(query) < 2:
+        return jsonify({'results': {}})
+    from app.services.search_service import global_search
+    results = global_search(company_id, query)
+    return jsonify({'results': results})

@@ -1,0 +1,41 @@
+{% extends "report_center/pdf_base.html" %}
+{% block content %}
+<div class="header">
+    <div class="company">{{ company.name }}</div>
+    <div class="subtitle">Resultaträkning {{ fiscal_year.start_date }} — {{ fiscal_year.end_date }}</div>
+</div>
+
+{% for section_name, section in report.sections.items() %}
+<h3>{{ section_name }}</h3>
+<table>
+    <tbody>
+        {% for account, balance in section.accounts %}
+        {% if balance|abs > 0.01 %}
+        <tr>
+            <td style="width: 15%">{{ account.account_number }}</td>
+            <td>{{ account.name }}</td>
+            <td class="text-end" style="width: 25%">{{ "%.2f"|format(balance) }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr class="total-row">
+            <td colspan="2">Summa {{ section_name }}</td>
+            <td class="text-end">{{ "%.2f"|format(section.total) }}</td>
+        </tr>
+    </tfoot>
+</table>
+{% endfor %}
+
+<table>
+    <tr class="summary-row">
+        <td>Rörelseresultat</td>
+        <td class="text-end">{{ "%.2f"|format(report.operating_result) }}</td>
+    </tr>
+    <tr class="summary-row">
+        <td>Resultat före skatt</td>
+        <td class="text-end">{{ "%.2f"|format(report.result_before_tax) }}</td>
+    </tr>
+</table>
+{% endblock %}

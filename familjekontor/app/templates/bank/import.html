@@ -1,5 +1,13 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Importera banktransaktioner - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Bank', 'url': url_for('bank.index')},
+    {'title': 'Importera'}
+]) }}
+{% endblock %}
 {% block content %}
 <h2 class="mb-4"><i class="bi bi-upload"></i> Importera banktransaktioner</h2>
 

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}{{ portfolio.name }} - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Investeringar', 'url': url_for('investments.index')},
+    {'title': portfolio.name}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2>{{ portfolio.name }}</h2>
+        <p class="text-muted mb-0">
+            {{ portfolio.portfolio_type_label }}
+            {% if portfolio.broker %} — {{ portfolio.broker }}{% endif %}
+            {% if portfolio.account_number %} ({{ portfolio.account_number }}){% endif %}
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if not current_user.is_readonly %}
+        <a href="{{ url_for('investments.transaction_new', portfolio_id=portfolio.id) }}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Ny transaktion</a>
+        <a href="{{ url_for('investments.import_csv', portfolio_id=portfolio.id) }}" class="btn btn-outline-secondary"><i class="bi bi-upload"></i> Importera CSV</a>
+        {% endif %}
+    </div>
+</div>
+
+{# Summary #}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Anskaffningsvärde</h6>
+                <h4>{{ total_cost|sek(0) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Marknadsvärde</h6>
+                <h4>{{ total_value|sek(0) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Orealiserad vinst/förlust</h6>
+                {% set unrealized = total_value - total_cost %}
+                <h4 class="{% if unrealized > 0 %}text-success{% elif unrealized < 0 %}text-danger{% endif %}">
+                    {{ unrealized|sek(0) }}
+                </h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Active Holdings #}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">Aktiva innehav</h5></div>
+    <div class="card-body">
+        {% if active_holdings %}
+        <div class="table-responsive">
+            <table class="table table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th>Värdepapper</th>
+                        <th>Typ</th>
+                        <th class="text-end">Antal</th>
+                        <th class="text-end">GAV</th>
+                        <th class="text-end">Kostnad</th>
+                        <th class="text-end">Kurs</th>
+                        <th class="text-end">Värde</th>
+                        <th class="text-end">Orealiserat</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in active_holdings %}
+                    <tr class="cursor-pointer" data-href="{{ url_for('investments.holding_view', holding_id=h.id) }}">
+                        <td>
+                            <strong>{{ h.name }}</strong>
+                            {% if h.ticker %}<small class="text-muted">({{ h.ticker }})</small>{% endif %}
+                        </td>
+                        <td><span class="badge bg-secondary">{{ h.instrument_type_label }}</span></td>
+                        <td class="text-end">{{ "%.2f"|format(h.quantity) }}</td>
+                        <td class="text-end">{{ h.average_cost|sek(2) }}</td>
+                        <td class="text-end">{{ h.total_cost|sek(0) }}</td>
+                        <td class="text-end">{% if h.current_price %}{{ h.current_price|sek(2) }}{% else %}-{% endif %}</td>
+                        <td class="text-end">{% if h.current_value %}{{ h.current_value|sek(0) }}{% else %}-{% endif %}</td>
+                        <td class="text-end">
+                            {% if h.unrealized_gain is not none %}
+                            <span class="{% if h.unrealized_gain > 0 %}text-success{% elif h.unrealized_gain < 0 %}text-danger{% endif %}">
+                                {{ h.unrealized_gain|sek(0) }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('investments.price_update', holding_id=h.id) }}" class="btn btn-outline-secondary btn-sm" title="Uppdatera pris"><i class="bi bi-currency-exchange"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Inga aktiva innehav.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# Inactive Holdings #}
+{% if inactive_holdings %}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">Sålda/avslutade innehav</h5></div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm text-muted">
+                <thead>
+                    <tr>
+                        <th>Värdepapper</th>
+                        <th>Typ</th>
+                        <th class="text-end">Slutlig kostnad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in inactive_holdings %}
+                    <tr class="cursor-pointer" data-href="{{ url_for('investments.holding_view', holding_id=h.id) }}">
+                        <td>{{ h.name }}</td>
+                        <td>{{ h.instrument_type_label }}</td>
+                        <td class="text-end">{{ h.total_cost|sek(0) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

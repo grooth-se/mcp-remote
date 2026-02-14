@@ -1,5 +1,13 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Skatt - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Skatteöversikt'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="row mb-4">
     <div class="col">
@@ -69,6 +77,9 @@
                 </a>
                 <a href="{{ url_for('tax.deadline_new') }}" class="list-group-item list-group-item-action">
                     <i class="bi bi-plus-circle"></i> Ny deadline
+                </a>
+                <a href="{{ url_for('tax.deklaration_index') }}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-file-earmark-text"></i> Inkomstdeklaration
                 </a>
             </div>
         </div>

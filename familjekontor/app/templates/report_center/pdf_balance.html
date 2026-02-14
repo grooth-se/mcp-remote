@@ -1,0 +1,71 @@
+{% extends "report_center/pdf_base.html" %}
+{% block content %}
+<div class="header">
+    <div class="company">{{ company.name }}</div>
+    <div class="subtitle">Balansräkning per {{ fiscal_year.end_date }}</div>
+</div>
+
+<h2>TILLGÅNGAR</h2>
+{% for section_name in ['Anläggningstillgångar', 'Omsättningstillgångar'] %}
+{% set section = report.sections[section_name] %}
+<h3>{{ section_name }}</h3>
+<table>
+    <tbody>
+        {% for account, balance in section.accounts %}
+        {% if balance|abs > 0.01 %}
+        <tr>
+            <td style="width: 15%">{{ account.account_number }}</td>
+            <td>{{ account.name }}</td>
+            <td class="text-end" style="width: 25%">{{ "%.2f"|format(balance) }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr class="total-row">
+            <td colspan="2">Summa {{ section_name }}</td>
+            <td class="text-end">{{ "%.2f"|format(section.total) }}</td>
+        </tr>
+    </tfoot>
+</table>
+{% endfor %}
+
+<table>
+    <tr class="summary-row">
+        <td>SUMMA TILLGÅNGAR</td>
+        <td class="text-end">{{ "%.2f"|format(report.total_assets) }}</td>
+    </tr>
+</table>
+
+<h2>EGET KAPITAL OCH SKULDER</h2>
+{% for section_name in ['Eget kapital', 'Långfristiga skulder', 'Kortfristiga skulder'] %}
+{% set section = report.sections[section_name] %}
+<h3>{{ section_name }}</h3>
+<table>
+    <tbody>
+        {% for account, balance in section.accounts %}
+        {% if balance|abs > 0.01 %}
+        <tr>
+            <td style="width: 15%">{{ account.account_number }}</td>
+            <td>{{ account.name }}</td>
+            <td class="text-end" style="width: 25%">{{ "%.2f"|format(balance) }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr class="total-row">
+            <td colspan="2">Summa {{ section_name }}</td>
+            <td class="text-end">{{ "%.2f"|format(section.total) }}</td>
+        </tr>
+    </tfoot>
+</table>
+{% endfor %}
+
+<table>
+    <tr class="summary-row">
+        <td>SUMMA EGET KAPITAL OCH SKULDER</td>
+        <td class="text-end">{{ "%.2f"|format(report.total_equity_liabilities) }}</td>
+    </tr>
+</table>
+{% endblock %}

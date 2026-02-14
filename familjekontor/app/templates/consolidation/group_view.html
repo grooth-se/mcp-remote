@@ -1,5 +1,13 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}{{ group.name }} - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Koncernrapporter', 'url': url_for('consolidation.index')},
+    {'title': group.name}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-diagram-3"></i> {{ group.name }}</h2>
@@ -21,13 +29,14 @@
             <div class="table-responsive">
                 <table class="table table-sm mb-0">
                     <thead>
-                        <tr><th>Företag</th><th>Ägarandel</th><th></th></tr>
+                        <tr><th>Företag</th><th>Ägarandel</th><th>Metod</th><th></th></tr>
                     </thead>
                     <tbody>
                         {% for member in group.members %}
                         <tr>
                             <td>{{ member.company.name }}</td>
                             <td>{{ member.ownership_pct }}%</td>
+                            <td><span class="badge bg-secondary">{{ member.method_label }}</span></td>
                             <td>
                                 <form method="post" action="{{ url_for('consolidation.remove_member', group_id=group.id, company_id=member.company_id) }}"
                                       class="d-inline">
@@ -38,7 +47,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="3" class="text-muted">Inga medlemmar.</td></tr>
+                        <tr><td colspan="4" class="text-muted">Inga medlemmar.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -50,8 +59,11 @@
                     <div class="col">
                         {{ add_form.company_id(class="form-select form-select-sm") }}
                     </div>
-                    <div class="col-3">
+                    <div class="col-2">
                         {{ add_form.ownership_pct(class="form-control form-control-sm", placeholder="%") }}
+                    </div>
+                    <div class="col-3">
+                        {{ add_form.consolidation_method(class="form-select form-select-sm") }}
                     </div>
                     <div class="col-auto">
                         <button class="btn btn-sm btn-primary">Lägg till</button>
@@ -62,7 +74,7 @@
         </div>
     </div>
 
-    {# Report generator #}
+    {# Report generator + actions #}
     <div class="col-md-6 mb-4">
         <div class="card">
             <div class="card-header">Generera koncernrapport</div>
@@ -83,7 +95,7 @@
         </div>
 
         <div class="card mt-3">
-            <div class="card-header">Elimineringar</div>
+            <div class="card-header">Elimineringar & matchningar</div>
             <div class="card-body">
                 {% if show_eliminations is defined and eliminations %}
                 <table class="table table-sm mb-2">
@@ -96,21 +108,78 @@
                             <td>{{ e.from_company.name }}</td>
                             <td>{{ e.to_company.name }}</td>
                             <td>{{ e.account_number }}</td>
-                            <td class="text-end">{{ "{:,.2f}".format(e.amount|float) }}</td>
+                            <td class="text-end">{{ e.amount|sek }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
                 {% endif %}
-                <a href="{{ url_for('consolidation.new_elimination', group_id=group.id) }}"
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('consolidation.new_elimination', group_id=group.id) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-plus-circle"></i> Ny eliminering
+                    </a>
+                    <a href="{{ url_for('consolidation.eliminations', group_id=group.id) }}"
+                       class="btn btn-sm btn-outline-secondary">Visa alla</a>
+                    <a href="{{ url_for('consolidation.matches', group_id=group.id) }}"
+                       class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-search"></i> Koncerninterna matchningar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {# Goodwill #}
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between">
+                <span>Goodwill</span>
+                <a href="{{ url_for('consolidation.new_goodwill', group_id=group.id) }}"
                    class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-plus-circle"></i> Ny eliminering
-                </a>
-                <a href="{{ url_for('consolidation.eliminations', group_id=group.id) }}"
-                   class="btn btn-sm btn-outline-secondary">
-                    Visa alla
+                    <i class="bi bi-plus-circle"></i> Registrera förvärv
                 </a>
             </div>
+            {% if goodwill_entries %}
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Företag</th>
+                            <th>Förvärvsdatum</th>
+                            <th class="text-end">Goodwill</th>
+                            <th class="text-end">Ack. avskr.</th>
+                            <th class="text-end">Kvarvarande</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for gw in goodwill_entries %}
+                        <tr>
+                            <td>{{ gw.company.name }}</td>
+                            <td>{{ gw.acquisition_date }}</td>
+                            <td class="text-end">{{ gw.goodwill_amount|sek(0) }}</td>
+                            <td class="text-end">{{ gw.accumulated_amortization|sek(0) }}</td>
+                            <td class="text-end">{{ gw.remaining_goodwill|sek(0) }}</td>
+                            <td>
+                                {% if gw.remaining_goodwill > 0 %}
+                                <form method="post" action="{{ url_for('consolidation.amortize_goodwill', goodwill_id=gw.id) }}"
+                                      class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="months" value="12">
+                                    <button class="btn btn-sm btn-outline-warning"
+                                            data-confirm="Skriv av 12 månader?">Skriv av</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <p class="text-muted mb-0">Inga förvärv registrerade.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

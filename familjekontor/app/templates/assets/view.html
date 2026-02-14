@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}{{ asset.asset_number }} - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Anläggningstillgångar', 'url': url_for('assets.index')},
+    {'title': asset.asset_number}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3>{{ asset.name }}
+            {% if asset.status == 'active' %}
+            <span class="badge bg-success">Aktiv</span>
+            {% elif asset.status == 'fully_depreciated' %}
+            <span class="badge bg-warning text-dark">Fullt avskriven</span>
+            {% elif asset.status == 'disposed' %}
+            <span class="badge bg-secondary">Avyttrad</span>
+            {% endif %}
+        </h3>
+        <p class="text-muted mb-0">{{ asset.asset_number }} — {{ asset.category_label }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if asset.status == 'active' %}
+        <a href="{{ url_for('assets.edit', asset_id=asset.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-pencil"></i> Redigera
+        </a>
+        <a href="{{ url_for('assets.do_dispose', asset_id=asset.id) }}" class="btn btn-outline-danger">
+            <i class="bi bi-trash"></i> Avyttra
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Anskaffningsvärde</h6>
+                <h4>{{ asset.purchase_amount|sek }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Ack. avskrivningar</h6>
+                <h4>{{ accumulated|sek }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Bokfört värde</h6>
+                <h4>{{ book_value|sek }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Månadsavskrivning</h6>
+                <h4>{{ monthly|sek }}</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header"><h6 class="mb-0">Tillgångsuppgifter</h6></div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr><td class="text-muted">Inköpsdatum</td><td>{{ asset.purchase_date.strftime('%Y-%m-%d') }}</td></tr>
+                    <tr><td class="text-muted">Leverantör</td><td>{{ asset.supplier_name or '—' }}</td></tr>
+                    <tr><td class="text-muted">Fakturareferens</td><td>{{ asset.invoice_reference or '—' }}</td></tr>
+                    {% if asset.description %}
+                    <tr><td class="text-muted">Beskrivning</td><td>{{ asset.description }}</td></tr>
+                    {% endif %}
+                    {% if asset.status == 'disposed' %}
+                    <tr><td class="text-muted">Avyttrad</td><td>{{ asset.disposed_date.strftime('%Y-%m-%d') }}</td></tr>
+                    <tr><td class="text-muted">Försäljningsbelopp</td><td>{{ asset.disposal_amount|sek }}</td></tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header"><h6 class="mb-0">Avskrivningsuppgifter</h6></div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr><td class="text-muted">Metod</td><td>{{ 'Linjär' if asset.depreciation_method == 'straight_line' else 'Degressiv' }}</td></tr>
+                    <tr><td class="text-muted">Nyttjandeperiod</td><td>{{ asset.useful_life_months }} månader</td></tr>
+                    <tr><td class="text-muted">Restvärde</td><td>{{ asset.residual_value|sek }}</td></tr>
+                    <tr><td class="text-muted">Start</td><td>{{ asset.depreciation_start.strftime('%Y-%m-%d') }}</td></tr>
+                    <tr><td class="text-muted">Tillgångskonto</td><td>{{ asset.asset_account }}</td></tr>
+                    <tr><td class="text-muted">Ack. avskr. konto</td><td>{{ asset.depreciation_account }}</td></tr>
+                    <tr><td class="text-muted">Kostnadskonto</td><td>{{ asset.expense_account }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if schedule %}
+<div class="card">
+    <div class="card-header"><h6 class="mb-0">Avskrivningsplan</h6></div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        <th class="text-end">Avskrivning</th>
+                        <th class="text-end">Ackumulerat</th>
+                        <th class="text-end">Bokfört värde</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in schedule %}
+                    <tr>
+                        <td>{{ row.month }}</td>
+                        <td class="text-end">{{ row.depreciation|sek }}</td>
+                        <td class="text-end">{{ row.accumulated|sek }}</td>
+                        <td class="text-end">{{ row.book_value|sek }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

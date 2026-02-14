@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}{% if edit %}Redigera{% else %}Ny{% endif %} tillgång - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Anläggningstillgångar', 'url': url_for('assets.index')},
+    {'title': 'Redigera' if edit else 'Ny tillgång'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-{% if edit %}pencil{% else %}plus-lg{% endif %}"></i>
+            {% if edit %}Redigera {{ asset.asset_number }}{% else %}Ny anläggningstillgång{% endif %}
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" class="needs-validation" novalidate>
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label required-field">{{ form.name.label.text }}</label>
+                    {{ form.name(class="form-control", placeholder="t.ex. Volvo XC60") }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label required-field">{{ form.asset_category.label.text }}</label>
+                    {{ form.asset_category(class="form-select", id="asset_category") }}
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.description.label.text }}</label>
+                {{ form.description(class="form-control", rows=2) }}
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label required-field">{{ form.purchase_date.label.text }}</label>
+                    {{ form.purchase_date(class="form-control") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label required-field">{{ form.purchase_amount.label.text }}</label>
+                    {{ form.purchase_amount(class="form-control") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.supplier_name.label.text }}</label>
+                    {{ form.supplier_name(class="form-control") }}
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.invoice_reference.label.text }}</label>
+                {{ form.invoice_reference(class="form-control") }}
+            </div>
+
+            <hr>
+            <h6>Avskrivning</h6>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label required-field">{{ form.depreciation_method.label.text }}</label>
+                    {{ form.depreciation_method(class="form-select") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label required-field">{{ form.useful_life_months.label.text }}</label>
+                    {{ form.useful_life_months(class="form-control", id="useful_life") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.residual_value.label.text }}</label>
+                    {{ form.residual_value(class="form-control") }}
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.depreciation_start.label.text }}</label>
+                {{ form.depreciation_start(class="form-control") }}
+                <small class="text-muted">Lämna tomt för att använda inköpsdatum.</small>
+            </div>
+
+            <hr>
+            <h6>BAS-konton <small class="text-muted">(fylls i automatiskt utifrån kategori)</small></h6>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.asset_account.label.text }}</label>
+                    {{ form.asset_account(class="form-control", id="asset_account") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.depreciation_account.label.text }}</label>
+                    {{ form.depreciation_account(class="form-control", id="depreciation_account") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.expense_account.label.text }}</label>
+                    {{ form.expense_account(class="form-control", id="expense_account") }}
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('assets.index') }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var categoryDefaults = {{ category_defaults|tojson }};
+document.getElementById('asset_category').addEventListener('change', function() {
+    var cat = this.value;
+    if (categoryDefaults[cat]) {
+        var d = categoryDefaults[cat];
+        document.getElementById('asset_account').value = d[0];
+        document.getElementById('depreciation_account').value = d[1];
+        document.getElementById('expense_account').value = d[2];
+        document.getElementById('useful_life').value = d[3];
+    }
+});
+</script>
+{% endblock %}

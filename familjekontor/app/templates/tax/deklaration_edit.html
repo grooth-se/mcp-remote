@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Redigera deklaration {{ tr.tax_year }} - Familjekontor{% endblock %}
+{% block content %}
+<h2><i class="bi bi-pencil-square"></i> Redigera skattemässiga justeringar — {{ tr.tax_year }}</h2>
+<p class="text-muted">{{ tr.company.name }} — {{ tr.return_type|upper }}</p>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="post">
+                    {{ form.hidden_tag() }}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Årets resultat (från bokföringen): <strong>{{ tr.net_income|sek }}</strong>
+                    </div>
+
+                    <h5>Tillkommande poster</h5>
+                    <div class="mb-3">
+                        {{ form.non_deductible_expenses.label(class="form-label") }}
+                        {{ form.non_deductible_expenses(class="form-control") }}
+                        <div class="form-text">Representation, böter, gåvor > 500 kr, etc.</div>
+                    </div>
+
+                    <h5 class="mt-4">Avgående poster</h5>
+                    <div class="mb-3">
+                        {{ form.non_taxable_income.label(class="form-label") }}
+                        {{ form.non_taxable_income(class="form-control") }}
+                        <div class="form-text">Skattefria utdelningar, koncernbidrag mottaget, etc.</div>
+                    </div>
+
+                    <h5 class="mt-4">Avskrivningar</h5>
+                    <div class="mb-3">
+                        {{ form.depreciation_tax_diff.label(class="form-label") }}
+                        {{ form.depreciation_tax_diff(class="form-control") }}
+                        <div class="form-text">Positivt = högre skattemässig avskrivning, Negativt = lägre. Bokförda avskrivningar: {{ tr.depreciation_booked|sek }}</div>
+                    </div>
+
+                    <h5 class="mt-4">Underskott</h5>
+                    <div class="mb-3">
+                        {{ form.previous_deficit.label(class="form-label") }}
+                        {{ form.previous_deficit(class="form-control") }}
+                        <div class="form-text">Ackumulerat underskott som rullas framåt.</div>
+                    </div>
+
+                    <h5 class="mt-4">Anteckningar</h5>
+                    <div class="mb-3">
+                        {{ form.notes(class="form-control", rows=3) }}
+                    </div>
+
+                    {{ form.submit(class="btn btn-primary") }}
+                    <a href="{{ url_for('tax.deklaration_view', return_id=tr.id) }}" class="btn btn-outline-secondary">Avbryt</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

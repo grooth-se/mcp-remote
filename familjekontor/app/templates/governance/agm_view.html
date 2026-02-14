@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Bolagsstämma {{ agm.meeting_date }} - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Bolagsstämmor', 'url': url_for('governance.agm_list')},
+    {'title': agm.meeting_date.strftime('%Y-%m-%d')}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>
+        <i class="bi bi-journal-bookmark"></i>
+        {{ agm.meeting_type_label }} {{ agm.meeting_date.strftime('%Y-%m-%d') }}
+    </h2>
+    <button onclick="window.print()" class="btn btn-outline-secondary no-print"><i class="bi bi-printer"></i> Skriv ut</button>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3"><strong>Datum:</strong></div>
+            <div class="col-md-9">{{ agm.meeting_date.strftime('%Y-%m-%d') }}</div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-3"><strong>Typ:</strong></div>
+            <div class="col-md-9">{{ agm.meeting_type_label }}</div>
+        </div>
+        {% if agm.fiscal_year %}
+        <div class="row mb-3">
+            <div class="col-md-3"><strong>Avser räkenskapsår:</strong></div>
+            <div class="col-md-9">{{ agm.fiscal_year.year }}</div>
+        </div>
+        {% endif %}
+        {% if agm.chairman %}
+        <div class="row mb-3">
+            <div class="col-md-3"><strong>Ordförande:</strong></div>
+            <div class="col-md-9">{{ agm.chairman }}</div>
+        </div>
+        {% endif %}
+        {% if agm.minutes_taker %}
+        <div class="row mb-3">
+            <div class="col-md-3"><strong>Protokollförare:</strong></div>
+            <div class="col-md-9">{{ agm.minutes_taker }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if agm.attendees %}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">Närvarande</h5></div>
+    <div class="card-body">
+        <p style="white-space: pre-line;">{{ agm.attendees }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% if agm.resolutions %}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">Beslut</h5></div>
+    <div class="card-body">
+        <p style="white-space: pre-line;">{{ agm.resolutions }}</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

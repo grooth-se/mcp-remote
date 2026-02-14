@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Uppdatera pris - {{ holding.name }}{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Investeringar', 'url': url_for('investments.index')},
+    {'title': holding.name, 'url': url_for('investments.holding_view', holding_id=holding.id)},
+    {'title': 'Uppdatera pris'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-currency-exchange"></i> Uppdatera pris — {{ holding.name }}</h2>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <div class="mb-3">
+            <p class="text-muted">
+                Antal: <strong>{{ "%.2f"|format(holding.quantity) }}</strong> |
+                Nuvarande pris: <strong>{% if holding.current_price %}{{ holding.current_price|sek(2) }}{% else %}-{% endif %}</strong>
+                {% if holding.last_price_date %} ({{ holding.last_price_date.strftime('%Y-%m-%d') }}){% endif %}
+            </p>
+        </div>
+        <form method="POST" data-unsaved-warning>
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.current_price.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.current_price(class="form-control") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.price_date.label.text }}</label>
+                    {{ form.price_date(class="form-control", type="date") }}
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('investments.holding_view', holding_id=holding.id) }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

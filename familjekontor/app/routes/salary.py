@@ -1,7 +1,7 @@
 from datetime import date
 from flask import (
     Blueprint, render_template, redirect, url_for, flash,
-    request, session,
+    request, session, send_file,
 )
 from flask_login import login_required, current_user
 from app.extensions import db
@@ -497,3 +497,35 @@ def collectum():
 
     return render_template('salary/collectum.html',
                            form=form, collectum=collectum_data, company=company)
+
+
+@salary_bp.route('/employees/export-csv')
+@login_required
+def employees_export_csv():
+    company_id, company, _ = _get_active_context()
+    if not company:
+        return redirect(url_for('dashboard.index'))
+    from app.services.csv_export_service import export_csv
+    emps = Employee.query.filter_by(company_id=company_id).order_by(Employee.last_name).all()
+    rows = [
+        {
+            'name': f'{e.first_name} {e.last_name}',
+            'personal_number': e.personal_number or '',
+            'email': e.email or '',
+            'employment_start': str(e.employment_start) if e.employment_start else '',
+            'monthly_salary': str(e.monthly_salary) if e.monthly_salary else '',
+            'active': 'Ja' if e.active else 'Nej',
+        }
+        for e in emps
+    ]
+    columns = [
+        ('name', 'Namn'),
+        ('personal_number', 'Personnummer'),
+        ('email', 'E-post'),
+        ('employment_start', 'Anställningsdatum'),
+        ('monthly_salary', 'Månadslön'),
+        ('active', 'Aktiv'),
+    ]
+    output = export_csv(rows, columns)
+    return send_file(output, mimetype='text/csv',
+                     as_attachment=True, download_name='anstallda.csv')

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Avyttra {{ asset.asset_number }} - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Anläggningstillgångar', 'url': url_for('assets.index')},
+    {'title': asset.asset_number, 'url': url_for('assets.view', asset_id=asset.id)},
+    {'title': 'Avyttra'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-trash"></i> Avyttra {{ asset.name }} ({{ asset.asset_number }})</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <h6 class="text-muted">Anskaffningsvärde</h6>
+                        <h4>{{ asset.purchase_amount|sek }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <h6 class="text-muted">Ack. avskrivningar</h6>
+                        <h4>{{ accumulated|sek }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center bg-light">
+                    <div class="card-body">
+                        <h6 class="text-muted">Bokfört värde</h6>
+                        <h4>{{ book_value|sek }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            Vid avyttring skapas en verifikation som bokför bort tillgången och eventuell vinst (3973) eller förlust (7973).
+        </div>
+
+        <form method="POST">
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label required-field">{{ form.disposal_date.label.text }}</label>
+                    {{ form.disposal_date(class="form-control") }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label required-field">{{ form.disposal_amount.label.text }}</label>
+                    {{ form.disposal_amount(class="form-control") }}
+                    <small class="text-muted">Ange 0 om tillgången skrotas utan försäljning.</small>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-danger", onclick="return confirm('Är du säker på att du vill avyttra denna tillgång?')") }}
+                <a href="{{ url_for('assets.view', asset_id=asset.id) }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

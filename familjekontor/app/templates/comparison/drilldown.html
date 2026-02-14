@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Kontoanalys {{ account_number }} - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-search"></i> Kontoanalys: {{ account_number }}{% if data %} {{ data.account.name }}{% endif %}</h2>
+    <div class="d-flex gap-2">
+        <form method="get" class="d-flex gap-2">
+            <select name="fiscal_year_id" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                {% for fy in fiscal_years %}
+                <option value="{{ fy.id }}" {% if fy.id == current_fy_id %}selected{% endif %}>
+                    {{ fy.year }}
+                </option>
+                {% endfor %}
+            </select>
+            <input type="date" name="start_date" class="form-control form-control-sm" style="width: auto;"
+                   value="{{ start_date or '' }}" placeholder="Från">
+            <input type="date" name="end_date" class="form-control form-control-sm" style="width: auto;"
+                   value="{{ end_date or '' }}" placeholder="Till">
+            <button type="submit" class="btn btn-sm btn-outline-primary">Filtrera</button>
+        </form>
+    </div>
+</div>
+
+{% if data %}
+<!-- Summary cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Ingående balans</h6>
+                <h4>{{ data.opening_balance|sek }} kr</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Total debet</h6>
+                <h4 class="text-success">{{ data.total_debit|sek }} kr</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Total kredit</h6>
+                <h4 class="text-danger">{{ data.total_credit|sek }} kr</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Utgående balans</h6>
+                <h4>{{ data.closing_balance|sek }} kr</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Transaction table -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">Transaktioner ({{ data.transactions|length }} st)</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Ver.nr</th>
+                            <th>Beskrivning</th>
+                            <th class="text-end">Debet</th>
+                            <th class="text-end">Kredit</th>
+                            <th class="text-end">Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if data.opening_balance %}
+                        <tr class="table-light">
+                            <td colspan="5"><em>Ingående balans</em></td>
+                            <td class="text-end"><em>{{ data.opening_balance|sek }}</em></td>
+                        </tr>
+                        {% endif %}
+                        {% for t in data.transactions %}
+                        <tr>
+                            <td>{{ t.date }}</td>
+                            <td>
+                                <a href="{{ url_for('accounting.view_verification', verification_id=t.verification_id) }}">
+                                    {{ t.verification_number }}
+                                </a>
+                            </td>
+                            <td>{{ t.description }}</td>
+                            <td class="text-end">{% if t.debit %}{{ t.debit|sek }}{% endif %}</td>
+                            <td class="text-end">{% if t.credit %}{{ t.credit|sek }}{% endif %}</td>
+                            <td class="text-end">{{ t.balance|sek }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not data.transactions %}
+                        <tr><td colspan="6" class="text-muted text-center">Inga transaktioner</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly summary -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">Månadsöversikt</div>
+            <div class="card-body">
+                <canvas id="monthlyChart" height="250"></canvas>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Månad</th>
+                            <th class="text-end">Debet</th>
+                            <th class="text-end">Kredit</th>
+                            <th class="text-end">Netto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set month_names = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'] %}
+                        {% for m in data.monthly %}
+                        {% if m.debit or m.credit %}
+                        <tr>
+                            <td>{{ month_names[m.month - 1] }}</td>
+                            <td class="text-end">{{ m.debit|sek }}</td>
+                            <td class="text-end">{{ m.credit|sek }}</td>
+                            <td class="text-end {% if m.net > 0 %}text-success{% elif m.net < 0 %}text-danger{% endif %}">
+                                {{ m.net|sek }}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Välj ett räkenskapsår.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var monthly = {{ data.monthly|tojson }};
+    var labels = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+    new Chart(document.getElementById('monthlyChart'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Netto',
+                    data: monthly.map(function(m) { return m.net; }),
+                    backgroundColor: monthly.map(function(m) {
+                        return m.net >= 0 ? 'rgba(25, 135, 84, 0.6)' : 'rgba(220, 53, 69, 0.6)';
+                    }),
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { title: { display: true, text: 'SEK' } } }
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,11 +1,11 @@
 // Verification form - dynamic rows and balance calculation
 
 let rowCount = 2;
+// Store original options HTML before Choices.js wraps the selects
+let accountOptionsHtml = '';
 
 function addRow() {
     const tbody = document.getElementById('rowsBody');
-    const firstRow = tbody.querySelector('.ver-row');
-    const selectHtml = firstRow.querySelector('select').innerHTML;
 
     const idx = rowCount;
     const tr = document.createElement('tr');
@@ -13,8 +13,8 @@ function addRow() {
     tr.dataset.index = idx;
     tr.innerHTML = `
         <td>
-            <select name="rows-${idx}-account_id" class="form-select form-select-sm">
-                ${selectHtml}
+            <select name="rows-${idx}-account_id" class="form-select form-select-sm searchable-select">
+                ${accountOptionsHtml}
             </select>
         </td>
         <td><input type="number" step="0.01" name="rows-${idx}-debit" class="form-control form-control-sm debit-input" value="0"></td>
@@ -24,6 +24,12 @@ function addRow() {
     `;
     tbody.appendChild(tr);
     rowCount++;
+
+    // Initialize Choices.js on the new select
+    var newSelect = tr.querySelector('select');
+    if (typeof initSearchableSelect === 'function') {
+        initSearchableSelect(newSelect);
+    }
 
     // Add event listeners
     tr.querySelectorAll('.debit-input, .credit-input').forEach(input => {
@@ -69,6 +75,12 @@ function updateTotals() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
+    // Capture original options HTML before Choices.js wraps the selects
+    var firstSelect = document.querySelector('#rowsBody .ver-row select');
+    if (firstSelect) {
+        accountOptionsHtml = firstSelect.innerHTML;
+    }
+
     document.querySelectorAll('.debit-input, .credit-input').forEach(input => {
         input.addEventListener('input', updateTotals);
     });

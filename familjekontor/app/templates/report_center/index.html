@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Rapportcenter - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Rapportcenter'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-grid-3x3-gap"></i> Rapportcenter</h2>
+</div>
+
+{% for category, reports in categories.items() %}
+<h5 class="mt-4 mb-3">{{ category }}</h5>
+<div class="row">
+    {% for r in reports %}
+    <div class="col-md-4 col-lg-3 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6><i class="bi {{ r.icon }}"></i> {{ r.name }}</h6>
+                <p class="text-muted small mb-2">{{ r.description }}</p>
+                <div class="d-flex gap-1 flex-wrap">
+                    <a href="{{ url_for(r.url_name) }}" class="btn btn-sm btn-outline-primary">Visa</a>
+                    {% if r.has_pdf and fiscal_years %}
+                    <a href="{{ url_for('report_center.pdf', report_type=r.key, fiscal_year_id=fiscal_years[0].id) }}"
+                       class="btn btn-sm btn-outline-danger" title="PDF">
+                        <i class="bi bi-file-earmark-pdf"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+{% if saved %}
+<h5 class="mt-4 mb-3">Sparade rapporter</h5>
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Namn</th>
+                    <th>Typ</th>
+                    <th>Sparad</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sr in saved %}
+                <tr>
+                    <td>{{ sr.name }}</td>
+                    <td>{{ sr.report_type }}</td>
+                    <td>{{ sr.created_at.strftime('%Y-%m-%d') if sr.created_at else '' }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('report_center.delete', report_id=sr.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Ta bort?')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

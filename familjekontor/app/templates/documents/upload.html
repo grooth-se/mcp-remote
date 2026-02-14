@@ -1,5 +1,13 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Ladda upp dokument - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Dokument', 'url': url_for('documents.index')},
+    {'title': 'Ladda upp'}
+]) }}
+{% endblock %}
 {% block content %}
 <h2 class="mb-4"><i class="bi bi-upload"></i> Ladda upp dokument</h2>
 

@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Anläggningstillgångar - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Anläggningstillgångar'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Antal tillgångar</h6>
+                <h3>{{ assets|length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Totalt anskaffningsvärde</h6>
+                <h3>{{ total_purchase|sek(0) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Totalt bokfört värde</h6>
+                <h3>{{ total_book|sek(0) }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Anläggningstillgångar</h5>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('assets.depreciation_list') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-down-circle"></i> Avskrivningar
+            </a>
+            <a href="{{ url_for('assets.new') }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg"></i> Ny tillgång
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="mb-3 d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('assets.index') }}"
+               class="btn btn-sm {% if not status_filter and not category_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">Alla</a>
+            <a href="{{ url_for('assets.index', status='active') }}"
+               class="btn btn-sm {% if status_filter == 'active' %}btn-success{% else %}btn-outline-success{% endif %}">Aktiva</a>
+            <a href="{{ url_for('assets.index', status='fully_depreciated') }}"
+               class="btn btn-sm {% if status_filter == 'fully_depreciated' %}btn-warning{% else %}btn-outline-warning{% endif %}">Fullt avskrivna</a>
+            <a href="{{ url_for('assets.index', status='disposed') }}"
+               class="btn btn-sm {% if status_filter == 'disposed' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Avyttrade</a>
+            {% for key, label in category_labels.items() %}
+            <a href="{{ url_for('assets.index', category=key) }}"
+               class="btn btn-sm {% if category_filter == key %}btn-info{% else %}btn-outline-info{% endif %}">{{ label }}</a>
+            {% endfor %}
+        </div>
+
+        {% if assets %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Nr</th>
+                        <th>Namn</th>
+                        <th>Kategori</th>
+                        <th class="text-end">Anskaffningsvärde</th>
+                        <th>Inköpsdatum</th>
+                        <th>Status</th>
+                        <th>Åtgärder</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in assets %}
+                    <tr data-href="{{ url_for('assets.view', asset_id=asset.id) }}" class="clickable-row">
+                        <td>{{ asset.asset_number }}</td>
+                        <td>{{ asset.name }}</td>
+                        <td>{{ asset.category_label }}</td>
+                        <td class="text-end">{{ asset.purchase_amount|sek }}</td>
+                        <td>{{ asset.purchase_date.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            {% if asset.status == 'active' %}
+                            <span class="badge bg-success">Aktiv</span>
+                            {% elif asset.status == 'fully_depreciated' %}
+                            <span class="badge bg-warning text-dark">Fullt avskriven</span>
+                            {% elif asset.status == 'disposed' %}
+                            <span class="badge bg-secondary">Avyttrad</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('assets.view', asset_id=asset.id) }}"
+                               class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">Inga tillgångar registrerade.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

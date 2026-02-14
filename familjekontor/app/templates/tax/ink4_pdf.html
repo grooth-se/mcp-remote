@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Inkomstdeklaration 4 (INK4) — {{ company.name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm;
+            @bottom-center {
+                content: "Sida " counter(page) " av " counter(pages);
+                font-size: 7pt;
+                color: #666;
+            }
+        }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 9pt;
+            line-height: 1.4;
+            color: #222;
+            margin: 0;
+        }
+        .page-break { page-break-before: always; }
+        .form-header {
+            background: #2d5016;
+            color: white;
+            padding: 8px 12px;
+            font-size: 12pt;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+        .form-header small {
+            font-weight: normal;
+            font-size: 8pt;
+            display: block;
+            margin-top: 2px;
+        }
+        .company-info {
+            border: 1px solid #999;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            font-size: 9pt;
+        }
+        .company-info .label { color: #666; font-size: 7pt; text-transform: uppercase; }
+        .company-info .value { font-weight: bold; font-size: 10pt; }
+        .form-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+        }
+        .form-table th {
+            background: #e8eddf;
+            padding: 4px 6px;
+            text-align: left;
+            font-size: 8pt;
+            font-weight: bold;
+            border-bottom: 1px solid #999;
+        }
+        .form-table td {
+            padding: 3px 6px;
+            border-bottom: 1px solid #ddd;
+            font-size: 9pt;
+        }
+        .form-table .field-nr { width: 40px; font-weight: bold; color: #2d5016; text-align: center; }
+        .form-table .field-sru { width: 40px; color: #999; text-align: center; font-size: 7pt; }
+        .form-table .field-value { width: 110px; text-align: right; font-family: 'Courier New', monospace; }
+        .section-row td { background: #f0f4e8; font-weight: bold; font-size: 9pt; padding: 5px 6px; border-bottom: 1px solid #bbb; }
+        .total-row td { background: #e0e8d0; font-weight: bold; border-top: 1px solid #999; border-bottom: 1px solid #999; }
+        .grand-total td { background: #c8d8a8; font-weight: bold; font-size: 10pt; border-top: 2px solid #2d5016; border-bottom: 2px solid #2d5016; }
+        .main-field {
+            border: 1px solid #999;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .main-field .field-nr { font-weight: bold; color: #2d5016; font-size: 11pt; margin-right: 12px; }
+        .main-field .field-label { flex: 1; }
+        .main-field .field-value { font-family: 'Courier New', monospace; font-size: 12pt; font-weight: bold; min-width: 120px; text-align: right; }
+        .info-box { background: #f8f9f0; border: 1px solid #bbb; padding: 10px; margin: 12px 0; font-size: 9pt; }
+        .skv-ref { color: #999; font-size: 7pt; text-align: right; margin-top: 4px; }
+        h2 { font-size: 12pt; margin: 16px 0 8px; }
+    </style>
+</head>
+<body>
+
+{# ===== PAGE 1: INK4 Huvudblankett ===== #}
+<div class="form-header">
+    Inkomstdeklaration 4 (INK4)
+    <small>Handelsbolag och kommanditbolag — Skatteverket</small>
+</div>
+
+<div class="company-info">
+    <table style="width:100%">
+        <tr>
+            <td style="width:50%">
+                <span class="label">Företagsnamn</span><br>
+                <span class="value">{{ company.name }}</span>
+            </td>
+            <td style="width:25%">
+                <span class="label">Organisationsnummer</span><br>
+                <span class="value">{{ company.org_number }}</span>
+            </td>
+            <td style="width:25%">
+                <span class="label">Räkenskapsår</span><br>
+                <span class="value">{{ fy.start_date }} — {{ fy.end_date }}</span>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div class="info-box">
+    <strong>Handelsbolag/kommanditbolag</strong> betalar ingen bolagsskatt.
+    Resultatet fördelas till delägarna som beskattas i sina respektive inkomstdeklarationer.
+</div>
+
+<h2>Näringsverksamhet</h2>
+
+{% for field_nr, field in ink_main.items() %}
+<div class="main-field">
+    <span class="field-nr">{{ field_nr }}</span>
+    <span class="field-label">{{ field.label }}</span>
+    <span class="field-value">
+        {% if field.value and field.value > 0 %}
+            {{ "{:,.0f}".format(field.value|float).replace(",", " ") }}
+        {% else %}
+            —
+        {% endif %}
+    </span>
+</div>
+{% endfor %}
+
+<div class="skv-ref">Genererat av Familjekontor</div>
+
+{# ===== PAGE 2: INK4R Balansräkning ===== #}
+<div class="page-break"></div>
+
+<div class="form-header">
+    INK4R — Räkenskapsschema: Balansräkning
+    <small>{{ company.name }} ({{ company.org_number }}) — Räkenskapsår {{ fy.start_date }} till {{ fy.end_date }}</small>
+</div>
+
+<table class="form-table">
+    <thead>
+        <tr>
+            <th class="field-nr">Fält</th>
+            <th>Benämning</th>
+            <th class="field-sru">SRU</th>
+            <th class="field-value">Belopp (SEK)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for key, field in balance_sheet.items() %}
+        {% if field.get('is_section') %}
+        <tr class="section-row">
+            <td class="field-nr"></td>
+            <td colspan="2">{{ field.label }}</td>
+            <td class="field-value"></td>
+        </tr>
+        {% elif field.get('is_total') or key.startswith('sum_') %}
+        <tr class="{{ 'grand-total' if key in ('sum_assets', 'sum_equity_liabilities') else 'total-row' }}">
+            <td class="field-nr"></td>
+            <td>{{ field.label }}</td>
+            <td class="field-sru">{{ field.sru_code or '' }}</td>
+            <td class="field-value">{{ "{:,.0f}".format(field.value|float).replace(",", " ") }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td class="field-nr">{{ key }}</td>
+            <td>{{ field.label }}</td>
+            <td class="field-sru">{{ field.sru_code or '' }}</td>
+            <td class="field-value">
+                {% if field.value and field.value|float|abs > 0.005 %}
+                    {{ "{:,.0f}".format(field.value|float).replace(",", " ") }}
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </tbody>
+</table>
+
+{# ===== PAGE 3: INK4R Resultaträkning ===== #}
+<div class="page-break"></div>
+
+<div class="form-header">
+    INK4R — Räkenskapsschema: Resultaträkning
+    <small>{{ company.name }} ({{ company.org_number }}) — Räkenskapsår {{ fy.start_date }} till {{ fy.end_date }}</small>
+</div>
+
+<table class="form-table">
+    <thead>
+        <tr>
+            <th class="field-nr">Fält</th>
+            <th>Benämning</th>
+            <th class="field-sru">SRU</th>
+            <th class="field-value">Belopp (SEK)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for key, field in income_statement.items() %}
+        {% if field.get('is_section') %}
+        <tr class="section-row">
+            <td class="field-nr"></td>
+            <td colspan="2">{{ field.label }}</td>
+            <td class="field-value"></td>
+        </tr>
+        {% elif field.get('is_total') or key.startswith('sum_') or key.startswith('operating_') or key.startswith('result_') %}
+        <tr class="{{ 'grand-total' if key in ('3.26', '3.27') and field.value and field.value|float|abs > 0.005 else 'total-row' }}">
+            <td class="field-nr">{% if key[0].isdigit() %}{{ key }}{% endif %}</td>
+            <td>{{ field.label }}</td>
+            <td class="field-sru">{{ field.sru_code or '' }}</td>
+            <td class="field-value">{{ "{:,.0f}".format(field.value|float).replace(",", " ") }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td class="field-nr">{{ key }}</td>
+            <td>{{ field.label }}</td>
+            <td class="field-sru">{{ field.sru_code or '' }}</td>
+            <td class="field-value">
+                {% if field.value and field.value|float|abs > 0.005 %}
+                    {{ "{:,.0f}".format(field.value|float).replace(",", " ") }}
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </tbody>
+</table>
+
+{# ===== PAGE 4: INK4S Skattemässiga justeringar ===== #}
+<div class="page-break"></div>
+
+<div class="form-header">
+    INK4S — Skattemässiga justeringar
+    <small>{{ company.name }} ({{ company.org_number }}) — Beskattningsår {{ tr.tax_year }}</small>
+</div>
+
+<table class="form-table">
+    <thead>
+        <tr>
+            <th class="field-nr">Fält</th>
+            <th>Benämning</th>
+            <th class="field-sru">SRU</th>
+            <th class="field-value">Belopp (SEK)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for key, field in ink_s.items() %}
+        {% if field.get('is_section') %}
+        <tr class="section-row">
+            <td class="field-nr"></td>
+            <td colspan="2">{{ field.label }}</td>
+            <td class="field-value"></td>
+        </tr>
+        {% elif field.get('is_total') %}
+        <tr class="grand-total">
+            <td class="field-nr">{{ key }}</td>
+            <td>{{ field.label }}</td>
+            <td class="field-sru">{{ field.sru_code or '' }}</td>
+            <td class="field-value">{{ "{:,.0f}".format(field.value|float).replace(",", " ") }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td class="field-nr">{{ key }}</td>
+            <td>{{ field.label }}</td>
+            <td class="field-sru">{{ field.sru_code or '' }}</td>
+            <td class="field-value">
+                {% if field.value and field.value|float|abs > 0.005 %}
+                    {{ "{:,.0f}".format(field.value|float).replace(",", " ") }}
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="skv-ref">Genererat av Familjekontor</div>
+
+</body>
+</html>

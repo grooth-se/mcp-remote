@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Investeringsrapporter - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Investeringar', 'url': url_for('investments.index')},
+    {'title': 'Rapporter'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-bar-chart"></i> Investeringsrapporter</h2>
+
+{# Portfolio Performance #}
+<div class="card mb-4 mt-3">
+    <div class="card-header"><h5 class="mb-0">Portföljöversikt</h5></div>
+    <div class="card-body">
+        {% if summary.portfolios %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Portfölj</th>
+                        <th>Mäklare</th>
+                        <th class="text-end">Innehav</th>
+                        <th class="text-end">Kostnad</th>
+                        <th class="text-end">Värde</th>
+                        <th class="text-end">Orealiserat</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in summary.portfolios %}
+                    <tr>
+                        <td><a href="{{ url_for('investments.portfolio_view', portfolio_id=p.portfolio.id) }}">{{ p.portfolio.name }}</a></td>
+                        <td>{{ p.portfolio.broker or '-' }}</td>
+                        <td class="text-end">{{ p.holdings_count }}</td>
+                        <td class="text-end">{{ p.total_cost|sek(0) }}</td>
+                        <td class="text-end">{{ p.total_value|sek(0) }}</td>
+                        <td class="text-end">
+                            <span class="{% if p.unrealized_gain > 0 %}text-success{% elif p.unrealized_gain < 0 %}text-danger{% endif %}">
+                                {{ p.unrealized_gain|sek(0) }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-primary">
+                        <td colspan="3"><strong>Totalt</strong></td>
+                        <td class="text-end"><strong>{{ summary.total_cost|sek(0) }}</strong></td>
+                        <td class="text-end"><strong>{{ summary.total_value|sek(0) }}</strong></td>
+                        <td class="text-end">
+                            <strong class="{% if summary.total_unrealized > 0 %}text-success{% elif summary.total_unrealized < 0 %}text-danger{% endif %}">
+                                {{ summary.total_unrealized|sek(0) }}
+                            </strong>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Inga portföljer.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# Dividend Income #}
+{% if active_fy %}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">Utdelningsintäkter {{ active_fy.year }}</h5></div>
+    <div class="card-body">
+        {% if dividend_summary %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Värdepapper</th>
+                        <th class="text-end">Antal utdelningar</th>
+                        <th class="text-end">Totalt belopp (SEK)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in dividend_summary %}
+                    <tr>
+                        <td>{{ row.name }}</td>
+                        <td class="text-end">{{ row.count }}</td>
+                        <td class="text-end">{{ row.total|sek }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-primary">
+                        <td><strong>Totalt</strong></td>
+                        <td></td>
+                        <td class="text-end"><strong>{{ dividend_summary|sum(attribute='total')|sek }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Inga utdelningar under {{ active_fy.year }}.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

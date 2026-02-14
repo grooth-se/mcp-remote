@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Kund/Leverantörsanalys - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Kund/Lev-analys'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-people-fill"></i> Kund/Leverantörsanalys</h2>
+    <form method="get">
+        <select name="fiscal_year_id" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+            {% for fy in fiscal_years %}
+            <option value="{{ fy.id }}" {% if fy.id == current_fy_id %}selected{% endif %}>
+                {{ fy.year }}
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<!-- KPI Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">DSO (betaldagar kund)</h6>
+                <h4>{% if dso is not none %}{{ dso }} dagar{% else %}-{% endif %}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">DPO (betaldagar lev.)</h6>
+                <h4>{% if dpo is not none %}{{ dpo }} dagar{% else %}-{% endif %}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Totalt kundfordringar</h6>
+                <h4 class="text-success">{{ ar.totals.total|sek }} kr</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle text-muted">Totalt leverantörsskulder</h6>
+                <h4 class="text-danger">{{ ap.totals.total|sek }} kr</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Top Customers Chart -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Topp kunder
+                <a href="{{ url_for('arap.receivables') }}" class="btn btn-sm btn-outline-primary float-end">Åldersanalys</a>
+            </div>
+            <div class="card-body">
+                <canvas id="topCustomersChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue Breakdown -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Intäktsfördelning
+                <a href="{{ url_for('arap.payables') }}" class="btn btn-sm btn-outline-primary float-end">Leverantörer</a>
+            </div>
+            <div class="card-body">
+                <canvas id="revenueChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick aging summary -->
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Kundfordringar — åldringsöversikt</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Aktuell</th>
+                            <th>1-30 dagar</th>
+                            <th>31-60 dagar</th>
+                            <th>61-90 dagar</th>
+                            <th>90+ dagar</th>
+                            <th>Totalt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ ar.totals.current|sek }}</td>
+                            <td>{{ ar.totals['1_30']|sek }}</td>
+                            <td>{{ ar.totals['31_60']|sek }}</td>
+                            <td class="{% if ar.totals['61_90'] > 0 %}text-warning{% endif %}">{{ ar.totals['61_90']|sek }}</td>
+                            <td class="{% if ar.totals['90_plus'] > 0 %}text-danger fw-bold{% endif %}">{{ ar.totals['90_plus']|sek }}</td>
+                            <td><strong>{{ ar.totals.total|sek }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Leverantörsskulder — åldringsöversikt</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Aktuell</th>
+                            <th>1-30 dagar</th>
+                            <th>31-60 dagar</th>
+                            <th>61-90 dagar</th>
+                            <th>90+ dagar</th>
+                            <th>Totalt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ ap.totals.current|sek }}</td>
+                            <td>{{ ap.totals['1_30']|sek }}</td>
+                            <td>{{ ap.totals['31_60']|sek }}</td>
+                            <td class="{% if ap.totals['61_90'] > 0 %}text-warning{% endif %}">{{ ap.totals['61_90']|sek }}</td>
+                            <td class="{% if ap.totals['90_plus'] > 0 %}text-danger fw-bold{% endif %}">{{ ap.totals['90_plus']|sek }}</td>
+                            <td><strong>{{ ap.totals.total|sek }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if current_fy_id %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var fyId = {{ current_fy_id }};
+    var colors = ['#198754','#0d6efd','#ffc107','#dc3545','#6f42c1','#20c997','#fd7e14','#6610f2','#0dcaf0','#d63384'];
+
+    fetch('{{ url_for("arap.api_top_customers") }}?fiscal_year_id=' + fyId)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.labels && data.labels.length) {
+                new Chart(document.getElementById('topCustomersChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: 'Fakturerat belopp',
+                            data: data.values,
+                            backgroundColor: colors.slice(0, data.labels.length),
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: { title: { display: true, text: 'SEK' } } }
+                    }
+                });
+            }
+        });
+
+    fetch('{{ url_for("arap.api_revenue_breakdown") }}?fiscal_year_id=' + fyId)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.labels && data.labels.length) {
+                new Chart(document.getElementById('revenueChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            data: data.values,
+                            backgroundColor: colors.slice(0, data.labels.length),
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right', labels: { boxWidth: 12 } } }
+                    }
+                });
+            }
+        });
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination, sortable_header %}
 {% from "macros/empty_state.html" import render_empty_state %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Leverantörsfakturor - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Bokföring', 'url': url_for('accounting.index')},
+    {'title': 'Leverantörsfakturor'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>Leverantörsfakturor</h2>
@@ -26,52 +34,63 @@
         {% if search %}<a href="{{ url_for('invoices.supplier_invoices', status=status) }}" class="btn btn-outline-secondary">Rensa</a>{% endif %}
     </div>
 </form>
-<div class="table-responsive">
-    <table class="table table-hover">
-        <thead>
-            <tr>
-                <th>Leverantör</th>
-                {{ sortable_header('Fakturanr', 'invoice_number', sort, order, 'invoices.supplier_invoices', status=status, search=search) }}
-                {{ sortable_header('Datum', 'invoice_date', sort, order, 'invoices.supplier_invoices', status=status, search=search) }}
-                {{ sortable_header('Förfaller', 'due_date', sort, order, 'invoices.supplier_invoices', status=status, search=search) }}
-                {{ sortable_header('Belopp', 'total_amount', sort, order, 'invoices.supplier_invoices', class='text-end', status=status, search=search) }}
-                <th>Valuta</th><th>Status</th><th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for inv in pagination.items %}
-            <tr>
-                <td>{{ inv.supplier.name }}</td>
-                <td>{{ inv.invoice_number }}</td>
-                <td>{{ inv.invoice_date }}</td>
-                <td>{{ inv.due_date }}</td>
-                <td class="text-end">{{ inv.total_amount|sek }}</td>
-                <td>{{ inv.currency }}</td>
-                <td>
-                    {% if inv.status == 'pending' %}<span class="badge bg-warning">Väntande</span>
-                    {% elif inv.status == 'approved' %}<span class="badge bg-info">Godkänd</span>
-                    {% elif inv.status == 'paid' %}<span class="badge bg-success">Betald</span>
-                    {% else %}<span class="badge bg-secondary">{{ inv.status }}</span>{% endif %}
-                </td>
-                <td>
-                    {% if inv.status == 'pending' %}
-                    <form method="POST" action="{{ url_for('invoices.approve_supplier_invoice', invoice_id=inv.id) }}" class="d-inline">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-info" data-bs-toggle="tooltip" title="Godkänn faktura">Godkänn</button>
-                    </form>
-                    {% elif inv.status == 'approved' %}
-                    <form method="POST" action="{{ url_for('invoices.pay_supplier_invoice', invoice_id=inv.id) }}" class="d-inline">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button class="btn btn-sm btn-outline-success" data-confirm="Markera fakturan som betald?" data-bs-toggle="tooltip" title="Markera som betald">Betala</button>
-                    </form>
-                    {% endif %}
-                </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="8">{{ render_empty_state('receipt', 'Inga leverantörsfakturor', 'Registrera din första leverantörsfaktura.', url_for('invoices.new_supplier_invoice'), 'Ny leverantörsfaktura') }}</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="batch-container">
+    <div class="d-flex gap-2 mb-2 align-items-center" id="batch-toolbar">
+        <span class="badge bg-primary" id="batch-count">0</span> <span class="small">markerade</span>
+        <button class="btn btn-sm btn-outline-info" data-batch-action="approve"
+                data-batch-url="{{ url_for('batch.approve_supplier_invoices') }}"><i class="bi bi-check-circle"></i> Godkänn</button>
+        <button class="btn btn-sm btn-outline-secondary" data-batch-action="export"
+                data-batch-url="{{ url_for('batch.export_supplier_invoices') }}"><i class="bi bi-download"></i> Exportera CSV</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-sticky-header">
+            <thead>
+                <tr>
+                    <th class="batch-check-cell"><input type="checkbox" id="batch-select-all" class="form-check-input"></th>
+                    <th>Leverantör</th>
+                    {{ sortable_header('Fakturanr', 'invoice_number', sort, order, 'invoices.supplier_invoices', status=status, search=search) }}
+                    {{ sortable_header('Datum', 'invoice_date', sort, order, 'invoices.supplier_invoices', status=status, search=search) }}
+                    {{ sortable_header('Förfaller', 'due_date', sort, order, 'invoices.supplier_invoices', status=status, search=search) }}
+                    {{ sortable_header('Belopp', 'total_amount', sort, order, 'invoices.supplier_invoices', class='text-end', status=status, search=search) }}
+                    <th>Valuta</th><th>Status</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in pagination.items %}
+                <tr>
+                    <td class="batch-check-cell"><input type="checkbox" class="form-check-input batch-checkbox" value="{{ inv.id }}"></td>
+                    <td>{{ inv.supplier.name }}</td>
+                    <td>{{ inv.invoice_number }}</td>
+                    <td>{{ inv.invoice_date }}</td>
+                    <td>{{ inv.due_date }}</td>
+                    <td class="text-end">{{ inv.total_amount|sek }}</td>
+                    <td>{{ inv.currency }}</td>
+                    <td>
+                        {% if inv.status == 'pending' %}<span class="badge bg-warning">Väntande</span>
+                        {% elif inv.status == 'approved' %}<span class="badge bg-info">Godkänd</span>
+                        {% elif inv.status == 'paid' %}<span class="badge bg-success">Betald</span>
+                        {% else %}<span class="badge bg-secondary">{{ inv.status }}</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if inv.status == 'pending' %}
+                        <form method="POST" action="{{ url_for('invoices.approve_supplier_invoice', invoice_id=inv.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-outline-info" data-bs-toggle="tooltip" title="Godkänn faktura">Godkänn</button>
+                        </form>
+                        {% elif inv.status == 'approved' %}
+                        <form method="POST" action="{{ url_for('invoices.pay_supplier_invoice', invoice_id=inv.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-sm btn-outline-success" data-confirm="Markera fakturan som betald?" data-bs-toggle="tooltip" title="Markera som betald">Betala</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="10">{{ render_empty_state('receipt', 'Inga leverantörsfakturor', 'Registrera din första leverantörsfaktura.', url_for('invoices.new_supplier_invoice'), 'Ny leverantörsfaktura') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {{ render_pagination(pagination, 'invoices.supplier_invoices', status=status, search=search, sort=sort, order=order) }}
 {% endblock %}

@@ -14,7 +14,7 @@
     <form method="POST" data-warn-unsaved>
         {{ form.hidden_tag() }}
         <div class="row mb-3">
-            <div class="col-md-6">{{ form.customer_id.label(class="form-label required") }}{{ form.customer_id(class="form-select") }}</div>
+            <div class="col-md-6">{{ form.customer_id.label(class="form-label required") }}{{ form.customer_id(class="form-select searchable-select") }}</div>
             <div class="col-md-3">{{ form.invoice_number.label(class="form-label required") }}{{ form.invoice_number(class="form-control") }}</div>
             <div class="col-md-3">{{ form.vat_type.label(class="form-label") }} <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Omvänd skattskyldighet = köparen redovisar moms. Export = momsfri utlandsförsäljning"></i>{{ form.vat_type(class="form-select") }}</div>
         </div>

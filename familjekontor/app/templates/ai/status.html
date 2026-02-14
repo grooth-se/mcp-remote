@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}AI Status - Familjekontor{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-cpu"></i> AI Systemstatus</h2>
+    <a href="{{ url_for('ai.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Tillbaka till assistenten
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-robot"></i> Ollama (LLM)</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Aktiverad</dt>
+                    <dd class="col-7">
+                        {% if ai_status.enabled %}
+                        <span class="badge bg-success">Ja</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Nej</span>
+                        <br><small class="text-muted">Sätt <code>OLLAMA_ENABLED=true</code></small>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-5">Tillgänglig</dt>
+                    <dd class="col-7">
+                        {% if ai_status.available %}
+                        <span class="badge bg-success">Ja</span>
+                        {% else %}
+                        <span class="badge bg-danger">Nej</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-5">Värd</dt>
+                    <dd class="col-7"><code>{{ ai_status.host }}</code></dd>
+
+                    <dt class="col-5">Modell</dt>
+                    <dd class="col-7"><code>{{ ai_status.model }}</code></dd>
+
+                    {% if ai_status.models %}
+                    <dt class="col-5">Tillgängliga modeller</dt>
+                    <dd class="col-7">
+                        {% for m in ai_status.models %}
+                        <span class="badge bg-info me-1">{{ m }}</span>
+                        {% endfor %}
+                    </dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-eye"></i> Tesseract (OCR)</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5">Tillgänglig</dt>
+                    <dd class="col-7">
+                        {% if tesseract_available %}
+                        <span class="badge bg-success">Ja</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Ej installerad</span>
+                        <br><small class="text-muted">Installera: <code>brew install tesseract</code></small>
+                        {% endif %}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><i class="bi bi-gear"></i> Installation</div>
+    <div class="card-body">
+        <h6>Ollama</h6>
+        <ol>
+            <li>Installera Ollama: <code>brew install ollama</code> (macOS) eller <a href="https://ollama.ai" target="_blank">ollama.ai</a></li>
+            <li>Starta: <code>ollama serve</code></li>
+            <li>Ladda ner modell: <code>ollama pull llama3.2</code></li>
+            <li>Aktivera i appen: <code>OLLAMA_ENABLED=true flask run</code></li>
+        </ol>
+
+        <h6 class="mt-3">Tesseract OCR</h6>
+        <ol>
+            <li>Installera: <code>brew install tesseract</code></li>
+            <li>Svenska språkdata: <code>brew install tesseract-lang</code></li>
+            <li>Python-paket: <code>pip install pytesseract Pillow</code></li>
+        </ol>
+    </div>
+</div>
+{% endblock %}

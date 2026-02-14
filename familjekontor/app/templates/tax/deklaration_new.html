@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Ny deklaration - Familjekontor{% endblock %}
+{% block content %}
+<h2><i class="bi bi-file-earmark-plus"></i> Ny inkomstdeklaration</h2>
+<p class="text-muted">{{ company.name }} ({{ company.company_type }})</p>
+
+<div class="card mt-3" style="max-width: 600px;">
+    <div class="card-body">
+        <form method="post">
+            {{ form.hidden_tag() }}
+            <div class="mb-3">
+                {{ form.fiscal_year_id.label(class="form-label") }}
+                {{ form.fiscal_year_id(class="form-select") }}
+                <div class="form-text">Resultatdata hämtas automatiskt från bokföringen.</div>
+            </div>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                {% if company.company_type == 'AB' %}
+                    Skapar <strong>INK2</strong> (Inkomstdeklaration Aktiebolag). Bolagsskatt: 20,6%.
+                {% elif company.company_type in ('HB', 'KB') %}
+                    Skapar <strong>INK4</strong> (Inkomstdeklaration Handelsbolag). Ingen bolagsskatt — resultatet fördelas på delägare.
+                {% else %}
+                    Skapar inkomstdeklaration baserat på företagstyp.
+                {% endif %}
+            </div>
+            {{ form.submit(class="btn btn-primary") }}
+            <a href="{{ url_for('tax.deklaration_index') }}" class="btn btn-outline-secondary">Avbryt</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -3,6 +3,12 @@
 {% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% from "macros/empty_state.html" import render_empty_state %}
 {% block title %}Verifikationer - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Verifikationer'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>Verifikationer</h2>
@@ -19,6 +25,10 @@
         {% if current_fy_id %}
         <a href="{{ url_for('accounting.export_csv', fiscal_year_id=current_fy_id, search=search) }}" class="btn btn-outline-secondary btn-sm" data-bs-toggle="tooltip" title="Exportera till CSV"><i class="bi bi-download"></i> CSV</a>
         {% endif %}
+        <div class="dropdown col-visibility-dropdown d-inline-block">
+            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside"><i class="bi bi-layout-three-columns"></i> Kolumner</button>
+            <ul class="dropdown-menu dropdown-menu-end"></ul>
+        </div>
         <a href="{{ url_for('accounting.new_verification') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle"></i> Ny</a>
     </div>
 </div>
@@ -32,45 +42,57 @@
         {% if search %}<a href="{{ url_for('accounting.index', fiscal_year_id=current_fy_id) }}" class="btn btn-outline-secondary">Rensa</a>{% endif %}
     </div>
 </form>
-<div class="table-responsive">
-    <table class="table table-hover">
-        <thead>
-            <tr>
-                {{ sortable_header('#', 'verification_number', sort, order, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
-                {{ sortable_header('Datum', 'verification_date', sort, order, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
-                {{ sortable_header('Beskrivning', 'description', sort, order, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
-                <th>Typ</th><th class="text-end">Debet</th><th class="text-end">Kredit</th><th><i class="bi bi-paperclip"></i></th><th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% if pagination %}
-            {% for ver in pagination.items %}
-            <tr data-row-link="{{ url_for('accounting.view_verification', verification_id=ver.id) }}">
-                <td>{{ ver.verification_number }}</td>
-                <td>{{ ver.verification_date }}</td>
-                <td>{{ ver.description }}</td>
-                <td>{{ ver.verification_type }}</td>
-                <td class="text-end">{{ ver.total_debit|sek }}</td>
-                <td class="text-end">{{ ver.total_credit|sek }}</td>
-                <td>
-                    {% if ver.documents %}
-                    <span class="text-primary" style="cursor:pointer;"
-                          data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true"
-                          data-bs-content="{% for doc in ver.documents %}<a href='{{ url_for('documents.view', doc_id=doc.id) }}'>{{ doc.file_name }}</a><br>{% endfor %}">
-                        <i class="bi bi-paperclip"></i> {{ ver.documents|length }}
-                    </span>
-                    {% endif %}
-                </td>
-                <td><a href="{{ url_for('accounting.view_verification', verification_id=ver.id) }}" class="btn btn-sm btn-outline-primary">Visa</a></td>
-            </tr>
-            {% else %}
-            <tr><td colspan="8">{{ render_empty_state('journal-text', 'Inga verifikationer', 'Skapa din första verifikation för att komma igång.', url_for('accounting.new_verification'), 'Skapa ny verifikation') }}</td></tr>
-            {% endfor %}
-            {% else %}
-            <tr><td colspan="8" class="text-center text-muted py-4">Välj ett räkenskapsår.</td></tr>
-            {% endif %}
-        </tbody>
-    </table>
+<div class="batch-container">
+    <div class="d-flex gap-2 mb-2 align-items-center" id="batch-toolbar">
+        <span class="badge bg-primary" id="batch-count">0</span> <span class="small">markerade</span>
+        <button class="btn btn-sm btn-outline-danger" data-batch-action="delete"
+                data-batch-url="{{ url_for('batch.delete_verifications') }}"
+                data-batch-confirm="Vill du ta bort de markerade verifikationerna?"><i class="bi bi-trash"></i> Ta bort</button>
+        <button class="btn btn-sm btn-outline-secondary" data-batch-action="export"
+                data-batch-url="{{ url_for('batch.export_verifications') }}"><i class="bi bi-download"></i> Exportera CSV</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-sticky-header">
+            <thead>
+                <tr>
+                    <th class="batch-check-cell"><input type="checkbox" id="batch-select-all" class="form-check-input"></th>
+                    {{ sortable_header('#', 'verification_number', sort, order, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
+                    {{ sortable_header('Datum', 'verification_date', sort, order, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
+                    {{ sortable_header('Beskrivning', 'description', sort, order, 'accounting.index', fiscal_year_id=current_fy_id, search=search) }}
+                    <th>Typ</th><th class="text-end">Debet</th><th class="text-end">Kredit</th><th><i class="bi bi-paperclip"></i></th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if pagination %}
+                {% for ver in pagination.items %}
+                <tr data-row-link="{{ url_for('accounting.view_verification', verification_id=ver.id) }}">
+                    <td class="batch-check-cell"><input type="checkbox" class="form-check-input batch-checkbox" value="{{ ver.id }}"></td>
+                    <td>{{ ver.verification_number }}</td>
+                    <td>{{ ver.verification_date }}</td>
+                    <td>{{ ver.description }}</td>
+                    <td>{{ ver.verification_type }}</td>
+                    <td class="text-end">{{ ver.total_debit|sek }}</td>
+                    <td class="text-end">{{ ver.total_credit|sek }}</td>
+                    <td>
+                        {% if ver.documents %}
+                        <span class="text-primary" style="cursor:pointer;"
+                              data-bs-toggle="popover" data-bs-trigger="hover focus" data-bs-html="true"
+                              data-bs-content="{% for doc in ver.documents %}<a href='{{ url_for('documents.view', doc_id=doc.id) }}'>{{ doc.file_name }}</a><br>{% endfor %}">
+                            <i class="bi bi-paperclip"></i> {{ ver.documents|length }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td><a href="{{ url_for('accounting.view_verification', verification_id=ver.id) }}" class="btn btn-sm btn-outline-primary">Visa</a></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="10">{{ render_empty_state('journal-text', 'Inga verifikationer', 'Skapa din första verifikation för att komma igång.', url_for('accounting.new_verification'), 'Skapa ny verifikation') }}</td></tr>
+                {% endfor %}
+                {% else %}
+                <tr><td colspan="10" class="text-center text-muted py-4">Välj ett räkenskapsår.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% if pagination %}
 {{ render_pagination(pagination, 'accounting.index', fiscal_year_id=current_fy_id, search=search, sort=sort, order=order) }}

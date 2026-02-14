@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}{{ ink_type }} Inkomstdeklaration {{ tr.tax_year }} - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Skatt', 'url': url_for('tax.index')},
+    {'title': 'Deklarationer', 'url': url_for('tax.deklaration_index')},
+    {'title': ink_type + ' ' + tr.tax_year|string}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2><i class="bi bi-file-earmark-ruled"></i> {{ ink_type }} Inkomstdeklaration {{ tr.tax_year }}</h2>
+        <p class="text-muted mb-0">{{ company.name }} ({{ company.org_number }}) — Räkenskapsår {{ fy.start_date }} till {{ fy.end_date }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('tax.deklaration_ink_pdf', return_id=tr.id) }}" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-filetype-pdf"></i> PDF
+        </a>
+        <a href="{{ url_for('tax.deklaration_sru_export', return_id=tr.id) }}" class="btn btn-outline-dark btn-sm">
+            <i class="bi bi-file-code"></i> SRU-fil
+        </a>
+        <a href="{{ url_for('tax.deklaration_export', return_id=tr.id) }}" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+        </a>
+        <a href="{{ url_for('tax.deklaration_view', return_id=tr.id) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Tillbaka
+        </a>
+    </div>
+</div>
+
+{# Status badge #}
+<div class="mb-3">
+    {% if tr.status == 'draft' %}
+    <span class="badge bg-warning text-dark">Utkast</span>
+    {% elif tr.status == 'submitted' %}
+    <span class="badge bg-primary">Inlämnad {{ tr.submitted_at.strftime('%Y-%m-%d') if tr.submitted_at else '' }}</span>
+    {% elif tr.status == 'approved' %}
+    <span class="badge bg-success">Godkänd</span>
+    {% endif %}
+    <span class="badge bg-info">{{ ink_type }}</span>
+    {% if ink_type == 'INK2' %}
+    <span class="badge bg-secondary">Bolagsskatt {{ (tr.tax_rate * 100)|round(1) }}%</span>
+    {% else %}
+    <span class="badge bg-secondary">Handelsbolag (genomskinligt)</span>
+    {% endif %}
+</div>
+
+{# Tabs #}
+<ul class="nav nav-tabs" id="inkTabs" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button">
+            <i class="bi bi-speedometer2"></i> Översikt
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" id="bs-tab" data-bs-toggle="tab" data-bs-target="#balansrakning" type="button">
+            <i class="bi bi-bank"></i> Balansräkning
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" id="is-tab" data-bs-toggle="tab" data-bs-target="#resultatrakning" type="button">
+            <i class="bi bi-graph-up"></i> Resultaträkning
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" id="adj-tab" data-bs-toggle="tab" data-bs-target="#justeringar" type="button">
+            <i class="bi bi-sliders"></i> Skattemässiga justeringar
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" id="main-tab" data-bs-toggle="tab" data-bs-target="#huvudblankett" type="button">
+            <i class="bi bi-file-earmark-text"></i> Huvudblankett
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content pt-3" id="inkTabContent">
+
+    {# ===== TAB: Översikt ===== #}
+    <div class="tab-pane fade show active" id="overview" role="tabpanel">
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="card-title text-muted">Summa tillgångar</h6>
+                        <h3>{{ totals.sum_assets|sek }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="card-title text-muted">Årets resultat</h6>
+                        <h3 class="{{ 'text-success' if totals.annual_result >= 0 else 'text-danger' }}">{{ totals.annual_result|sek }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h6 class="card-title text-muted">
+                            {% if ink_type == 'INK2' %}Beräknad bolagsskatt{% else %}Beskattningsbart resultat{% endif %}
+                        </h6>
+                        <h3>
+                            {% if ink_type == 'INK2' %}
+                                {{ tr.calculated_tax|sek }}
+                            {% else %}
+                                {{ tr.taxable_income|sek }}
+                            {% endif %}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Balansräkning — kontroll</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>Summa tillgångar</td>
+                        <td class="text-end">{{ totals.sum_assets|sek }}</td>
+                    </tr>
+                    <tr>
+                        <td>Summa eget kapital och skulder</td>
+                        <td class="text-end">{{ totals.sum_equity_liabilities|sek }}</td>
+                    </tr>
+                    <tr class="{{ 'table-success' if (totals.sum_assets - totals.sum_equity_liabilities)|abs < 1 else 'table-danger' }}">
+                        <td><strong>Differens</strong></td>
+                        <td class="text-end"><strong>{{ (totals.sum_assets - totals.sum_equity_liabilities)|sek }}</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ===== TAB: Balansräkning ===== #}
+    <div class="tab-pane fade" id="balansrakning" role="tabpanel">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-bank"></i> {{ ink_type }}R — Balansräkning</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:50px">Fält</th>
+                            <th>Benämning</th>
+                            <th style="width:60px" class="text-muted text-center">SRU</th>
+                            <th style="width:130px" class="text-end">Belopp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, field in balance_sheet.items() %}
+                        {% if field.get('is_section') %}
+                        <tr class="table-light">
+                            <td></td>
+                            <td colspan="2"><strong>{{ field.label }}</strong></td>
+                            <td></td>
+                        </tr>
+                        {% elif field.get('is_total') or key.startswith('sum_') %}
+                        <tr class="{{ 'table-primary fw-bold' if key in ('sum_assets', 'sum_equity_liabilities') else 'table-active fw-bold' }}">
+                            <td></td>
+                            <td>{{ field.label }}</td>
+                            <td class="text-muted text-center small">{{ field.sru_code or '' }}</td>
+                            <td class="text-end">{{ field.value|sek }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td class="text-primary fw-bold">{{ key }}</td>
+                            <td>{{ field.label }}</td>
+                            <td class="text-muted text-center small">{{ field.sru_code or '' }}</td>
+                            <td class="text-end">
+                                {% if field.value and field.value|abs > 0 %}{{ field.value|sek }}{% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ===== TAB: Resultaträkning ===== #}
+    <div class="tab-pane fade" id="resultatrakning" role="tabpanel">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-graph-up"></i> {{ ink_type }}R — Resultaträkning</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:50px">Fält</th>
+                            <th>Benämning</th>
+                            <th style="width:60px" class="text-muted text-center">SRU</th>
+                            <th style="width:130px" class="text-end">Belopp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, field in income_statement.items() %}
+                        {% if field.get('is_section') %}
+                        <tr class="table-light">
+                            <td></td>
+                            <td colspan="2"><strong>{{ field.label }}</strong></td>
+                            <td></td>
+                        </tr>
+                        {% elif field.get('is_total') or key.startswith('sum_') or key.startswith('operating_') or key.startswith('result_') %}
+                        <tr class="{{ 'table-primary fw-bold' if key in ('3.26', '3.27') else 'table-active fw-bold' }}">
+                            <td class="text-primary fw-bold">{% if key[0].isdigit() %}{{ key }}{% endif %}</td>
+                            <td>{{ field.label }}</td>
+                            <td class="text-muted text-center small">{{ field.sru_code or '' }}</td>
+                            <td class="text-end">{{ field.value|sek }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td class="text-primary fw-bold">{{ key }}</td>
+                            <td>{{ field.label }}</td>
+                            <td class="text-muted text-center small">{{ field.sru_code or '' }}</td>
+                            <td class="text-end">
+                                {% if field.value and field.value|abs > 0 %}{{ field.value|sek }}{% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ===== TAB: Skattemässiga justeringar ===== #}
+    <div class="tab-pane fade" id="justeringar" role="tabpanel">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-sliders"></i> {{ ink_type }}S — Skattemässiga justeringar</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:50px">Fält</th>
+                            <th>Benämning</th>
+                            <th style="width:60px" class="text-muted text-center">SRU</th>
+                            <th style="width:130px" class="text-end">Belopp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, field in ink_s.items() %}
+                        {% if field.get('is_section') %}
+                        <tr class="table-light">
+                            <td></td>
+                            <td colspan="2"><strong>{{ field.label }}</strong></td>
+                            <td></td>
+                        </tr>
+                        {% elif field.get('is_total') %}
+                        <tr class="table-primary fw-bold">
+                            <td class="text-primary fw-bold">{{ key }}</td>
+                            <td>{{ field.label }}</td>
+                            <td class="text-muted text-center small">{{ field.sru_code or '' }}</td>
+                            <td class="text-end">{{ field.value|sek }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td class="text-primary fw-bold">{{ key }}</td>
+                            <td>{{ field.label }}</td>
+                            <td class="text-muted text-center small">{{ field.sru_code or '' }}</td>
+                            <td class="text-end">
+                                {% if field.value and field.value|abs > 0 %}{{ field.value|sek }}{% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if tr.adjustments %}
+        <div class="card mt-3">
+            <div class="card-header">Detaljerade justeringsrader</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr><th>Typ</th><th>Beskrivning</th><th>SRU</th><th class="text-end">Belopp</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for adj in tr.adjustments %}
+                        <tr>
+                            <td><span class="badge {{ 'bg-danger' if adj.adjustment_type == 'add' else 'bg-success' }}">{{ 'Tillkommer' if adj.adjustment_type == 'add' else 'Avgår' }}</span></td>
+                            <td>{{ adj.description }}</td>
+                            <td class="text-muted">{{ adj.sru_code or '—' }}</td>
+                            <td class="text-end">{{ adj.amount|sek }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {# ===== TAB: Huvudblankett ===== #}
+    <div class="tab-pane fade" id="huvudblankett" role="tabpanel">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-file-earmark-text"></i> {{ ink_type }} — Huvudblankett</div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th style="width:50px">Fält</th>
+                            <th>Benämning</th>
+                            <th style="width:60px" class="text-muted text-center">SRU</th>
+                            <th style="width:130px" class="text-end">Belopp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, field in ink_main.items() %}
+                        <tr>
+                            <td class="text-primary fw-bold">{{ key }}</td>
+                            <td>{{ field.label }}</td>
+                            <td class="text-muted text-center small">{{ field.sru_code or '' }}</td>
+                            <td class="text-end fw-bold">
+                                {% if field.value and field.value > 0 %}{{ field.value|sek }}{% else %}<span class="text-muted">—</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                {% if ink_type == 'INK2' and tr.calculated_tax and tr.calculated_tax > 0 %}
+                <div class="alert alert-info mt-3">
+                    <strong>Beräknad bolagsskatt:</strong> {{ tr.calculated_tax|sek }}
+                    ({{ (tr.tax_rate * 100)|round(1) }}% av beskattningsbart resultat {{ tr.taxable_income|sek }})
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Årsredovisning - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Årsredovisning'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-file-earmark-text"></i> Årsredovisning</h2>
+</div>
+
+<div class="card">
+    <div class="card-header">Välj räkenskapsår</div>
+    <div class="card-body">
+        {% if fiscal_years %}
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>År</th>
+                    <th>Period</th>
+                    <th>Status RÅ</th>
+                    <th>Årsredovisning</th>
+                    <th>Åtgärder</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fy in fiscal_years %}
+                <tr>
+                    <td><strong>{{ fy.year }}</strong></td>
+                    <td>{{ fy.start_date.strftime('%Y-%m-%d') }} – {{ fy.end_date.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        {% if fy.status == 'closed' %}
+                        <span class="badge bg-success">Stängt</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">Öppet</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if fy.id in report_map %}
+                            {% set r = report_map[fy.id] %}
+                            {% if r.status == 'final' %}
+                            <span class="badge bg-primary">Finaliserad</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Utkast</span>
+                            {% endif %}
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if fy.id in report_map %}
+                            {% set r = report_map[fy.id] %}
+                            <a href="{{ url_for('annual_report.view', report_id=r.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i> Visa</a>
+                            {% if r.status == 'draft' %}
+                            <a href="{{ url_for('annual_report.edit', fiscal_year_id=fy.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i> Redigera</a>
+                            {% endif %}
+                            <a href="{{ url_for('annual_report.download_pdf', report_id=r.id) }}" class="btn btn-sm btn-outline-success"><i class="bi bi-file-pdf"></i> PDF</a>
+                        {% else %}
+                            <a href="{{ url_for('annual_report.edit', fiscal_year_id=fy.id) }}" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i> Skapa</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            <i class="bi bi-calendar-x fs-1"></i>
+            <p class="mt-2">Inga räkenskapsår finns. Skapa ett räkenskapsår först.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

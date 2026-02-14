@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Bolagsstämmor - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Bolagsstämmor'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-journal-bookmark"></i> Bolagsstämmor</h2>
+    {% if not current_user.is_readonly %}
+    <a href="{{ url_for('governance.agm_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Ny bolagsstämma</a>
+    {% endif %}
+</div>
+
+{% if agms %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Datum</th>
+                <th>Typ</th>
+                <th>Räkenskapsår</th>
+                <th>Ordförande</th>
+                <th>Protokollförare</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for agm in agms %}
+            <tr class="cursor-pointer" data-href="{{ url_for('governance.agm_view', agm_id=agm.id) }}">
+                <td>{{ agm.meeting_date.strftime('%Y-%m-%d') }}</td>
+                <td>
+                    <span class="badge {% if agm.meeting_type == 'arsstamma' %}bg-primary{% else %}bg-secondary{% endif %}">
+                        {{ agm.meeting_type_label }}
+                    </span>
+                </td>
+                <td>{% if agm.fiscal_year %}{{ agm.fiscal_year.year }}{% else %}-{% endif %}</td>
+                <td>{{ agm.chairman or '' }}</td>
+                <td>{{ agm.minutes_taker or '' }}</td>
+                <td class="text-end">
+                    <a href="{{ url_for('governance.agm_view', agm_id=agm.id) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-eye"></i></a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">Inga bolagsstämmor registrerade.</div>
+{% endif %}
+{% endblock %}

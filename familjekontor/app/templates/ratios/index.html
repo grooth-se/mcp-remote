@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Nyckeltal - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Nyckeltal'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-speedometer2"></i> Nyckeltal</h2>
+    <form class="d-flex gap-2" method="get">
+        <select name="fiscal_year_id" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+            {% for fy in fiscal_years %}
+            <option value="{{ fy.id }}" {% if fy.id == current_fy_id %}selected{% endif %}>
+                {{ fy.year }} ({{ fy.start_date }} - {{ fy.end_date }})
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+{% if ratios %}
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-graph-up-arrow"></i> Lönsamhet</div>
+            <div class="card-body">
+                {% for item in summary if item.section == 'profitability' %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small>{{ item.label }}</small>
+                    <span class="badge bg-{{ item.status }}">
+                        {% if item.value is not none %}
+                            {% if item.format == 'pct' %}{{ item.value }}%{% else %}{{ item.value }}{% endif %}
+                        {% else %}-{% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-droplet-half"></i> Likviditet</div>
+            <div class="card-body">
+                {% for item in summary if item.section == 'liquidity' %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small>{{ item.label }}</small>
+                    <span class="badge bg-{{ item.status }}">
+                        {% if item.value is not none %}
+                            {% if item.format == 'pct' %}{{ item.value }}%
+                            {% elif item.format == 'sek' %}{{ item.value|sek }}
+                            {% else %}{{ item.value }}{% endif %}
+                        {% else %}-{% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-shield-check"></i> Soliditet</div>
+            <div class="card-body">
+                {% for item in summary if item.section == 'solvency' %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small>{{ item.label }}</small>
+                    <span class="badge bg-{{ item.status }}">
+                        {% if item.value is not none %}
+                            {% if item.format == 'pct' %}{{ item.value }}%{% else %}{{ item.value }}{% endif %}
+                        {% else %}-{% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-arrow-repeat"></i> Effektivitet</div>
+            <div class="card-body">
+                {% for item in summary if item.section == 'efficiency' %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <small>{{ item.label }}</small>
+                    <span class="badge bg-{{ item.status }}">
+                        {% if item.value is not none %}{{ item.value }}{% else %}-{% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row mb-4">
+    <div class="col-lg-6 mb-3">
+        <div class="card">
+            <div class="card-header">Nyckeltal - aktuellt år</div>
+            <div class="card-body">
+                <canvas id="ratioBarChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-3">
+        <div class="card">
+            <div class="card-header">Flerårsöversikt</div>
+            <div class="card-body">
+                <canvas id="ratioTrendChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Table -->
+<div class="card">
+    <div class="card-header">Detaljerad nyckeltalstabell</div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Kategori</th>
+                    <th>Nyckeltal</th>
+                    <th class="text-end">Värde</th>
+                    <th>Status</th>
+                    <th>Beskrivning</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in summary %}
+                <tr>
+                    <td>
+                        {% if item.section == 'profitability' %}Lönsamhet
+                        {% elif item.section == 'liquidity' %}Likviditet
+                        {% elif item.section == 'solvency' %}Soliditet
+                        {% elif item.section == 'efficiency' %}Effektivitet
+                        {% endif %}
+                    </td>
+                    <td>{{ item.label }}</td>
+                    <td class="text-end">
+                        {% if item.value is not none %}
+                            {% if item.format == 'pct' %}{{ item.value }}%
+                            {% elif item.format == 'sek' %}{{ item.value|sek }} kr
+                            {% else %}{{ item.value }}{% endif %}
+                        {% else %}<span class="text-muted">-</span>{% endif %}
+                    </td>
+                    <td><span class="badge bg-{{ item.status }}">
+                        {% if item.status == 'good' %}Bra
+                        {% elif item.status == 'warning' %}Varning
+                        {% elif item.status == 'danger' %}Låg
+                        {% else %}N/A{% endif %}
+                    </span></td>
+                    <td class="text-muted small">{{ item.description }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Välj ett räkenskapsår för att se nyckeltal.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if ratios %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/ratio_charts.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Current year horizontal bar
+    var barData = {
+        labels: [
+            {% for item in summary if item.format == 'pct' or item.format == 'ratio' %}
+            '{{ item.label }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        values: [
+            {% for item in summary if item.format == 'pct' or item.format == 'ratio' %}
+            {{ item.value if item.value is not none else 'null' }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        statuses: [
+            {% for item in summary if item.format == 'pct' or item.format == 'ratio' %}
+            '{{ item.status }}'{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]
+    };
+    initRatioBarChart('ratioBarChart', barData);
+
+    // Multi-year trend
+    initRatioTrendChart('ratioTrendChart', '{{ url_for("ratios.api_multi_year") }}');
+});
+</script>
+{% endif %}
+{% endblock %}

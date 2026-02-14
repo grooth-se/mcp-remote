@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Investeringar - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Investeringar'}
+]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-graph-up"></i> Investeringar</h2>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('investments.reports') }}" class="btn btn-outline-secondary"><i class="bi bi-bar-chart"></i> Rapporter</a>
+        {% if not current_user.is_readonly %}
+        <a href="{{ url_for('investments.portfolio_new') }}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Ny portfölj</a>
+        {% endif %}
+    </div>
+</div>
+
+{# Summary Cards #}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Anskaffningsvärde</h6>
+                <h4>{{ summary.total_cost|sek(0) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Marknadsvärde</h6>
+                <h4>{{ summary.total_value|sek(0) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Orealiserad vinst/förlust</h6>
+                <h4 class="{% if summary.total_unrealized > 0 %}text-success{% elif summary.total_unrealized < 0 %}text-danger{% endif %}">
+                    {{ summary.total_unrealized|sek(0) }}
+                </h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Portfolio Cards #}
+{% if summary.portfolios %}
+<div class="row">
+    {% for p in summary.portfolios %}
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <a href="{{ url_for('investments.portfolio_view', portfolio_id=p.portfolio.id) }}">{{ p.portfolio.name }}</a>
+                </h5>
+                <span class="badge bg-secondary">{{ p.portfolio.portfolio_type_label }}</span>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <small class="text-muted">Innehav</small><br>
+                        <strong>{{ p.holdings_count }}</strong>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Kostnad</small><br>
+                        <strong>{{ p.total_cost|sek(0) }}</strong>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Värde</small><br>
+                        <strong>{{ p.total_value|sek(0) }}</strong>
+                    </div>
+                </div>
+                {% if p.unrealized_gain %}
+                <div class="text-center mt-2">
+                    <small class="{% if p.unrealized_gain > 0 %}text-success{% elif p.unrealized_gain < 0 %}text-danger{% endif %}">
+                        Orealiserat: {{ p.unrealized_gain|sek(0) }}
+                    </small>
+                </div>
+                {% endif %}
+                {% if p.portfolio.broker %}
+                <div class="text-center mt-1">
+                    <small class="text-muted">{{ p.portfolio.broker }}</small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer text-end">
+                <a href="{{ url_for('investments.portfolio_view', portfolio_id=p.portfolio.id) }}" class="btn btn-outline-primary btn-sm">Visa</a>
+                {% if not current_user.is_readonly %}
+                <a href="{{ url_for('investments.transaction_new', portfolio_id=p.portfolio.id) }}" class="btn btn-outline-secondary btn-sm">Ny transaktion</a>
+                <a href="{{ url_for('investments.import_csv', portfolio_id=p.portfolio.id) }}" class="btn btn-outline-secondary btn-sm">Importera</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">
+    Inga portföljer skapade.
+    {% if not current_user.is_readonly %}
+    <a href="{{ url_for('investments.portfolio_new') }}">Skapa en portfölj</a>.
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,7 +1,16 @@
 {% extends "base.html" %}
 {% from "macros/pagination.html" import render_pagination, sortable_header %}
 {% from "macros/empty_state.html" import render_empty_state %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Anställda - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Lön', 'url': url_for('salary.index')},
+    {'title': 'Anställda'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="row mb-3">
     <div class="col">

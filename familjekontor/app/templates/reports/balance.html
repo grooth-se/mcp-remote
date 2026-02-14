@@ -1,5 +1,13 @@
 {% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
 {% block title %}Balansräkning - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Rapporter'},
+    {'title': 'Balansräkning'}
+]) }}
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2>Balansräkning</h2>
@@ -34,7 +42,7 @@
                 {% for account, balance in section.accounts %}
                 {% if balance|abs > 0.01 %}
                 <tr>
-                    <td style="width:10%">{{ account.account_number }}</td>
+                    <td style="width:10%"><a href="{{ url_for('comparison.drilldown', account_number=account.account_number, fiscal_year_id=current_fy_id) }}">{{ account.account_number }}</a></td>
                     <td>{{ account.name }}</td>
                     <td class="text-end" style="width:20%">{{ balance|sek }}</td>
                 </tr>
@@ -70,7 +78,7 @@
                 {% for account, balance in section.accounts %}
                 {% if balance|abs > 0.01 %}
                 <tr>
-                    <td style="width:10%">{{ account.account_number }}</td>
+                    <td style="width:10%"><a href="{{ url_for('comparison.drilldown', account_number=account.account_number, fiscal_year_id=current_fy_id) }}">{{ account.account_number }}</a></td>
                     <td>{{ account.name }}</td>
                     <td class="text-end" style="width:20%">{{ balance|sek }}</td>
                 </tr>

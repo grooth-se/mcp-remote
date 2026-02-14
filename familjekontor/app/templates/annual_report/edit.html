@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Redigera årsredovisning {{ fy.year }} - Familjekontor{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Årsredovisning', 'url': url_for('annual_report.index')},
+    {'title': 'Redigera ' ~ fy.year|string}
+]) }}
+{% endblock %}
+{% block content %}
+<h2>Årsredovisning <small class="text-muted">{{ company.name }} — {{ fy.year }}</small></h2>
+<p class="text-muted">{{ fy.start_date.strftime('%Y-%m-%d') }} – {{ fy.end_date.strftime('%Y-%m-%d') }}</p>
+
+<form method="POST" data-warn-unsaved>
+    {{ form.hidden_tag() }}
+
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-forvaltning">Förvaltningsberättelse</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-pnl">Resultaträkning</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-balance">Balansräkning</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-noter">Noter</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-sign">Underskrifter</a></li>
+    </ul>
+
+    <div class="tab-content">
+        {# Tab 1: Förvaltningsberättelse #}
+        <div class="tab-pane fade show active" id="tab-forvaltning">
+            <div class="card mb-3">
+                <div class="card-header">Förvaltningsberättelse</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        {{ form.verksamhet.label(class="form-label") }}
+                        {{ form.verksamhet(class="form-control", rows=5, placeholder="Beskriv bolagets verksamhet, inriktning och väsentliga förhållanden...") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.vasentliga_handelser.label(class="form-label") }}
+                        {{ form.vasentliga_handelser(class="form-control", rows=4) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.handelser_efter_fy.label(class="form-label") }}
+                        {{ form.handelser_efter_fy(class="form-control", rows=3) }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.framtida_utveckling.label(class="form-label") }}
+                        {{ form.framtida_utveckling(class="form-control", rows=3) }}
+                    </div>
+                    {% if company.company_type == 'AB' %}
+                    <div class="mb-3">
+                        {{ form.resultatdisposition.label(class="form-label") }}
+                        {{ form.resultatdisposition(class="form-control", rows=4, placeholder="Styrelsen föreslår att årets resultat disponeras enligt följande...") }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Flerårsöversikt (auto-calculated, read-only) #}
+            <div class="card mb-3">
+                <div class="card-header">Flerårsöversikt</div>
+                <div class="card-body">
+                    {% if overview %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Nyckeltal</th>
+                                    {% for row in overview %}
+                                    <th class="text-end">{{ row.year }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Nettoomsättning</td>
+                                    {% for row in overview %}<td class="text-end">{{ row.revenue|sek(0) }}</td>{% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>Resultat före skatt</td>
+                                    {% for row in overview %}<td class="text-end">{{ row.result_before_tax|sek(0) }}</td>{% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>Balansomslutning</td>
+                                    {% for row in overview %}<td class="text-end">{{ row.total_assets|sek(0) }}</td>{% endfor %}
+                                </tr>
+                                <tr>
+                                    <td>Eget kapital</td>
+                                    {% for row in overview %}<td class="text-end">{{ row.equity|sek(0) }}</td>{% endfor %}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Ingen data tillgänglig.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# Tab 2: Resultaträkning (read-only) #}
+        <div class="tab-pane fade" id="tab-pnl">
+            <div class="card mb-3">
+                <div class="card-header">Resultaträkning</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            {% for section_name, section in pnl.sections.items() %}
+                            <tr class="table-light">
+                                <td colspan="2"><strong>{{ section_name }}</strong></td>
+                            </tr>
+                            {% for account, balance in section.accounts %}
+                            {% if balance|abs > 0.01 %}
+                            <tr>
+                                <td class="ps-3">{{ account.account_number }} {{ account.name }}</td>
+                                <td class="text-end">{{ balance|sek }}</td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                            <tr class="table-info">
+                                <td><em>Summa {{ section_name }}</em></td>
+                                <td class="text-end"><strong>{{ section.total|sek }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="table-primary">
+                                <td><strong>Rörelseresultat</strong></td>
+                                <td class="text-end"><strong>{{ pnl.operating_result|sek }}</strong></td>
+                            </tr>
+                            <tr class="table-primary">
+                                <td><strong>Resultat före skatt</strong></td>
+                                <td class="text-end"><strong>{{ pnl.result_before_tax|sek }}</strong></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Tab 3: Balansräkning (read-only) #}
+        <div class="tab-pane fade" id="tab-balance">
+            <div class="card mb-3">
+                <div class="card-header">Balansräkning</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr class="table-dark"><td colspan="2"><strong>TILLGÅNGAR</strong></td></tr>
+                            {% for section_name in ['Anläggningstillgångar', 'Omsättningstillgångar'] %}
+                            {% set section = bs.sections[section_name] %}
+                            <tr class="table-light"><td colspan="2"><strong>{{ section_name }}</strong></td></tr>
+                            {% for account, balance in section.accounts %}
+                            {% if balance|abs > 0.01 %}
+                            <tr><td class="ps-3">{{ account.account_number }} {{ account.name }}</td><td class="text-end">{{ balance|sek }}</td></tr>
+                            {% endif %}
+                            {% endfor %}
+                            <tr class="table-info"><td><em>Summa {{ section_name }}</em></td><td class="text-end"><strong>{{ section.total|sek }}</strong></td></tr>
+                            {% endfor %}
+                            <tr class="table-primary"><td><strong>SUMMA TILLGÅNGAR</strong></td><td class="text-end"><strong>{{ bs.total_assets|sek }}</strong></td></tr>
+
+                            <tr><td colspan="2">&nbsp;</td></tr>
+                            <tr class="table-dark"><td colspan="2"><strong>EGET KAPITAL OCH SKULDER</strong></td></tr>
+                            {% for section_name in ['Eget kapital', 'Långfristiga skulder', 'Kortfristiga skulder'] %}
+                            {% set section = bs.sections[section_name] %}
+                            <tr class="table-light"><td colspan="2"><strong>{{ section_name }}</strong></td></tr>
+                            {% for account, balance in section.accounts %}
+                            {% if balance|abs > 0.01 %}
+                            <tr><td class="ps-3">{{ account.account_number }} {{ account.name }}</td><td class="text-end">{{ balance|sek }}</td></tr>
+                            {% endif %}
+                            {% endfor %}
+                            <tr class="table-info"><td><em>Summa {{ section_name }}</em></td><td class="text-end"><strong>{{ section.total|sek }}</strong></td></tr>
+                            {% endfor %}
+                            <tr class="table-primary"><td><strong>SUMMA EGET KAPITAL OCH SKULDER</strong></td><td class="text-end"><strong>{{ bs.total_equity_liabilities|sek }}</strong></td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Tab 4: Noter #}
+        <div class="tab-pane fade" id="tab-noter">
+            <div class="card mb-3">
+                <div class="card-header">Not 1: Redovisningsprinciper</div>
+                <div class="card-body">
+                    {{ form.redovisningsprinciper(class="form-control", rows=6) }}
+                </div>
+            </div>
+            <div class="card mb-3">
+                <div class="card-header">Not 2: Medelantal anställda</div>
+                <div class="card-body">
+                    <p>Medelantal anställda under räkenskapsåret: <strong>{{ avg_employees }}</strong></p>
+                </div>
+            </div>
+            <div class="card mb-3">
+                <div class="card-header">Övriga noter</div>
+                <div class="card-body">
+                    {{ form.extra_noter(class="form-control", rows=6, placeholder="Fritext. Separera noter med ---") }}
+                </div>
+            </div>
+        </div>
+
+        {# Tab 5: Underskrifter #}
+        <div class="tab-pane fade" id="tab-sign">
+            <div class="card mb-3">
+                <div class="card-header">Underskrifter</div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.signing_location.label(class="form-label") }}
+                            {{ form.signing_location(class="form-control", placeholder=company.city or '') }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.signing_date.label(class="form-label") }}
+                            {{ form.signing_date(class="form-control", type="date") }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        {{ form.board_members.label(class="form-label") }}
+                        {{ form.board_members(class="form-control", rows=4, placeholder="Förnamn Efternamn\nFörnamn Efternamn") }}
+                        <small class="text-muted">Ange en person per rad.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('annual_report.index') }}" class="btn btn-secondary">Avbryt</a>
+    </div>
+</form>
+{% endblock %}
