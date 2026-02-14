@@ -1860,6 +1860,16 @@ def temperature_3d_snapshot(id):
     geometry_type = sim.geometry_type
     geometry_params = sim.geometry_dict
 
+    # For CAD geometry, inject STEP file path and analysis data
+    if geometry_type == 'cad':
+        geometry_params = dict(geometry_params)
+        geometry_params['step_path'] = sim.cad_file_path
+        analysis = sim.cad_analysis_dict
+        geometry_params['characteristic_length'] = analysis.get('characteristic_length', 0.01)
+        # Use equivalent params for fallback radius
+        equiv = analysis.get('equivalent_params', {})
+        geometry_params.setdefault('radius', equiv.get('radius', 0.05))
+
     # Generate snapshot
     png_bytes = visualization_3d.create_temperature_snapshot(
         geometry_type=geometry_type,
@@ -1918,6 +1928,15 @@ def temperature_3d_animation(id):
     # Get geometry params
     geometry_type = sim.geometry_type
     geometry_params = sim.geometry_dict
+
+    # For CAD geometry, inject STEP file path and analysis data
+    if geometry_type == 'cad':
+        geometry_params = dict(geometry_params)
+        geometry_params['step_path'] = sim.cad_file_path
+        analysis = sim.cad_analysis_dict
+        geometry_params['characteristic_length'] = analysis.get('characteristic_length', 0.01)
+        equiv = analysis.get('equivalent_params', {})
+        geometry_params.setdefault('radius', equiv.get('radius', 0.05))
 
     # Check animation type
     anim_type = request.args.get('type', 'cross_section')

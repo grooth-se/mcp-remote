@@ -22,6 +22,71 @@ def _check_pyvista():
         return False
 
 
+def create_cad_mesh(step_path: str, tolerance: float = 0.1):
+    """Load STEP file via CadQuery and tessellate to PyVista PolyData.
+
+    Parameters
+    ----------
+    step_path : str
+        Path to STEP (.stp/.step) file
+    tolerance : float
+        Tessellation tolerance in mm (smaller = finer mesh)
+
+    Returns
+    -------
+    pyvista.PolyData
+        Triangulated surface mesh with 'centroid' and 'char_length' in field_data
+    """
+    import pyvista as pv
+
+    try:
+        import cadquery as cq
+    except ImportError:
+        raise ImportError("CadQuery is required for STEP mesh creation")
+
+    # Load STEP file
+    result = cq.importers.importStep(str(step_path))
+    if hasattr(result, 'val'):
+        solid = result.val()
+    else:
+        solid = result.objects[0] if result.objects else None
+
+    if solid is None:
+        raise ValueError(f"Could not extract solid from STEP file: {step_path}")
+
+    # Tessellate the solid
+    vertices, triangles = solid.tessellate(tolerance)
+
+    # Convert to numpy arrays
+    # Vertices are CadQuery Vector objects with .x, .y, .z
+    # Triangles are plain tuples (i, j, k) of vertex indices
+    verts_np = np.array([[v.x, v.y, v.z] for v in vertices], dtype=np.float64)
+    tris_np = np.array(triangles, dtype=np.int32)
+
+    # Build PyVista faces array: [3, i, j, k, 3, i, j, k, ...]
+    n_faces = len(tris_np)
+    faces = np.column_stack([np.full(n_faces, 3, dtype=np.int32), tris_np]).ravel()
+
+    # Create PolyData mesh
+    mesh = pv.PolyData(verts_np, faces)
+
+    # Store centroid and characteristic length as field data
+    center = solid.Center()
+    centroid = np.array([center.x, center.y, center.z])
+    mesh.field_data['centroid'] = centroid
+
+    # Characteristic length = V/A (in mm since CadQuery uses mm)
+    volume = solid.Volume()   # mm³
+    area = solid.Area()       # mm²
+    char_length = volume / area if area > 0 else 1.0  # mm
+    mesh.field_data['char_length'] = np.array([char_length])
+
+    logger.info(f"CAD mesh created: {mesh.n_points} points, {mesh.n_cells} cells, "
+                f"char_length={char_length:.2f}mm")
+
+    return mesh
+
+
 def create_cylinder_mesh(radius: float, length: float, n_radial: int = 50, n_axial: int = 20):
     """Create a cylindrical mesh for visualization.
 
@@ -193,10 +258,29 @@ def interpolate_temperature_to_mesh(mesh, temperatures: np.ndarray, radial_posit
         # Normalize: 0 at center (y=thickness/2), 1 at surface
         r_norm = np.abs(points[:, 1] - thickness/2) / (thickness/2)
 
+    elif geometry_type == 'cad':
+        # CAD geometry: use distance from centroid normalized by characteristic length
+        # Centroid from mesh field_data (set by create_cad_mesh) or geometry_params
+        if 'centroid' in mesh.field_data:
+            centroid = mesh.field_data['centroid']
+        else:
+            centroid = np.array(geometry_params.get('centroid', [0, 0, 0]))
+
+        if 'char_length' in mesh.field_data:
+            char_length = float(mesh.field_data['char_length'][0])
+        else:
+            # characteristic_length from cad_analysis is in meters, mesh is in mm
+            char_length = geometry_params.get('characteristic_length', 1.0) * 1000
+
+        # Distance from centroid for each point
+        dist = np.linalg.norm(points - centroid, axis=1)
+        # Normalize: 0 at centroid, 1 at ~3× characteristic length (typical max radius)
+        r_norm = dist / (3.0 * char_length) if char_length > 0 else dist
+
     else:
         # Default: use distance from origin
         r_norm = np.linalg.norm(points, axis=1)
-        r_norm = r_norm / r_norm.max()
+        r_norm = r_norm / r_norm.max() if r_norm.max() > 0 else r_norm
 
     # Clamp to valid range
     r_norm = np.clip(r_norm, 0, 1)
@@ -279,6 +363,15 @@ def create_temperature_snapshot(
             width = geometry_params.get('width', 0.1)
             length = geometry_params.get('length', 0.1)
             mesh = create_plate_mesh(thickness, width, length)
+
+        elif geometry_type == 'cad':
+            step_path = geometry_params.get('step_path')
+            if step_path and Path(step_path).exists():
+                mesh = create_cad_mesh(step_path)
+            else:
+                # Fallback to equivalent cylinder
+                logger.warning("STEP file not found, falling back to cylinder")
+                mesh = create_cylinder_mesh(0.05, 0.1)
 
         else:
             # Default to cylinder
@@ -442,6 +535,12 @@ def create_temperature_animation(
             width = geometry_params.get('width', 0.1)
             length = geometry_params.get('length', 0.1)
             mesh = create_plate_mesh(thickness, width, length, n_thickness=20)
+        elif geometry_type == 'cad':
+            step_path = geometry_params.get('step_path')
+            if step_path and Path(step_path).exists():
+                mesh = create_cad_mesh(step_path)
+            else:
+                mesh = create_cylinder_mesh(0.05, 0.1, n_radial=30, n_axial=10)
         else:
             mesh = create_cylinder_mesh(0.05, 0.1, n_radial=30, n_axial=10)
 
@@ -614,8 +713,8 @@ def _create_fallback_snapshot(
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
         # Left plot: Cross-section view
-        if geometry_type in ['cylinder', 'hollow_cylinder']:
-            if geometry_type == 'cylinder':
+        if geometry_type in ['cylinder', 'hollow_cylinder', 'cad']:
+            if geometry_type in ('cylinder', 'cad'):
                 radius = geometry_params.get('radius', 0.05) * 1000  # Convert to mm
                 inner_radius = 0
             else:
@@ -782,9 +881,9 @@ def create_cross_section_animation(
 
             fig, ax = plt.subplots(figsize=(8, 8))
 
-            if geometry_type in ['cylinder', 'hollow_cylinder']:
+            if geometry_type in ['cylinder', 'hollow_cylinder', 'cad']:
                 # Draw circular cross-section
-                if geometry_type == 'cylinder':
+                if geometry_type in ('cylinder', 'cad'):
                     radius = geometry_params.get('radius', 0.05) * 1000  # Convert to mm
                     inner_radius = 0
                 else:

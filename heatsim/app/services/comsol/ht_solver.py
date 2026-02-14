@@ -383,7 +383,8 @@ class MockHeatTreatmentSolver:
 
         from ..visualization_3d import (
             create_cylinder_mesh, create_plate_mesh,
-            create_hollow_cylinder_mesh, interpolate_temperature_to_mesh
+            create_hollow_cylinder_mesh, create_cad_mesh,
+            interpolate_temperature_to_mesh
         )
 
         temperature_profiles = phase_result.get('temperature_profiles')
@@ -397,9 +398,25 @@ class MockHeatTreatmentSolver:
         n_snapshots = min(8, len(times))
         indices = np.linspace(0, len(times) - 1, n_snapshots, dtype=int)
 
+        # Determine if we should use the actual CAD mesh
+        use_cad_mesh = (
+            self.simulation.geometry_type == 'cad'
+            and self.simulation.cad_file_path
+            and Path(self.simulation.cad_file_path).exists()
+        )
+
         # Create mesh for this geometry
         try:
-            if geo_type == 'cylinder':
+            if use_cad_mesh:
+                mesh = create_cad_mesh(self.simulation.cad_file_path)
+                # Override geo_type for interpolation
+                geo_type = 'cad'
+                # Pass characteristic_length from analysis
+                analysis = self.simulation.cad_analysis_dict
+                geo_config = {
+                    'characteristic_length': analysis.get('characteristic_length', 0.01),
+                }
+            elif geo_type == 'cylinder':
                 radius = geo_config.get('radius', 0.05)
                 length = geo_config.get('length', 0.1)
                 mesh = create_cylinder_mesh(radius, length, n_radial=30, n_axial=10)
