@@ -21,7 +21,7 @@ from app.models.material import SteelGrade
 
 from .forms import (
     WeldProjectForm, WeldStringForm, QuickAddStringsForm, RunSimulationForm,
-    HAZAnalysisForm, PreheatForm,
+    HAZAnalysisForm, PreheatForm, GoldakAnalysisForm, GoldakMultiPassForm,
 )
 from . import welding_bp
 
@@ -505,6 +505,34 @@ def plot(id, plot_type):
             from app.services.visualization import create_preheat_summary_plot
             img_data = create_preheat_summary_plot(preheat_data)
 
+    # Goldak plots (Phase 15)
+    elif plot_type == 'goldak_temperature_field':
+        goldak_data = _get_goldak_data(project)
+        if goldak_data:
+            from app.services.visualization import create_goldak_temperature_heatmap
+            img_data = create_goldak_temperature_heatmap(goldak_data)
+
+    elif plot_type == 'goldak_weld_pool':
+        goldak_data = _get_goldak_data(project)
+        if goldak_data:
+            from app.services.visualization import create_goldak_weld_pool_plot
+            img_data = create_goldak_weld_pool_plot(goldak_data)
+
+    elif plot_type == 'goldak_thermal_cycles':
+        goldak_data = _get_goldak_data(project)
+        if goldak_data and goldak_data.get('probe_thermal_cycles'):
+            from app.services.visualization import create_goldak_thermal_cycle_plot
+            img_data = create_goldak_thermal_cycle_plot(
+                goldak_data['probe_thermal_cycles'],
+                title=f'{project.name} — Goldak Thermal Cycles',
+            )
+
+    elif plot_type == 'goldak_vs_rosenthal':
+        comparison_data = _get_goldak_rosenthal_comparison(project)
+        if comparison_data:
+            from app.services.visualization import create_goldak_rosenthal_comparison_plot
+            img_data = create_goldak_rosenthal_comparison_plot(comparison_data)
+
     if img_data:
         from io import BytesIO
         return send_file(BytesIO(img_data), mimetype='image/png')
@@ -756,3 +784,181 @@ def duplicate(id):
 
     flash(f'Project duplicated as "{new_project.name}".', 'success')
     return redirect(url_for('welding.configure', id=new_project.id))
+
+
+# ---- Phase 15: Goldak Analysis Routes ----
+
+def _get_goldak_data(project: WeldProject, form_data=None) -> dict:
+    """Run Goldak analysis with default or form parameters."""
+    try:
+        from app.services.goldak_solver import GoldakSolver, GoldakSolverConfig
+
+        config = GoldakSolverConfig(ny=41, nz=31, dt=0.05, total_time=120.0)
+
+        b_override = None
+        c_override = None
+        a_f_override = None
+        a_r_override = None
+
+        if form_data:
+            if form_data.get('grid_ny'):
+                config.ny = form_data['grid_ny']
+            if form_data.get('grid_nz'):
+                config.nz = form_data['grid_nz']
+            if form_data.get('simulation_duration'):
+                config.total_time = form_data['simulation_duration']
+            b_override = form_data.get('pool_half_width_mm')
+            if b_override:
+                b_override /= 1000.0
+            c_override = form_data.get('penetration_depth_mm')
+            if c_override:
+                c_override /= 1000.0
+            a_f_override = form_data.get('front_length_mm')
+            if a_f_override:
+                a_f_override /= 1000.0
+            a_r_override = form_data.get('rear_length_mm')
+            if a_r_override:
+                a_r_override /= 1000.0
+
+        solver = GoldakSolver.from_weld_project(
+            project, config=config,
+            b_override=b_override, c_override=c_override,
+            a_f_override=a_f_override, a_r_override=a_r_override,
+        )
+        result = solver.solve()
+        return result.to_dict()
+    except Exception as e:
+        logger.warning(f"Goldak analysis failed: {e}")
+        return {}
+
+
+def _get_goldak_rosenthal_comparison(project: WeldProject) -> dict:
+    """Run both Goldak and Rosenthal and build comparison."""
+    try:
+        from app.services.goldak_solver import GoldakSolver, GoldakSolverConfig
+        from app.services.rosenthal_solver import RosenthalSolver
+        import numpy as np
+
+        config = GoldakSolverConfig(ny=41, nz=31, dt=0.05, total_time=120.0)
+        solver = GoldakSolver.from_weld_project(project, config=config)
+        result = solver.solve()
+
+        ros = RosenthalSolver.from_weld_project(project)
+
+        # Surface distances (positive half)
+        ny_mid = len(solver.y) // 2
+        distances_m = solver.y[ny_mid:]
+        distances_mm = distances_m * 1000
+
+        ros_peak = ros.peak_temperature_at_distance(distances_m, z=0.0)
+        goldak_peak = result.peak_temperature_map[0, ny_mid:]
+
+        # HAZ widths
+        ros_haz = {}
+        goldak_haz = {}
+        for zone, temp in [('fusion', 1500), ('cghaz', 1100), ('fghaz', 900), ('ichaz', 727)]:
+            ros_haz[zone] = ros.haz_boundary_distance(temp, z=0.0) * 1000
+            idx = np.where(goldak_peak < temp)[0]
+            if len(idx) > 0 and idx[0] > 0:
+                goldak_haz[zone] = float(distances_mm[idx[0]])
+            else:
+                goldak_haz[zone] = 0.0
+
+        return {
+            'distances_mm': distances_mm.tolist(),
+            'goldak_peak_temps': goldak_peak.tolist(),
+            'rosenthal_peak_temps': ros_peak.tolist(),
+            'goldak_haz_widths': goldak_haz,
+            'rosenthal_haz_widths': ros_haz,
+        }
+    except Exception as e:
+        logger.warning(f"Goldak/Rosenthal comparison failed: {e}")
+        return {}
+
+
+@welding_bp.route('/<int:id>/goldak', methods=['GET', 'POST'])
+@login_required
+def goldak_analysis(id):
+    """Goldak heat source analysis page."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    form = GoldakAnalysisForm()
+    goldak_data = None
+    comparison_data = None
+    pool_estimate = None
+
+    # Show estimated pool params
+    from app.services.goldak_solver import estimate_pool_params
+    pool_estimate = estimate_pool_params(
+        project.default_heat_input or 1.5,
+        project.process_type or 'mig_mag'
+    )
+
+    if form.validate_on_submit():
+        form_data = {
+            'pool_half_width_mm': form.pool_half_width_mm.data,
+            'penetration_depth_mm': form.penetration_depth_mm.data,
+            'front_length_mm': form.front_length_mm.data,
+            'rear_length_mm': form.rear_length_mm.data,
+            'grid_ny': form.grid_ny.data,
+            'grid_nz': form.grid_nz.data,
+            'simulation_duration': form.simulation_duration.data,
+        }
+        goldak_data = _get_goldak_data(project, form_data)
+
+        if form.compare_with_rosenthal.data:
+            comparison_data = _get_goldak_rosenthal_comparison(project)
+
+        if not goldak_data:
+            flash('Goldak analysis failed. Check parameters.', 'danger')
+
+    return render_template(
+        'welding/goldak.html',
+        project=project, form=form,
+        goldak_data=goldak_data,
+        comparison_data=comparison_data,
+        pool_estimate=pool_estimate,
+    )
+
+
+@welding_bp.route('/<int:id>/goldak/multipass', methods=['GET', 'POST'])
+@login_required
+def goldak_multipass(id):
+    """Goldak multi-pass simulation page."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('welding.index'))
+
+    if not project.total_strings or project.total_strings == 0:
+        flash('Configure weld strings before running multi-pass simulation.', 'warning')
+        return redirect(url_for('welding.configure', id=id))
+
+    form = GoldakMultiPassForm()
+    multipass_data = None
+
+    if form.validate_on_submit():
+        try:
+            from app.services.goldak_multipass import GoldakMultiPassSolver
+
+            solver = GoldakMultiPassSolver.with_preset(
+                project,
+                preset=form.grid_resolution.data,
+                compare=form.compare_methods.data,
+            )
+            result = solver.run()
+            multipass_data = result.to_dict()
+        except Exception as e:
+            flash(f'Multi-pass Goldak simulation failed: {e}', 'danger')
+            logger.exception("Goldak multi-pass failed")
+
+    return render_template(
+        'welding/goldak_multipass.html',
+        project=project, form=form,
+        multipass_data=multipass_data,
+    )

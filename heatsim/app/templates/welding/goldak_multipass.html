@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Goldak Multi-Pass - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.view', id=project.id) }}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item active">Multi-Pass Goldak</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-stack"></i> Goldak Multi-Pass Simulation</h2>
+        <p class="text-muted">Chain Goldak solver across {{ project.total_strings }} passes for <strong>{{ project.name }}</strong></p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Settings Form -->
+    <div class="col-md-3">
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Settings</h5></div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.grid_resolution.label(class="form-label") }}
+                        {{ form.grid_resolution(class="form-select") }}
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        {{ form.compare_methods(class="form-check-input") }}
+                        {{ form.compare_methods.label(class="form-check-label") }}
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-play-fill"></i> Run Multi-Pass
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h6 class="mb-0">Project Info</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td>Strings</td><td>{{ project.total_strings }}</td></tr>
+                    <tr><td>Process</td><td>{{ project.process_label }}</td></tr>
+                    <tr><td>Heat Input</td><td>{{ project.default_heat_input }} kJ/mm</td></tr>
+                    <tr><td>Interpass</td><td>{{ project.interpass_temperature }}&deg;C</td></tr>
+                    <tr><td>Preheat</td><td>{{ project.preheat_temperature }}&deg;C</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="col-md-9">
+        {% if multipass_data %}
+
+        <!-- Per-Pass Summary Table -->
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Per-Pass Summary</h5></div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Pass</th>
+                            <th>Heat Input</th>
+                            <th>Peak Temp</th>
+                            <th>t8/5</th>
+                            <th>Interpass Before</th>
+                            <th>Cooling Time</th>
+                            <th>Fusion Area</th>
+                            <th>Solver Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in multipass_data.pass_summary %}
+                        <tr>
+                            <td><strong>{{ p.string_name }}</strong></td>
+                            <td>{{ "%.1f"|format(p.heat_input_kj_mm) }} kJ/mm</td>
+                            <td>{{ "%.0f"|format(p.peak_temperature) }}&deg;C</td>
+                            <td>{{ "%.1f"|format(p.t8_5) if p.t8_5 else '-' }} s</td>
+                            <td>{{ "%.0f"|format(p.interpass_temp_before) }}&deg;C</td>
+                            <td>{{ "%.0f"|format(p.interpass_cooling_time) }} s</td>
+                            <td>{{ "%.1f"|format(p.fusion_area_mm2) }} mm&sup2;</td>
+                            <td>{{ "%.1f"|format(p.solver_wall_time) }} s</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Cumulative Peak Temperature Heatmap -->
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Cumulative Peak Temperature</h5></div>
+            <div class="card-body text-center">
+                {% set peak_map = multipass_data.cumulative_peak_temp_map %}
+                <img id="cumulative-heatmap" class="img-fluid"
+                     alt="Cumulative Peak Temperature"
+                     style="max-height: 400px;">
+                <script>
+                // Render heatmap client-side using canvas (data already computed)
+                document.getElementById('cumulative-heatmap').onerror = function() {
+                    this.parentElement.innerHTML = '<div class="alert alert-info">Heatmap rendered server-side only</div>';
+                };
+                </script>
+                <noscript>
+                    <div class="alert alert-info">Enable JavaScript for interactive visualization</div>
+                </noscript>
+            </div>
+        </div>
+
+        <!-- Cumulative Thermal Cycles -->
+        {% if multipass_data.cumulative_thermal_cycles %}
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Cumulative Thermal Cycles</h5></div>
+            <div class="card-body">
+                <canvas id="cumulative-cycles-chart" height="300"></canvas>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+        <script>
+        (function() {
+            const cycles = {{ multipass_data.cumulative_thermal_cycles | tojson }};
+            const colors = ['#FF0000', '#FF8800', '#2196F3', '#4CAF50', '#9C27B0'];
+            const datasets = [];
+            let idx = 0;
+            for (const [name, data] of Object.entries(cycles)) {
+                if (data.times && data.temps && data.times.length > 0) {
+                    const points = data.times.map((t, i) => ({x: t, y: data.temps[i]}));
+                    datasets.push({
+                        label: name.replace(/_/g, ' '),
+                        data: points,
+                        borderColor: colors[idx % colors.length],
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        fill: false,
+                    });
+                    idx++;
+                }
+            }
+            new Chart(document.getElementById('cumulative-cycles-chart'), {
+                type: 'scatter',
+                data: { datasets: datasets },
+                options: {
+                    showLine: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Time (s)' } },
+                        y: { title: { display: true, text: 'Temperature (\u00b0C)' } }
+                    },
+                    plugins: {
+                        title: { display: true, text: 'Cumulative Thermal Cycles — All Passes' }
+                    }
+                }
+            });
+        })();
+        </script>
+        {% endif %}
+
+        <!-- Rosenthal Comparison -->
+        {% if multipass_data.comparison_with_rosenthal and multipass_data.comparison_with_rosenthal.passes %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> Goldak vs Rosenthal per Pass</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-hover table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Pass</th>
+                            <th colspan="2">Peak Temp (&deg;C)</th>
+                            <th colspan="2">HAZ to Ac1 (mm)</th>
+                        </tr>
+                        <tr>
+                            <th></th>
+                            <th class="text-primary">Goldak</th>
+                            <th class="text-danger">Rosenthal</th>
+                            <th class="text-primary">Goldak</th>
+                            <th class="text-danger">Rosenthal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in multipass_data.comparison_with_rosenthal.passes %}
+                        {% if not p.get('error') %}
+                        <tr>
+                            <td>Pass {{ p.string_number }}</td>
+                            <td>{{ "%.0f"|format(p.goldak_peak_temps|max) if p.goldak_peak_temps else '-' }}</td>
+                            <td>{{ "%.0f"|format(p.rosenthal_peak_temps|max) if p.rosenthal_peak_temps else '-' }}</td>
+                            <td>{{ "%.1f"|format(p.goldak_haz_widths.get('ichaz', 0)) }}</td>
+                            <td>{{ "%.1f"|format(p.rosenthal_haz_widths.get('ichaz', 0)) }}</td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            Click <strong>Run Multi-Pass</strong> to chain the Goldak solver across all
+            {{ project.total_strings }} weld strings with interpass cooling.
+            The temperature field from each pass is carried forward as the initial condition
+            for the next.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Navigation -->
+<div class="d-flex gap-2 mt-3">
+    <a href="{{ url_for('welding.view', id=project.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Project
+    </a>
+    <a href="{{ url_for('welding.goldak_analysis', id=project.id) }}" class="btn btn-outline-success">
+        <i class="bi bi-bullseye"></i> Single-Pass Goldak
+    </a>
+    <a href="{{ url_for('welding.haz_analysis', id=project.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-layers"></i> HAZ Analysis
+    </a>
+</div>
+{% endblock %}

@@ -234,6 +234,32 @@
                     </div>
                 </div>
             </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-bullseye display-4 text-success"></i>
+                        <h5 class="mt-2">Goldak Heat Source</h5>
+                        <p class="text-muted">2D cross-section numerical solver with double-ellipsoid heat source model</p>
+                        <a href="{{ url_for('welding.goldak_analysis', id=project.id) }}" class="btn btn-outline-success">
+                            <i class="bi bi-bullseye"></i> Goldak Analysis
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% if project.total_strings and project.total_strings > 1 %}
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-stack display-4 text-success"></i>
+                        <h5 class="mt-2">Multi-Pass Goldak</h5>
+                        <p class="text-muted">Chain Goldak solver across all {{ project.total_strings }} passes with interpass cooling</p>
+                        <a href="{{ url_for('welding.goldak_multipass', id=project.id) }}" class="btn btn-outline-success">
+                            <i class="bi bi-stack"></i> Multi-Pass Goldak
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

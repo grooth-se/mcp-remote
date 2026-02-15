@@ -268,3 +268,85 @@ class RunSimulationForm(FlaskForm):
         'Save intermediate results',
         default=True
     )
+
+
+class GoldakAnalysisForm(FlaskForm):
+    """Form for Goldak heat source analysis."""
+
+    pool_half_width_mm = FloatField(
+        'Pool Half-Width b (mm)',
+        validators=[Optional(), NumberRange(min=0.5, max=20)],
+        render_kw={'placeholder': 'Auto-estimate'}
+    )
+    penetration_depth_mm = FloatField(
+        'Penetration Depth c (mm)',
+        validators=[Optional(), NumberRange(min=0.5, max=30)],
+        render_kw={'placeholder': 'Auto-estimate'}
+    )
+    front_length_mm = FloatField(
+        'Front Semi-Axis a_f (mm)',
+        validators=[Optional(), NumberRange(min=0.5, max=20)],
+        render_kw={'placeholder': 'Auto-estimate'}
+    )
+    rear_length_mm = FloatField(
+        'Rear Semi-Axis a_r (mm)',
+        validators=[Optional(), NumberRange(min=1, max=40)],
+        render_kw={'placeholder': 'Auto-estimate'}
+    )
+    f_front = FloatField(
+        'Front Fraction f_f',
+        validators=[Optional(), NumberRange(min=0.3, max=1.0)],
+        default=0.6
+    )
+    f_rear = FloatField(
+        'Rear Fraction f_r',
+        validators=[Optional(), NumberRange(min=1.0, max=1.7)],
+        default=1.4
+    )
+    grid_ny = IntegerField(
+        'Grid Points (transverse)',
+        validators=[DataRequired(), NumberRange(min=11, max=101)],
+        default=41
+    )
+    grid_nz = IntegerField(
+        'Grid Points (depth)',
+        validators=[DataRequired(), NumberRange(min=11, max=61)],
+        default=31
+    )
+    domain_half_width_mm = FloatField(
+        'Domain Half-Width (mm)',
+        validators=[DataRequired(), NumberRange(min=10, max=200)],
+        default=30.0
+    )
+    plate_thickness_mm = FloatField(
+        'Plate Thickness (mm)',
+        validators=[DataRequired(), NumberRange(min=3, max=200)],
+        default=20.0
+    )
+    simulation_duration = FloatField(
+        'Simulation Duration (s)',
+        validators=[DataRequired(), NumberRange(min=10, max=600)],
+        default=120.0
+    )
+    compare_with_rosenthal = BooleanField(
+        'Compare with Rosenthal',
+        default=True
+    )
+
+
+class GoldakMultiPassForm(FlaskForm):
+    """Form for running Goldak multi-pass simulation."""
+
+    grid_resolution = SelectField(
+        'Grid Resolution',
+        choices=[
+            ('coarse', 'Coarse (21\u00d711) \u2014 Fast ~5s/pass'),
+            ('medium', 'Medium (41\u00d731) \u2014 Balanced ~15s/pass'),
+            ('fine', 'Fine (61\u00d741) \u2014 Accurate ~60s/pass'),
+        ],
+        default='medium'
+    )
+    compare_methods = BooleanField(
+        'Generate Rosenthal comparison',
+        default=True
+    )

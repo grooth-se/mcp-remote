@@ -2436,3 +2436,371 @@ def create_parameter_trajectory_plot(
     buf.seek(0)
     plt.close(fig)
     return buf.getvalue()
+
+
+# ==========================================================================
+# Phase 15: Goldak visualization functions
+# ==========================================================================
+
+def create_goldak_temperature_heatmap(goldak_data: dict) -> bytes:
+    """Generate 2D heatmap of peak temperature in y-z cross-section.
+
+    Shows pcolormesh with HAZ zone contour lines overlaid.
+
+    Parameters
+    ----------
+    goldak_data : dict
+        GoldakResult.to_dict() output
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    y = np.array(goldak_data['y_coords'])   # in mm from to_dict
+    z = np.array(goldak_data['z_coords'])
+    peak_map = np.array(goldak_data['peak_temperature_map'])
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+
+    im = ax.pcolormesh(y, z, peak_map, cmap='hot', shading='auto')
+    cbar = plt.colorbar(im, ax=ax, pad=0.02)
+    cbar.set_label('Peak Temperature (\u00b0C)', fontsize=11)
+
+    # HAZ contour lines
+    contour_temps = [1500, 1100, 900, 727]
+    contour_labels = {1500: 'Solidus', 1100: 'CGHAZ', 900: 'Ac3', 727: 'Ac1'}
+    contour_colors = ['white', '#FFD700', '#00FFFF', '#00FF00']
+
+    try:
+        cs = ax.contour(y, z, peak_map, levels=contour_temps,
+                        colors=contour_colors, linewidths=1.5)
+        ax.clabel(cs, fmt=contour_labels, fontsize=8)
+    except ValueError:
+        pass
+
+    pool = goldak_data.get('weld_pool_boundary', {})
+    if pool.get('y_mm') and pool.get('z_mm'):
+        ax.plot(pool['y_mm'], pool['z_mm'], 'w-', linewidth=2, alpha=0.8)
+
+    ax.set_xlabel('Transverse Distance y (mm)', fontsize=11)
+    ax.set_ylabel('Depth z (mm)', fontsize=11)
+    ax.set_title('Goldak 2D Cross-Section \u2014 Peak Temperature', fontsize=13, fontweight='bold')
+    ax.invert_yaxis()
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_goldak_weld_pool_plot(goldak_data: dict) -> bytes:
+    """Plot weld pool shape (solidus isotherm) with ellipsoid parameters.
+
+    Parameters
+    ----------
+    goldak_data : dict
+        GoldakResult.to_dict() output
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    pool = goldak_data.get('weld_pool_boundary', {})
+    params = goldak_data.get('goldak_params', {})
+
+    if pool.get('y_mm') and pool.get('z_mm'):
+        ax.fill(pool['y_mm'], pool['z_mm'], color='#FF4444', alpha=0.3, label='Fusion Zone')
+        ax.plot(pool['y_mm'], pool['z_mm'], 'r-', linewidth=2, label='Solidus Isotherm')
+
+    b_mm = params.get('b_mm', 0)
+    c_mm = params.get('c_mm', 0)
+    if b_mm > 0 and c_mm > 0:
+        theta_arr = np.linspace(0, np.pi, 100)
+        ey = b_mm * np.cos(theta_arr)
+        ez = c_mm * np.sin(theta_arr)
+        ax.plot(ey, ez, 'b--', linewidth=1.5, alpha=0.6,
+                label=f'Ellipsoid (b={b_mm:.1f}, c={c_mm:.1f} mm)')
+
+    ax.set_xlabel('Transverse Distance y (mm)', fontsize=11)
+    ax.set_ylabel('Depth z (mm)', fontsize=11)
+    ax.set_title('Weld Pool Shape \u2014 Goldak Double-Ellipsoid', fontsize=13, fontweight='bold')
+    ax.invert_yaxis()
+    ax.set_aspect('equal')
+    ax.legend(fontsize=10)
+    ax.grid(True, alpha=0.3)
+
+    info_text = (f"Q = {params.get('Q_W', 0):.0f} W\n"
+                 f"v = {params.get('v_mm_s', 0):.1f} mm/s\n"
+                 f"b = {b_mm:.1f} mm, c = {c_mm:.1f} mm\n"
+                 f"a_f = {params.get('a_f_mm', 0):.1f}, a_r = {params.get('a_r_mm', 0):.1f} mm")
+    ax.text(0.98, 0.02, info_text, transform=ax.transAxes,
+            fontsize=9, verticalalignment='bottom', horizontalalignment='right',
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8))
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_goldak_rosenthal_comparison_plot(comparison_data: dict) -> bytes:
+    """Side-by-side comparison: Goldak vs Rosenthal.
+
+    Parameters
+    ----------
+    comparison_data : dict
+        Comparison data from _compare_with_rosenthal
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    distances = comparison_data.get('distances_mm', [])
+    goldak_peaks = comparison_data.get('goldak_peak_temps', [])
+    ros_peaks = comparison_data.get('rosenthal_peak_temps', [])
+
+    if distances and goldak_peaks:
+        ax1.plot(distances, goldak_peaks, 'b-', linewidth=2, label='Goldak (numerical)')
+    if distances and ros_peaks:
+        ax1.plot(distances, ros_peaks, 'r--', linewidth=2, label='Rosenthal (analytical)')
+
+    zone_temps = [(1500, 'Solidus', '#FF0000'), (1100, 'CGHAZ', '#FF8800'),
+                  (900, 'Ac3', '#CCAA00'), (727, 'Ac1', '#88CC00')]
+    for temp, label, color in zone_temps:
+        ax1.axhline(temp, color=color, linestyle=':', alpha=0.5, linewidth=1)
+        if distances:
+            ax1.text(max(distances) * 0.98, temp + 15, label, fontsize=8,
+                     ha='right', color=color, alpha=0.7)
+
+    ax1.set_xlabel('Distance from Weld Center (mm)', fontsize=11)
+    ax1.set_ylabel('Peak Temperature (\u00b0C)', fontsize=11)
+    ax1.set_title('Peak Temperature Profile', fontsize=12, fontweight='bold')
+    ax1.legend(fontsize=10)
+    ax1.grid(True, alpha=0.3)
+
+    goldak_haz = comparison_data.get('goldak_haz_widths', {})
+    ros_haz = comparison_data.get('rosenthal_haz_widths', {})
+
+    zones = ['fusion', 'cghaz', 'fghaz', 'ichaz']
+    zone_labels = ['Fusion', 'CGHAZ', 'FGHAZ', 'ICHAZ']
+
+    x_pos = np.arange(len(zones))
+    bar_width = 0.35
+
+    goldak_vals = [goldak_haz.get(z, 0) for z in zones]
+    ros_vals = [ros_haz.get(z, 0) for z in zones]
+
+    ax2.bar(x_pos - bar_width/2, goldak_vals, bar_width,
+            label='Goldak', color='#2196F3', alpha=0.8)
+    ax2.bar(x_pos + bar_width/2, ros_vals, bar_width,
+            label='Rosenthal', color='#FF5722', alpha=0.8)
+
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels(zone_labels)
+    ax2.set_ylabel('Boundary Distance (mm)', fontsize=11)
+    ax2.set_title('HAZ Zone Widths', fontsize=12, fontweight='bold')
+    ax2.legend(fontsize=10)
+    ax2.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_goldak_thermal_cycle_plot(thermal_cycles: dict, title: str = '') -> bytes:
+    """Thermal cycles from Goldak solver at probe points.
+
+    Parameters
+    ----------
+    thermal_cycles : dict
+        {probe_name: {'times': [...], 'temps': [...]}}
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(11, 6))
+
+    colors = ['#FF0000', '#FF8800', '#2196F3', '#4CAF50', '#9C27B0']
+    for idx, (name, cycle) in enumerate(thermal_cycles.items()):
+        times = cycle.get('times', [])
+        temps = cycle.get('temps', [])
+        if times and temps:
+            color = colors[idx % len(colors)]
+            label = name.replace('_', ' ').title()
+            ax.plot(times, temps, '-', color=color, linewidth=1.5,
+                    label=label, alpha=0.9)
+
+    ax.axhline(800, color='gray', linestyle=':', alpha=0.4, linewidth=1)
+    ax.axhline(500, color='gray', linestyle=':', alpha=0.4, linewidth=1)
+    ax.text(0.02, 810, '800\u00b0C', transform=ax.get_yaxis_transform(),
+            fontsize=8, color='gray')
+    ax.text(0.02, 510, '500\u00b0C', transform=ax.get_yaxis_transform(),
+            fontsize=8, color='gray')
+
+    ax.set_xlabel('Time (s)', fontsize=11)
+    ax.set_ylabel('Temperature (\u00b0C)', fontsize=11)
+    ax.set_title(title or 'Goldak \u2014 Thermal Cycles at Probe Points',
+                 fontsize=13, fontweight='bold')
+    ax.legend(fontsize=9, loc='upper right')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_goldak_multipass_heatmap(multipass_data: dict) -> bytes:
+    """Cumulative peak temperature map across all passes.
+
+    Parameters
+    ----------
+    multipass_data : dict
+        MultiPassResult.to_dict() output
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    y = np.array(multipass_data.get('y_coords_mm', []))
+    z = np.array(multipass_data.get('z_coords_mm', []))
+    peak_map = np.array(multipass_data.get('cumulative_peak_temp_map', []))
+
+    if peak_map.size == 0:
+        return b''
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+
+    im = ax.pcolormesh(y, z, peak_map, cmap='hot', shading='auto')
+    cbar = plt.colorbar(im, ax=ax, pad=0.02)
+    cbar.set_label('Cumulative Peak Temperature (\u00b0C)', fontsize=11)
+
+    try:
+        contour_temps = [1500, 1100, 900, 727]
+        cs = ax.contour(y, z, peak_map, levels=contour_temps,
+                        colors=['white', '#FFD700', '#00FFFF', '#00FF00'],
+                        linewidths=1.5)
+        ax.clabel(cs, fmt={1500: 'Solidus', 1100: 'CGHAZ', 900: 'Ac3', 727: 'Ac1'},
+                  fontsize=8)
+    except ValueError:
+        pass
+
+    n_passes = multipass_data.get('n_passes', '?')
+    ax.set_xlabel('Transverse Distance y (mm)', fontsize=11)
+    ax.set_ylabel('Depth z (mm)', fontsize=11)
+    ax.set_title(f'Cumulative Peak Temperature \u2014 {n_passes} Passes',
+                 fontsize=13, fontweight='bold')
+    ax.invert_yaxis()
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+
+def create_goldak_multipass_comparison_plot(multipass_data: dict) -> bytes:
+    """Per-pass comparison bar chart: Goldak vs Rosenthal peak temps and HAZ widths.
+
+    Parameters
+    ----------
+    multipass_data : dict
+        MultiPassResult.to_dict() output with comparison_with_rosenthal
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    comparison = multipass_data.get('comparison_with_rosenthal', {})
+    if not comparison or not comparison.get('passes'):
+        return b''
+
+    passes = comparison['passes']
+    n = len(passes)
+    if n == 0:
+        return b''
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    x = np.arange(n)
+    bar_w = 0.35
+
+    goldak_peaks = []
+    ros_peaks = []
+    pass_labels = []
+    for i, p in enumerate(passes):
+        if 'error' in p:
+            goldak_peaks.append(0)
+            ros_peaks.append(0)
+        else:
+            g_temps = p.get('goldak_peak_temps', [])
+            r_temps = p.get('rosenthal_peak_temps', [])
+            goldak_peaks.append(max(g_temps) if g_temps else 0)
+            ros_peaks.append(max(r_temps) if r_temps else 0)
+        pass_labels.append(f"Pass {p.get('string_number', i + 1)}")
+
+    ax1.bar(x - bar_w/2, goldak_peaks, bar_w, label='Goldak', color='#2196F3', alpha=0.8)
+    ax1.bar(x + bar_w/2, ros_peaks, bar_w, label='Rosenthal', color='#FF5722', alpha=0.8)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(pass_labels, fontsize=9)
+    ax1.set_ylabel('Peak Temperature (\u00b0C)', fontsize=11)
+    ax1.set_title('Peak Temperature per Pass', fontsize=12, fontweight='bold')
+    ax1.legend(fontsize=10)
+    ax1.grid(True, alpha=0.3, axis='y')
+
+    goldak_haz = []
+    ros_haz = []
+    for p in passes:
+        if 'error' in p:
+            goldak_haz.append(0)
+            ros_haz.append(0)
+        else:
+            g_widths = p.get('goldak_haz_widths', {})
+            r_widths = p.get('rosenthal_haz_widths', {})
+            goldak_haz.append(g_widths.get('ichaz', 0))
+            ros_haz.append(r_widths.get('ichaz', 0))
+
+    ax2.bar(x - bar_w/2, goldak_haz, bar_w, label='Goldak', color='#2196F3', alpha=0.8)
+    ax2.bar(x + bar_w/2, ros_haz, bar_w, label='Rosenthal', color='#FF5722', alpha=0.8)
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(pass_labels, fontsize=9)
+    ax2.set_ylabel('HAZ Width to Ac1 (mm)', fontsize=11)
+    ax2.set_title('HAZ Extent per Pass', fontsize=12, fontweight='bold')
+    ax2.legend(fontsize=10)
+    ax2.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()

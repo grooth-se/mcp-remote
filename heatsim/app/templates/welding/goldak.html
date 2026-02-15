@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}Goldak Analysis - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.index') }}">Weld Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('welding.view', id=project.id) }}">{{ project.name }}</a></li>
+                <li class="breadcrumb-item active">Goldak Analysis</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-bullseye"></i> Goldak Heat Source Analysis</h2>
+        <p class="text-muted">2D cross-section numerical solver for <strong>{{ project.name }}</strong></p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Parameters Form -->
+    <div class="col-md-3">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Goldak Parameters</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <h6 class="text-muted mb-2">Pool Geometry</h6>
+                    <div class="mb-2">
+                        {{ form.pool_half_width_mm.label(class="form-label form-label-sm") }}
+                        {{ form.pool_half_width_mm(class="form-control form-control-sm", step="0.1") }}
+                    </div>
+                    <div class="mb-2">
+                        {{ form.penetration_depth_mm.label(class="form-label form-label-sm") }}
+                        {{ form.penetration_depth_mm(class="form-control form-control-sm", step="0.1") }}
+                    </div>
+                    <div class="mb-2">
+                        {{ form.front_length_mm.label(class="form-label form-label-sm") }}
+                        {{ form.front_length_mm(class="form-control form-control-sm", step="0.1") }}
+                    </div>
+                    <div class="mb-2">
+                        {{ form.rear_length_mm.label(class="form-label form-label-sm") }}
+                        {{ form.rear_length_mm(class="form-control form-control-sm", step="0.1") }}
+                    </div>
+
+                    <hr>
+                    <h6 class="text-muted mb-2">Solver Settings</h6>
+                    <div class="mb-2">
+                        {{ form.grid_ny.label(class="form-label form-label-sm") }}
+                        {{ form.grid_ny(class="form-control form-control-sm") }}
+                    </div>
+                    <div class="mb-2">
+                        {{ form.grid_nz.label(class="form-label form-label-sm") }}
+                        {{ form.grid_nz(class="form-control form-control-sm") }}
+                    </div>
+                    <div class="mb-2">
+                        {{ form.simulation_duration.label(class="form-label form-label-sm") }}
+                        {{ form.simulation_duration(class="form-control form-control-sm", step="10") }}
+                    </div>
+
+                    <hr>
+                    <div class="mb-3 form-check">
+                        {{ form.compare_with_rosenthal(class="form-check-input") }}
+                        {{ form.compare_with_rosenthal.label(class="form-check-label") }}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-calculator"></i> Run Goldak
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Project Info -->
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0">Weld Parameters</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td>Process</td><td>{{ project.process_label }}</td></tr>
+                    <tr><td>Heat Input</td><td>{{ project.default_heat_input }} kJ/mm</td></tr>
+                    <tr><td>Travel Speed</td><td>{{ project.default_travel_speed }} mm/s</td></tr>
+                    <tr><td>Preheat</td><td>{{ project.preheat_temperature }}&deg;C</td></tr>
+                    <tr><td>Steel</td><td>{{ project.steel_grade.display_name if project.steel_grade else 'N/A' }}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        {% if pool_estimate %}
+        <div class="card">
+            <div class="card-header"><h6 class="mb-0">Auto-Estimated Pool</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td>b (half-width)</td><td>{{ "%.1f"|format(pool_estimate.b_mm) }} mm</td></tr>
+                    <tr><td>c (penetration)</td><td>{{ "%.1f"|format(pool_estimate.c_mm) }} mm</td></tr>
+                    <tr><td>a_f (front)</td><td>{{ "%.1f"|format(pool_estimate.a_f_mm) }} mm</td></tr>
+                    <tr><td>a_r (rear)</td><td>{{ "%.1f"|format(pool_estimate.a_r_mm) }} mm</td></tr>
+                </table>
+                <small class="text-muted">Leave pool fields blank to use these.</small>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Results -->
+    <div class="col-md-9">
+        {% if goldak_data %}
+        <!-- Summary Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card text-center border-primary">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Pool Width</h6>
+                        <h3 class="card-title text-primary">{{ "%.1f"|format(goldak_data.goldak_params.b_mm) }} mm</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center border-info">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Penetration</h6>
+                        <h3 class="card-title text-info">{{ "%.1f"|format(goldak_data.goldak_params.c_mm) }} mm</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center border-danger">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Fusion Area</h6>
+                        <h3 class="card-title text-danger">{{ "%.1f"|format(goldak_data.fusion_zone_area_mm2) }} mm&sup2;</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h6 class="card-subtitle text-muted">Solver Time</h6>
+                        <h3 class="card-title">{{ goldak_data.solver_info.wall_time_s }} s</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2D Temperature Heatmap -->
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">Peak Temperature Cross-Section</h5></div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('welding.plot', id=project.id, plot_type='goldak_temperature_field') }}"
+                     class="img-fluid" alt="Goldak Temperature Field"
+                     onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+            </div>
+        </div>
+
+        <!-- Thermal Cycles & Weld Pool -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Thermal Cycles</h5></div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('welding.plot', id=project.id, plot_type='goldak_thermal_cycles') }}"
+                             class="img-fluid" alt="Goldak Thermal Cycles"
+                             onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header"><h5 class="mb-0">Weld Pool Shape</h5></div>
+                    <div class="card-body text-center">
+                        <img src="{{ url_for('welding.plot', id=project.id, plot_type='goldak_weld_pool') }}"
+                             class="img-fluid" alt="Weld Pool Shape"
+                             onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if comparison_data %}
+        <!-- Comparison Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> Goldak vs Rosenthal Comparison</h5>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ url_for('welding.plot', id=project.id, plot_type='goldak_vs_rosenthal') }}"
+                     class="img-fluid" alt="Goldak vs Rosenthal"
+                     onerror="this.parentElement.innerHTML='<div class=\'alert alert-warning\'>Plot not available</div>'">
+            </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="mb-0">HAZ Width Comparison</h5></div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Zone</th>
+                            <th>Goldak (mm)</th>
+                            <th>Rosenthal (mm)</th>
+                            <th>Difference</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for zone, label in [('fusion', 'Fusion'), ('cghaz', 'CGHAZ'), ('fghaz', 'FGHAZ'), ('ichaz', 'ICHAZ')] %}
+                        {% set g_val = comparison_data.goldak_haz_widths.get(zone, 0) %}
+                        {% set r_val = comparison_data.rosenthal_haz_widths.get(zone, 0) %}
+                        <tr>
+                            <td>{{ label }}</td>
+                            <td>{{ "%.1f"|format(g_val) }}</td>
+                            <td>{{ "%.1f"|format(r_val) }}</td>
+                            <td>
+                                {% if r_val > 0 %}
+                                {{ "%.0f"|format((g_val - r_val) / r_val * 100) }}%
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            Click <strong>Run Goldak</strong> to compute the 2D temperature field using the
+            Goldak double-ellipsoid heat source model. Leave pool geometry fields blank to
+            auto-estimate from the heat input.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Navigation -->
+<div class="d-flex gap-2 mt-3">
+    <a href="{{ url_for('welding.view', id=project.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Project
+    </a>
+    <a href="{{ url_for('welding.haz_analysis', id=project.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-layers"></i> HAZ Analysis (Rosenthal)
+    </a>
+    <a href="{{ url_for('welding.preheat', id=project.id) }}" class="btn btn-outline-primary">
+        <i class="bi bi-thermometer-half"></i> Preheat Calculator
+    </a>
+    {% if project.total_strings and project.total_strings > 0 %}
+    <a href="{{ url_for('welding.goldak_multipass', id=project.id) }}" class="btn btn-outline-success">
+        <i class="bi bi-stack"></i> Multi-Pass Goldak
+    </a>
+    {% endif %}
+</div>
+{% endblock %}
