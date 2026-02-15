@@ -1,11 +1,11 @@
-/* Familjekontor - Custom Styles */
+/* PsalmGears - Custom Styles */
 
 body {
     font-size: 0.9rem;
 }
 
 .navbar {
-    background-color: #495057 !important;
+    background-color: #926F34 !important;
 }
 
 .navbar-brand {
@@ -173,7 +173,7 @@ tr[data-row-link]:hover td {
 /* Active nav highlight */
 .navbar-nav .nav-link.active {
     font-weight: 600;
-    border-bottom: 2px solid #fff;
+    border-bottom: 2px solid #DFBD69;
 }
 
 /* Required field asterisk */

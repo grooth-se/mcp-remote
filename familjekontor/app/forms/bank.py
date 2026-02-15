@@ -17,6 +17,7 @@ class BankAccountForm(FlaskForm):
     account_number = StringField('Kontonummer', validators=[DataRequired(), Length(max=30)])
     clearing_number = StringField('Clearingnummer', validators=[Optional(), Length(max=10)])
     iban = StringField('IBAN', validators=[Optional(), Length(max=34)])
+    bic = StringField('BIC/SWIFT', validators=[Optional(), Length(max=11)])
     currency = SelectField('Valuta')
     ledger_account = StringField('Bokföringskonto', default='1930', validators=[Optional()])
     submit = SubmitField('Spara')

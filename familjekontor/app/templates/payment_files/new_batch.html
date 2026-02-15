@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Ny betalningsbatch - PsalmGears{% endblock %}
+{% block breadcrumbs %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{{ render_breadcrumbs([('Start', url_for('dashboard.index')), ('Betalningsfiler', url_for('payment_files.index')), ('Ny batch', none)]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-plus-circle"></i> Ny betalningsbatch</h2>
+
+<form method="POST" id="batch-form">
+    {{ form.hidden_tag() }}
+    {{ form.invoice_ids(type="hidden", id="invoice-ids-field") }}
+
+    <div class="card mb-3">
+        <div class="card-header">Batchinställningar</div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        {{ form.bank_account_id.label(class="form-label") }}
+                        {{ form.bank_account_id(class="form-select") }}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        {{ form.file_format.label(class="form-label") }}
+                        {{ form.file_format(class="form-select") }}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        {{ form.execution_date.label(class="form-label") }}
+                        {{ form.execution_date(class="form-control", type="date") }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Fakturor att betala</span>
+            <span id="selection-summary" class="text-muted small">0 valda, 0,00 SEK</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th style="width:32px"><input type="checkbox" id="select-all"></th>
+                        <th>Leverantör</th>
+                        <th>Fakturanr</th>
+                        <th>Förfallodag</th>
+                        <th class="text-end">Belopp</th>
+                        <th>Valuta</th>
+                        <th>Betalmetod</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in invoice_data %}
+                    <tr class="{% if not item.has_payment_details %}table-warning{% endif %}">
+                        <td>
+                            {% if item.has_payment_details %}
+                            <input type="checkbox" class="invoice-check" value="{{ item.invoice.id }}"
+                                   data-amount="{{ item.invoice.total_amount }}">
+                            {% else %}
+                            <i class="bi bi-exclamation-triangle text-warning" title="Saknar betalningsuppgifter"></i>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.invoice.supplier.name }}</td>
+                        <td>{{ item.invoice.invoice_number }}</td>
+                        <td>{{ item.invoice.due_date }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(item.invoice.total_amount) }}</td>
+                        <td>{{ item.invoice.currency or 'SEK' }}</td>
+                        <td>
+                            {% if item.has_payment_details %}
+                            <span class="badge bg-success">{{ item.payment_method }}</span>
+                            <small class="text-muted">{{ item.payment_account }}</small>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">Saknas</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">Inga godkända fakturor att betala.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('payment_files.index') }}" class="btn btn-outline-secondary">Avbryt</a>
+    </div>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const selectAll = document.getElementById('select-all');
+    const checks = document.querySelectorAll('.invoice-check');
+    const idsField = document.getElementById('invoice-ids-field');
+    const summary = document.getElementById('selection-summary');
+
+    function updateSummary() {
+        const selected = document.querySelectorAll('.invoice-check:checked');
+        let total = 0;
+        const ids = [];
+        selected.forEach(function(cb) {
+            total += parseFloat(cb.dataset.amount || 0);
+            ids.push(cb.value);
+        });
+        idsField.value = ids.join(',');
+        summary.textContent = selected.length + ' valda, ' + total.toLocaleString('sv-SE', {minimumFractionDigits: 2}) + ' SEK';
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checks.forEach(function(cb) { cb.checked = selectAll.checked; });
+            updateSummary();
+        });
+    }
+
+    checks.forEach(function(cb) {
+        cb.addEventListener('change', updateSummary);
+    });
+})();
+</script>
+{% endblock %}

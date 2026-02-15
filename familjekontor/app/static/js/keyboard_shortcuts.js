@@ -1,5 +1,5 @@
 /**
- * Keyboard shortcuts for Familjekontor.
+ * Keyboard shortcuts for PsalmGears.
  * Ctrl+S / Cmd+S — submit the first visible form
  * Escape — navigate back (Avbryt / Tillbaka)
  * Alt+N — navigate to "Ny" (new) action

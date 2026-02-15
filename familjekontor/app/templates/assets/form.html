@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/breadcrumbs.html" import render_breadcrumbs %}
-{% block title %}{% if edit %}Redigera{% else %}Ny{% endif %} tillgång - Familjekontor{% endblock %}
+{% block title %}{% if edit %}Redigera{% else %}Ny{% endif %} tillgång - PsalmGears{% endblock %}
 {% block breadcrumbs %}
 {{ render_breadcrumbs([
     {'title': 'Start', 'url': url_for('dashboard.index')},

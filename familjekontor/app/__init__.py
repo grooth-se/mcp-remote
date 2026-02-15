@@ -43,6 +43,7 @@ def create_app(config_name=None):
     from app.routes.documents import documents_bp
     from app.routes.consolidation import consolidation_bp
     from app.routes.payments import payments_bp
+    from app.routes.payment_files import payment_files_bp
     from app.routes.closing import closing_bp
     from app.routes.currency import currency_bp
     from app.routes.recurring import recurring_bp
@@ -76,6 +77,7 @@ def create_app(config_name=None):
     app.register_blueprint(documents_bp, url_prefix='/documents')
     app.register_blueprint(consolidation_bp, url_prefix='/consolidation')
     app.register_blueprint(payments_bp, url_prefix='/payments')
+    app.register_blueprint(payment_files_bp, url_prefix='/payment-files')
     app.register_blueprint(closing_bp, url_prefix='/closing')
     app.register_blueprint(currency_bp, url_prefix='/currency')
     app.register_blueprint(recurring_bp, url_prefix='/invoices/recurring')

@@ -11,6 +11,7 @@ class BankAccount(db.Model):
     account_number = db.Column(db.String(30), nullable=False)
     clearing_number = db.Column(db.String(10), nullable=True)
     iban = db.Column(db.String(34), nullable=True)
+    bic = db.Column(db.String(11), nullable=True)
     currency = db.Column(db.String(3), default='SEK')
     balance = db.Column(db.Numeric(15, 2), default=0)
     ledger_account = db.Column(db.String(10), default='1930')

@@ -361,97 +361,18 @@ def pay_supplier_invoice(invoice_id):
         )
         db.session.add(audit)
 
-        # Auto-create payment verification
-        company_id = invoice.company_id
-        fy = FiscalYear.query.filter_by(
-            company_id=company_id, status='open'
-        ).order_by(FiscalYear.year.desc()).first()
-
-        if fy and invoice.total_amount:
-            payable_acct = Account.query.filter_by(
-                company_id=company_id, account_number='2440').first()
-
-            # Use bank account's ledger account, default to 1930
-            bank_account = BankAccount.query.filter_by(company_id=company_id).first()
-            bank_num = bank_account.ledger_account if bank_account else '1930'
-            bank_acct = Account.query.filter_by(
-                company_id=company_id, account_number=bank_num).first()
-
-            if payable_acct and bank_acct:
-                is_foreign = invoice.currency and invoice.currency != 'SEK'
-                invoice_sek = Decimal(str(invoice.amount_sek or invoice.total_amount))
-
-                if is_foreign:
-                    # Get payment-date rate
-                    try:
-                        from app.services.exchange_rate_service import get_rate
-                        payment_rate = get_rate(invoice.currency, invoice.paid_at.date())
-                    except (ValueError, Exception):
-                        payment_rate = Decimal(str(invoice.exchange_rate or 1))
-
-                    total_foreign = Decimal(str(invoice.total_amount))
-                    payment_sek = (total_foreign * payment_rate).quantize(Decimal('0.01'))
-                    fx_diff = calculate_fx_gain_loss(invoice_sek, payment_sek)
-                else:
-                    payment_sek = invoice_sek
-                    fx_diff = Decimal('0')
-
-                rows = [
-                    {'account_id': payable_acct.id, 'debit': invoice_sek, 'credit': Decimal('0'),
-                     'description': invoice.invoice_number},
-                    {'account_id': bank_acct.id, 'debit': Decimal('0'), 'credit': payment_sek,
-                     'description': invoice.invoice_number},
-                ]
-
-                # FX gain/loss row
-                if abs(fx_diff) >= Decimal('0.01'):
-                    if fx_diff > 0:
-                        # Loss: paid more SEK → debit 6991
-                        fx_acct = Account.query.filter_by(
-                            company_id=company_id, account_number='6991').first()
-                        if not fx_acct:
-                            fx_acct = Account(company_id=company_id, account_number='6991',
-                                              name='Valutakursförluster', account_type='expense')
-                            db.session.add(fx_acct)
-                            db.session.flush()
-                        rows.append({
-                            'account_id': fx_acct.id,
-                            'debit': abs(fx_diff), 'credit': Decimal('0'),
-                            'description': f'Kursförlust {invoice.currency}',
-                        })
-                    else:
-                        # Gain: paid less SEK → credit 3960
-                        fx_acct = Account.query.filter_by(
-                            company_id=company_id, account_number='3960').first()
-                        if not fx_acct:
-                            fx_acct = Account(company_id=company_id, account_number='3960',
-                                              name='Valutakursvinster', account_type='revenue')
-                            db.session.add(fx_acct)
-                            db.session.flush()
-                        rows.append({
-                            'account_id': fx_acct.id,
-                            'debit': Decimal('0'), 'credit': abs(fx_diff),
-                            'description': f'Kursvinst {invoice.currency}',
-                        })
-
-                try:
-                    ver = create_verification(
-                        company_id=company_id,
-                        fiscal_year_id=fy.id,
-                        verification_date=invoice.paid_at.date(),
-                        description=f'Betalning lev.faktura {invoice.invoice_number}',
-                        rows=rows,
-                        verification_type='bank',
-                        created_by=current_user.id,
-                        source='supplier_invoice_payment',
-                    )
-                    invoice.payment_verification_id = ver.id
-                except ValueError as e:
-                    flash(f'Betalningsverifikation kunde inte skapas: {e}', 'warning')
+        # Auto-create payment verification via shared helper
+        from app.services.payment_file_service import create_supplier_payment_verification
+        ver = create_supplier_payment_verification(invoice, current_user.id)
+        if ver:
+            invoice.payment_verification_id = ver.id
+        else:
+            fy = FiscalYear.query.filter_by(
+                company_id=invoice.company_id, status='open').first()
+            if not fy:
+                flash('Inget öppet räkenskapsår — ingen betalningsverifikation skapades.', 'warning')
             else:
                 flash('Konto 2440 eller bankkonto saknas — ingen betalningsverifikation skapades.', 'warning')
-        elif not fy:
-            flash('Inget öppet räkenskapsår — ingen betalningsverifikation skapades.', 'warning')
 
         db.session.commit()
         flash('Fakturan har markerats som betald.', 'success')

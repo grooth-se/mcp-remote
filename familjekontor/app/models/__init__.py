@@ -21,6 +21,7 @@ from app.models.investment import InvestmentPortfolio, InvestmentHolding, Invest
 from app.models.saved_report import SavedReport
 from app.models.notification import Notification
 from app.models.favorite import UserFavorite
+from app.models.payment_file import PaymentFile, PaymentInstruction
 
 __all__ = [
     'User', 'Company',
@@ -43,4 +44,5 @@ __all__ = [
     'SavedReport',
     'Notification',
     'UserFavorite',
+    'PaymentFile', 'PaymentInstruction',
 ]

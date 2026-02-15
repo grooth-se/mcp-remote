@@ -561,12 +561,12 @@ def generate_sru_file(return_id):
     lines.append('#PRODUKT SRU')
     lines.append(f'#SESSION {datetime.now().strftime("%Y%m%d%H%M%S")}')
     lines.append('#FLAGGA 0')
-    lines.append('#PROGRAM Familjekontor')
+    lines.append('#PROGRAM PsalmGears')
     lines.append('#DATABESKRIVNING_SLUT')
     lines.append('#MEDESSION_START')
     lines.append(f'#UPPGIFTSLAMNARE {org_nr}')
     lines.append(f'#BLANKETT {blankett_r}')
-    lines.append('#SYSTEMINFO Familjekontor')
+    lines.append('#SYSTEMINFO PsalmGears')
     lines.append('#MEDESSION_SLUT')
 
     def _emit_fields(blankett, fields_dict):

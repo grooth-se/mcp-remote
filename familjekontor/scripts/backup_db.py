@@ -7,13 +7,13 @@ from datetime import datetime
 
 
 def main():
-    db_url = os.environ.get('DATABASE_URL', 'postgresql://familjekontor:familjekontor@localhost:5432/familjekontor')
+    db_url = os.environ.get('DATABASE_URL', 'postgresql://psalmgears:psalmgears@localhost:5432/psalmgears')
 
     backup_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'backups')
     os.makedirs(backup_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f'familjekontor_backup_{timestamp}.sql'
+    filename = f'psalmgears_backup_{timestamp}.sql'
     filepath = os.path.join(backup_dir, filename)
 
     # Parse connection string

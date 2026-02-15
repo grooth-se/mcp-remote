@@ -430,7 +430,7 @@ class TestSRUExport:
         assert '#DATABESKRIVNING_SLUT' in content
         assert '#MEDESSION_START' in content
         assert '#MEDESSION_SLUT' in content
-        assert '#PROGRAM Familjekontor' in content
+        assert '#PROGRAM PsalmGears' in content
 
     def test_sru_org_number_no_dash(self, ink_company):
         """Org number in SRU should be without dash."""

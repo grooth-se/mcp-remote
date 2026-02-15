@@ -156,7 +156,7 @@ class TestFooter:
         response = logged_in_client.get('/')
         html = response.data.decode()
         assert '<footer' in html
-        assert 'Familjekontor' in html
+        assert 'PsalmGears' in html
         assert 'Bokföring' in html
 
     def test_footer_has_year(self, logged_in_client):

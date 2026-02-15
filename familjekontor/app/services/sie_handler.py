@@ -425,7 +425,7 @@ def export_sie(company_id, fiscal_year_id):
 
     # Header
     lines.append(f'#FLAGGA 0')
-    lines.append(f'#PROGRAM "Familjekontor" "1.0"')
+    lines.append(f'#PROGRAM "PsalmGears" "1.0"')
     lines.append(f'#FORMAT PC8')
     lines.append(f'#GEN {now.strftime("%Y%m%d")}')
     lines.append(f'#SIETYP 4')

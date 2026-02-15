@@ -198,7 +198,7 @@ def batch_categorize(transactions):
 # Natural Language Financial Queries
 # ---------------------------------------------------------------------------
 
-QUERY_SYSTEM_PROMPT = """Du är en AI-assistent för ett svenskt bokföringssystem (Familjekontor).
+QUERY_SYSTEM_PROMPT = """Du är en AI-assistent för ett svenskt bokföringssystem (PsalmGears).
 Du hjälper användare att förstå sin ekonomi genom att svara på frågor.
 Svara alltid på svenska. Var koncis men informativ.
 Om du inte kan svara, förklara vad som behövs."""

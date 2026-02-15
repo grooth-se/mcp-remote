@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}{{ batch.batch_reference }} - PsalmGears{% endblock %}
+{% block breadcrumbs %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{{ render_breadcrumbs([('Start', url_for('dashboard.index')), ('Betalningsfiler', url_for('payment_files.index')), (batch.batch_reference, none)]) }}
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-file-earmark-arrow-up"></i> {{ batch.batch_reference }}</h2>
+    <div>
+        {% if batch.status == 'draft' %}
+        <span class="badge bg-secondary fs-6">{{ status_labels.get(batch.status) }}</span>
+        {% elif batch.status == 'generated' %}
+        <span class="badge bg-primary fs-6">{{ status_labels.get(batch.status) }}</span>
+        {% elif batch.status == 'uploaded' %}
+        <span class="badge bg-warning text-dark fs-6">{{ status_labels.get(batch.status) }}</span>
+        {% elif batch.status == 'confirmed' %}
+        <span class="badge bg-success fs-6">{{ status_labels.get(batch.status) }}</span>
+        {% elif batch.status == 'cancelled' %}
+        <span class="badge bg-danger fs-6">{{ status_labels.get(batch.status) }}</span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header">Batchinformation</div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <strong>Bankkonto</strong><br>
+                {{ batch.bank_account.bank_name }} - {{ batch.bank_account.account_number }}
+            </div>
+            <div class="col-md-3">
+                <strong>Filformat</strong><br>
+                {% if batch.file_format == 'pain001' %}ISO 20022 pain.001{% else %}Bankgirot{% endif %}
+            </div>
+            <div class="col-md-3">
+                <strong>Betalningsdatum</strong><br>
+                {{ batch.execution_date }}
+            </div>
+            <div class="col-md-3">
+                <strong>Skapad</strong><br>
+                {{ batch.created_at.strftime('%Y-%m-%d %H:%M') if batch.created_at else '-' }}
+                {% if batch.creator %}<br><small class="text-muted">av {{ batch.creator.username }}</small>{% endif %}
+            </div>
+        </div>
+        {% if batch.status == 'confirmed' and batch.confirmed_at %}
+        <div class="row mt-2">
+            <div class="col-md-3">
+                <strong>Bekräftad</strong><br>
+                {{ batch.confirmed_at.strftime('%Y-%m-%d %H:%M') }}
+                {% if batch.confirmer %}<br><small class="text-muted">av {{ batch.confirmer.username }}</small>{% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Betalningar ({{ batch.number_of_transactions }})</span>
+        <strong>Totalt: {{ "{:,.2f}".format(batch.total_amount) }} SEK</strong>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Leverantör</th>
+                    <th>Fakturanr</th>
+                    <th>Metod</th>
+                    <th>Konto</th>
+                    <th class="text-end">Belopp</th>
+                    <th>Status</th>
+                    {% if batch.status == 'draft' %}<th></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for instr in batch.instructions %}
+                <tr>
+                    <td>{{ instr.creditor_name }}</td>
+                    <td>
+                        {{ instr.remittance_info }}
+                        {% if instr.supplier_invoice and instr.supplier_invoice.payment_verification_id %}
+                        <a href="{{ url_for('accounting.view_verification', verification_id=instr.supplier_invoice.payment_verification_id) }}"
+                           class="ms-1" title="Visa verifikation"><i class="bi bi-journal-check"></i></a>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge bg-info">{{ instr.payment_method }}</span></td>
+                    <td><small>{{ instr.creditor_account }}</small></td>
+                    <td class="text-end">{{ "{:,.2f}".format(instr.amount) }}</td>
+                    <td>
+                        {% if instr.status == 'paid' %}
+                        <span class="badge bg-success">Betald</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Väntar</span>
+                        {% endif %}
+                    </td>
+                    {% if batch.status == 'draft' %}
+                    <td>
+                        <form method="POST" action="{{ url_for('payment_files.remove_instruction', batch_id=batch.id, instruction_id=instr.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Ta bort"
+                                    onclick="return confirm('Ta bort denna betalning från batchen?')">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if summary and summary.by_method %}
+<div class="card mb-3">
+    <div class="card-header">Fördelning per metod</div>
+    <div class="card-body">
+        <div class="row">
+            {% for method, data in summary.by_method.items() %}
+            <div class="col-md-4">
+                <strong>{{ method|upper }}</strong>: {{ data.count }} betalningar, {{ "{:,.2f}".format(data.total) }} SEK
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="d-flex gap-2">
+    {% if batch.status == 'draft' %}
+    <form method="POST" action="{{ url_for('payment_files.generate_file', batch_id=batch.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-primary"><i class="bi bi-file-earmark-code"></i> Generera fil</button>
+    </form>
+    <form method="POST" action="{{ url_for('payment_files.cancel', batch_id=batch.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Avbryt denna batch?')">
+            <i class="bi bi-x-circle"></i> Avbryt
+        </button>
+    </form>
+    {% elif batch.status == 'generated' %}
+    <a href="{{ url_for('payment_files.download_file', batch_id=batch.id) }}" class="btn btn-success">
+        <i class="bi bi-download"></i> Ladda ner fil
+    </a>
+    <form method="POST" action="{{ url_for('payment_files.mark_uploaded', batch_id=batch.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-warning"><i class="bi bi-upload"></i> Markera uppladdad</button>
+    </form>
+    <form method="POST" action="{{ url_for('payment_files.cancel', batch_id=batch.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Avbryt denna batch?')">
+            <i class="bi bi-x-circle"></i> Avbryt
+        </button>
+    </form>
+    {% elif batch.status == 'uploaded' %}
+    <a href="{{ url_for('payment_files.download_file', batch_id=batch.id) }}" class="btn btn-outline-success">
+        <i class="bi bi-download"></i> Ladda ner fil
+    </a>
+    <form method="POST" action="{{ url_for('payment_files.confirm_paid', batch_id=batch.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-success" onclick="return confirm('Bekräfta att alla betalningar har genomförts?')">
+            <i class="bi bi-check-circle"></i> Bekräfta betald
+        </button>
+    </form>
+    {% elif batch.status == 'confirmed' %}
+    <a href="{{ url_for('payment_files.download_file', batch_id=batch.id) }}" class="btn btn-outline-secondary">
+        <i class="bi bi-download"></i> Ladda ner fil
+    </a>
+    {% endif %}
+
+    <a href="{{ url_for('payment_files.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Tillbaka
+    </a>
+</div>
+{% endblock %}
