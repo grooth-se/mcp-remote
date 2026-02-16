@@ -3393,8 +3393,14 @@ def optimize(id):
                 flash(f'Optimized simulation created: "{best_sim.name}" (#{best_sim.id}).', 'info')
 
             db.session.commit()
-            flash(f'Optimization completed: {opt_result.total_evaluations} evaluations '
-                  f'in {opt_result.elapsed_seconds:.1f}s.', 'success')
+            if opt_result.status == 'timeout':
+                flash(f'Optimization stopped early (timeout): '
+                      f'{opt_result.total_evaluations} evaluations '
+                      f'in {opt_result.elapsed_seconds:.1f}s. '
+                      f'Best result saved.', 'warning')
+            else:
+                flash(f'Optimization completed: {opt_result.total_evaluations} evaluations '
+                      f'in {opt_result.elapsed_seconds:.1f}s.', 'success')
             return redirect(url_for('simulation.optimize_results', id=id))
 
         except Exception as e:

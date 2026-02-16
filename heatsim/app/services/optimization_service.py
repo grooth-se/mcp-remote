@@ -23,6 +23,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class _OptimizationTimeout(Exception):
+    """Raised when optimization exceeds wall-time limit."""
+    pass
+
+
 # ---------------------------------------------------------------------------
 # Parameter and output definitions
 # ---------------------------------------------------------------------------
@@ -174,6 +179,10 @@ class OptimizationService:
     """
 
     PENALTY_WEIGHT = 1000.0
+    # Hard cap on total evaluations to prevent runaway DE runs
+    MAX_TOTAL_EVALUATIONS = 200
+    # Timeout per optimization run (seconds)
+    MAX_WALL_TIME = 300  # 5 minutes
 
     def __init__(self, simulation: 'Simulation'):
         self.sim = simulation
@@ -182,6 +191,7 @@ class OptimizationService:
         self._best_obj = float('inf')
         self._best_params: Dict[str, float] = {}
         self._best_outputs: Dict[str, float] = {}
+        self._start_time: float = 0.0
 
     def optimize(
         self,
@@ -218,6 +228,7 @@ class OptimizationService:
         self._best_outputs = {}
 
         t_start = time.time()
+        self._start_time = t_start
 
         # Bounds for scipy
         bounds = [(p.min_value, p.max_value) for p in parameters]
@@ -234,11 +245,23 @@ class OptimizationService:
 
         try:
             if method == 'differential_evolution':
+                n_params = len(parameters)
+                # Cap popsize so total evals stay manageable:
+                # total ≈ popsize * n_params * maxiter
+                # With MAX_TOTAL_EVALUATIONS=200 and maxiter=30:
+                # popsize = 200 / (n_params * 30), minimum 2
+                safe_popsize = max(2, min(15, self.MAX_TOTAL_EVALUATIONS // (n_params * max_iterations)))
+                logger.info(
+                    f"Differential evolution: {n_params} params, "
+                    f"popsize={safe_popsize}, maxiter={max_iterations}, "
+                    f"est. max evals={safe_popsize * n_params * (max_iterations + 1)}"
+                )
                 result = differential_evolution(
                     self._objective_function,
                     bounds=bounds,
                     args=(parameters, objective, constraints),
                     maxiter=max_iterations,
+                    popsize=safe_popsize,
                     seed=42,
                     tol=1e-3,
                     polish=False,
@@ -247,6 +270,11 @@ class OptimizationService:
                 status = 'completed' if result.success else 'max_iterations'
             else:
                 # Nelder-Mead with bounds
+                max_fev = min(max_iterations * 3, self.MAX_TOTAL_EVALUATIONS)
+                logger.info(
+                    f"Nelder-Mead: {len(parameters)} params, "
+                    f"maxiter={max_iterations}, maxfev={max_fev}"
+                )
                 result = minimize(
                     self._objective_function,
                     x0,
@@ -254,13 +282,19 @@ class OptimizationService:
                     method='Nelder-Mead',
                     options={
                         'maxiter': max_iterations,
-                        'maxfev': max_iterations * 3,
+                        'maxfev': max_fev,
                         'xatol': 1e-2,
                         'fatol': 1e-3,
                         'adaptive': True,
                     },
                 )
                 status = 'completed' if result.success else 'max_iterations'
+        except _OptimizationTimeout:
+            logger.warning(
+                f"Optimization timed out after {self.MAX_WALL_TIME}s "
+                f"({self._eval_count} evaluations)"
+            )
+            status = 'timeout'
         except Exception as e:
             logger.error(f"Optimization failed: {e}")
             status = 'failed'
@@ -288,6 +322,20 @@ class OptimizationService:
         constraints: List[OptimizationConstraint],
     ) -> float:
         """Evaluate objective for a parameter vector."""
+        # Check wall-time timeout
+        elapsed = time.time() - self._start_time
+        if elapsed > self.MAX_WALL_TIME:
+            raise _OptimizationTimeout(
+                f"Wall time {elapsed:.0f}s exceeds limit {self.MAX_WALL_TIME}s"
+            )
+
+        # Check evaluation count limit
+        if self._eval_count >= self.MAX_TOTAL_EVALUATIONS:
+            raise _OptimizationTimeout(
+                f"Evaluation count {self._eval_count} reached limit "
+                f"{self.MAX_TOTAL_EVALUATIONS}"
+            )
+
         # Map vector to named parameters
         param_values = {}
         for i, p in enumerate(parameters):
@@ -346,8 +394,11 @@ class OptimizationService:
             self._best_params = dict(iteration.parameters)
             self._best_outputs = dict(iteration.outputs)
 
-        logger.debug(f"Eval #{self._eval_count}: obj={total_obj:.4f}, "
-                     f"feasible={is_feasible}, params={param_values}")
+        elapsed = time.time() - self._start_time
+        logger.info(
+            f"Optimization eval #{self._eval_count}: obj={total_obj:.4f}, "
+            f"feasible={is_feasible}, elapsed={elapsed:.1f}s"
+        )
 
         return total_obj
 
