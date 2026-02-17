@@ -6,6 +6,7 @@ PORTFOLIO_TYPE_LABELS = {
     'aktiedepå': 'Aktiedepå',
     'isk': 'ISK',
     'kapitalforsakring': 'Kapitalförsäkring',
+    'direkt': 'Direktinvesteringar',
 }
 
 INSTRUMENT_TYPE_LABELS = {
@@ -13,6 +14,9 @@ INSTRUMENT_TYPE_LABELS = {
     'fond': 'Fond',
     'obligation': 'Obligation',
     'etf': 'ETF',
+    'onoterad': 'Onoterad aktie',
+    'lan': 'Lån',
+    'foretagsobligation': 'Företagsobligation',
 }
 
 TRANSACTION_TYPE_LABELS = {
@@ -23,6 +27,9 @@ TRANSACTION_TYPE_LABELS = {
     'avgift': 'Avgift',
     'insattning': 'Insättning',
     'uttag': 'Uttag',
+    'utlan': 'Utlåning',
+    'amortering': 'Amortering',
+    'kupong': 'Kupongbetalning',
 }
 
 
@@ -75,12 +82,24 @@ class InvestmentHolding(db.Model):
     active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
+    # Extended fields for direct investments, loans, bonds
+    org_number = db.Column(db.String(15), nullable=True)
+    ownership_pct = db.Column(db.Numeric(7, 4), nullable=True)
+    interest_rate = db.Column(db.Numeric(7, 4), nullable=True)
+    maturity_date = db.Column(db.Date, nullable=True)
+    face_value = db.Column(db.Numeric(15, 2), nullable=True)
+    remaining_principal = db.Column(db.Numeric(15, 2), nullable=True)
+
     company = db.relationship('Company', backref='investment_holdings')
     transactions = db.relationship('InvestmentTransaction', backref='holding')
 
     @property
     def instrument_type_label(self):
         return INSTRUMENT_TYPE_LABELS.get(self.instrument_type, self.instrument_type)
+
+    @property
+    def is_loan_type(self):
+        return self.instrument_type in ('lan', 'foretagsobligation')
 
     def __repr__(self):
         return f'<Holding {self.name} qty={self.quantity}>'

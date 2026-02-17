@@ -85,6 +85,17 @@
                             {% if h.ticker %}<small class="text-muted">({{ h.ticker }})</small>{% endif %}
                         </td>
                         <td><span class="badge bg-secondary">{{ h.instrument_type_label }}</span></td>
+                        {% if h.is_loan_type %}
+                        <td class="text-end" colspan="2">
+                            <small class="text-muted">Kvarstående:</small>
+                            {% if h.remaining_principal is not none %}{{ h.remaining_principal|sek(0) }}{% else %}-{% endif %}
+                        </td>
+                        <td class="text-end">{% if h.face_value %}{{ h.face_value|sek(0) }}{% else %}{{ h.total_cost|sek(0) }}{% endif %}</td>
+                        <td class="text-end">{% if h.interest_rate %}{{ "%.2f"|format(h.interest_rate) }}%{% else %}-{% endif %}</td>
+                        <td class="text-end">{% if h.maturity_date %}{{ h.maturity_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</td>
+                        <td class="text-end">-</td>
+                        <td class="text-end"></td>
+                        {% else %}
                         <td class="text-end">{{ "%.2f"|format(h.quantity) }}</td>
                         <td class="text-end">{{ h.average_cost|sek(2) }}</td>
                         <td class="text-end">{{ h.total_cost|sek(0) }}</td>
@@ -100,6 +111,7 @@
                         <td class="text-end">
                             <a href="{{ url_for('investments.price_update', holding_id=h.id) }}" class="btn btn-outline-secondary btn-sm" title="Uppdatera pris"><i class="bi bi-currency-exchange"></i></a>
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>

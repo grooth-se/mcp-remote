@@ -108,6 +108,11 @@ def _get_or_create_holding(portfolio, company_id, data):
             quantity=0,
             average_cost=0,
             total_cost=0,
+            org_number=data.get('org_number'),
+            ownership_pct=Decimal(str(data['ownership_pct'])) if data.get('ownership_pct') else None,
+            interest_rate=Decimal(str(data['interest_rate'])) if data.get('interest_rate') else None,
+            maturity_date=data.get('maturity_date'),
+            face_value=Decimal(str(data['face_value'])) if data.get('face_value') else None,
         )
         db.session.add(holding)
         db.session.flush()
@@ -168,7 +173,7 @@ def create_transaction(portfolio_id, data, created_by=None):
     realized_gain = None
 
     # For buy/sell/dividend on specific instruments, manage holding
-    if tx_type in ('kop', 'salj', 'utdelning') and data.get('name'):
+    if tx_type in ('kop', 'salj', 'utdelning', 'utlan', 'amortering', 'kupong') and data.get('name'):
         holding = _get_or_create_holding(portfolio, company_id, data)
 
     if tx_type == 'kop' and holding and quantity:
@@ -197,6 +202,33 @@ def create_transaction(portfolio_id, data, created_by=None):
             holding.quantity = 0
             holding.total_cost = 0
             holding.active = False
+
+    # --- Loan: utlan creates holding with face_value/remaining_principal ---
+    elif tx_type == 'utlan' and holding:
+        holding.instrument_type = data.get('instrument_type', 'lan')
+        holding.face_value = amount_sek
+        holding.remaining_principal = amount_sek
+        holding.quantity = Decimal('1')
+        holding.total_cost = amount_sek
+        holding.active = True
+
+    # --- Amortization: reduce remaining_principal ---
+    elif tx_type == 'amortering' and holding:
+        remaining = holding.remaining_principal or Decimal('0')
+        if amount_sek > remaining:
+            raise ValueError(
+                f'Amortering {amount_sek} överskrider kvarstående kapital {remaining}'
+            )
+        holding.remaining_principal = remaining - amount_sek
+        holding.total_cost = holding.remaining_principal
+        if holding.remaining_principal <= 0:
+            holding.remaining_principal = Decimal('0')
+            holding.total_cost = Decimal('0')
+            holding.active = False
+
+    # --- Coupon: income from bond, no holding quantity change ---
+    elif tx_type == 'kupong' and holding:
+        pass  # No holding changes, just transaction + verification
 
     # Create transaction record
     tx = InvestmentTransaction(
@@ -316,6 +348,26 @@ def _create_investment_verification(company_id, fiscal_year_id, portfolio,
         rows.append({'account_id': acct_asset.id, 'debit': 0, 'credit': amount_sek})
         desc = 'Uttag värdepapperskonto'
 
+    elif tx_type == 'utlan':
+        acct_loan = _ensure_account(company_id, ledger_acct_num if ledger_acct_num != '1350' else '1385',
+                                     'Långfristiga lånefordringar', 'asset')
+        rows.append({'account_id': acct_loan.id, 'debit': amount_sek, 'credit': 0})
+        rows.append({'account_id': acct_bank.id, 'debit': 0, 'credit': amount_sek})
+        desc = f'Utlåning {holding.name if holding else ""}'
+
+    elif tx_type == 'amortering':
+        acct_loan = _ensure_account(company_id, ledger_acct_num if ledger_acct_num != '1350' else '1385',
+                                     'Långfristiga lånefordringar', 'asset')
+        rows.append({'account_id': acct_bank.id, 'debit': amount_sek, 'credit': 0})
+        rows.append({'account_id': acct_loan.id, 'debit': 0, 'credit': amount_sek})
+        desc = f'Amortering {holding.name if holding else ""}'
+
+    elif tx_type == 'kupong':
+        acct_int = _ensure_account(company_id, '8310', 'Ränteintäkter', 'revenue')
+        rows.append({'account_id': acct_bank.id, 'debit': amount_sek, 'credit': 0})
+        rows.append({'account_id': acct_int.id, 'debit': 0, 'credit': amount_sek})
+        desc = f'Kupongbetalning {holding.name if holding else ""}'
+
     else:
         return None
 
@@ -351,9 +403,18 @@ def get_portfolio_summary(company_id):
 
     for p in portfolios:
         active_holdings = [h for h in p.holdings if h.active]
-        p_cost = sum(h.total_cost or 0 for h in active_holdings)
-        p_value = sum(h.current_value or h.total_cost or 0 for h in active_holdings)
-        p_unrealized = sum(h.unrealized_gain or 0 for h in active_holdings)
+        p_cost = Decimal('0')
+        p_value = Decimal('0')
+        p_unrealized = Decimal('0')
+        for h in active_holdings:
+            if h.is_loan_type:
+                val = h.remaining_principal or h.face_value or h.total_cost or 0
+                p_cost += val
+                p_value += val
+            else:
+                p_cost += h.total_cost or 0
+                p_value += h.current_value or h.total_cost or 0
+                p_unrealized += h.unrealized_gain or 0
 
         summary['portfolios'].append({
             'portfolio': p,
@@ -393,6 +454,52 @@ def get_dividend_income_summary(company_id, fiscal_year_id):
 
     result = sorted(by_holding.values(), key=lambda x: x['total'], reverse=True)
     return result
+
+
+def get_interest_income_summary(company_id, fiscal_year_id):
+    """Get interest/coupon income grouped by holding for a fiscal year."""
+    fy = db.session.get(FiscalYear, fiscal_year_id)
+    if not fy:
+        return []
+
+    txs = InvestmentTransaction.query.filter(
+        InvestmentTransaction.company_id == company_id,
+        InvestmentTransaction.transaction_type.in_(['ranta', 'kupong']),
+        InvestmentTransaction.transaction_date >= fy.start_date,
+        InvestmentTransaction.transaction_date <= fy.end_date,
+    ).all()
+
+    by_holding = {}
+    for tx in txs:
+        key = tx.holding_id or 'other'
+        if key not in by_holding:
+            name = tx.holding.name if tx.holding else 'Övriga'
+            by_holding[key] = {'name': name, 'total': Decimal('0'), 'count': 0}
+        by_holding[key]['total'] += tx.amount_sek
+        by_holding[key]['count'] += 1
+
+    return sorted(by_holding.values(), key=lambda x: x['total'], reverse=True)
+
+
+def update_holding_metadata(holding_id, data):
+    """Update extended metadata on a holding (org_number, ownership, rates, etc.)."""
+    holding = db.session.get(InvestmentHolding, holding_id)
+    if not holding:
+        raise ValueError('Innehav hittades inte')
+
+    if 'org_number' in data:
+        holding.org_number = data['org_number'] or None
+    if 'ownership_pct' in data:
+        holding.ownership_pct = Decimal(str(data['ownership_pct'])) if data['ownership_pct'] else None
+    if 'interest_rate' in data:
+        holding.interest_rate = Decimal(str(data['interest_rate'])) if data['interest_rate'] else None
+    if 'maturity_date' in data:
+        holding.maturity_date = data['maturity_date']
+    if 'face_value' in data:
+        holding.face_value = Decimal(str(data['face_value'])) if data['face_value'] else None
+
+    db.session.commit()
+    return holding
 
 
 # ---------------------------------------------------------------------------

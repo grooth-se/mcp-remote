@@ -18,14 +18,56 @@
         <p class="text-muted mb-0">
             {{ holding.instrument_type_label }}
             {% if holding.isin %} — ISIN: {{ holding.isin }}{% endif %}
+            {% if holding.org_number %} — Org.nr: {{ holding.org_number }}{% endif %}
         </p>
     </div>
-    {% if holding.active and not current_user.is_readonly %}
-    <a href="{{ url_for('investments.price_update', holding_id=holding.id) }}" class="btn btn-outline-primary"><i class="bi bi-currency-exchange"></i> Uppdatera pris</a>
-    {% endif %}
+    <div class="d-flex gap-2">
+        {% if holding.instrument_type in ('onoterad', 'lan', 'foretagsobligation') and not current_user.is_readonly %}
+        <a href="{{ url_for('investments.holding_edit', holding_id=holding.id) }}" class="btn btn-outline-secondary"><i class="bi bi-pencil"></i> Redigera detaljer</a>
+        {% endif %}
+        {% if holding.active and not current_user.is_readonly and not holding.is_loan_type %}
+        <a href="{{ url_for('investments.price_update', holding_id=holding.id) }}" class="btn btn-outline-primary"><i class="bi bi-currency-exchange"></i> Uppdatera pris</a>
+        {% endif %}
+    </div>
 </div>
 
-{# Summary #}
+{# Summary cards — different layout for loans vs stocks #}
+{% if holding.is_loan_type %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Ursprungligt belopp</h6>
+                <h4>{% if holding.face_value %}{{ holding.face_value|sek(0) }}{% else %}{{ holding.total_cost|sek(0) }}{% endif %}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Kvarstående</h6>
+                <h4>{% if holding.remaining_principal is not none %}{{ holding.remaining_principal|sek(0) }}{% else %}-{% endif %}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Ränta</h6>
+                <h4>{% if holding.interest_rate %}{{ "%.2f"|format(holding.interest_rate) }}%{% else %}-{% endif %}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Förfallodag</h6>
+                <h4>{% if holding.maturity_date %}{{ holding.maturity_date.strftime('%Y-%m-%d') }}{% else %}-{% endif %}</h4>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
 <div class="row mb-4">
     <div class="col-md-3">
         <div class="card text-center">
@@ -67,6 +109,15 @@
 {% if holding.unrealized_gain is not none %}
 <div class="alert {% if holding.unrealized_gain >= 0 %}alert-success{% else %}alert-danger{% endif %} text-center">
     Orealiserad vinst/förlust: <strong>{{ holding.unrealized_gain|sek }}</strong>
+</div>
+{% endif %}
+{% endif %}
+
+{# Extended metadata for onoterad/direct investments #}
+{% if holding.instrument_type == 'onoterad' and holding.ownership_pct %}
+<div class="alert alert-info">
+    Ägarandel: <strong>{{ "%.2f"|format(holding.ownership_pct) }}%</strong>
+    {% if holding.org_number %} | Org.nr: <strong>{{ holding.org_number }}</strong>{% endif %}
 </div>
 {% endif %}
 

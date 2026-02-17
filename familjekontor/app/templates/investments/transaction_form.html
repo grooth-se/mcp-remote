@@ -74,6 +74,33 @@
                 </div>
             </div>
 
+            <div id="detailFields" style="display:none;">
+                <hr>
+                <h6 class="text-muted mb-3">Detaljer (lån/direktinvestering)</h6>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">{{ form.org_number.label.text }}</label>
+                        {{ form.org_number(class="form-control", placeholder="556000-0000") }}
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">{{ form.ownership_pct.label.text }}</label>
+                        {{ form.ownership_pct(class="form-control") }}
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">{{ form.interest_rate.label.text }}</label>
+                        {{ form.interest_rate(class="form-control") }}
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">{{ form.maturity_date.label.text }}</label>
+                        {{ form.maturity_date(class="form-control", type="date") }}
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">{{ form.face_value.label.text }}</label>
+                        {{ form.face_value(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
             <div class="mb-3">
                 <label class="form-label">{{ form.note.label.text }}</label>
                 {{ form.note(class="form-control", rows="2") }}
@@ -91,8 +118,11 @@
 <script>
 document.getElementById('txType').addEventListener('change', function() {
     var fields = document.getElementById('instrumentFields');
+    var detailFields = document.getElementById('detailFields');
     var noInstrument = ['insattning', 'uttag', 'avgift', 'ranta'];
+    var showDetails = ['utlan', 'amortering', 'kupong', 'kop', 'salj'];
     fields.style.display = noInstrument.includes(this.value) ? 'none' : 'block';
+    detailFields.style.display = showDetails.includes(this.value) ? 'block' : 'none';
 });
 </script>
 {% endblock %}

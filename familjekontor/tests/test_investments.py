@@ -12,8 +12,9 @@ from app.models.investment import (
 from app.services.investment_service import (
     create_portfolio, get_portfolios, get_portfolio,
     get_holding, get_holding_transactions, update_holding_price,
+    update_holding_metadata,
     create_transaction, get_portfolio_summary,
-    get_dividend_income_summary,
+    get_dividend_income_summary, get_interest_income_summary,
     parse_nordnet_csv, import_nordnet_transactions,
 )
 
@@ -596,3 +597,358 @@ class TestInvestmentRoutes:
         resp = logged_in_client.get(f'/investments/holdings/{tx.holding_id}/price')
         assert resp.status_code == 200
         assert 'Uppdatera pris' in resp.data.decode()
+
+    def test_holding_edit_get(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'utlan',
+            'transaction_date': date(2024, 3, 1),
+            'name': 'Lån till Startup AB',
+            'instrument_type': 'lan',
+            'amount': 500000,
+            'fiscal_year_id': fy.id,
+        })
+        resp = logged_in_client.get(f'/investments/holdings/{tx.holding_id}/edit')
+        assert resp.status_code == 200
+        assert 'Redigera detaljer' in resp.data.decode()
+
+    def test_holding_edit_post(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'utlan',
+            'transaction_date': date(2024, 3, 1),
+            'name': 'Edit Test AB',
+            'instrument_type': 'lan',
+            'amount': 100000,
+            'fiscal_year_id': fy.id,
+        })
+        resp = logged_in_client.post(f'/investments/holdings/{tx.holding_id}/edit', data={
+            'org_number': '556123-4567',
+            'interest_rate': '5.5',
+            'maturity_date': '2026-12-31',
+        }, follow_redirects=True)
+        assert resp.status_code == 200
+        assert 'Detaljer uppdaterade' in resp.data.decode()
+
+
+# ---------------------------------------------------------------------------
+# Loans (utlan / amortering)
+# ---------------------------------------------------------------------------
+
+class TestLoanTransactions:
+    def test_utlan_creates_loan_holding(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'utlan',
+            'transaction_date': date(2024, 3, 1),
+            'name': 'Startup AB',
+            'instrument_type': 'lan',
+            'amount': 500000,
+            'org_number': '556123-4567',
+            'interest_rate': 8.0,
+            'maturity_date': date(2026, 3, 1),
+            'fiscal_year_id': fy.id,
+        })
+        assert tx.id is not None
+        assert tx.holding_id is not None
+        assert tx.verification_id is not None
+
+        holding = get_holding(tx.holding_id)
+        assert holding.name == 'Startup AB'
+        assert holding.instrument_type == 'lan'
+        assert float(holding.face_value) == 500000
+        assert float(holding.remaining_principal) == 500000
+        assert float(holding.quantity) == 1
+        assert holding.org_number == '556123-4567'
+        assert holding.active is True
+
+    def test_amortering_reduces_principal(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        # Issue loan
+        create_transaction(p.id, {
+            'transaction_type': 'utlan',
+            'transaction_date': date(2024, 1, 15),
+            'name': 'Borrower AB',
+            'instrument_type': 'lan',
+            'amount': 200000,
+            'fiscal_year_id': fy.id,
+        })
+
+        # Partial amortization
+        tx = create_transaction(p.id, {
+            'transaction_type': 'amortering',
+            'transaction_date': date(2024, 6, 15),
+            'name': 'Borrower AB',
+            'amount': 50000,
+            'fiscal_year_id': fy.id,
+        })
+        assert tx.verification_id is not None
+
+        holding = get_holding(tx.holding_id)
+        assert float(holding.remaining_principal) == 150000
+        assert holding.active is True
+
+    def test_full_repayment_deactivates(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        create_transaction(p.id, {
+            'transaction_type': 'utlan',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Full Repay AB',
+            'instrument_type': 'lan',
+            'amount': 100000,
+            'fiscal_year_id': fy.id,
+        })
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'amortering',
+            'transaction_date': date(2024, 12, 1),
+            'name': 'Full Repay AB',
+            'amount': 100000,
+            'fiscal_year_id': fy.id,
+        })
+
+        holding = get_holding(tx.holding_id)
+        assert float(holding.remaining_principal) == 0
+        assert holding.active is False
+
+    def test_over_amortization_raises(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        create_transaction(p.id, {
+            'transaction_type': 'utlan',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Over Amort AB',
+            'instrument_type': 'lan',
+            'amount': 50000,
+            'fiscal_year_id': fy.id,
+        })
+
+        try:
+            create_transaction(p.id, {
+                'transaction_type': 'amortering',
+                'transaction_date': date(2024, 6, 1),
+                'name': 'Over Amort AB',
+                'amount': 60000,
+                'fiscal_year_id': fy.id,
+            })
+            assert False, 'Should have raised ValueError'
+        except ValueError as e:
+            assert 'överskrider' in str(e)
+
+    def test_utlan_verification_accounts(self, logged_in_client):
+        """utlan: Debit loan account (1385), Credit bank (1930)."""
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'utlan',
+            'transaction_date': date(2024, 3, 1),
+            'name': 'Verify Loan AB',
+            'instrument_type': 'lan',
+            'amount': 300000,
+            'fiscal_year_id': fy.id,
+        })
+
+        v = db.session.get(Verification, tx.verification_id)
+        assert v is not None
+        assert len(v.rows) == 2
+        debits = [r for r in v.rows if float(r.debit) > 0]
+        credits = [r for r in v.rows if float(r.credit) > 0]
+        assert len(debits) == 1
+        assert len(credits) == 1
+        # Debit is loan account (1385), credit is bank (1930)
+        debit_acct = db.session.get(Account, debits[0].account_id)
+        credit_acct = db.session.get(Account, credits[0].account_id)
+        assert debit_acct.account_number == '1385'
+        assert credit_acct.account_number == '1930'
+
+
+# ---------------------------------------------------------------------------
+# Direct investments (onoterad)
+# ---------------------------------------------------------------------------
+
+class TestDirectInvestment:
+    def test_buy_onoterad_with_metadata(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'kop',
+            'transaction_date': date(2024, 2, 1),
+            'name': 'TechStartup AB',
+            'instrument_type': 'onoterad',
+            'quantity': 1000,
+            'price_per_unit': 100,
+            'amount': 100000,
+            'org_number': '559000-1234',
+            'ownership_pct': 25.0,
+            'fiscal_year_id': fy.id,
+        })
+
+        holding = get_holding(tx.holding_id)
+        assert holding.instrument_type == 'onoterad'
+        assert holding.org_number == '559000-1234'
+        assert float(holding.ownership_pct) == 25.0
+        assert float(holding.quantity) == 1000
+
+
+# ---------------------------------------------------------------------------
+# Bonds (kupong)
+# ---------------------------------------------------------------------------
+
+class TestBondTransactions:
+    def test_kupong_verification(self, logged_in_client):
+        """kupong: Debit bank (1930), Credit ränteintäkter (8310)."""
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        # Ensure 8310 exists
+        Account.query.filter_by(company_id=co.id, account_number='8310').first() or \
+            db.session.add(Account(company_id=co.id, account_number='8310',
+                                   name='Ränteintäkter', account_type='revenue', active=True))
+        db.session.commit()
+
+        p = _create_test_portfolio(co)
+
+        # First create the bond holding via buy
+        create_transaction(p.id, {
+            'transaction_type': 'kop',
+            'transaction_date': date(2024, 1, 15),
+            'name': 'Corp Bond 2027',
+            'instrument_type': 'foretagsobligation',
+            'quantity': 10,
+            'price_per_unit': 10000,
+            'amount': 100000,
+            'interest_rate': 5.5,
+            'maturity_date': date(2027, 6, 15),
+            'face_value': 100000,
+            'fiscal_year_id': fy.id,
+        })
+
+        # Coupon payment
+        tx = create_transaction(p.id, {
+            'transaction_type': 'kupong',
+            'transaction_date': date(2024, 6, 15),
+            'name': 'Corp Bond 2027',
+            'amount': 2750,
+            'fiscal_year_id': fy.id,
+        })
+        assert tx.verification_id is not None
+
+        v = db.session.get(Verification, tx.verification_id)
+        assert len(v.rows) == 2
+        debits = [r for r in v.rows if float(r.debit) > 0]
+        credits = [r for r in v.rows if float(r.credit) > 0]
+        debit_acct = db.session.get(Account, debits[0].account_id)
+        credit_acct = db.session.get(Account, credits[0].account_id)
+        assert debit_acct.account_number == '1930'
+        assert credit_acct.account_number == '8310'
+
+
+# ---------------------------------------------------------------------------
+# Interest Income Summary
+# ---------------------------------------------------------------------------
+
+class TestInterestSummary:
+    def test_interest_summary(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co, 2024)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        # Create loan + coupon income
+        create_transaction(p.id, {
+            'transaction_type': 'utlan',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Interest Test AB',
+            'instrument_type': 'lan',
+            'amount': 100000,
+            'fiscal_year_id': fy.id,
+        })
+        create_transaction(p.id, {
+            'transaction_type': 'kupong',
+            'transaction_date': date(2024, 6, 15),
+            'name': 'Interest Test AB',
+            'amount': 5000,
+            'fiscal_year_id': fy.id,
+        })
+
+        result = get_interest_income_summary(co.id, fy.id)
+        assert len(result) == 1
+        assert float(result[0]['total']) == 5000
+
+    def test_interest_summary_includes_ranta(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co, 2024)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        # Plain ranta transaction (no holding)
+        create_transaction(p.id, {
+            'transaction_type': 'ranta',
+            'transaction_date': date(2024, 3, 31),
+            'amount': 1500,
+            'fiscal_year_id': fy.id,
+        })
+
+        result = get_interest_income_summary(co.id, fy.id)
+        assert len(result) == 1
+        assert float(result[0]['total']) == 1500
+
+
+# ---------------------------------------------------------------------------
+# Holding metadata update
+# ---------------------------------------------------------------------------
+
+class TestHoldingMetadata:
+    def test_update_holding_metadata(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'utlan',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Meta Test AB',
+            'instrument_type': 'lan',
+            'amount': 200000,
+            'fiscal_year_id': fy.id,
+        })
+
+        holding = update_holding_metadata(tx.holding_id, {
+            'org_number': '556999-0001',
+            'interest_rate': 6.5,
+            'maturity_date': date(2026, 6, 30),
+            'face_value': 200000,
+        })
+        assert holding.org_number == '556999-0001'
+        assert float(holding.interest_rate) == 6.5
+        assert holding.maturity_date == date(2026, 6, 30)

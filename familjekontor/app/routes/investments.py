@@ -6,12 +6,16 @@ from app.models.investment import (
     InvestmentPortfolio, InvestmentHolding, InvestmentTransaction,
     INSTRUMENT_TYPE_LABELS, TRANSACTION_TYPE_LABELS,
 )
-from app.forms.investment import PortfolioForm, TransactionForm, ImportForm, PriceUpdateForm
+from app.forms.investment import (
+    PortfolioForm, TransactionForm, ImportForm, PriceUpdateForm, HoldingEditForm,
+)
 from app.services.investment_service import (
     create_portfolio, get_portfolios, get_portfolio,
     get_holding, get_holding_transactions, update_holding_price,
+    update_holding_metadata,
     create_transaction, get_portfolio_summary,
-    get_dividend_income_summary, parse_nordnet_csv, import_nordnet_transactions,
+    get_dividend_income_summary, get_interest_income_summary,
+    parse_nordnet_csv, import_nordnet_transactions,
 )
 
 investments_bp = Blueprint('investments', __name__)
@@ -141,6 +145,11 @@ def transaction_new(portfolio_id):
             'exchange_rate': form.exchange_rate.data or 1,
             'note': form.note.data,
             'fiscal_year_id': active_fy.id if active_fy else None,
+            'org_number': form.org_number.data,
+            'ownership_pct': form.ownership_pct.data,
+            'interest_rate': form.interest_rate.data,
+            'maturity_date': form.maturity_date.data,
+            'face_value': form.face_value.data,
         }
         try:
             tx = create_transaction(portfolio_id, data, created_by=current_user.id)
@@ -229,6 +238,40 @@ def holding_view(holding_id):
                            holding=holding, transactions=transactions)
 
 
+@investments_bp.route('/holdings/<int:holding_id>/edit', methods=['GET', 'POST'])
+@login_required
+def holding_edit(holding_id):
+    company_id, company, active_fy = _get_active_context()
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('investments.index'))
+
+    holding = get_holding(holding_id)
+    if not holding or holding.company_id != company_id:
+        flash('Innehav hittades inte.', 'danger')
+        return redirect(url_for('investments.index'))
+
+    form = HoldingEditForm(obj=holding)
+    if form.validate_on_submit():
+        try:
+            update_holding_metadata(holding.id, {
+                'org_number': form.org_number.data,
+                'ownership_pct': form.ownership_pct.data,
+                'interest_rate': form.interest_rate.data,
+                'maturity_date': form.maturity_date.data,
+                'face_value': form.face_value.data,
+            })
+            flash(f'Detaljer uppdaterade för {holding.name}.', 'success')
+            return redirect(url_for('investments.holding_view', holding_id=holding.id))
+        except ValueError as e:
+            flash(str(e), 'danger')
+
+    return render_template('investments/holding_edit.html', form=form, holding=holding)
+
+
 @investments_bp.route('/holdings/<int:holding_id>/price', methods=['GET', 'POST'])
 @login_required
 def price_update(holding_id):
@@ -272,9 +315,12 @@ def reports():
 
     summary = get_portfolio_summary(company_id)
     dividend_summary = []
+    interest_summary = []
     if active_fy:
         dividend_summary = get_dividend_income_summary(company_id, active_fy.id)
+        interest_summary = get_interest_income_summary(company_id, active_fy.id)
 
     return render_template('investments/reports.html',
                            summary=summary, dividend_summary=dividend_summary,
+                           interest_summary=interest_summary,
                            active_fy=active_fy)

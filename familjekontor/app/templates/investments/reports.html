@@ -102,5 +102,42 @@
         {% endif %}
     </div>
 </div>
+{# Interest/Coupon Income #}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0">Ränteintäkter {{ active_fy.year }}</h5></div>
+    <div class="card-body">
+        {% if interest_summary %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Källa</th>
+                        <th class="text-end">Antal betalningar</th>
+                        <th class="text-end">Totalt belopp (SEK)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in interest_summary %}
+                    <tr>
+                        <td>{{ row.name }}</td>
+                        <td class="text-end">{{ row.count }}</td>
+                        <td class="text-end">{{ row.total|sek }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-primary">
+                        <td><strong>Totalt</strong></td>
+                        <td></td>
+                        <td class="text-end"><strong>{{ interest_summary|sum(attribute='total')|sek }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Inga ränteintäkter under {{ active_fy.year }}.</p>
+        {% endif %}
+    </div>
+</div>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Redigera detaljer - {{ holding.name }}{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Investeringar', 'url': url_for('investments.index')},
+    {'title': holding.portfolio.name, 'url': url_for('investments.portfolio_view', portfolio_id=holding.portfolio.id)},
+    {'title': holding.name, 'url': url_for('investments.holding_view', holding_id=holding.id)},
+    {'title': 'Redigera detaljer'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-pencil"></i> Redigera detaljer — {{ holding.name }}</h2>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="POST" data-unsaved-warning>
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">{{ form.org_number.label.text }}</label>
+                    {{ form.org_number(class="form-control", placeholder="556000-0000") }}
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">{{ form.ownership_pct.label.text }}</label>
+                    {{ form.ownership_pct(class="form-control") }}
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">{{ form.interest_rate.label.text }}</label>
+                    {{ form.interest_rate(class="form-control") }}
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">{{ form.maturity_date.label.text }}</label>
+                    {{ form.maturity_date(class="form-control", type="date") }}
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label class="form-label">{{ form.face_value.label.text }}</label>
+                    {{ form.face_value(class="form-control") }}
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('investments.holding_view', holding_id=holding.id) }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

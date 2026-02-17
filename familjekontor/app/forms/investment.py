@@ -48,7 +48,22 @@ class TransactionForm(FlaskForm):
     currency = StringField('Valuta', default='SEK', validators=[Optional(), Length(max=3)])
     exchange_rate = DecimalField('Växelkurs', places=6, default=1, validators=[Optional()])
     note = TextAreaField('Anteckning', validators=[Optional(), Length(max=500)])
+    # Extended fields for direct investments, loans, bonds
+    org_number = StringField('Org.nummer', validators=[Optional(), Length(max=15)])
+    ownership_pct = DecimalField('Ägarandel (%)', places=4, validators=[Optional()])
+    interest_rate = DecimalField('Ränta (%)', places=4, validators=[Optional()])
+    maturity_date = DateField('Förfallodag', validators=[Optional()])
+    face_value = DecimalField('Nominellt belopp', places=2, validators=[Optional()])
     submit = SubmitField('Registrera')
+
+
+class HoldingEditForm(FlaskForm):
+    org_number = StringField('Org.nummer', validators=[Optional(), Length(max=15)])
+    ownership_pct = DecimalField('Ägarandel (%)', places=4, validators=[Optional()])
+    interest_rate = DecimalField('Ränta (%)', places=4, validators=[Optional()])
+    maturity_date = DateField('Förfallodag', validators=[Optional()])
+    face_value = DecimalField('Nominellt belopp', places=2, validators=[Optional()])
+    submit = SubmitField('Spara')
 
 
 class ImportForm(FlaskForm):
