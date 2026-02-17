@@ -1,0 +1,45 @@
+{% extends "admin/layout.html" %}
+{% block title %}{{ title }} - Admin{% endblock %}
+
+{% block admin_content %}
+<div class="mb-4">
+    <a href="{{ url_for('admin_apps.list_apps') }}" class="text-decoration-none">
+        <i class="bi bi-arrow-left"></i> Back to Applications
+    </a>
+</div>
+
+<h3>{{ title }}</h3>
+
+<div class="card mt-3" style="max-width: 600px;">
+    <div class="card-body">
+        <form method="POST" novalidate>
+            {{ form.hidden_tag() }}
+
+            {% for field in form if field.type not in ('HiddenField', 'CSRFTokenField', 'SubmitField') %}
+            <div class="mb-3">
+                <label for="{{ field.id }}" class="form-label">{{ field.label.text }}</label>
+                {% if field.type == 'BooleanField' %}
+                <div class="form-check">
+                    {{ field(class="form-check-input") }}
+                </div>
+                {% elif field.type == 'TextAreaField' %}
+                {{ field(class="form-control", rows=3) }}
+                {% elif field.type == 'IntegerField' %}
+                {{ field(class="form-control", type="number") }}
+                {% else %}
+                {{ field(class="form-control") }}
+                {% endif %}
+                {% for error in field.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-accent") }}
+                <a href="{{ url_for('admin_apps.list_apps') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

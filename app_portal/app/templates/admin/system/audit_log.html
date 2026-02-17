@@ -1,0 +1,53 @@
+{% extends "admin/layout.html" %}
+{% block title %}Audit Log - Admin{% endblock %}
+
+{% block admin_content %}
+<h3 class="mb-4"><i class="bi bi-clipboard-check"></i> Audit Log</h3>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Admin</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Old Value</th>
+                    <th>New Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs.items %}
+                <tr>
+                    <td><small>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
+                    <td>{{ log.admin.username if log.admin else '-' }}</td>
+                    <td><span class="badge bg-info">{{ log.action }}</span></td>
+                    <td>{{ log.target_type or '' }} {{ '#' ~ log.target_id if log.target_id else '' }}</td>
+                    <td><small class="text-muted">{{ log.old_value or '' }}</small></td>
+                    <td><small>{{ log.new_value or '' }}</small></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">No audit entries.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if logs.pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center">
+        {% for p in logs.iter_pages() %}
+        {% if p %}
+        <li class="page-item {{ 'active' if p == logs.page }}">
+            <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

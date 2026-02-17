@@ -1,0 +1,82 @@
+{% extends "admin/layout.html" %}
+{% block title %}Permissions - Admin{% endblock %}
+
+{% block admin_content %}
+<h3 class="mb-4"><i class="bi bi-shield-check"></i> Permission Matrix</h3>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-bordered mb-0 permission-matrix">
+            <thead>
+                <tr>
+                    <th class="sticky-col">User</th>
+                    {% for app in apps %}
+                    <th class="text-center">
+                        <small>{{ app.app_name }}</small>
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td class="sticky-col">
+                        <strong>{{ user.username }}</strong>
+                        {% if user.is_admin %}
+                        <span class="badge bg-danger ms-1">Admin</span>
+                        {% endif %}
+                    </td>
+                    {% for app in apps %}
+                    <td class="text-center">
+                        {% if user.is_admin %}
+                        <i class="bi bi-check-circle-fill text-success" title="Admin - all access"></i>
+                        {% else %}
+                        <div class="form-check d-flex justify-content-center">
+                            <input type="checkbox" class="form-check-input perm-checkbox"
+                                   data-user-id="{{ user.id }}"
+                                   data-app-id="{{ app.id }}"
+                                   {{ 'checked' if perms.get((user.id, app.id)) }}>
+                        </div>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="perm-status" class="mt-2 small text-muted"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.perm-checkbox').forEach(cb => {
+    cb.addEventListener('change', function() {
+        const userId = this.dataset.userId;
+        const appId = this.dataset.appId;
+        const granted = this.checked;
+        const status = document.getElementById('perm-status');
+
+        fetch('{{ url_for("admin_permissions.update") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify({ user_id: parseInt(userId), app_id: parseInt(appId), granted })
+        })
+        .then(r => r.json())
+        .then(data => {
+            status.textContent = `Permission ${data.status}.`;
+            setTimeout(() => status.textContent = '', 2000);
+        })
+        .catch(err => {
+            status.textContent = 'Error updating permission.';
+            this.checked = !granted;
+        });
+    });
+});
+</script>
+{% endblock %}

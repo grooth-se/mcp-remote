@@ -1,0 +1,91 @@
+{% extends "admin/layout.html" %}
+{% block title %}Users - Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3><i class="bi bi-people"></i> Users</h3>
+    <a href="{{ url_for('admin_users.create_user') }}" class="btn btn-accent">
+        <i class="bi bi-person-plus"></i> Create User
+    </a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Display Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Last Login</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td><strong>{{ user.username }}</strong></td>
+                    <td>{{ user.display_name or '-' }}</td>
+                    <td>{{ user.email or '-' }}</td>
+                    <td>
+                        {% if user.is_admin %}
+                        <span class="badge bg-danger">Admin</span>
+                        {% else %}
+                        <span class="badge bg-secondary">User</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.is_active %}
+                        <span class="badge bg-success">Active</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('admin_users.edit_user', user_id=user.id) }}"
+                               class="btn btn-outline-primary" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{{ url_for('admin_users.reset_password', user_id=user.id) }}"
+                               class="btn btn-outline-warning" title="Reset Password">
+                                <i class="bi bi-key"></i>
+                            </a>
+                            {% if user.id != current_user.id %}
+                            <form method="POST" action="{{ url_for('admin_users.toggle_active', user_id=user.id) }}"
+                                  class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-{{ 'warning' if user.is_active else 'success' }}"
+                                        title="{{ 'Deactivate' if user.is_active else 'Activate' }}">
+                                    <i class="bi bi-{{ 'pause' if user.is_active else 'play' }}"></i>
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('admin_users.toggle_admin', user_id=user.id) }}"
+                                  class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-{{ 'secondary' if user.is_admin else 'danger' }}"
+                                        title="{{ 'Revoke Admin' if user.is_admin else 'Grant Admin' }}">
+                                    <i class="bi bi-shield{{ '-check' if not user.is_admin else '' }}"></i>
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('admin_users.delete_user', user_id=user.id) }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Delete user {{ user.username }}?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

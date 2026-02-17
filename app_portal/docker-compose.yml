@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - portal
+    restart: unless-stopped
+
+  portal:
+    build: .
+    environment:
+      - SECRET_KEY=${PORTAL_SECRET_KEY}
+      - DATABASE_PATH=/data/portal.db
+    volumes:
+      - portal_data:/data
+    restart: unless-stopped
+
+  # Apps will be added here as they are deployed
+  # accruedincome:
+  #   build: ../accruedincome
+  #   environment:
+  #     - PORTAL_URL=http://portal:5000
+  #   volumes:
+  #     - accruedincome_data:/data
+  #   restart: unless-stopped
+
+volumes:
+  portal_data:

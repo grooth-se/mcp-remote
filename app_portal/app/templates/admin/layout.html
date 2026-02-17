@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Admin Sidebar -->
+        <div class="col-md-2">
+            <div class="admin-sidebar">
+                <h6 class="text-uppercase text-muted small fw-bold mb-3">Administration</h6>
+                <nav class="nav flex-column">
+                    <a class="nav-link {{ 'active' if request.endpoint and 'admin_users' in request.endpoint }}"
+                       href="{{ url_for('admin_users.list_users') }}">
+                        <i class="bi bi-people"></i> Users
+                    </a>
+                    <a class="nav-link {{ 'active' if request.endpoint and 'admin_apps' in request.endpoint }}"
+                       href="{{ url_for('admin_apps.list_apps') }}">
+                        <i class="bi bi-collection"></i> Applications
+                    </a>
+                    <a class="nav-link {{ 'active' if request.endpoint and 'admin_permissions' in request.endpoint }}"
+                       href="{{ url_for('admin_permissions.matrix') }}">
+                        <i class="bi bi-shield-check"></i> Permissions
+                    </a>
+                    <hr>
+                    <a class="nav-link {{ 'active' if request.endpoint == 'admin_system.sessions' }}"
+                       href="{{ url_for('admin_system.sessions') }}">
+                        <i class="bi bi-key"></i> Sessions
+                    </a>
+                    <a class="nav-link {{ 'active' if request.endpoint == 'admin_system.access_log' }}"
+                       href="{{ url_for('admin_system.access_log') }}">
+                        <i class="bi bi-journal-text"></i> Access Log
+                    </a>
+                    <a class="nav-link {{ 'active' if request.endpoint == 'admin_system.audit_log' }}"
+                       href="{{ url_for('admin_system.audit_log') }}">
+                        <i class="bi bi-clipboard-check"></i> Audit Log
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-10">
+            {% block admin_content %}{% endblock %}
+        </div>
+    </div>
+</div>
+{% endblock %}

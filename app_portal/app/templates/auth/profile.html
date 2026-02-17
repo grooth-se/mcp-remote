@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Profile - {{ config.PORTAL_NAME }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px;">
+    <h2 class="mb-4"><i class="bi bi-person-circle"></i> Profile</h2>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-borderless mb-0">
+                <tr>
+                    <th class="text-muted" style="width: 40%;">Username</th>
+                    <td>{{ current_user.username }}</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Display Name</th>
+                    <td>{{ current_user.display_name or '-' }}</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Email</th>
+                    <td>{{ current_user.email or '-' }}</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Role</th>
+                    <td>
+                        {% if current_user.is_admin %}
+                        <span class="badge bg-danger">Admin</span>
+                        {% else %}
+                        <span class="badge bg-secondary">User</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Last Login</th>
+                    <td>{{ current_user.last_login.strftime('%Y-%m-%d %H:%M') if current_user.last_login else '-' }}</td>
+                </tr>
+                <tr>
+                    <th class="text-muted">Member Since</th>
+                    <td>{{ current_user.created_at.strftime('%Y-%m-%d') if current_user.created_at else '-' }}</td>
+                </tr>
+            </table>
+        </div>
+        <div class="card-footer">
+            <a href="{{ url_for('auth.change_password_view') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-lock"></i> Change Password
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

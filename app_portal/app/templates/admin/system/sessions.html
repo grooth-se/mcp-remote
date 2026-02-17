@@ -1,0 +1,45 @@
+{% extends "admin/layout.html" %}
+{% block title %}Sessions - Admin{% endblock %}
+
+{% block admin_content %}
+<h3 class="mb-4"><i class="bi bi-key"></i> Active Sessions</h3>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>IP Address</th>
+                    <th>Created</th>
+                    <th>Expires</th>
+                    <th>User Agent</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in sessions %}
+                <tr>
+                    <td><strong>{{ session.user.username if session.user else 'Unknown' }}</strong></td>
+                    <td><code>{{ session.ip_address or '-' }}</code></td>
+                    <td>{{ session.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>{{ session.expires_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td><small class="text-muted">{{ (session.user_agent or '-')[:60] }}</small></td>
+                    <td class="text-end">
+                        <form method="POST" action="{{ url_for('admin_system.revoke_session', session_id=session.id) }}"
+                              class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-x-circle"></i> Revoke
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">No active sessions.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
