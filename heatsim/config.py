@@ -63,6 +63,7 @@ class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SQLALCHEMY_BINDS = {'materials': 'sqlite://'}
     WTF_CSRF_ENABLED = False
 
 
