@@ -26,15 +26,26 @@ class Config:
     COMPLETION_THRESHOLD = 0.99  # cc = 0.99
     HOUR_COST = 475  # SEK per hour for time tracking
 
+    # Portal authentication
+    PORTAL_AUTH_ENABLED = os.environ.get('PORTAL_AUTH_ENABLED', 'false').lower() == 'true'
+    PORTAL_URL = os.environ.get('PORTAL_URL', 'http://portal:5000')
+    PORTAL_EXTERNAL_URL = os.environ.get('PORTAL_EXTERNAL_URL', '/')
+    APP_CODE = 'accruedincome'
+
+    # Session
+    PERMANENT_SESSION_LIFETIME = 8 * 60 * 60  # 8 hours
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
+    PORTAL_AUTH_ENABLED = False
 
 
 class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
+    PORTAL_AUTH_ENABLED = True
 
 
 config = {

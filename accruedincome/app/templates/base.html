@@ -72,9 +72,26 @@
                         </a>
                     </li>
                 </ul>
-                <span class="navbar-text">
-                    <i class="bi bi-building"></i> Subseatec
-                </span>
+                <ul class="navbar-nav">
+                    {% if portal_user %}
+                    <li class="nav-item">
+                        <span class="nav-link text-light">
+                            <i class="bi bi-person-circle"></i> {{ portal_user.display_name or portal_user.username }}
+                        </span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/" title="Back to Portal">
+                            <i class="bi bi-grid-fill"></i> Portal
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <span class="nav-link text-light">
+                            <i class="bi bi-building"></i> Subseatec
+                        </span>
+                    </li>
+                    {% endif %}
+                </ul>
             </div>
         </div>
     </nav>

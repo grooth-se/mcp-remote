@@ -1,7 +1,7 @@
 """Application factory for Accrued Income Calculator."""
 
 import os
-from flask import Flask
+from flask import Flask, jsonify
 from config import config
 from .extensions import db
 
@@ -19,6 +19,15 @@ def create_app(config_name='default'):
 
     # Initialize extensions
     db.init_app(app)
+
+    # Portal authentication
+    from .portal_auth import init_portal_auth
+    init_portal_auth(app)
+
+    # Health check endpoint (used by portal to check if app is online)
+    @app.route('/health')
+    def health():
+        return jsonify({'status': 'ok', 'app': 'accruedincome'})
 
     # Import models for db.create_all()
     from . import models  # noqa: F401
