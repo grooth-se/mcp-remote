@@ -9,9 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install Python dependencies (cadquery needs native OCP - skip if unavailable)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN grep -v cadquery requirements.txt > requirements-docker.txt && \
+    pip install --no-cache-dir -r requirements-docker.txt && \
+    pip install --no-cache-dir cadquery 2>/dev/null || echo "cadquery skipped (optional, needs native OCP)"
 
 # Copy application code
 COPY . .

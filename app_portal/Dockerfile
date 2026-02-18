@@ -12,6 +12,9 @@ RUN mkdir -p /data
 ENV DATABASE_PATH=/data/portal.db
 ENV FLASK_APP=app:create_app
 
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:create_app()"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

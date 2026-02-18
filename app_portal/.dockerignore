@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+data/
+nginx/ssl/server.key
+nginx/ssl/server.crt
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+venv/
+.git/
+tests/
+*.md

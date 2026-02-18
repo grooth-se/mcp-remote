@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   nginx:
     image: nginx:alpine
@@ -18,18 +16,124 @@ services:
     environment:
       - SECRET_KEY=${PORTAL_SECRET_KEY}
       - DATABASE_PATH=/data/portal.db
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     volumes:
       - portal_data:/data
     restart: unless-stopped
 
-  # Apps will be added here as they are deployed
-  # accruedincome:
-  #   build: ../accruedincome
+  # --- Apps ---
+
+  accruedincome:
+    build: ../accruedincome
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${ACCRUEDINCOME_SECRET_KEY:-change-me}
+      - DATABASE_URL=sqlite:////data/accrued.db
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_EXTERNAL_URL=/
+      - PORTAL_AUTH_ENABLED=true
+    volumes:
+      - accruedincome_data:/data
+      - accruedincome_uploads:/app/app/static/uploads
+      - accruedincome_output:/app/output
+    depends_on:
+      - portal
+    restart: unless-stopped
+
+  durabler2:
+    build: ../Durabler2
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${DURABLER2_SECRET_KEY:-change-me}
+      - DATABASE_URL=sqlite:////data/durabler.db
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_AUTH_ENABLED=true
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+    volumes:
+      - durabler2_data:/data
+      - durabler2_reports:/app/reports
+      - durabler2_uploads:/app/app/static/uploads
+      - durabler2_certs:/app/certs
+    depends_on:
+      - portal
+    restart: unless-stopped
+
+  heatsim:
+    build: ../heatsim
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${HEATSIM_SECRET_KEY:-change-me}
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_AUTH_ENABLED=true
+    volumes:
+      - heatsim_data:/app/instance
+      - heatsim_uploads:/app/data/uploads
+      - heatsim_results:/app/data/results
+    depends_on:
+      - portal
+    restart: unless-stopped
+
+  mg5integration:
+    build: ../MG5integration
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${MG5_SECRET_KEY:-change-me}
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_AUTH_ENABLED=true
+    volumes:
+      - mg5_data:/app/instance
+      - mg5_exports:/app/data/excel_exports
+    depends_on:
+      - portal
+    restart: unless-stopped
+
+  spinventory:
+    build: ../SPInventory
+    environment:
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_AUTH_ENABLED=true
+    volumes:
+      - spinventory_data:/app/data
+    depends_on:
+      - portal
+    restart: unless-stopped
+
+  # --- Uncomment when ready ---
+
+  # mpqpgenerator:
+  #   build: ../mpqp-generator
   #   environment:
+  #     - FLASK_CONFIG=production
   #     - PORTAL_URL=http://portal:5000
-  #   volumes:
-  #     - accruedincome_data:/data
+  #     - PORTAL_AUTH_ENABLED=true
+  #   depends_on:
+  #     - portal
+  #   restart: unless-stopped
+
+  # heattreattracker:
+  #   build: ../heattreattracker
+  #   environment:
+  #     - FLASK_CONFIG=production
+  #     - PORTAL_URL=http://portal:5000
+  #     - PORTAL_AUTH_ENABLED=true
+  #   depends_on:
+  #     - portal
   #   restart: unless-stopped
 
 volumes:
   portal_data:
+  accruedincome_data:
+  accruedincome_uploads:
+  accruedincome_output:
+  durabler2_data:
+  durabler2_reports:
+  durabler2_uploads:
+  durabler2_certs:
+  heatsim_data:
+  heatsim_uploads:
+  heatsim_results:
+  mg5_data:
+  mg5_exports:
+  spinventory_data:

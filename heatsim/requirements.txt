@@ -17,6 +17,9 @@ psycopg2-binary>=2.9.0
 Werkzeug>=3.0.0
 python-dotenv>=1.0.0
 
+# Production Server
+gunicorn>=22.0.0
+
 # Data Processing (Phase 2+)
 numpy>=1.24.0
 pandas>=2.0.0
