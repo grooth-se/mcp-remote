@@ -1,0 +1,9 @@
+__pycache__
+*.pyc
+instance/
+output/
+app/static/uploads/
+.git
+.gitignore
+*.md
+oldprogram/
