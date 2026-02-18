@@ -1,0 +1,19 @@
+services:
+  mg5:
+    build: .
+    container_name: mg5integration
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./instance:/app/instance
+      - ./data/excel_exports:/app/data/excel_exports
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - API_PORT=5001
+      - MONITOR_HOST=${MONITOR_HOST:-172.27.55.101}
+      - MONITOR_PORT=${MONITOR_PORT:-2638}
+      - MONITOR_DATABASE=${MONITOR_DATABASE:-001.1}
+      - MONITOR_USER=${MONITOR_USER:-ReadOnlyUser}
+      - MONITOR_PASSWORD=${MONITOR_PASSWORD:-}

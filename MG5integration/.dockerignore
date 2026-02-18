@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+instance/
+*.db
+.git/
+.gitignore
+*.xlsx
+tests/
+docs/
+*.md
