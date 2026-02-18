@@ -147,6 +147,20 @@ class SpecimenForm(FlaskForm):
         FileAllowed(['jpg', 'jpeg', 'png'], 'Image files only')
     ])
 
+    # Uncertainty parameters (ISO 17025)
+    force_uncertainty = FloatField('Force Uncertainty (%)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=10, message='Typically 0.5-2%')
+    ], default=1.0)
+    diagonal_uncertainty = FloatField('Diagonal Measurement Uncertainty (%)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=10)
+    ], default=1.0)
+    machine_uncertainty = FloatField('Machine Calibration Uncertainty (%)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=5)
+    ], default=0.5)
+
     # Notes
     notes = TextAreaField('Notes', validators=[Optional()])
 

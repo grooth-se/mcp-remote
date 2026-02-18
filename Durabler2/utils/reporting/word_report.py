@@ -265,48 +265,65 @@ class TensileReportGenerator:
                 cell.paragraphs[0].paragraph_format.space_before = Pt(1)
                 cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
-        # Test Results table
+        # Test Results table - simplified per ISO 17025 requirements
         heading = doc.add_heading('Test Results', level=1)
         heading.paragraph_format.space_before = Pt(12)
         heading.paragraph_format.space_after = Pt(6)
 
-        table = doc.add_table(rows=10, cols=4)
+        # Build results list based on yield method
+        # Format: (parameter, unit, value, requirement, uncertainty)
+        yield_method = data.get('yield_method', 'Rp0.2/Rp0.5')
+        is_yield_point = 'ReH' in yield_method or 'yield_point' in yield_method.lower()
+
+        if is_yield_point:
+            # Yield point method: ReH, ReL
+            results_data = [
+                ('ReH', 'MPa', data.get('ReH', '-'), data.get('ReH_req', '-'), data.get('ReH_uncertainty', '-')),
+                ('ReL', 'MPa', data.get('ReL', '-'), data.get('ReL_req', '-'), data.get('ReL_uncertainty', '-')),
+            ]
+            ratio_label = 'ReH/Rm'
+        else:
+            # Offset method: Rp0.2, Rp0.5
+            results_data = [
+                ('Rp0.2', 'MPa', data.get('Rp02', '-'), data.get('Rp02_req', '-'), data.get('Rp02_uncertainty', '-')),
+                ('Rp0.5', 'MPa', data.get('Rp05_value', '-'), data.get('Rp05_req', '-'), data.get('Rp05_uncertainty', '-')),
+            ]
+            ratio_label = 'Rp0.2/Rm'
+
+        # Add common results: Rm, A, Z, and yield/tensile ratio
+        # Default requirements: A >18%, Z >40%
+        a_req = data.get('A_req', data.get('A5_req', '-'))
+        if a_req == '-' or not a_req:
+            a_req = '>18'
+        z_req = data.get('Z_req', '-')
+        if z_req == '-' or not z_req:
+            z_req = '>40'
+
+        results_data.extend([
+            ('Rm', 'MPa', data.get('Rm', '-'), data.get('Rm_req', '-'), data.get('Rm_uncertainty', '-')),
+            ('A', '%', data.get('A', '-'), a_req, data.get('A_uncertainty', '-')),
+            ('Z', '%', data.get('Z', '-'), z_req, data.get('Z_uncertainty', '-')),
+            (ratio_label, '-', data.get('yield_tensile_ratio', '-'), data.get('ratio_req', '-'), '-'),
+        ])
+
+        # Create table with 5 columns: Parameter, Unit, Value, Requirement, U(k=2)
+        num_rows = len(results_data) + 1  # +1 for header
+        table = doc.add_table(rows=num_rows, cols=5)
         table.style = 'Table Grid'
 
         # Header row
-        result_headers = ['Parameter', 'Value', 'U (k=2)', 'Unit']
+        result_headers = ['Parameter', 'Unit', 'Value', 'Requirement', 'U (k=2)']
         for i, header_text in enumerate(result_headers):
             table.rows[0].cells[i].text = header_text
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
-        # Get yield method values
-        yield_method = data.get('yield_method', 'Rp0.2/Rp0.5')
-        if 'ReH' in yield_method or 'yield_point' in yield_method.lower():
-            yield_val = data.get('ReH', '-')
-            yield_unc = data.get('ReH_uncertainty', '-')
-            yield_label = 'ReH (Upper Yield)'
-        else:
-            yield_val = data.get('Rp02', '-')
-            yield_unc = data.get('Rp02_uncertainty', '-')
-            yield_label = 'Rp0.2 (Offset Yield)'
-
-        results_data = [
-            ("Young's Modulus E", data.get('E', '-'), data.get('E_uncertainty', '-'), 'GPa'),
-            (yield_label, yield_val, yield_unc, 'MPa'),
-            ('Rm (Tensile Strength)', data.get('Rm', '-'), data.get('Rm_uncertainty', '-'), 'MPa'),
-            ('Ag (Uniform Elongation)', data.get('Ag', '-'), data.get('Ag_uncertainty', '-'), '%'),
-            ('A (Total Elongation)', data.get('A', '-'), data.get('A_uncertainty', '-'), '%'),
-            ('Z (Reduction of Area)', data.get('Z', '-'), data.get('Z_uncertainty', '-'), '%'),
-            ('Stress Rate at Yield', data.get('stress_rate_yield', '-'), '-', 'MPa/s'),
-            ('Strain Rate at Yield', data.get('strain_rate_yield', '-'), '-', 's⁻¹'),
-            (data.get('ratio_label', 'Rp0.2/Rm'), data.get('yield_tensile_ratio', '-'), '-', '-'),
-        ]
-
-        for i, (param, value, unc, unit) in enumerate(results_data):
+        # Data rows
+        for i, (param, unit, value, req, unc) in enumerate(results_data):
             table.rows[i+1].cells[0].text = param
-            table.rows[i+1].cells[1].text = str(value)
-            table.rows[i+1].cells[2].text = str(unc)
-            table.rows[i+1].cells[3].text = unit
+            table.rows[i+1].cells[1].text = unit
+            table.rows[i+1].cells[2].text = str(value)
+            table.rows[i+1].cells[3].text = str(req) if req else '-'
+            table.rows[i+1].cells[4].text = str(unc)
 
         # Compact table rows
         for row in table.rows:
@@ -619,6 +636,7 @@ class TensileReportGenerator:
         A_val, A_unc = get_result('A_percent')
         data['A'] = A_val
         data['A_uncertainty'] = A_unc
+        data['A_req'] = requirements.get('A', requirements.get('A5', '-'))
 
         # A5 from L1-L0 (manual measurement), fallback to A_percent if not available
         A5_val, A5_unc = get_result('A_manual')
@@ -627,7 +645,7 @@ class TensileReportGenerator:
             A5_val, A5_unc = A_val, A_unc
         data['A5_value'] = A5_val if A5_val != '-' else '-'
         data['A5_uncertainty'] = A5_unc if A5_unc != '-' else '-'
-        data['A5_req'] = requirements.get('A5', '-')
+        data['A5_req'] = requirements.get('A5', requirements.get('A', '-'))
 
         # Uniform elongation (Ag) - template uses {{Ag}}, {{Ag_uncertainty}}
         Ag_val, Ag_unc = get_result('Ag')

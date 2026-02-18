@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import (
     render_template, redirect, url_for, flash, request,
-    current_app, send_file
+    current_app, send_file, Response
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -14,7 +14,7 @@ from werkzeug.utils import secure_filename
 from . import vickers_bp
 from .forms import SpecimenForm, ReportForm
 from app.extensions import db
-from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
+from app.models import TestRecord, AnalysisResult, AuditLog, Certificate, RawTestData, TestPhoto, ReportFile
 
 # Import calculation utilities
 from utils.analysis.vickers_calculations import VickersAnalyzer, VickersResult
@@ -176,6 +176,13 @@ def new():
             'notes': form.notes.data,
         }
 
+        # Store uncertainty inputs (ISO 17025)
+        test_params['uncertainty_inputs'] = {
+            'force_pct': form.force_uncertainty.data or 1.0,
+            'diagonal_pct': form.diagonal_uncertainty.data or 1.0,
+            'machine_pct': form.machine_uncertainty.data or 0.5
+        }
+
         # Create test record
         test = TestRecord(
             test_id=test_id,
@@ -291,6 +298,20 @@ def new():
         else:
             flash('No hardness readings entered.', 'warning')
 
+        # Store photo in database for data persistence
+        if form.photo.data:
+            photo_file = form.photo.data
+            photo_file.seek(0)
+            photo_data = photo_file.read()
+            db_photo = TestPhoto(
+                test_record_id=test.id,
+                photo_number=1,
+                description='Vickers test photo',
+                uploaded_by_id=current_user.id
+            )
+            db_photo.set_image(photo_data, photo_file.filename)
+            db.session.add(db_photo)
+
         # Audit log
         audit = AuditLog(
             user_id=current_user.id,
@@ -340,9 +361,12 @@ def view(test_id):
         load_level = test_params.get('load_level', 'HV')
         hardness_plot = create_hardness_profile_plot(readings, load_level)
 
-    # Get photo path
+    # Get photo - prefer database, fall back to file system
     photo_url = None
-    if test_params.get('photo_path'):
+    db_photo = test.photos.first()
+    if db_photo:
+        photo_url = url_for('vickers.photo', test_id=test_id, photo_id=db_photo.id)
+    elif test_params.get('photo_path'):
         photo_url = url_for('static', filename=f'uploads/{test_params["photo_path"]}')
 
     return render_template('vickers/view.html',
@@ -352,6 +376,18 @@ def view(test_id):
                            results=results,
                            hardness_plot=hardness_plot,
                            photo_url=photo_url)
+
+
+@vickers_bp.route('/<int:test_id>/photo/<int:photo_id>')
+@login_required
+def photo(test_id, photo_id):
+    """Serve photo from database."""
+    photo = TestPhoto.query.filter_by(id=photo_id, test_record_id=test_id).first_or_404()
+    return Response(
+        photo.data,
+        mimetype=photo.mime_type or 'image/jpeg',
+        headers={'Content-Disposition': f'inline; filename="{photo.original_filename}"'}
+    )
 
 
 @vickers_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])
@@ -432,6 +468,7 @@ def report(test_id):
                 'certificate_number': form.certificate_number.data or test.test_id,
                 'test_project': test.certificate.test_project if test.certificate else '',
                 'customer': test.certificate.customer if test.certificate else '',
+                'customer_order': test.certificate.customer_order if test.certificate else '',
                 'specimen_id': test.specimen_id or '',
                 'customer_specimen_info': test.certificate.customer_specimen_info if test.certificate else '',
                 'material': test.material or '',
@@ -442,6 +479,7 @@ def report(test_id):
                 'load_level': test_params.get('load_level', 'HV 10'),
                 'dwell_time': test_params.get('dwell_time', '15'),
                 'notes': test_params.get('notes', ''),
+                'operator': current_user.full_name if current_user.full_name else current_user.username,
             }
 
             # Create VickersResult for report
@@ -577,39 +615,37 @@ def report(test_id):
                 date_run = date_para.add_run(f"Date: {test_info.get('test_date', '')}")
                 date_run.font.size = Pt(8)
 
-            # Test Information - exclude certificate number and test date (now in header)
+            # Test Information - 4-column layout like Tensile report
             heading = doc.add_heading('Test Information', level=1)
             heading.paragraph_format.space_before = Pt(0)
             heading.paragraph_format.space_after = Pt(6)
 
-            # Build info data - exclude certificate and date (moved to header)
+            # Two-column layout: Label | Value | Label | Value (like Tensile report)
             info_data = [
-                ('Customer:', test_info.get('customer', '')),
-                ('Test Project:', test_info.get('test_project', '')),
-                ('Specimen ID:', test_info.get('specimen_id', '')),
-                ('Customer Specimen Info:', test_info.get('customer_specimen_info', '')),
-                ('Material:', test_info.get('material', '')),
-                ('Requirement:', test_info.get('requirement', '')),
-                ('Location/Orientation:', test_info.get('location_orientation', '')),
-                ('Temperature:', f"{test_info.get('temperature', '23')} °C"),
-                ('Load Level:', test_info.get('load_level', '')),
-                ('Dwell Time:', f"{test_info.get('dwell_time', '15')} s"),
-                ('Test Equipment:', 'q-ness ATM test machine with automatic indenter'),
+                ('Test Project:', test_info.get('test_project', ''), 'Temperature:', f"{test_info.get('temperature', '23')} °C"),
+                ('Customer:', test_info.get('customer', ''), 'Test Standard:', 'ASTM E92 / ISO 6507'),
+                ('Customer Order:', test_info.get('customer_order', ''), 'Test Equipment:', 'q-ness ATM test machine'),
+                ('Product S/N:', test_info.get('specimen_id', ''), 'Load Level:', test_info.get('load_level', '')),
+                ('Material:', test_info.get('material', ''), 'Dwell Time:', f"{test_info.get('dwell_time', '15')} s"),
+                ('Customer Specimen Info:', test_info.get('customer_specimen_info', ''), 'Location/Orientation:', test_info.get('location_orientation', '')),
+                ('Requirement:', test_info.get('requirement', ''), 'Operator:', test_info.get('operator', '')),
             ]
 
-            # Filter out empty values for cleaner report
-            info_data = [(label, value) for label, value in info_data if value and str(value).strip()]
-
-            table = doc.add_table(rows=len(info_data), cols=2)
+            table = doc.add_table(rows=len(info_data), cols=4)
             table.style = 'Table Grid'
 
-            for i, (label, value) in enumerate(info_data):
-                row = table.rows[i]
-                row.cells[0].text = label
-                row.cells[1].text = str(value)
-                row.cells[0].paragraphs[0].runs[0].bold = True
+            for i, (label1, value1, label2, value2) in enumerate(info_data):
+                table.rows[i].cells[0].text = label1
+                table.rows[i].cells[1].text = str(value1) if value1 else ''
+                table.rows[i].cells[2].text = label2
+                table.rows[i].cells[3].text = str(value2) if value2 else ''
+                # Bold the labels
+                if table.rows[i].cells[0].paragraphs[0].runs:
+                    table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+                if table.rows[i].cells[2].paragraphs[0].runs:
+                    table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
                 # Compact row height
-                for cell in row.cells:
+                for cell in table.rows[i].cells:
                     cell.paragraphs[0].paragraph_format.space_before = Pt(1)
                     cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
@@ -618,13 +654,16 @@ def report(test_id):
             heading.paragraph_format.space_before = Pt(12)
             heading.paragraph_format.space_after = Pt(6)
 
-            table = doc.add_table(rows=7, cols=3)
+            table = doc.add_table(rows=8, cols=3)
             table.style = 'Table Grid'
 
             headers = ['Parameter', 'Value', 'Unit']
             for i, h in enumerate(headers):
                 table.rows[0].cells[i].text = h
                 table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+            # Get requirement from test info
+            requirement_value = test_info.get('requirement', '') or '-'
 
             results_data = [
                 ('Mean Hardness', f'{result_proxy.mean_hardness.value:.1f} ± {result_proxy.mean_hardness.uncertainty:.1f}', result_proxy.load_level),
@@ -633,6 +672,7 @@ def report(test_id):
                 ('Minimum', f'{result_proxy.min_value:.1f}', result_proxy.load_level),
                 ('Maximum', f'{result_proxy.max_value:.1f}', result_proxy.load_level),
                 ('Number of Readings', str(result_proxy.n_readings), '-'),
+                ('Requirement', requirement_value, '-'),
             ]
 
             for i, (param, value, unit) in enumerate(results_data):

@@ -1,73 +1,231 @@
-/* Durabler Web Application Styles */
+/* Durabler Web Application Styles - Compact Layout */
 
-/* Body */
+/* ============================================
+   COMPACT MODE - Reduced spacing throughout
+   ============================================ */
+
+/* Body and main content */
 body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    font-size: 0.875rem; /* Slightly smaller base font */
 }
 
 main {
     flex: 1;
 }
 
-/* Test method cards */
-.test-card {
-    transition: transform 0.2s, box-shadow 0.2s;
-    cursor: pointer;
+/* Reduce main container padding */
+main.container-fluid {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
 }
 
-.test-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+/* ============================================
+   NAVBAR - More compact
+   ============================================ */
+.navbar {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
 }
 
-/* Login page centering */
-.login-container {
-    min-height: calc(100vh - 200px);
-    display: flex;
-    align-items: center;
+.navbar-brand img {
+    filter: brightness(0) invert(1);
+    height: 24px !important;
 }
 
-/* Form styling */
+.nav-link {
+    padding: 0.35rem 0.6rem !important;
+    font-size: 0.85rem;
+}
+
+.dropdown-item {
+    padding: 0.35rem 1rem;
+    font-size: 0.85rem;
+}
+
+/* ============================================
+   CARDS - Compact styling
+   ============================================ */
+.card {
+    margin-bottom: 0.75rem !important;
+}
+
+.card-header {
+    padding: 0.5rem 0.75rem !important;
+}
+
+.card-header h4,
+.card-header h5,
+.card-header h6 {
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+
+.card-body {
+    padding: 0.75rem !important;
+}
+
+/* Card header icons */
+.card-header i {
+    margin-right: 0.4rem;
+}
+
+/* ============================================
+   FORMS - Tighter spacing
+   ============================================ */
 .form-label {
     font-weight: 500;
+    margin-bottom: 0.2rem;
+    font-size: 0.8rem;
 }
 
-/* Table improvements */
+.form-control,
+.form-select {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+.form-control-sm,
+.form-select-sm {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+}
+
+/* Form groups and rows */
+.mb-3 {
+    margin-bottom: 0.6rem !important;
+}
+
+.mb-4 {
+    margin-bottom: 0.85rem !important;
+}
+
+.row.g-3 {
+    --bs-gutter-y: 0.5rem;
+    --bs-gutter-x: 0.5rem;
+}
+
+/* Input groups */
+.input-group-text {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+/* ============================================
+   BUTTONS - Slightly smaller
+   ============================================ */
+.btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.85rem;
+}
+
+.btn-lg {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+}
+
+.btn-sm {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+}
+
+/* ============================================
+   TABLES - Compact
+   ============================================ */
+.table {
+    font-size: 0.8rem;
+}
+
+.table th,
+.table td {
+    padding: 0.35rem 0.5rem !important;
+}
+
 .table th {
     background-color: #f8f9fa;
     font-weight: 600;
 }
 
-/* Status badges */
-.badge {
-    font-weight: 500;
-}
-
-/* Plot container */
-.plot-container {
-    width: 100%;
-    min-height: 400px;
-    border: 1px solid #dee2e6;
-    border-radius: 0.375rem;
-    background: #fff;
+.table-sm th,
+.table-sm td {
+    padding: 0.25rem 0.4rem !important;
 }
 
 /* Results table */
 .results-table {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
 }
 
 .results-table th {
     width: 40%;
 }
 
-/* File upload area */
+/* ============================================
+   ALERTS - Compact
+   ============================================ */
+.alert {
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.85rem;
+}
+
+.alert-heading {
+    font-size: 0.9rem;
+}
+
+/* ============================================
+   BREADCRUMB - Compact
+   ============================================ */
+.breadcrumb {
+    padding: 0.3rem 0;
+    margin-bottom: 0.5rem !important;
+    font-size: 0.8rem;
+}
+
+/* ============================================
+   HEADINGS - Slightly smaller
+   ============================================ */
+h1, .h1 { font-size: 1.6rem; }
+h2, .h2 { font-size: 1.35rem; }
+h3, .h3 { font-size: 1.15rem; }
+h4, .h4 { font-size: 1rem; }
+h5, .h5 { font-size: 0.9rem; }
+h6, .h6 { font-size: 0.85rem; }
+
+/* Page titles */
+h2.mb-4 {
+    margin-bottom: 0.75rem !important;
+}
+
+/* ============================================
+   BADGES
+   ============================================ */
+.badge {
+    font-weight: 500;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.4rem;
+}
+
+/* ============================================
+   PLOTS - Reduced height
+   ============================================ */
+.plot-container {
+    width: 100%;
+    min-height: 300px;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    background: #fff;
+}
+
+/* ============================================
+   FILE UPLOAD - Compact
+   ============================================ */
 .upload-area {
     border: 2px dashed #dee2e6;
     border-radius: 0.5rem;
-    padding: 2rem;
+    padding: 1rem;
     text-align: center;
     transition: border-color 0.2s;
 }
@@ -81,24 +239,163 @@ main {
     background-color: #f8f9fa;
 }
 
-/* Footer */
+/* ============================================
+   FOOTER - Compact
+   ============================================ */
 .footer {
     margin-top: auto;
+    padding: 0.5rem 0 !important;
+    font-size: 0.75rem;
 }
 
-/* Navbar brand */
-.navbar-brand img {
-    filter: brightness(0) invert(1);
+/* ============================================
+   TEST METHOD CARDS (Dashboard)
+   ============================================ */
+.test-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
 }
 
-/* Card header icons */
-.card-header i {
-    margin-right: 0.5rem;
+.test-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0.3rem 0.6rem rgba(0, 0, 0, 0.15);
 }
 
-/* Print styles */
+.test-card .card-body {
+    padding: 0.6rem !important;
+}
+
+/* ============================================
+   LOGIN PAGE
+   ============================================ */
+.login-container {
+    min-height: calc(100vh - 150px);
+    display: flex;
+    align-items: center;
+}
+
+/* ============================================
+   TWO-COLUMN FORM LAYOUT (for specimen forms)
+   ============================================ */
+@media (min-width: 992px) {
+    .compact-form .row {
+        margin-bottom: 0.4rem;
+    }
+
+    .compact-form .col-md-6,
+    .compact-form .col-lg-6 {
+        padding-left: 0.4rem;
+        padding-right: 0.4rem;
+    }
+}
+
+/* ============================================
+   SPECIMEN FORM - Extra compact sections
+   ============================================ */
+.specimen-section .card-header {
+    padding: 0.4rem 0.6rem !important;
+}
+
+.specimen-section .card-body {
+    padding: 0.5rem !important;
+}
+
+/* ============================================
+   VIEW PAGE - Results display
+   ============================================ */
+.result-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.result-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* ============================================
+   STATISTICS PAGE - Compact stats boxes
+   ============================================ */
+.stat-box {
+    padding: 0.5rem !important;
+}
+
+.stat-box h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0;
+}
+
+.stat-box small {
+    font-size: 0.7rem;
+}
+
+/* ============================================
+   FLASH MESSAGES - Compact and dismissible
+   ============================================ */
+.alert-dismissible {
+    padding-right: 2.5rem;
+}
+
+.alert-dismissible .btn-close {
+    padding: 0.6rem;
+}
+
+/* ============================================
+   MODAL - Compact
+   ============================================ */
+.modal-header {
+    padding: 0.6rem 1rem;
+}
+
+.modal-body {
+    padding: 0.75rem 1rem;
+}
+
+.modal-footer {
+    padding: 0.5rem 1rem;
+}
+
+/* ============================================
+   LIST GROUPS - Compact
+   ============================================ */
+.list-group-item {
+    padding: 0.4rem 0.75rem;
+}
+
+/* ============================================
+   SMALL TEXT HELPER
+   ============================================ */
+.text-muted, small, .small {
+    font-size: 0.75rem !important;
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
 @media print {
-    .navbar, .footer, .btn {
+    .navbar, .footer, .btn, .breadcrumb {
         display: none !important;
     }
+
+    .card {
+        border: 1px solid #ccc !important;
+        margin-bottom: 0.5rem !important;
+    }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+.py-compact {
+    padding-top: 0.4rem !important;
+    padding-bottom: 0.4rem !important;
+}
+
+.px-compact {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+}
+
+.gap-compact {
+    gap: 0.4rem !important;
 }

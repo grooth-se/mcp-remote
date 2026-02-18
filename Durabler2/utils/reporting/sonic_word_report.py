@@ -289,32 +289,34 @@ class SonicReportGenerator:
                 cell.paragraphs[0].paragraph_format.space_after = Pt(1)
 
         # Test Results table
-        heading = doc.add_heading('Elastic Moduli Results', level=1)
+        heading = doc.add_heading('Test Result (Elastic Moduli)', level=1)
         heading.paragraph_format.space_before = Pt(12)
         heading.paragraph_format.space_after = Pt(6)
 
-        table = doc.add_table(rows=6, cols=4)
+        table = doc.add_table(rows=6, cols=5)
         table.style = 'Table Grid'
 
-        # Header row
-        result_headers = ['Parameter', 'Value', 'U (k=2)', 'Unit']
+        # Header row - new order: Parameter, Unit, Value, Requirement, U (k=2)
+        result_headers = ['Parameter', 'Unit', 'Value', 'Requirement', 'U (k=2)']
         for i, header in enumerate(result_headers):
             table.rows[0].cells[i].text = header
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
+        # Results data: (Parameter, Unit, Value, Requirement, Uncertainty)
         results_data = [
-            ("Young's Modulus E", data.get('youngs_modulus', '-'), data.get('youngs_modulus_unc', '-'), 'GPa'),
-            ('Shear Modulus G', data.get('shear_modulus', '-'), data.get('shear_modulus_unc', '-'), 'GPa'),
-            ("Poisson's Ratio ν", data.get('poissons_ratio', '-'), data.get('poissons_ratio_unc', '-'), '-'),
-            ('Flexural Frequency', data.get('flexural_frequency', '-'), data.get('flexural_frequency_unc', '-'), 'Hz'),
-            ('Torsional Frequency', data.get('torsional_frequency', '-'), data.get('torsional_frequency_unc', '-'), 'Hz'),
+            ("Young's Modulus E", 'GPa', data.get('youngs_modulus', '-'), data.get('youngs_modulus_req', '-'), data.get('youngs_modulus_unc', '-')),
+            ('Shear Modulus G', 'GPa', data.get('shear_modulus', '-'), data.get('shear_modulus_req', '-'), data.get('shear_modulus_unc', '-')),
+            ("Poisson's Ratio ν", '-', data.get('poissons_ratio', '-'), data.get('poissons_ratio_req', '-'), data.get('poissons_ratio_unc', '-')),
+            ('Flexural Frequency', 'Hz', data.get('flexural_frequency', '-'), '-', data.get('flexural_frequency_unc', '-')),
+            ('Torsional Frequency', 'Hz', data.get('torsional_frequency', '-'), '-', data.get('torsional_frequency_unc', '-')),
         ]
 
-        for i, (param, value, unc, unit) in enumerate(results_data):
+        for i, (param, unit, value, req, unc) in enumerate(results_data):
             table.rows[i+1].cells[0].text = param
-            table.rows[i+1].cells[1].text = str(value)
-            table.rows[i+1].cells[2].text = str(unc)
-            table.rows[i+1].cells[3].text = unit
+            table.rows[i+1].cells[1].text = unit
+            table.rows[i+1].cells[2].text = str(value)
+            table.rows[i+1].cells[3].text = str(req)
+            table.rows[i+1].cells[4].text = str(unc)
 
         # Compact table rows
         for row in table.rows:
@@ -512,6 +514,50 @@ class SonicReportGenerator:
         data['vs2'] = velocity_data.get('vs2', '-')
         data['vs3'] = velocity_data.get('vs3', '-')
 
+        # Parse requirements from test_info if available
+        requirement_str = test_info.get('requirement', '')
+        youngs_modulus_req = '-'
+        shear_modulus_req = '-'
+        poissons_ratio_req = '-'
+
+        if requirement_str:
+            import re
+            # Match patterns for Young's modulus: "E: >200", "Young's modulus ≥200 GPa", etc.
+            e_patterns = [
+                r"Young'?s?\s*(?:modulus)?\s*E?[:\s]*([>≥<≤]?\s*[\d.]+)\s*(?:GPa)?",
+                r'\bE[:\s]*([>≥<≤]?\s*[\d.]+)\s*(?:GPa)?',
+            ]
+            for pattern in e_patterns:
+                match = re.search(pattern, requirement_str, re.IGNORECASE)
+                if match:
+                    youngs_modulus_req = match.group(1).strip()
+                    if not youngs_modulus_req.startswith(('>','<','≥','≤')):
+                        youngs_modulus_req = '>' + youngs_modulus_req
+                    break
+
+            # Match patterns for Shear modulus: "G: >80", "Shear modulus ≥80 GPa", etc.
+            g_patterns = [
+                r'Shear\s*(?:modulus)?\s*G?[:\s]*([>≥<≤]?\s*[\d.]+)\s*(?:GPa)?',
+                r'\bG[:\s]*([>≥<≤]?\s*[\d.]+)\s*(?:GPa)?',
+            ]
+            for pattern in g_patterns:
+                match = re.search(pattern, requirement_str, re.IGNORECASE)
+                if match:
+                    shear_modulus_req = match.group(1).strip()
+                    if not shear_modulus_req.startswith(('>','<','≥','≤')):
+                        shear_modulus_req = '>' + shear_modulus_req
+                    break
+
+            # Match patterns for Poisson's ratio: "ν: 0.28-0.32", "Poisson's ratio: 0.3", etc.
+            nu_patterns = [
+                r"Poisson'?s?\s*(?:ratio)?\s*[νv]?[:\s]*([\d.]+\s*[-–]\s*[\d.]+|[>≥<≤]?\s*[\d.]+)",
+            ]
+            for pattern in nu_patterns:
+                match = re.search(pattern, requirement_str, re.IGNORECASE)
+                if match:
+                    poissons_ratio_req = match.group(1).strip()
+                    break
+
         # Results
         if results:
             data['density'] = f"{results.density.value:.1f}"
@@ -520,12 +566,15 @@ class SonicReportGenerator:
 
             data['poissons_ratio'] = f"{results.poissons_ratio.value:.4f}"
             data['poissons_ratio_unc'] = f"±{results.poissons_ratio.uncertainty:.4f}"
+            data['poissons_ratio_req'] = poissons_ratio_req
 
             data['shear_modulus'] = f"{results.shear_modulus.value:.2f}"
             data['shear_modulus_unc'] = f"±{results.shear_modulus.uncertainty:.2f}"
+            data['shear_modulus_req'] = shear_modulus_req
 
             data['youngs_modulus'] = f"{results.youngs_modulus.value:.2f}"
             data['youngs_modulus_unc'] = f"±{results.youngs_modulus.uncertainty:.2f}"
+            data['youngs_modulus_req'] = youngs_modulus_req
 
             data['flexural_frequency'] = f"{results.flexural_frequency.value:.1f}"
             data['flexural_frequency_unc'] = f"±{results.flexural_frequency.uncertainty:.1f}"
@@ -541,10 +590,13 @@ class SonicReportGenerator:
             data['vs_avg'] = '-'
             data['poissons_ratio'] = '-'
             data['poissons_ratio_unc'] = '-'
+            data['poissons_ratio_req'] = poissons_ratio_req
             data['shear_modulus'] = '-'
             data['shear_modulus_unc'] = '-'
+            data['shear_modulus_req'] = shear_modulus_req
             data['youngs_modulus'] = '-'
             data['youngs_modulus_unc'] = '-'
+            data['youngs_modulus_req'] = youngs_modulus_req
             data['flexural_frequency'] = '-'
             data['flexural_frequency_unc'] = '-'
             data['torsional_frequency'] = '-'

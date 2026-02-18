@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 
 from flask import (render_template, redirect, url_for, flash, request,
-                   current_app, send_file, session)
+                   current_app, send_file, session, Response)
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
@@ -15,7 +15,7 @@ import plotly.io as pio
 from . import fcgr_bp
 from .forms import UploadForm, SpecimenForm, ReportForm
 from app.extensions import db
-from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
+from app.models import TestRecord, AnalysisResult, AuditLog, Certificate, RawTestData, TestPhoto, ReportFile
 
 # Import analysis utilities
 from utils.analysis.fcgr_calculations import FCGRAnalyzer
@@ -235,16 +235,8 @@ def new():
             else:
                 session.pop('fcgr_certificate_id', None)
 
-            # Handle optional CSV file
-            if form.csv_file.data:
-                csv_file = form.csv_file.data
-                csv_filename = secure_filename(csv_file.filename)
-                csv_saved = f"{timestamp}_{csv_filename}"
-                csv_filepath = Path(current_app.config['UPLOAD_FOLDER']) / csv_saved
-                csv_file.save(csv_filepath)
-                session['fcgr_csv_path'] = str(csv_filepath)
-            else:
-                session.pop('fcgr_csv_path', None)
+            # Clear any existing CSV path (CSV is uploaded in Step 2)
+            session.pop('fcgr_csv_path', None)
 
             flash(f'Excel data imported: {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm, a₀={a_0_calculated:.2f}mm', 'success')
             return redirect(url_for('fcgr.specimen'))
@@ -638,6 +630,51 @@ def specimen():
             geometry['validity_notes'] = results.validity_notes
             test_record.geometry = geometry
 
+            # Store photos in database for data persistence
+            for i in range(1, 4):
+                photo_field = getattr(form, f'photo_{i}', None)
+                desc_field = getattr(form, f'photo_description_{i}', None)
+                if photo_field and photo_field.data:
+                    photo_file = photo_field.data
+                    photo_file.seek(0)
+                    photo_data = photo_file.read()
+                    db_photo = TestPhoto(
+                        test_record_id=test_record.id,
+                        photo_number=i,
+                        description=desc_field.data if desc_field else '',
+                        uploaded_by_id=current_user.id
+                    )
+                    db_photo.set_image(photo_data, photo_file.filename)
+                    db.session.add(db_photo)
+
+            # Store raw CSV data in database
+            csv_path = session.get('fcgr_csv_path')
+            if csv_path and Path(csv_path).exists():
+                with open(csv_path, 'rb') as f:
+                    csv_raw = RawTestData(
+                        test_record_id=test_record.id,
+                        data_type='csv',
+                        original_filename=Path(csv_path).name,
+                        mime_type='text/csv',
+                        uploaded_by_id=current_user.id
+                    )
+                    csv_raw.set_data(f.read())
+                    db.session.add(csv_raw)
+
+            # Store Excel data in database
+            excel_path = session.get('fcgr_excel_path')
+            if excel_path and Path(excel_path).exists():
+                with open(excel_path, 'rb') as f:
+                    excel_raw = RawTestData(
+                        test_record_id=test_record.id,
+                        data_type='excel',
+                        original_filename=Path(excel_path).name,
+                        mime_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        uploaded_by_id=current_user.id
+                    )
+                    excel_raw.set_data(f.read())
+                    db.session.add(excel_raw)
+
             # Audit log
             audit = AuditLog(
                 user_id=current_user.id,
@@ -785,17 +822,49 @@ def view(test_id):
                 delta_K, da_dN, paris_result, paris_initial, outlier_mask, test.specimen_id
             )
 
-    # Build photo URLs
+    # Build photo URLs - prefer database photos, fall back to file system
     photo_urls = []
-    for photo in geometry.get('photos', []):
-        photo_urls.append({
-            'url': url_for('static', filename=f"uploads/{photo['filename']}"),
-            'description': photo.get('description', '')
-        })
+    db_photos = test.photos.all()
+    if db_photos:
+        for photo in db_photos:
+            photo_urls.append({
+                'url': url_for('fcgr.photo', test_id=test_id, photo_id=photo.id),
+                'description': photo.description or ''
+            })
+    else:
+        for photo in geometry.get('photos', []):
+            photo_urls.append({
+                'url': url_for('static', filename=f"uploads/{photo['filename']}"),
+                'description': photo.get('description', '')
+            })
 
     return render_template('fcgr/view.html', test=test, results=results,
                           geometry=geometry, crack_plot=crack_plot, paris_plot=paris_plot,
                           photo_urls=photo_urls)
+
+
+@fcgr_bp.route('/<int:test_id>/photo/<int:photo_id>')
+@login_required
+def photo(test_id, photo_id):
+    """Serve photo from database."""
+    photo = TestPhoto.query.filter_by(id=photo_id, test_record_id=test_id).first_or_404()
+    return Response(
+        photo.data,
+        mimetype=photo.mime_type or 'image/jpeg',
+        headers={'Content-Disposition': f'inline; filename="{photo.original_filename}"'}
+    )
+
+
+@fcgr_bp.route('/<int:test_id>/raw-data/<int:data_id>')
+@login_required
+def raw_data(test_id, data_id):
+    """Download raw test data from database."""
+    data = RawTestData.query.filter_by(id=data_id, test_record_id=test_id).first_or_404()
+    return Response(
+        data.get_data(),
+        mimetype=data.mime_type or 'application/octet-stream',
+        headers={'Content-Disposition': f'attachment; filename="{data.original_filename}"'}
+    )
 
 
 @fcgr_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])
@@ -826,6 +895,7 @@ def report(test_id):
                 'material': test.material or '',
                 'certificate_number': form.certificate_number.data or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
+                'requirement': cert.requirement if cert else '',
             }
 
             # Prepare specimen data

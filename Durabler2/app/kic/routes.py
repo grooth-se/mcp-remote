@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import (
     render_template, redirect, url_for, flash, request,
-    current_app, send_file, session
+    current_app, send_file, session, Response
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -14,7 +14,7 @@ from werkzeug.utils import secure_filename
 from . import kic_bp
 from .forms import UploadForm, SpecimenForm, ReportForm
 from app.extensions import db
-from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
+from app.models import TestRecord, AnalysisResult, AuditLog, Certificate, RawTestData, TestPhoto, ReportFile
 
 # Import calculation utilities
 from utils.data_acquisition.kic_csv_parser import parse_kic_csv, KICTestData
@@ -23,6 +23,64 @@ from utils.data_acquisition.precrack_csv_parser import parse_precrack_csv, valid
 from utils.analysis.kic_calculations import KICAnalyzer
 from utils.models.kic_specimen import KICSpecimen, KICMaterial
 from utils.reporting.kic_word_report import KICReportGenerator
+
+
+def detect_break_point(force, threshold=0.5):
+    """Detect specimen break point based on significant force drop.
+
+    Parameters
+    ----------
+    force : array-like
+        Force data array
+    threshold : float
+        Fraction of max force below which break is detected (default 0.5 = 50%)
+
+    Returns
+    -------
+    int or None
+        Index of break point, or None if no break detected
+    """
+    import numpy as np
+    force = np.array(force)
+    if len(force) < 10:
+        return None
+
+    max_force_idx = np.argmax(force)
+    max_force = force[max_force_idx]
+
+    # Look for first point after max where force drops below threshold
+    for i in range(max_force_idx + 1, len(force)):
+        if force[i] < max_force * threshold:
+            return i
+
+    return None
+
+
+def truncate_at_break(displacement, force, break_threshold=0.5):
+    """Truncate force-displacement data at break point to clean up plots.
+
+    Parameters
+    ----------
+    displacement : array-like
+        Displacement data
+    force : array-like
+        Force data
+    break_threshold : float
+        Fraction of max force for break detection (default 0.5)
+
+    Returns
+    -------
+    tuple
+        (truncated_displacement, truncated_force)
+    """
+    import numpy as np
+    displacement = np.array(displacement)
+    force = np.array(force)
+
+    break_idx = detect_break_point(force, break_threshold)
+    if break_idx is not None:
+        return displacement[:break_idx], force[:break_idx]
+    return displacement, force
 
 
 def create_force_displacement_plot(force, displacement, P_Q=None, P_max=None, secant_line=None):
@@ -47,13 +105,17 @@ def create_force_displacement_plot(force, displacement, P_Q=None, P_max=None, se
         HTML string with Plotly figure
     """
     import plotly.graph_objects as go
+    import numpy as np
 
     fig = go.Figure()
 
+    # Truncate data at break point to remove post-fracture noise
+    disp_plot, force_plot = truncate_at_break(displacement, force, break_threshold=0.5)
+
     # Main force-displacement curve - darkred
     fig.add_trace(go.Scatter(
-        x=list(displacement),
-        y=list(force),
+        x=list(disp_plot),
+        y=list(force_plot),
         mode='lines',
         name='Force vs Displacement',
         line=dict(color='darkred', width=2)
@@ -213,16 +275,8 @@ def new():
             else:
                 session.pop('kic_certificate_id', None)
 
-            # Handle optional CSV file
-            if form.csv_file.data:
-                csv_file = form.csv_file.data
-                csv_filename = secure_filename(csv_file.filename)
-                csv_saved = f"{timestamp}_{csv_filename}"
-                csv_filepath = Path(current_app.config['UPLOAD_FOLDER']) / csv_saved
-                csv_file.save(csv_filepath)
-                session['kic_csv_path'] = str(csv_filepath)
-            else:
-                session.pop('kic_csv_path', None)
+            # Clear any existing CSV path (CSV is uploaded in Step 2)
+            session.pop('kic_csv_path', None)
 
             flash(f'Excel data imported: {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm, a₀={a_0_calculated:.2f}mm', 'success')
             return redirect(url_for('kic.specimen'))
@@ -589,6 +643,51 @@ def specimen():
                 )
                 db.session.add(analysis)
 
+            # Store photos in database for data persistence
+            for i in range(1, 4):
+                photo_field = getattr(form, f'photo_{i}', None)
+                desc_field = getattr(form, f'photo_description_{i}', None)
+                if photo_field and photo_field.data:
+                    photo_file = photo_field.data
+                    photo_file.seek(0)
+                    photo_data = photo_file.read()
+                    db_photo = TestPhoto(
+                        test_record_id=test.id,
+                        photo_number=i,
+                        description=desc_field.data if desc_field else '',
+                        uploaded_by_id=current_user.id
+                    )
+                    db_photo.set_image(photo_data, photo_file.filename)
+                    db.session.add(db_photo)
+
+            # Store raw CSV data in database
+            csv_path = session.get('kic_csv_path')
+            if csv_path and Path(csv_path).exists():
+                with open(csv_path, 'rb') as f:
+                    csv_raw = RawTestData(
+                        test_record_id=test.id,
+                        data_type='csv',
+                        original_filename=Path(csv_path).name,
+                        mime_type='text/csv',
+                        uploaded_by_id=current_user.id
+                    )
+                    csv_raw.set_data(f.read())
+                    db.session.add(csv_raw)
+
+            # Store Excel data in database
+            excel_path = session.get('kic_excel_path')
+            if excel_path and Path(excel_path).exists():
+                with open(excel_path, 'rb') as f:
+                    excel_raw = RawTestData(
+                        test_record_id=test.id,
+                        data_type='excel',
+                        original_filename=Path(excel_path).name,
+                        mime_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        uploaded_by_id=current_user.id
+                    )
+                    excel_raw.set_data(f.read())
+                    db.session.add(excel_raw)
+
             # Audit log
             audit = AuditLog(
                 user_id=current_user.id,
@@ -716,13 +815,21 @@ def view(test_id):
             P_max=P_max
         )
 
-    # Build photo URLs
+    # Build photo URLs - prefer database photos, fall back to file system
     photo_urls = []
-    for photo in geometry_data.get('photos', []):
-        photo_urls.append({
-            'url': url_for('static', filename=f"uploads/{photo['filename']}"),
-            'description': photo.get('description', '')
-        })
+    db_photos = test.photos.all()
+    if db_photos:
+        for photo in db_photos:
+            photo_urls.append({
+                'url': url_for('kic.photo', test_id=test_id, photo_id=photo.id),
+                'description': photo.description or ''
+            })
+    else:
+        for photo in geometry_data.get('photos', []):
+            photo_urls.append({
+                'url': url_for('static', filename=f"uploads/{photo['filename']}"),
+                'description': photo.get('description', '')
+            })
 
     # Merge geometry_data into geometry for template access
     geometry.update({
@@ -738,6 +845,30 @@ def view(test_id):
                            results=results,
                            force_disp_plot=force_disp_plot,
                            photo_urls=photo_urls)
+
+
+@kic_bp.route('/<int:test_id>/photo/<int:photo_id>')
+@login_required
+def photo(test_id, photo_id):
+    """Serve photo from database."""
+    photo = TestPhoto.query.filter_by(id=photo_id, test_record_id=test_id).first_or_404()
+    return Response(
+        photo.data,
+        mimetype=photo.mime_type or 'image/jpeg',
+        headers={'Content-Disposition': f'inline; filename="{photo.original_filename}"'}
+    )
+
+
+@kic_bp.route('/<int:test_id>/raw-data/<int:data_id>')
+@login_required
+def raw_data(test_id, data_id):
+    """Download raw test data from database."""
+    data = RawTestData.query.filter_by(id=data_id, test_record_id=test_id).first_or_404()
+    return Response(
+        data.get_data(),
+        mimetype=data.mime_type or 'application/octet-stream',
+        headers={'Content-Disposition': f'attachment; filename="{data.original_filename}"'}
+    )
 
 
 @kic_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])
@@ -793,7 +924,10 @@ def report(test_id):
                 force = np.array(raw_data['force'])
                 displacement = np.array(raw_data['displacement'])
 
-                ax.plot(displacement, force, color='darkred', linewidth=1.5, label='Force vs Displacement')
+                # Truncate data at break point to clean up chart
+                disp_plot, force_plot = truncate_at_break(displacement, force, break_threshold=0.5)
+
+                ax.plot(disp_plot, force_plot, color='darkred', linewidth=1.5, label='Force vs Displacement')
 
                 # Mark PQ - grey diamond
                 P_Q_data = results.get('P_Q')
@@ -824,6 +958,24 @@ def report(test_id):
                 plt.close(fig)
 
             # Prepare report data
+            # Parse KIC requirement from certificate
+            kic_req = '-'
+            if test.certificate and test.certificate.requirement:
+                import re
+                req_str = test.certificate.requirement
+                # Match patterns like "KIC: >50", "K_IC ≥50 MPa√m", etc.
+                patterns = [
+                    r'K_?IC[:\s]*([>≥<≤]?\s*[\d.]+)\s*(?:MPa)?',
+                    r'fracture\s*toughness[:\s]*([>≥<≤]?\s*[\d.]+)',
+                ]
+                for pattern in patterns:
+                    match = re.search(pattern, req_str, re.IGNORECASE)
+                    if match:
+                        kic_req = match.group(1).strip()
+                        if not kic_req.startswith(('>','<','≥','≤')):
+                            kic_req = '>' + kic_req
+                        break
+
             test_info = {
                 'certificate_number': form.certificate_number.data or test.test_id,
                 'test_project': test.certificate.test_project if test.certificate else '',
@@ -832,6 +984,7 @@ def report(test_id):
                 'material': test.material or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'temperature': test.temperature or '23',
+                'kic_req': kic_req,  # KIC requirement from certificate
             }
 
             dimensions = {

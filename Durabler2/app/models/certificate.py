@@ -31,7 +31,7 @@ class Certificate(db.Model):
     cert_date = db.Column(db.Date)
 
     # Test information
-    provningsorder = db.Column(db.String(100))  # Test order (previously test_project)
+    test_order = db.Column(db.String(100))  # Test order/work order number
     project_name = db.Column(db.String(100))
     test_standard = db.Column(db.String(50))
 
@@ -73,12 +73,21 @@ class Certificate(db.Model):
     # Backwards compatibility properties
     @property
     def test_project(self):
-        """Backwards compatibility - alias for provningsorder."""
-        return self.provningsorder
+        """Backwards compatibility - alias for test_order."""
+        return self.test_order
 
     @test_project.setter
     def test_project(self, value):
-        self.provningsorder = value
+        self.test_order = value
+
+    @property
+    def provningsorder(self):
+        """Backwards compatibility - Swedish name alias for test_order."""
+        return self.test_order
+
+    @provningsorder.setter
+    def provningsorder(self, value):
+        self.test_order = value
 
     @property
     def specimen_id(self):

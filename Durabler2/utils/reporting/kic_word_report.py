@@ -337,33 +337,37 @@ class KICReportGenerator:
         heading.paragraph_format.space_before = Pt(12)
         heading.paragraph_format.space_after = Pt(6)
 
-        table = doc.add_table(rows=8, cols=4)
+        table = doc.add_table(rows=8, cols=5)
         table.style = 'Table Grid'
 
-        # Header row
-        result_headers = ['Parameter', 'Value', 'U (k=2)', 'Unit']
+        # Header row - new order: Parameter, Unit, Value, Requirement, U (k=2)
+        result_headers = ['Parameter', 'Unit', 'Value', 'Requirement', 'U (k=2)']
         for i, header in enumerate(result_headers):
             table.rows[0].cells[i].text = header
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
         if results:
-            # Format results table
+            # Get KIC requirement from test_info if available
+            kic_req = test_info.get('kic_req', '-')
+
+            # Format results table: (Parameter, Unit, Value, Requirement, Uncertainty)
             results_data = [
-                ('Pmax', f'{results.P_max.value:.2f}', f'±{results.P_max.uncertainty:.2f}', 'kN'),
-                ('PQ (5% secant)', f'{results.P_Q.value:.2f}', f'±{results.P_Q.uncertainty:.2f}', 'kN'),
-                ('Pmax/PQ ratio', f'{results.P_ratio:.3f}', '-', '≤1.10'),
-                ('KQ (conditional)', f'{results.K_Q.value:.2f}', f'±{results.K_Q.uncertainty:.2f}', 'MPa√m'),
-                ('KIC', f'{results.K_IC.value:.2f}' if results.K_IC else 'CONDITIONAL',
-                 f'±{results.K_IC.uncertainty:.2f}' if results.K_IC else '-', 'MPa√m'),
-                ('Compliance', f'{results.compliance:.6f}', '-', 'mm/kN'),
-                ('Validity', 'VALID' if results.is_valid else 'CONDITIONAL', '-', '-'),
+                ('Pmax', 'kN', f'{results.P_max.value:.2f}', '-', f'±{results.P_max.uncertainty:.2f}'),
+                ('PQ (5% secant)', 'kN', f'{results.P_Q.value:.2f}', '-', f'±{results.P_Q.uncertainty:.2f}'),
+                ('Pmax/PQ ratio', '-', f'{results.P_ratio:.3f}', '≤1.10', '-'),
+                ('KQ (conditional)', 'MPa√m', f'{results.K_Q.value:.2f}', '-', f'±{results.K_Q.uncertainty:.2f}'),
+                ('KIC', 'MPa√m', f'{results.K_IC.value:.2f}' if results.K_IC else 'CONDITIONAL',
+                 kic_req, f'±{results.K_IC.uncertainty:.2f}' if results.K_IC else '-'),
+                ('Compliance', 'mm/kN', f'{results.compliance:.6f}', '-', '-'),
+                ('Validity', '-', 'VALID' if results.is_valid else 'CONDITIONAL', '-', '-'),
             ]
 
-            for i, (param, value, unc, unit) in enumerate(results_data):
+            for i, (param, unit, value, req, unc) in enumerate(results_data):
                 table.rows[i+1].cells[0].text = param
-                table.rows[i+1].cells[1].text = value
-                table.rows[i+1].cells[2].text = unc
-                table.rows[i+1].cells[3].text = unit
+                table.rows[i+1].cells[1].text = unit
+                table.rows[i+1].cells[2].text = value
+                table.rows[i+1].cells[3].text = req
+                table.rows[i+1].cells[4].text = unc
 
         # Compact table rows
         for row in table.rows:

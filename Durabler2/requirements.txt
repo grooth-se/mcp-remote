@@ -11,6 +11,7 @@ Flask-Migrate>=4.0.0         # Database migrations
 # Database
 SQLAlchemy>=2.0.0
 alembic>=1.13.0              # Migration tool (used by Flask-Migrate)
+psycopg2-binary>=2.9.0       # PostgreSQL adapter
 
 # Production WSGI Server
 gunicorn>=21.0.0             # Linux/Mac production server

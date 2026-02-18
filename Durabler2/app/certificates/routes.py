@@ -36,7 +36,7 @@ def index():
         search_pattern = f'%{search_term}%'
         query = query.filter(
             db.or_(
-                Certificate.provningsorder.ilike(search_pattern),
+                Certificate.test_order.ilike(search_pattern),
                 Certificate.project_name.ilike(search_pattern),
                 Certificate.customer.ilike(search_pattern),
                 Certificate.customer_order.ilike(search_pattern),
@@ -100,7 +100,7 @@ def new():
             cert_id=form.cert_id.data,
             revision=form.revision.data,
             cert_date=form.cert_date.data,
-            provningsorder=form.provningsorder.data,
+            test_order=form.test_order.data,
             project_name=form.project_name.data,
             test_standard=form.test_standard.data,
             customer=form.customer.data,
@@ -147,39 +147,12 @@ def view(cert_id):
 
     cert = Certificate.query.get_or_404(cert_id)
 
-    # Get linked test records with approval status eagerly loaded
+    # Get linked test records
     test_records = cert.test_records.all() if cert.test_records else []
-
-    # Calculate approval statistics for this certificate
-    approval_stats = {
-        'total': len(test_records),
-        'with_approval': 0,
-        'draft': 0,
-        'pending': 0,
-        'approved': 0,
-        'rejected': 0,
-        'published': 0
-    }
-
-    for test in test_records:
-        if test.approval:
-            approval_stats['with_approval'] += 1
-            status = test.approval.status
-            if status == 'DRAFT':
-                approval_stats['draft'] += 1
-            elif status == 'PENDING_REVIEW':
-                approval_stats['pending'] += 1
-            elif status == 'APPROVED':
-                approval_stats['approved'] += 1
-            elif status == 'REJECTED':
-                approval_stats['rejected'] += 1
-            elif status == 'PUBLISHED':
-                approval_stats['published'] += 1
 
     return render_template('certificates/view.html',
                            cert=cert,
                            test_records=test_records,
-                           approval_stats=approval_stats,
                            status_colors=STATUS_COLORS,
                            status_labels=APPROVAL_STATUS_LABELS)
 
@@ -196,7 +169,7 @@ def edit(cert_id):
         old_values = {
             'certificate_number': cert.certificate_number,
             'customer': cert.customer,
-            'provningsorder': cert.provningsorder
+            'provningsorder': cert.test_order
         }
 
         # Update certificate
@@ -204,7 +177,7 @@ def edit(cert_id):
         cert.cert_id = form.cert_id.data
         cert.revision = form.revision.data
         cert.cert_date = form.cert_date.data
-        cert.provningsorder = form.provningsorder.data
+        cert.test_order = form.test_order.data
         cert.project_name = form.project_name.data
         cert.test_standard = form.test_standard.data
         cert.customer = form.customer.data
@@ -253,7 +226,7 @@ def create_revision(cert_id):
         cert_id=cert.cert_id,
         revision=cert.revision + 1,
         cert_date=date.today(),
-        provningsorder=cert.provningsorder,
+        test_order=cert.test_order,
         project_name=cert.project_name,
         test_standard=cert.test_standard,
         customer=cert.customer,
@@ -309,7 +282,7 @@ def copy(cert_id):
         cert_id=next_id,
         revision=1,
         cert_date=date.today(),
-        provningsorder=cert.provningsorder,
+        test_order=cert.test_order,
         project_name=cert.project_name,
         test_standard=cert.test_standard,
         customer=cert.customer,
@@ -406,7 +379,7 @@ def search():
     else:
         certs = Certificate.query.filter(
             db.or_(
-                Certificate.provningsorder.ilike(pattern),
+                Certificate.test_order.ilike(pattern),
                 Certificate.customer.ilike(pattern),
                 Certificate.product_sn.ilike(pattern),
                 Certificate.test_article_sn.ilike(pattern)
@@ -418,7 +391,7 @@ def search():
         'certificate_number': c.certificate_number,
         'certificate_number_with_rev': c.certificate_number_with_rev,
         'customer': c.customer or '',
-        'provningsorder': c.provningsorder or ''
+        'provningsorder': c.test_order or ''
     } for c in certs])
 
 
@@ -587,7 +560,7 @@ def import_excel():
 
                     cert.product = get_str('product')
                     cert.product_sn = get_str('product_sn')
-                    cert.provningsorder = get_str('provningsorder')
+                    cert.test_order = get_str('provningsorder')
                     cert.project_name = get_str('project_name')
                     cert.test_standard = get_str('test_standard')
                     cert.material = get_str('material')

@@ -12,11 +12,12 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from flask import session
+from flask import session, Response
+from io import BytesIO
 from . import ctod_bp
 from .forms import UploadForm, SpecimenForm, ReportForm
 from app.extensions import db
-from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
+from app.models import TestRecord, AnalysisResult, AuditLog, Certificate, RawTestData, TestPhoto, ReportFile
 
 # Import analysis utilities
 from utils.analysis.ctod_calculations import CTODAnalyzer, CTODResult
@@ -37,6 +38,58 @@ def generate_test_id():
     return f"{prefix}-{count + 1:03d}"
 
 
+def detect_break_point(force, threshold=0.5):
+    """Detect specimen break point based on significant force drop.
+
+    Parameters
+    ----------
+    force : array
+        Force data array
+    threshold : float
+        Fraction of max force below which break is detected (default 0.5 = 50%)
+
+    Returns
+    -------
+    int or None
+        Index of break point, or None if no break detected
+    """
+    if len(force) < 10:
+        return None
+
+    max_force_idx = np.argmax(force)
+    max_force = force[max_force_idx]
+
+    # Look for first point after max where force drops below threshold
+    for i in range(max_force_idx + 1, len(force)):
+        if force[i] < max_force * threshold:
+            return i
+
+    return None
+
+
+def truncate_at_break(cmod, force, break_threshold=0.5):
+    """Truncate force-CMOD data at break point to clean up plots.
+
+    Parameters
+    ----------
+    cmod : array
+        CMOD data
+    force : array
+        Force data
+    break_threshold : float
+        Fraction of max force for break detection (default 0.5)
+
+    Returns
+    -------
+    tuple
+        (truncated_cmod, truncated_force)
+    """
+    break_idx = detect_break_point(force, break_threshold)
+    if break_idx is not None:
+        return cmod[:break_idx], force[:break_idx]
+    return cmod, force
+
+
 def create_force_cmod_plot(force, cmod, specimen_id, elastic_coeffs=None, ctod_points=None):
     """Create Force vs CMOD plot with elastic line and CTOD points.
 
@@ -46,10 +99,13 @@ def create_force_cmod_plot(force, cmod, specimen_id, elastic_coeffs=None, ctod_p
     fig = go.Figure()
     Vp = None  # Plastic CMOD
 
+    # Truncate data at break point to remove post-fracture noise
+    cmod_plot, force_plot = truncate_at_break(cmod, force, break_threshold=0.5)
+
     # Main test data - darkred
     fig.add_trace(go.Scatter(
-        x=cmod,
-        y=force,
+        x=cmod_plot,
+        y=force_plot,
         mode='lines',
         name='Test Data',
         line=dict(width=2, color='darkred')
@@ -218,16 +274,8 @@ def new():
             else:
                 session.pop('ctod_certificate_id', None)
 
-            # Handle optional CSV file
-            if form.csv_file.data:
-                csv_file = form.csv_file.data
-                csv_filename = secure_filename(csv_file.filename)
-                csv_saved = f"{timestamp}_{csv_filename}"
-                csv_filepath = Path(current_app.config['UPLOAD_FOLDER']) / csv_saved
-                csv_file.save(csv_filepath)
-                session['ctod_csv_path'] = str(csv_filepath)
-            else:
-                session.pop('ctod_csv_path', None)
+            # Clear any existing CSV path (CSV is uploaded in Step 2)
+            session.pop('ctod_csv_path', None)
 
             flash(f'Excel data imported: {excel_data.specimen_id}, W={excel_data.W}mm, B={excel_data.B}mm, a₀={a_0_calculated:.2f}mm', 'success')
             return redirect(url_for('ctod.specimen'))
@@ -654,6 +702,51 @@ def specimen():
             geometry['validity_summary'] = results.get('validity_summary', '')
             test_record.geometry = geometry
 
+            # Store photos in database for data persistence
+            for i in range(1, 4):
+                photo_field = getattr(form, f'photo_{i}', None)
+                desc_field = getattr(form, f'photo_description_{i}', None)
+                if photo_field and photo_field.data:
+                    photo_file = photo_field.data
+                    photo_file.seek(0)  # Reset file pointer
+                    photo_data = photo_file.read()
+                    db_photo = TestPhoto(
+                        test_record_id=test_record.id,
+                        photo_number=i,
+                        description=desc_field.data if desc_field else '',
+                        uploaded_by_id=current_user.id
+                    )
+                    db_photo.set_image(photo_data, photo_file.filename)
+                    db.session.add(db_photo)
+
+            # Store raw CSV data in database
+            csv_path = session.get('ctod_csv_path')
+            if csv_path and Path(csv_path).exists():
+                with open(csv_path, 'rb') as f:
+                    csv_raw = RawTestData(
+                        test_record_id=test_record.id,
+                        data_type='csv',
+                        original_filename=Path(csv_path).name,
+                        mime_type='text/csv',
+                        uploaded_by_id=current_user.id
+                    )
+                    csv_raw.set_data(f.read())
+                    db.session.add(csv_raw)
+
+            # Store Excel data in database
+            excel_path = session.get('ctod_excel_path')
+            if excel_path and Path(excel_path).exists():
+                with open(excel_path, 'rb') as f:
+                    excel_raw = RawTestData(
+                        test_record_id=test_record.id,
+                        data_type='excel',
+                        original_filename=Path(excel_path).name,
+                        mime_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        uploaded_by_id=current_user.id
+                    )
+                    excel_raw.set_data(f.read())
+                    db.session.add(excel_raw)
+
             # Audit log
             audit = AuditLog(
                 user_id=current_user.id,
@@ -744,6 +837,31 @@ def view(test_id):
     results = {r.parameter_name: r for r in test.results.all()}
     geometry = test.geometry or {}
 
+    # Recalculate validity on-the-fly from current geometry values
+    # This ensures consistency even if the test was analyzed with older code
+    W = geometry.get('W', 0)
+    a_0 = geometry.get('a_0', 0)
+    S = geometry.get('S', 0)
+    specimen_type = geometry.get('type', 'SE(B)')
+
+    if W > 0 and a_0 > 0:
+        # Create specimen object to calculate validity
+        try:
+            specimen_obj = CTODSpecimen(
+                specimen_id=test.specimen_id or '',
+                specimen_type=specimen_type,
+                W=W,
+                B=geometry.get('B', 1),
+                a_0=a_0,
+                S=S if S > 0 else W * 4,
+                B_n=geometry.get('B_n')
+            )
+            # Update geometry with fresh validity calculations
+            geometry['is_valid'] = specimen_obj.is_valid_geometry
+            geometry['validity_summary'] = specimen_obj.validity_summary()
+        except Exception as e:
+            current_app.logger.warning(f'Could not recalculate validity: {e}')
+
     # Get data for plotting
     force = np.array(geometry.get('force', []))
     cmod = np.array(geometry.get('cmod', []))
@@ -766,17 +884,51 @@ def view(test_id):
             ctod_points=ctod_points
         )
 
-    # Build photo URLs
+    # Build photo URLs - prefer database photos, fall back to file system
     photo_urls = []
-    for photo in geometry.get('photos', []):
-        photo_urls.append({
-            'url': url_for('static', filename=f"uploads/{photo['filename']}"),
-            'description': photo.get('description', '')
-        })
+    db_photos = test.photos.all()
+    if db_photos:
+        # Photos stored in database
+        for photo in db_photos:
+            photo_urls.append({
+                'url': url_for('ctod.photo', test_id=test_id, photo_id=photo.id),
+                'description': photo.description or ''
+            })
+    else:
+        # Fallback to file system (legacy tests)
+        for photo in geometry.get('photos', []):
+            photo_urls.append({
+                'url': url_for('static', filename=f"uploads/{photo['filename']}"),
+                'description': photo.get('description', '')
+            })
 
     return render_template('ctod/view.html', test=test, results=results,
                           geometry=geometry, force_cmod_plot=force_cmod_plot,
                           photo_urls=photo_urls, Vp=Vp)
+
+
+@ctod_bp.route('/<int:test_id>/photo/<int:photo_id>')
+@login_required
+def photo(test_id, photo_id):
+    """Serve photo from database."""
+    photo = TestPhoto.query.filter_by(id=photo_id, test_record_id=test_id).first_or_404()
+    return Response(
+        photo.data,
+        mimetype=photo.mime_type or 'image/jpeg',
+        headers={'Content-Disposition': f'inline; filename="{photo.original_filename}"'}
+    )
+
+
+@ctod_bp.route('/<int:test_id>/raw-data/<int:data_id>')
+@login_required
+def raw_data(test_id, data_id):
+    """Download raw test data from database."""
+    data = RawTestData.query.filter_by(id=data_id, test_record_id=test_id).first_or_404()
+    return Response(
+        data.get_data(),
+        mimetype=data.mime_type or 'application/octet-stream',
+        headers={'Content-Disposition': f'attachment; filename="{data.original_filename}"'}
+    )
 
 
 @ctod_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])
@@ -808,6 +960,7 @@ def report(test_id):
                 'certificate_number': form.certificate_number.data or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'temperature': str(test.temperature) if test.temperature else '23',
+                'requirement': cert.requirement if cert else '',  # CTOD requirement from certificate
             }
 
             # Prepare specimen data
@@ -856,7 +1009,36 @@ def report(test_id):
             if K_max:
                 report_results['K_max'] = MockMeasured(K_max.value, K_max.uncertainty)
 
-            # CTOD results
+            report_results['compliance'] = results.get('compliance').value if results.get('compliance') else None
+
+            # Recalculate validity on-the-fly from current geometry values
+            W = geometry.get('W', 0)
+            a_0 = geometry.get('a_0', 0)
+            S = geometry.get('S', 0)
+            specimen_type = geometry.get('type', 'SE(B)')
+
+            if W > 0 and a_0 > 0:
+                try:
+                    specimen_obj = CTODSpecimen(
+                        specimen_id=test.specimen_id or '',
+                        specimen_type=specimen_type,
+                        W=W,
+                        B=geometry.get('B', 1),
+                        a_0=a_0,
+                        S=S if S > 0 else W * 4,
+                        B_n=geometry.get('B_n')
+                    )
+                    report_results['is_valid'] = specimen_obj.is_valid_geometry
+                    report_results['validity_summary'] = specimen_obj.validity_summary()
+                except Exception as e:
+                    current_app.logger.warning(f'Could not recalculate validity for report: {e}')
+                    report_results['is_valid'] = geometry.get('is_valid', False)
+                    report_results['validity_summary'] = geometry.get('validity_summary', '')
+            else:
+                report_results['is_valid'] = geometry.get('is_valid', False)
+                report_results['validity_summary'] = geometry.get('validity_summary', '')
+
+            # CTOD results (using recalculated validity)
             ctod_points = geometry.get('ctod_points', {})
             for ctod_type in ['delta_c', 'delta_u', 'delta_m']:
                 r = results.get(ctod_type)
@@ -866,12 +1048,13 @@ def report(test_id):
                         (r.value, r.uncertainty),
                         (pt.get('force', 0), 0.1),
                         (pt.get('cmod', 0), 0.01),
-                        geometry.get('is_valid', False)
+                        report_results['is_valid']  # Use recalculated validity
                     )
 
-            report_results['compliance'] = results.get('compliance').value if results.get('compliance') else None
-            report_results['is_valid'] = geometry.get('is_valid', False)
-            report_results['validity_summary'] = geometry.get('validity_summary', '')
+            # Add a_W_ratio for validity table
+            a_W_result = results.get('a_W_ratio')
+            if a_W_result:
+                report_results['a_W_ratio_value'] = a_W_result.value
 
             # Prepare report data
             report_data = CTODReportGenerator.prepare_report_data(
@@ -891,10 +1074,13 @@ def report(test_id):
             cmod = np.array(geometry.get('cmod', []))
 
             if len(force) > 0 and len(cmod) > 0:
+                # Truncate data at break point to clean up chart
+                cmod_plot, force_plot = truncate_at_break(cmod, force, break_threshold=0.5)
+
                 fig, ax = plt.subplots(figsize=(6, 4))
 
-                # Main test data - darkred
-                ax.plot(cmod, force, color='darkred', linewidth=1.5, label='Test Data')
+                # Main test data - darkred (truncated at break)
+                ax.plot(cmod_plot, force_plot, color='darkred', linewidth=1.5, label='Test Data')
 
                 # Find Pmax point
                 idx_max = np.argmax(force)

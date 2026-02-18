@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Review: {{ certificate.certificate_number_with_rev }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('certificates.index') }}">Certificates</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('certificates.view', cert_id=certificate.id) }}">{{ certificate.certificate_number_with_rev }}</a></li>
+            <li class="breadcrumb-item active">Review</li>
+        </ol>
+    </nav>
+
+    <div class="row mb-2">
+        <div class="col">
+            <h1>
+                <i class="bi bi-check-square"></i>
+                Review Report: {{ certificate.certificate_number_with_rev }}
+            </h1>
+        </div>
+        <div class="col-auto">
+            <span class="badge bg-{{ status_colors.get(approval.status, 'secondary') }} fs-5">
+                {{ status_labels.get(approval.status, approval.status) }}
+            </span>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Certificate Information -->
+            <div class="card mb-2">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-journal-text"></i> Certificate Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row mb-0">
+                                <dt class="col-5">Certificate No.</dt>
+                                <dd class="col-7"><strong>{{ certificate.certificate_number_with_rev }}</strong></dd>
+
+                                <dt class="col-5">Date</dt>
+                                <dd class="col-7">{{ certificate.cert_date.strftime('%Y-%m-%d') if certificate.cert_date else '-' }}</dd>
+
+                                <dt class="col-5">Customer</dt>
+                                <dd class="col-7">{{ certificate.customer or '-' }}</dd>
+
+                                <dt class="col-5">Customer Order</dt>
+                                <dd class="col-7">{{ certificate.customer_order or '-' }}</dd>
+
+                                <dt class="col-5">Test Order</dt>
+                                <dd class="col-7">{{ certificate.test_order or '-' }}</dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row mb-0">
+                                <dt class="col-5">Material</dt>
+                                <dd class="col-7">{{ certificate.material or '-' }}</dd>
+
+                                <dt class="col-5">Product</dt>
+                                <dd class="col-7">{{ certificate.product or '-' }}</dd>
+
+                                <dt class="col-5">Product S/N</dt>
+                                <dd class="col-7">{{ certificate.product_sn or '-' }}</dd>
+
+                                <dt class="col-5">Test Standard</dt>
+                                <dd class="col-7">{{ certificate.test_standard or '-' }}</dd>
+
+                                <dt class="col-5">Temperature</dt>
+                                <dd class="col-7">{{ certificate.temperature or '-' }}</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Results -->
+            <div class="card mb-2">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Test Results</h5>
+                </div>
+                <div class="card-body">
+                    {% if test_records %}
+                    {% for test in test_records %}
+                    <div class="border rounded p-3 mb-1">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">
+                                <span class="badge bg-info me-2">{{ test.test_method }}</span>
+                                {{ test.specimen_id or test.test_id }}
+                            </h6>
+                            <small class="text-muted">{{ test.test_date.strftime('%Y-%m-%d') if test.test_date else '' }}</small>
+                        </div>
+
+                        {% if test.results.count() > 0 %}
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Value</th>
+                                    <th>Uncertainty</th>
+                                    <th>Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in test.results %}
+                                {% if not result.parameter_name.endswith('_disp') and not result.parameter_name.startswith('True_') and result.parameter_name not in ['K', 'n', 'E_disp'] %}
+                                <tr>
+                                    <td>{{ result.parameter_name }}</td>
+                                    <td><strong>{{ "%.2f"|format(result.value) if result.value else '-' }}</strong></td>
+                                    <td>{{ "%.2f"|format(result.uncertainty) if result.uncertainty else '-' }}</td>
+                                    <td>{{ result.unit or '-' }}</td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted mb-0">No results available.</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted mb-0">No test records linked to this certificate.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Word Report -->
+            <div class="card mb-2">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-word"></i> Word Report</h5>
+                </div>
+                <div class="card-body">
+                    {% if approval.word_report_path %}
+                    <p class="mb-2">
+                        <i class="bi bi-file-earmark-word text-primary"></i>
+                        <code>{{ approval.word_report_path }}</code>
+                    </p>
+                    <a href="{{ url_for('reports.download_word', cert_id=certificate.id) }}"
+                       class="btn btn-primary">
+                        <i class="bi bi-download"></i> Download Word Report
+                    </a>
+                    <p class="text-muted small mt-2 mb-0">
+                        Download and review the Word document before approving.
+                    </p>
+                    {% else %}
+                    <p class="text-warning mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> No Word report available.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar: Actions -->
+        <div class="col-lg-4">
+            <!-- Approval Actions -->
+            <div class="card mb-2 border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Approval Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-1">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Approval workflow:</strong>
+                        <ol class="mb-0 mt-1 ps-3">
+                            <li>Download the Word report below</li>
+                            <li>Review and verify the content</li>
+                            <li>Save as PDF and sign with your PDF software</li>
+                            <li>Upload the signed PDF to approve</li>
+                        </ol>
+                    </div>
+
+                    <!-- Approve with Signed PDF Upload -->
+                    <form action="{{ url_for('reports.approve', cert_id=certificate.id) }}"
+                          method="POST" enctype="multipart/form-data" class="mb-1">
+                        <div class="mb-2">
+                            <label for="signed_pdf" class="form-label fw-bold">
+                                <i class="bi bi-file-pdf text-danger"></i> Upload Signed PDF
+                            </label>
+                            <input type="file" name="signed_pdf" id="signed_pdf"
+                                   class="form-control" accept=".pdf" required>
+                            <div class="form-text">Upload the PDF that you have signed externally</div>
+                        </div>
+                        <button type="submit" class="btn btn-success btn-lg w-100"
+                                onclick="return confirm('Approve this report and publish the uploaded PDF?')">
+                            <i class="bi bi-check-circle"></i> Approve & Publish
+                        </button>
+                    </form>
+
+                    <hr>
+
+                    <!-- Reject Form -->
+                    <form action="{{ url_for('reports.reject', cert_id=certificate.id) }}" method="POST">
+                        <div class="mb-1">
+                            <label for="comments" class="form-label">Rejection Comments</label>
+                            <textarea name="comments" id="comments" class="form-control" rows="3"
+                                      placeholder="Explain what needs to be corrected..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100"
+                                onclick="return confirm('Reject this report?')">
+                            <i class="bi bi-x-circle"></i> Reject
+                        </button>
+                    </form>
+
+                    <hr>
+
+                    <a href="{{ url_for('certificates.view', cert_id=certificate.id) }}"
+                       class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-arrow-left"></i> Back to Certificate
+                    </a>
+                </div>
+            </div>
+
+            <!-- Submission Info -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Submission Info</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-5">Submitted by</dt>
+                        <dd class="col-7">{{ approval.submitted_by.full_name or approval.submitted_by.username if approval.submitted_by else '-' }}</dd>
+
+                        <dt class="col-5">Submitted at</dt>
+                        <dd class="col-7">{{ approval.submitted_at.strftime('%Y-%m-%d %H:%M') if approval.submitted_at else '-' }}</dd>
+
+                        <dt class="col-5">Created by</dt>
+                        <dd class="col-7">{{ approval.created_by.full_name or approval.created_by.username if approval.created_by else '-' }}</dd>
+
+                        <dt class="col-5">Created at</dt>
+                        <dd class="col-7">{{ approval.created_at.strftime('%Y-%m-%d %H:%M') if approval.created_at else '-' }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

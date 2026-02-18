@@ -1,5 +1,6 @@
 """Sonic Resonance (E1875) test routes."""
 import os
+import math
 from pathlib import Path
 from datetime import datetime
 
@@ -181,6 +182,24 @@ def new():
                 'vs1': form.vs1.data,
                 'vs2': form.vs2.data,
                 'vs3': form.vs3.data,
+            }
+
+            # Store uncertainty inputs (ISO 17025)
+            geometry['uncertainty_inputs'] = {
+                'velocity_pct': form.velocity_uncertainty.data or 1.0,
+                'dimension_pct': form.dimension_uncertainty.data or 0.5,
+                'mass_pct': form.mass_uncertainty.data or 0.1
+            }
+
+            # Calculate uncertainty budget (simplified RSS)
+            vel_u = (form.velocity_uncertainty.data or 1.0) / 100
+            dim_u = (form.dimension_uncertainty.data or 0.5) / 100
+            mass_u = (form.mass_uncertainty.data or 0.1) / 100
+            combined_u = math.sqrt(vel_u**2 + dim_u**2 + mass_u**2) * 100
+            geometry['uncertainty_budget'] = {
+                'combined': combined_u,
+                'coverage_factor': 2,
+                'expanded': combined_u * 2
             }
 
             # Create test record

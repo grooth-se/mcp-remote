@@ -3,7 +3,7 @@
 {% block title %}{{ 'New Test Entry' if is_new else 'Edit ' + cert.certificate_number }}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('certificates.index') }}">Certificates</a></li>
         {% if not is_new %}
@@ -16,7 +16,7 @@
 </nav>
 
 {% if is_new %}
-<div class="alert alert-success mb-4">
+<div class="alert alert-success mb-2">
     <i class="bi bi-info-circle"></i>
     <strong>Create a new test entry</strong> - Fill in the basic information below. After saving, you can start tests (Tensile, CTOD, etc.) linked to this certificate number.
 </div>
@@ -34,7 +34,7 @@
             {{ form.hidden_tag() }}
 
             <!-- Certificate Number Display -->
-            <div class="alert alert-info mb-4">
+            <div class="alert alert-info mb-2">
                 <h5 class="mb-0">
                     <i class="bi bi-tag"></i>
                     Certificate: <strong id="cert-number-display">
@@ -47,28 +47,28 @@
             <div class="row">
                 <!-- Column 1: Certificate Info -->
                 <div class="col-md-3">
-                    <div class="card mb-3">
+                    <div class="card mb-1">
                         <div class="card-header"><h6 class="mb-0">Certificate Info</h6></div>
                         <div class="card-body">
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.year.label(class="form-label") }}
                                 {{ form.year(class="form-control", id="year-input") }}
                                 {% for error in form.year.errors %}
                                 <div class="text-danger small">{{ error }}</div>
                                 {% endfor %}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.cert_id.label(class="form-label") }}
                                 {{ form.cert_id(class="form-control", id="cert-id-input") }}
                                 {% for error in form.cert_id.errors %}
                                 <div class="text-danger small">{{ error }}</div>
                                 {% endfor %}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.revision.label(class="form-label") }}
                                 {{ form.revision(class="form-control", readonly=not is_new) }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.cert_date.label(class="form-label") }}
                                 {{ form.cert_date(class="form-control", type="date") }}
                             </div>
@@ -78,30 +78,30 @@
 
                 <!-- Column 2: Test Information -->
                 <div class="col-md-3">
-                    <div class="card mb-3">
+                    <div class="card mb-1">
                         <div class="card-header"><h6 class="mb-0">Test Information</h6></div>
                         <div class="card-body">
-                            <div class="mb-3">
-                                {{ form.provningsorder.label(class="form-label") }}
-                                {{ form.provningsorder(class="form-control") }}
+                            <div class="mb-1">
+                                {{ form.test_order.label(class="form-label") }}
+                                {{ form.test_order(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.project_name.label(class="form-label") }}
                                 {{ form.project_name(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.test_standard.label(class="form-label") }}
                                 {{ form.test_standard(class="form-select") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.customer.label(class="form-label") }}
                                 {{ form.customer(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.customer_order.label(class="form-label") }}
                                 {{ form.customer_order(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.test_article_sn.label(class="form-label") }}
                                 {{ form.test_article_sn(class="form-control") }}
                             </div>
@@ -111,34 +111,34 @@
 
                 <!-- Column 3: Test Article Information -->
                 <div class="col-md-3">
-                    <div class="card mb-3">
+                    <div class="card mb-1">
                         <div class="card-header"><h6 class="mb-0">Test Article Information</h6></div>
                         <div class="card-body">
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.product.label(class="form-label") }}
                                 {{ form.product(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.product_sn.label(class="form-label") }}
                                 {{ form.product_sn(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.material.label(class="form-label") }}
                                 {{ form.material(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.customer_specimen_info.label(class="form-label") }}
                                 {{ form.customer_specimen_info(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.location_orientation.label(class="form-label") }}
                                 {{ form.location_orientation(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.requirement.label(class="form-label") }}
                                 {{ form.requirement(class="form-control") }}
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-1">
                                 {{ form.temperature.label(class="form-label") }}
                                 {{ form.temperature(class="form-control", placeholder="e.g., 23°C") }}
                             </div>
@@ -148,13 +148,13 @@
 
                 <!-- Column 4: Comment & Status -->
                 <div class="col-md-3">
-                    <div class="card mb-3">
+                    <div class="card mb-1">
                         <div class="card-header"><h6 class="mb-0">Comment</h6></div>
                         <div class="card-body">
                             {{ form.comment(class="form-control", rows="4") }}
                         </div>
                     </div>
-                    <div class="card mb-3">
+                    <div class="card mb-1">
                         <div class="card-header"><h6 class="mb-0">Status</h6></div>
                         <div class="card-body">
                             <div class="form-check mb-2">

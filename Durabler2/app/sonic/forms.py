@@ -65,6 +65,20 @@ class SpecimenForm(FlaskForm):
     vs3 = FloatField('Vs₃ (m/s)', validators=[DataRequired(),
                      NumberRange(min=500, max=6000)])
 
+    # Uncertainty parameters (ISO 17025)
+    velocity_uncertainty = FloatField('Velocity Uncertainty (%)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=10, message='Typically 0.5-2%')
+    ], default=1.0)
+    dimension_uncertainty = FloatField('Dimension Uncertainty (%)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=5)
+    ], default=0.5)
+    mass_uncertainty = FloatField('Mass Uncertainty (%)', validators=[
+        Optional(),
+        NumberRange(min=0.1, max=5)
+    ], default=0.1)
+
     notes = TextAreaField('Notes', validators=[Optional()])
 
     submit = SubmitField('Calculate Results')

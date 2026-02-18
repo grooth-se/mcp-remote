@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: durabler
+      POSTGRES_USER: durabler
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-durabler_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U durabler"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5002:5000"
+    environment:
+      FLASK_CONFIG: production
+      DATABASE_URL: postgresql://durabler:${POSTGRES_PASSWORD:-durabler_secret}@db:5432/durabler
+      SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+    volumes:
+      - uploads:/app/app/static/uploads
+      - reports:/app/reports
+      - certs:/app/certs
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  uploads:
+  reports:
+  certs:

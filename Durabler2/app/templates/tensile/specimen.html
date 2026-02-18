@@ -3,7 +3,7 @@
 {% block title %}Specimen Data{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('tensile.index') }}">Tensile Tests</a></li>
         <li class="breadcrumb-item"><a href="{{ url_for('tensile.new') }}">New Test</a></li>
@@ -13,7 +13,7 @@
 
 <div class="row">
     <!-- CSV Info Card -->
-    <div class="col-md-3 mb-4">
+    <div class="col-md-3 mb-2">
         <div class="card">
             <div class="card-header bg-success text-white">
                 <h6 class="mb-0"><i class="bi bi-check-circle"></i> Loaded Data</h6>
@@ -43,7 +43,7 @@
 
         {% if certificate %}
         <!-- Linked Certificate Card -->
-        <div class="card mt-3">
+        <div class="card mt-1">
             <div class="card-header bg-info text-white">
                 <h6 class="mb-0"><i class="bi bi-link-45deg"></i> Linked Certificate</h6>
             </div>
@@ -84,7 +84,7 @@
                     {{ form.hidden_tag() }}
 
                     <!-- Row 1: Identification -->
-                    <div class="row mb-3">
+                    <div class="row mb-1">
                         <div class="col-md-3">
                             {{ form.specimen_id.label(class="form-label") }}
                             {{ form.specimen_id(class="form-control") }}
@@ -107,7 +107,7 @@
                     </div>
 
                     <!-- Row 2: Specimen Type, Yield Method, Temperature -->
-                    <div class="row mb-3">
+                    <div class="row mb-1">
                         <div class="col-md-3">
                             {{ form.specimen_type.label(class="form-label fw-bold") }}
                             {{ form.specimen_type(class="form-select", id="specimen_type") }}
@@ -137,11 +137,11 @@
                     <div class="row">
                         <!-- BEFORE TEST Column -->
                         <div class="col-md-6">
-                            <h5 class="text-primary mb-3"><i class="bi bi-box-arrow-in-right"></i> Before Test (Initial)</h5>
+                            <h5 class="text-primary mb-1"><i class="bi bi-box-arrow-in-right"></i> Before Test (Initial)</h5>
 
                             <!-- Round specimen fields -->
                             <div id="round-initial">
-                                <div class="row mb-3">
+                                <div class="row mb-1">
                                     <div class="col-md-8">
                                         {{ form.D0.label(class="form-label fw-bold") }}
                                         <div class="input-group">
@@ -158,7 +158,7 @@
 
                             <!-- Rectangular specimen fields -->
                             <div id="rect-initial" style="display: none;">
-                                <div class="row mb-3">
+                                <div class="row mb-1">
                                     <div class="col-md-6">
                                         {{ form.a0.label(class="form-label fw-bold") }}
                                         <div class="input-group">
@@ -184,7 +184,7 @@
                             </div>
 
                             <!-- Common length fields -->
-                            <div class="row mb-3">
+                            <div class="row mb-1">
                                 <div class="col-md-6">
                                     {{ form.L0.label(class="form-label fw-bold") }}
                                     <div class="input-group">
@@ -212,11 +212,11 @@
 
                         <!-- AFTER TEST Column -->
                         <div class="col-md-6">
-                            <h5 class="text-success mb-3"><i class="bi bi-box-arrow-right"></i> After Test (Final)</h5>
+                            <h5 class="text-success mb-1"><i class="bi bi-box-arrow-right"></i> After Test (Final)</h5>
 
                             <!-- Round specimen final -->
                             <div id="round-final">
-                                <div class="row mb-3">
+                                <div class="row mb-1">
                                     <div class="col-md-8">
                                         {{ form.D1.label(class="form-label fw-bold") }}
                                         <div class="input-group">
@@ -233,7 +233,7 @@
 
                             <!-- Rectangular specimen final -->
                             <div id="rect-final" style="display: none;">
-                                <div class="row mb-3">
+                                <div class="row mb-1">
                                     <div class="col-md-6">
                                         {{ form.au.label(class="form-label fw-bold") }}
                                         <div class="input-group">
@@ -259,7 +259,7 @@
                             </div>
 
                             <!-- Common final length fields -->
-                            <div class="row mb-3">
+                            <div class="row mb-1">
                                 <div class="col-md-6">
                                     {{ form.L1.label(class="form-label fw-bold") }}
                                     <div class="input-group">
@@ -288,8 +288,44 @@
 
                     <hr>
 
+                    <!-- Uncertainty Parameters (ISO 17025) -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-percent"></i> Uncertainty Parameters (ISO 17025)</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small">Enter measurement uncertainties for ISO 17025 compliance reporting</p>
+                            <div class="row">
+                                <div class="col-md-4 mb-1">
+                                    {{ form.force_uncertainty.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.force_uncertainty(class="form-control") }}
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Load cell uncertainty</small>
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.displacement_uncertainty.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.displacement_uncertainty(class="form-control") }}
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Extensometer/displacement</small>
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.dimension_uncertainty.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.dimension_uncertainty(class="form-control") }}
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Caliper/micrometer</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Notes -->
-                    <div class="row mb-3">
+                    <div class="row mb-1">
                         <div class="col-md-12">
                             {{ form.notes.label(class="form-label") }}
                             {{ form.notes(class="form-control", rows="2", placeholder="Test notes, observations...") }}

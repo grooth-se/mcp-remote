@@ -3,14 +3,14 @@
 {% block title %}Vickers Test - {{ test.test_id }}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('vickers.index') }}">Vickers Tests</a></li>
         <li class="breadcrumb-item active">{{ test.test_id }}</li>
     </ol>
 </nav>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
     <div>
         <h2><i class="bi bi-diamond"></i> {{ test.test_id }}</h2>
         <p class="text-muted mb-0">
@@ -34,13 +34,13 @@
     <!-- Left column: Results -->
     <div class="col-lg-4">
         <!-- Results Summary -->
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header text-white" style="background-color: #6f42c1;">
                 <h5 class="mb-0"><i class="bi bi-diamond"></i> Results Summary</h5>
             </div>
             <div class="card-body">
                 {% set mean = results.get('mean_hardness', {}) %}
-                <div class="text-center mb-3">
+                <div class="text-center mb-1">
                     <h2 class="mb-0">{{ "%.1f"|format(mean.get('value', 0)) }}</h2>
                     <p class="text-muted mb-0">+/- {{ "%.1f"|format(mean.get('uncertainty', 0)) }} {{ results.get('load_level', 'HV') }}</p>
                 </div>
@@ -70,7 +70,7 @@
         </div>
 
         <!-- Test Parameters -->
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-gear"></i> Test Parameters</h5>
             </div>
@@ -95,7 +95,7 @@
         <!-- Uncertainty Budget -->
         {% set unc_budget = results.get('uncertainty_budget', {}) %}
         {% if unc_budget %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-calculator"></i> Uncertainty (k=2)</h5>
             </div>
@@ -132,7 +132,7 @@
 
         <!-- Certificate Link -->
         {% if test.certificate %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header bg-info text-white">
                 <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Certificate</h5>
             </div>
@@ -149,7 +149,7 @@
     <div class="col-lg-8">
         <!-- Hardness Profile Plot -->
         {% if hardness_plot %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Hardness Profile</h5>
             </div>
@@ -161,7 +161,7 @@
 
         <!-- Individual Readings Table -->
         {% if readings %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-list-ol"></i> Individual Readings</h5>
             </div>
@@ -194,7 +194,7 @@
 
         <!-- Indent Photo -->
         {% if photo_url %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-camera"></i> Indent Photo</h5>
             </div>
@@ -206,7 +206,7 @@
 
         <!-- Notes -->
         {% if test.notes %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-chat-left-text"></i> Notes</h5>
             </div>

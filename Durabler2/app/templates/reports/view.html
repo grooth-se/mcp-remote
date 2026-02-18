@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col">
             <h1>
                 <i class="bi bi-file-earmark-text"></i>
@@ -29,7 +29,7 @@
         <!-- Main Content -->
         <div class="col-lg-8">
             <!-- Test Information -->
-            <div class="card mb-4">
+            <div class="card mb-2">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Test Information</h5>
                 </div>
@@ -62,7 +62,7 @@
 
             <!-- Rejection Comments (if rejected) -->
             {% if approval.status == 'REJECTED' and approval.review_comments %}
-            <div class="card mb-4 border-danger">
+            <div class="card mb-2 border-danger">
                 <div class="card-header bg-danger text-white">
                     <h5 class="mb-0"><i class="bi bi-x-circle"></i> Rejection Reason</h5>
                 </div>
@@ -79,7 +79,7 @@
 
             <!-- Word Report -->
             {% if approval.word_report_path %}
-            <div class="card mb-4">
+            <div class="card mb-2">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="bi bi-file-earmark-word"></i> Word Report</h5>
                 </div>
@@ -94,7 +94,7 @@
 
             <!-- Signed PDF -->
             {% if approval.status == 'PUBLISHED' %}
-            <div class="card mb-4 border-success">
+            <div class="card mb-2 border-success">
                 <div class="card-header bg-success text-white">
                     <h5 class="mb-0"><i class="bi bi-file-earmark-pdf"></i> Signed PDF</h5>
                 </div>
@@ -121,7 +121,7 @@
         <!-- Sidebar -->
         <div class="col-lg-4">
             <!-- Actions -->
-            <div class="card mb-4">
+            <div class="card mb-2">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
                 </div>
@@ -142,9 +142,23 @@
                     {% endif %}
 
                     {% if approval.status == 'APPROVED' and current_user.can_approve %}
-                    <a href="{{ url_for('reports.sign', id=approval.id) }}" class="btn btn-success">
-                        <i class="bi bi-pen"></i> Sign & Publish
+                    <!-- Upload signed PDF to publish -->
+                    <p class="text-muted small mb-1">Upload externally signed PDF:</p>
+                    {% if approval.certificate_id %}
+                    <a href="{{ url_for('certificates.view', cert_id=approval.certificate_id) }}" class="btn btn-success w-100">
+                        <i class="bi bi-upload"></i> Go to Certificate to Upload PDF
                     </a>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if approval.status == 'PUBLISHED' and current_user.can_approve %}
+                    <!-- Replace signed PDF if needed -->
+                    <p class="text-muted small mb-1">Replace signed PDF:</p>
+                    {% if approval.certificate_id %}
+                    <a href="{{ url_for('certificates.view', cert_id=approval.certificate_id) }}" class="btn btn-outline-warning w-100">
+                        <i class="bi bi-arrow-repeat"></i> Go to Certificate to Replace PDF
+                    </a>
+                    {% endif %}
                     {% endif %}
 
                     {% if approval.can_download_signed %}
@@ -166,7 +180,7 @@
                 </div>
                 <div class="card-body">
                     <ul class="list-unstyled mb-0">
-                        <li class="mb-3">
+                        <li class="mb-1">
                             <strong>Created</strong><br>
                             <small class="text-muted">
                                 {{ approval.created_at.strftime('%Y-%m-%d %H:%M') if approval.created_at else '-' }}
@@ -176,7 +190,7 @@
                             </small>
                         </li>
                         {% if approval.submitted_at %}
-                        <li class="mb-3">
+                        <li class="mb-1">
                             <strong>Submitted</strong><br>
                             <small class="text-muted">
                                 {{ approval.submitted_at.strftime('%Y-%m-%d %H:%M') }}
@@ -187,7 +201,7 @@
                         </li>
                         {% endif %}
                         {% if approval.reviewed_at %}
-                        <li class="mb-3">
+                        <li class="mb-1">
                             <strong>{{ 'Approved' if approval.status in ['APPROVED', 'PUBLISHED'] else 'Rejected' }}</strong><br>
                             <small class="text-muted">
                                 {{ approval.reviewed_at.strftime('%Y-%m-%d %H:%M') }}
@@ -198,7 +212,7 @@
                         </li>
                         {% endif %}
                         {% if approval.signature_timestamp %}
-                        <li class="mb-3">
+                        <li class="mb-1">
                             <strong>Published</strong><br>
                             <small class="text-muted">
                                 {{ approval.signature_timestamp.strftime('%Y-%m-%d %H:%M') }}

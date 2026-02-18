@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col">
             <h1><i class="bi bi-person-{{ 'plus' if not user else 'gear' }}"></i> {{ title }}</h1>
             <nav aria-label="breadcrumb">
@@ -33,7 +33,7 @@
                         {% endif %}
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6 mb-1">
                                 <label class="form-label" for="username">Username *</label>
                                 {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
                                 {% for error in form.username.errors %}
@@ -42,7 +42,7 @@
                                 <small class="text-muted">Used for login</small>
                             </div>
 
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6 mb-1">
                                 <label class="form-label" for="full_name">Full Name *</label>
                                 {{ form.full_name(class="form-control" + (" is-invalid" if form.full_name.errors else "")) }}
                                 {% for error in form.full_name.errors %}
@@ -53,7 +53,7 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6 mb-1">
                                 <label class="form-label" for="email">Email</label>
                                 {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
                                 {% for error in form.email.errors %}
@@ -61,7 +61,7 @@
                                 {% endfor %}
                             </div>
 
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6 mb-1">
                                 <label class="form-label" for="role">Role *</label>
                                 {{ form.role(class="form-select" + (" is-invalid" if form.role.errors else "")) }}
                                 {% for error in form.role.errors %}
@@ -78,7 +78,7 @@
                         <hr>
                         <h5>Password</h5>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6 mb-1">
                                 <label class="form-label" for="password">Password *</label>
                                 {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
                                 {% for error in form.password.errors %}
@@ -87,7 +87,7 @@
                                 <small class="text-muted">Minimum 6 characters</small>
                             </div>
 
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6 mb-1">
                                 <label class="form-label" for="password2">Confirm Password *</label>
                                 {{ form.password2(class="form-control" + (" is-invalid" if form.password2.errors else "")) }}
                                 {% for error in form.password2.errors %}
@@ -98,7 +98,7 @@
                         {% endif %}
 
                         <hr>
-                        <div class="mb-3">
+                        <div class="mb-1">
                             <div class="form-check">
                                 {{ form.is_active(class="form-check-input") }}
                                 <label class="form-check-label" for="is_active">

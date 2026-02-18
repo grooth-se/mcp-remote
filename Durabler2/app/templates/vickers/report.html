@@ -3,7 +3,7 @@
 {% block title %}Generate Vickers Report{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('vickers.index') }}">Vickers Tests</a></li>
         <li class="breadcrumb-item"><a href="{{ url_for('vickers.view', test_id=test.id) }}">{{ test.test_id }}</a></li>
@@ -22,7 +22,7 @@
                     {{ form.hidden_tag() }}
 
                     <!-- Test Summary -->
-                    <div class="card bg-light mb-4">
+                    <div class="card bg-light mb-2">
                         <div class="card-body">
                             <h6 class="card-title">Test Information</h6>
                             <dl class="row mb-0">
@@ -39,18 +39,18 @@
                     </div>
 
                     <!-- Report Options -->
-                    <div class="mb-4">
+                    <div class="mb-2">
                         {{ form.certificate_number.label(class="form-label") }}
                         {{ form.certificate_number(class="form-control") }}
                         <small class="text-muted">Enter or confirm the certificate number for the report</small>
                     </div>
 
-                    <div class="mb-4">
+                    <div class="mb-2">
                         {{ form.include_photo.label(class="form-label") }}
                         {{ form.include_photo(class="form-select") }}
                     </div>
 
-                    <div class="mb-4">
+                    <div class="mb-2">
                         {{ form.include_uncertainty_budget.label(class="form-label") }}
                         {{ form.include_uncertainty_budget(class="form-select") }}
                     </div>

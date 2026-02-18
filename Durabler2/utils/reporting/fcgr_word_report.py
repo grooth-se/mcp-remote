@@ -317,11 +317,11 @@ class FCGRReportGenerator:
         heading.paragraph_format.space_before = Pt(12)
         heading.paragraph_format.space_after = Pt(6)
 
-        table = doc.add_table(rows=9, cols=4)
+        table = doc.add_table(rows=9, cols=5)
         table.style = 'Table Grid'
 
-        # Header row
-        result_headers = ['Parameter', 'Value', 'U (k=2)', 'Unit']
+        # Header row - new order: Parameter, Unit, Value, Requirement, U (k=2)
+        result_headers = ['Parameter', 'Unit', 'Value', 'Requirement', 'U (k=2)']
         for i, header in enumerate(result_headers):
             table.rows[0].cells[i].text = header
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
@@ -341,22 +341,27 @@ class FCGRReportGenerator:
         if isinstance(paris_m_error, (int, float)) and paris_m_error != '-':
             paris_m_error = f"±{paris_m_error:.4f}"
 
+        # Get requirement from data (parsed from certificate)
+        requirement = data.get('requirement', '-') or '-'
+
+        # Format: (Parameter, Unit, Value, Requirement, Uncertainty)
         results_data = [
-            ('Paris Coefficient C', paris_C, paris_C_error, 'm/cycle/(MPa√m)^m'),
-            ('Paris Exponent m', paris_m, paris_m_error, '-'),
-            ('R² (fit quality)', self._format_value(data.get('paris_r_squared', '-')), '-', '-'),
-            ('Valid Data Points', str(data.get('paris_n_points', '-')), '-', '-'),
-            ('ΔK Range (min)', self._format_value(data.get('delta_K_min', '-')), '-', 'MPa√m'),
-            ('ΔK Range (max)', self._format_value(data.get('delta_K_max', '-')), '-', 'MPa√m'),
-            ('Total Cycles', str(data.get('total_cycles', '-')), '-', '-'),
-            ('Final Crack Length', self._format_value(data.get('final_crack_length', '-')), '-', 'mm'),
+            ('Paris Coefficient C', 'm/cycle/(MPa√m)^m', paris_C, requirement, paris_C_error),
+            ('Paris Exponent m', '-', paris_m, '-', paris_m_error),
+            ('R² (fit quality)', '-', self._format_value(data.get('paris_r_squared', '-')), '-', '-'),
+            ('Valid Data Points', '-', str(data.get('paris_n_points', '-')), '-', '-'),
+            ('ΔK Range (min)', 'MPa√m', self._format_value(data.get('delta_K_min', '-')), '-', '-'),
+            ('ΔK Range (max)', 'MPa√m', self._format_value(data.get('delta_K_max', '-')), '-', '-'),
+            ('Total Cycles', '-', str(data.get('total_cycles', '-')), '-', '-'),
+            ('Final Crack Length', 'mm', self._format_value(data.get('final_crack_length', '-')), '-', '-'),
         ]
 
-        for i, (param, value, unc, unit) in enumerate(results_data):
+        for i, (param, unit, value, req, unc) in enumerate(results_data):
             table.rows[i+1].cells[0].text = param
-            table.rows[i+1].cells[1].text = str(value)
-            table.rows[i+1].cells[2].text = str(unc)
-            table.rows[i+1].cells[3].text = unit
+            table.rows[i+1].cells[1].text = unit
+            table.rows[i+1].cells[2].text = str(value)
+            table.rows[i+1].cells[3].text = str(req)
+            table.rows[i+1].cells[4].text = str(unc)
 
         # Compact table rows
         for row in table.rows:
@@ -680,6 +685,7 @@ class FCGRReportGenerator:
         data['test_date'] = test_info.get('test_date', '')
         data['test_standard'] = 'ASTM E647'
         data['test_equipment'] = 'MTS Landmark 500kN'
+        data['requirement'] = test_info.get('requirement', '')
 
         # Specimen geometry
         data['specimen_type'] = specimen_data.get('specimen_type', 'C(T)')

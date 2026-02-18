@@ -1,4 +1,10 @@
-"""Report approval model for workflow tracking."""
+"""Report approval model for workflow tracking.
+
+Certificate-centric workflow:
+- Each Certificate has one ReportApproval record
+- Word document is saved on server and tracked
+- Approval workflow: DRAFT -> PENDING_REVIEW -> APPROVED/REJECTED -> PUBLISHED
+"""
 from datetime import datetime
 from app.extensions import db
 
@@ -31,16 +37,17 @@ STATUS_COLORS = {
 
 class ReportApproval(db.Model):
     """
-    Report approval workflow tracking.
+    Report approval workflow tracking - linked to Certificate.
 
-    Tracks the approval process for test reports from draft to signed PDF.
+    Each certificate has one approval workflow that covers all its test records.
+    The Word document is saved on the server and tracked through this model.
 
     Attributes
     ----------
     id : int
         Primary key
-    test_record_id : int
-        Foreign key to test_records
+    certificate_id : int
+        Foreign key to certificates (one approval per certificate)
     certificate_number : str
         Certificate number (cached for quick lookup)
     status : str
@@ -49,9 +56,16 @@ class ReportApproval(db.Model):
     __tablename__ = 'report_approvals'
 
     id = db.Column(db.Integer, primary_key=True)
-    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id'),
-                               nullable=False, unique=True, index=True)
+
+    # Link to Certificate (one approval per certificate)
+    certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'),
+                               nullable=True, unique=True, index=True)
     certificate_number = db.Column(db.String(50), index=True)
+
+    # Legacy: keep test_record_id for backwards compatibility during migration
+    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id'),
+                               nullable=True, unique=True, index=True)
+
     status = db.Column(db.String(20), default=STATUS_DRAFT, index=True)
 
     # Creation/submission
@@ -66,12 +80,13 @@ class ReportApproval(db.Model):
     review_comments = db.Column(db.Text)  # For rejections
 
     # Report files
-    word_report_path = db.Column(db.String(255))  # Draft Word document
-    signed_pdf_path = db.Column(db.String(255))   # Final signed PDF
+    word_report_path = db.Column(db.String(255))  # Draft Word document (saved on server)
+    signed_pdf_path = db.Column(db.String(255))   # Final PDF
     pdf_hash = db.Column(db.String(64))           # SHA-256 for integrity
     signature_timestamp = db.Column(db.DateTime)
 
     # Relationships
+    cert = db.relationship('Certificate', backref=db.backref('approval', uselist=False))
     test_record = db.relationship('TestRecord', backref=db.backref('approval', uselist=False))
     created_by = db.relationship('User', foreign_keys=[created_by_id],
                                  backref='reports_created')
@@ -139,8 +154,22 @@ class ReportApproval(db.Model):
         self.signature_timestamp = datetime.utcnow()
 
     @classmethod
+    def get_or_create_for_certificate(cls, certificate, user):
+        """Get existing approval or create new one for a certificate."""
+        approval = cls.query.filter_by(certificate_id=certificate.id).first()
+        if not approval:
+            approval = cls(
+                certificate_id=certificate.id,
+                certificate_number=certificate.certificate_number_with_rev,
+                created_by_id=user.id,
+                status=STATUS_DRAFT
+            )
+            db.session.add(approval)
+        return approval
+
+    @classmethod
     def get_or_create(cls, test_record, user):
-        """Get existing approval or create new one for a test record."""
+        """Legacy: Get existing approval or create new one for a test record."""
         approval = cls.query.filter_by(test_record_id=test_record.id).first()
         if not approval:
             approval = cls(
@@ -156,6 +185,10 @@ class ReportApproval(db.Model):
     def get_pending_count(cls) -> int:
         """Get count of reports pending approval."""
         return cls.query.filter_by(status=STATUS_PENDING).count()
+
+    def set_word_report(self, path: str) -> None:
+        """Set the Word report path (saved on server)."""
+        self.word_report_path = path
 
     def __repr__(self) -> str:
         return f'<ReportApproval {self.certificate_number} [{self.status}]>'

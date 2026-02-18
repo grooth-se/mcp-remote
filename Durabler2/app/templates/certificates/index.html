@@ -3,7 +3,7 @@
 {% block title %}Certificate Register{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
     <div>
         <h2><i class="bi bi-journal-text"></i> Certificate Register</h2>
         <p class="text-muted">Central hub for all test reports (DUR-YYYY-NNNN)</p>
@@ -21,7 +21,7 @@
 </div>
 
 <!-- Quick Lookup -->
-<div class="card mb-4 border-primary">
+<div class="card mb-2 border-primary">
     <div class="card-body">
         <form method="GET" class="row g-2 align-items-end">
             <div class="col-md-4">
@@ -51,7 +51,7 @@
 </div>
 
 <!-- Filter Bar -->
-<div class="card mb-4">
+<div class="card mb-2">
     <div class="card-body">
         <form method="GET" class="row g-3 align-items-end">
             <div class="col-md-2">
@@ -93,7 +93,7 @@
                     <tr>
                         <th>Certificate No.</th>
                         <th>Date</th>
-                        <th>Provningsorder</th>
+                        <th>Test Order</th>
                         <th>Customer</th>
                         <th>Standard</th>
                         <th>Material</th>
@@ -112,7 +112,7 @@
                             </a>
                         </td>
                         <td>{{ cert.cert_date.strftime('%Y-%m-%d') if cert.cert_date else '-' }}</td>
-                        <td>{{ cert.provningsorder or '-' }}</td>
+                        <td>{{ cert.test_order or '-' }}</td>
                         <td>{{ cert.customer or '-' }}</td>
                         <td><small>{{ cert.test_standard or '-' }}</small></td>
                         <td><small>{{ cert.material or '-' }}</small></td>
@@ -134,35 +134,29 @@
                             {% endif %}
                         </td>
                         <td class="text-center">
-                            {# Get approval status for first test record with an approval #}
-                            {% set approval = None %}
-                            {% for tr in cert.test_records %}
-                                {% if tr.approval %}
-                                    {% set approval = tr.approval %}
-                                {% endif %}
-                            {% endfor %}
-                            {% if approval %}
-                                <span class="badge bg-{{ approval.status_color }}">
-                                    {{ approval.status_label }}
+                            {# Certificate-level approval status #}
+                            {% if cert.approval %}
+                                <span class="badge bg-{{ cert.approval.status_color }}">
+                                    {{ cert.approval.status_label }}
                                 </span>
                                 {# Action link based on status and user role #}
-                                {% if approval.status == 'PENDING_REVIEW' and current_user.can_approve %}
-                                <a href="{{ url_for('reports.review', id=approval.id) }}"
+                                {% if cert.approval.status == 'PENDING_REVIEW' and current_user.can_approve %}
+                                <a href="{{ url_for('reports.review', cert_id=cert.id) }}"
                                    class="btn btn-sm btn-warning ms-1" title="Review">
                                     <i class="bi bi-check-square"></i>
                                 </a>
-                                {% elif approval.status == 'APPROVED' and current_user.can_approve %}
-                                <a href="{{ url_for('reports.sign', id=approval.id) }}"
-                                   class="btn btn-sm btn-success ms-1" title="Sign">
-                                    <i class="bi bi-pen"></i>
+                                {% elif cert.approval.status == 'APPROVED' and current_user.can_approve %}
+                                <a href="{{ url_for('certificates.view', cert_id=cert.id) }}"
+                                   class="btn btn-sm btn-success ms-1" title="Upload Signed PDF">
+                                    <i class="bi bi-upload"></i>
                                 </a>
-                                {% elif approval.status == 'PUBLISHED' %}
-                                <a href="{{ url_for('reports.download', id=approval.id) }}"
+                                {% elif cert.approval.status == 'PUBLISHED' %}
+                                <a href="{{ url_for('reports.download_pdf', cert_id=cert.id) }}"
                                    class="btn btn-sm btn-success ms-1" title="Download PDF">
                                     <i class="bi bi-file-pdf"></i>
                                 </a>
-                                {% elif approval.status in ['DRAFT', 'REJECTED'] and current_user.can_submit %}
-                                <a href="{{ url_for('reports.view', id=approval.id) }}"
+                                {% elif cert.approval.status in ['DRAFT', 'REJECTED'] %}
+                                <a href="{{ url_for('certificates.view', cert_id=cert.id) }}"
                                    class="btn btn-sm btn-outline-primary ms-1" title="Continue">
                                     <i class="bi bi-arrow-right"></i>
                                 </a>
@@ -193,7 +187,7 @@
 {% else %}
 <div class="card">
     <div class="card-body text-center py-5">
-        <i class="bi bi-journal display-1 text-muted mb-3"></i>
+        <i class="bi bi-journal display-1 text-muted mb-1"></i>
         <h4>No Certificates Found</h4>
         {% if search_term %}
         <p class="text-muted">No certificates match your search criteria.</p>

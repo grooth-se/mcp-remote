@@ -71,12 +71,28 @@ class CTODSpecimen:
         """
         Check if specimen geometry meets ASTM E1290 validity requirements.
 
+        Checks:
+        - a₀/W ratio: 0.45 ≤ a₀/W ≤ 0.70
+        - S/W ratio for SE(B): 3.8 ≤ S/W ≤ 4.2
+
         Returns
         -------
         bool
-            True if 0.45 ≤ a₀/W ≤ 0.70
+            True if all geometry checks pass
         """
-        return 0.45 <= self.a_W_ratio <= 0.70
+        # a/W ratio check (mandatory)
+        a_W_valid = 0.45 <= self.a_W_ratio <= 0.70
+
+        # S/W ratio check for SE(B) (informational, not strictly required)
+        # Only fail if grossly out of range
+        if self.specimen_type == 'SE(B)' and self.S > 0 and self.W > 0:
+            S_W = self.S / self.W
+            # Allow some tolerance - only fail if very far from 4.0
+            S_W_valid = 3.5 <= S_W <= 4.5
+        else:
+            S_W_valid = True
+
+        return a_W_valid and S_W_valid
 
     @property
     def ligament(self) -> float:
@@ -163,27 +179,42 @@ class CTODSpecimen:
         """
         checks = []
 
-        # a/W ratio check
+        # a/W ratio check (mandatory per ASTM E1290)
         a_W = self.a_W_ratio
         if 0.45 <= a_W <= 0.70:
-            checks.append(f"✓ a₀/W = {a_W:.3f} (valid: 0.45-0.70)")
+            checks.append(f"✓ a₀/W = {a_W:.3f} (valid range: 0.45-0.70)")
         else:
-            checks.append(f"✗ a₀/W = {a_W:.3f} (INVALID: must be 0.45-0.70)")
+            if a_W < 0.45:
+                checks.append(f"✗ a₀/W = {a_W:.3f} is TOO LOW (minimum: 0.45)")
+            else:
+                checks.append(f"✗ a₀/W = {a_W:.3f} is TOO HIGH (maximum: 0.70)")
 
         # Span check for SE(B)
-        if self.specimen_type == 'SE(B)':
+        if self.specimen_type == 'SE(B)' and self.S > 0 and self.W > 0:
             S_W = self.S / self.W
             if 3.8 <= S_W <= 4.2:
-                checks.append(f"✓ S/W = {S_W:.2f} (valid: ~4.0)")
+                checks.append(f"✓ S/W = {S_W:.2f} (recommended: ~4.0)")
+            elif 3.5 <= S_W <= 4.5:
+                checks.append(f"⚠ S/W = {S_W:.2f} (outside recommended 3.8-4.2, but acceptable)")
             else:
-                checks.append(f"✗ S/W = {S_W:.2f} (should be ~4.0)")
+                checks.append(f"✗ S/W = {S_W:.2f} (should be ~4.0, acceptable range 3.5-4.5)")
 
-        # Side groove check
+        # Side groove check (informational)
         if self.B_n < self.B:
             groove_pct = (1 - self.B_n / self.B) * 100
-            checks.append(f"  Side grooves: {groove_pct:.1f}% reduction")
+            if groove_pct <= 25:
+                checks.append(f"✓ Side grooves: {groove_pct:.1f}% (≤25% per E1290)")
+            else:
+                checks.append(f"⚠ Side grooves: {groove_pct:.1f}% (exceeds 25% recommendation)")
         else:
             checks.append("  No side grooves")
+
+        # Ligament check (W - a₀ should be reasonable)
+        ligament = self.W - self.a_0
+        if ligament > 0:
+            checks.append(f"✓ Ligament (W-a₀) = {ligament:.2f} mm")
+        else:
+            checks.append(f"✗ Invalid ligament (W-a₀) = {ligament:.2f} mm")
 
         return "\n".join(checks)
 

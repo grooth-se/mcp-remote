@@ -13,7 +13,7 @@
                 <form method="POST">
                     {{ form.hidden_tag() }}
 
-                    <div class="mb-3">
+                    <div class="mb-1">
                         {{ form.username.label(class="form-label") }}
                         {{ form.username(class="form-control", placeholder="Enter username") }}
                         {% for error in form.username.errors %}
@@ -21,7 +21,7 @@
                         {% endfor %}
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-1">
                         {{ form.password.label(class="form-label") }}
                         {{ form.password(class="form-control", placeholder="Enter password") }}
                         {% for error in form.password.errors %}
@@ -29,7 +29,7 @@
                         {% endfor %}
                     </div>
 
-                    <div class="mb-3">
+                    <div class="mb-1">
                         {{ form.password2.label(class="form-label") }}
                         {{ form.password2(class="form-control", placeholder="Confirm password") }}
                         {% for error in form.password2.errors %}

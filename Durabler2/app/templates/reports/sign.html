@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col">
             <h1>
                 <i class="bi bi-pen"></i>
@@ -91,7 +91,7 @@
                     </table>
 
                     <!-- Signing Capability Status -->
-                    <div class="alert {% if can_sign and has_certificate %}alert-success{% else %}alert-warning{% endif %} mt-3">
+                    <div class="alert {% if can_sign and has_certificate %}alert-success{% else %}alert-warning{% endif %} mt-1">
                         <h6><i class="bi bi-gear"></i> Signing Capability</h6>
                         <ul class="mb-0 small">
                             <li>
@@ -130,7 +130,7 @@
                     <hr>
 
                     <form action="{{ url_for('reports.sign', id=approval.id) }}" method="POST">
-                        <div class="form-check mb-3">
+                        <div class="form-check mb-1">
                             <input class="form-check-input" type="checkbox" id="confirmSign" required>
                             <label class="form-check-label" for="confirmSign">
                                 I confirm that I have reviewed this report and authorize its publication

@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col">
             <h1><i class="bi bi-hourglass-split"></i> Pending Review</h1>
             <nav aria-label="breadcrumb">
@@ -25,7 +25,7 @@
 
     <div class="row">
         {% for report in reports %}
-        <div class="col-md-6 col-lg-4 mb-4">
+        <div class="col-md-6 col-lg-4 mb-2">
             <div class="card h-100 border-warning">
                 <div class="card-header bg-warning text-dark">
                     <h5 class="mb-0">
@@ -61,7 +61,7 @@
     <div class="card">
         <div class="card-body text-center py-5">
             <i class="bi bi-check-circle fs-1 text-success"></i>
-            <h4 class="mt-3">All Caught Up!</h4>
+            <h4 class="mt-1">All Caught Up!</h4>
             <p class="text-muted">No reports are pending your review.</p>
             <a href="{{ url_for('reports.index') }}" class="btn btn-outline-primary">
                 <i class="bi bi-arrow-left"></i> Back to Reports

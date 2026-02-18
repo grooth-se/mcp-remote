@@ -12,6 +12,7 @@ from .report_approval import (
     STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_PUBLISHED,
     APPROVAL_STATUSES, STATUS_LABELS as APPROVAL_STATUS_LABELS, STATUS_COLORS
 )
+from .test_data import RawTestData, TestPhoto, ReportFile
 
 __all__ = [
     # User
@@ -21,6 +22,8 @@ __all__ = [
     'admin_required', 'approver_required', 'engineer_required',
     # Test records
     'TestRecord', 'AnalysisResult', 'AuditLog', 'Certificate',
+    # Test data storage
+    'RawTestData', 'TestPhoto', 'ReportFile',
     # Report approval
     'ReportApproval',
     'STATUS_DRAFT', 'STATUS_PENDING', 'STATUS_APPROVED', 'STATUS_REJECTED', 'STATUS_PUBLISHED',

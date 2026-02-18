@@ -3,8 +3,8 @@
 {% block title %}{% if is_specimen_step %}Review &amp; Analyze CTOD Test{% else %}New CTOD Test{% endif %}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
-    <ol class="breadcrumb">
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="{{ url_for('ctod.index') }}">CTOD Tests</a></li>
         {% if is_specimen_step %}
         <li class="breadcrumb-item"><a href="{{ url_for('ctod.new') }}">Upload</a></li>
@@ -16,7 +16,7 @@
 </nav>
 
 <div class="row justify-content-center">
-    <div class="col-lg-11">
+    <div class="col-lg-12">
         <div class="card shadow">
             <div class="card-header bg-primary text-white">
                 <h4 class="mb-0">
@@ -27,7 +27,7 @@
             <div class="card-body">
                 {% if is_specimen_step and excel_data %}
                 <!-- Imported Data Summary -->
-                <div class="alert alert-success mb-4">
+                <div class="alert alert-success mb-2">
                     <h6 class="alert-heading"><i class="bi bi-check-circle"></i> Data Imported from Excel</h6>
                     <div class="row small">
                         <div class="col-md-4">
@@ -56,7 +56,7 @@
                     {{ form.hidden_tag() }}
 
                     <!-- Certificate Selection -->
-                    <div class="card mb-4 border-info">
+                    <div class="card mb-2 border-info">
                         <div class="card-header bg-info text-white">
                             <h6 class="mb-0"><i class="bi bi-link-45deg"></i> Link to Certificate</h6>
                         </div>
@@ -68,7 +68,7 @@
 
                     {% if is_specimen_step %}
                     <!-- CSV Upload for analysis (if not already uploaded) -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header"><h6 class="mb-0"><i class="bi bi-file-earmark-bar-graph"></i> Raw Test Data</h6></div>
                         <div class="card-body">
                             {{ form.csv_file.label(class="form-label") }}
@@ -78,7 +78,7 @@
                     </div>
                     {% else %}
                     <!-- File Upload (original step) -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header"><h6 class="mb-0"><i class="bi bi-upload"></i> Data Files</h6></div>
                         <div class="card-body">
                             <div class="row">
@@ -100,22 +100,22 @@
                     <div class="row">
                         <!-- Specimen Information -->
                         <div class="col-md-4">
-                            <div class="card mb-4">
+                            <div class="card mb-2">
                                 <div class="card-header"><h6 class="mb-0">Specimen Information</h6></div>
                                 <div class="card-body">
-                                    <div class="mb-3">
+                                    <div class="mb-1">
                                         {{ form.specimen_id.label(class="form-label") }}
                                         {{ form.specimen_id(class="form-control") }}
                                     </div>
-                                    <div class="mb-3">
+                                    <div class="mb-1">
                                         {{ form.material.label(class="form-label") }}
                                         {{ form.material(class="form-control") }}
                                     </div>
-                                    <div class="mb-3">
+                                    <div class="mb-1">
                                         {{ form.batch_number.label(class="form-label") }}
                                         {{ form.batch_number(class="form-control") }}
                                     </div>
-                                    <div class="mb-3">
+                                    <div class="mb-1">
                                         {{ form.specimen_type.label(class="form-label") }}
                                         {{ form.specimen_type(class="form-select") }}
                                     </div>
@@ -125,30 +125,30 @@
 
                         <!-- Specimen Geometry -->
                         <div class="col-md-4">
-                            <div class="card mb-4">
+                            <div class="card mb-2">
                                 <div class="card-header"><h6 class="mb-0">Specimen Geometry</h6></div>
                                 <div class="card-body">
                                     <div class="row">
-                                        <div class="col-6 mb-3">
+                                        <div class="col-6 mb-1">
                                             {{ form.W.label(class="form-label") }}
                                             {{ form.W(class="form-control", placeholder="25.0") }}
                                         </div>
-                                        <div class="col-6 mb-3">
+                                        <div class="col-6 mb-1">
                                             {{ form.B.label(class="form-label") }}
                                             {{ form.B(class="form-control", placeholder="12.5") }}
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-6 mb-3">
+                                        <div class="col-6 mb-1">
                                             {{ form.B_n.label(class="form-label") }}
                                             {{ form.B_n(class="form-control", placeholder="(=B)") }}
                                         </div>
-                                        <div class="col-6 mb-3">
+                                        <div class="col-6 mb-1">
                                             {{ form.a_0.label(class="form-label") }}
                                             {{ form.a_0(class="form-control", placeholder="12.5") }}
                                         </div>
                                     </div>
-                                    <div class="mb-3">
+                                    <div class="mb-1">
                                         {{ form.S.label(class="form-label") }}
                                         {{ form.S(class="form-control", placeholder="100 (4×W)") }}
                                         <small class="text-muted">For SE(B) only</small>
@@ -159,23 +159,23 @@
 
                         <!-- Material Properties -->
                         <div class="col-md-4">
-                            <div class="card mb-4">
+                            <div class="card mb-2">
                                 <div class="card-header"><h6 class="mb-0">Material Properties</h6></div>
                                 <div class="card-body">
-                                    <div class="mb-3">
+                                    <div class="mb-1">
                                         {{ form.yield_strength.label(class="form-label") }}
                                         {{ form.yield_strength(class="form-control", placeholder="500") }}
                                     </div>
-                                    <div class="mb-3">
+                                    <div class="mb-1">
                                         {{ form.ultimate_strength.label(class="form-label") }}
                                         {{ form.ultimate_strength(class="form-control", placeholder="600") }}
                                     </div>
                                     <div class="row">
-                                        <div class="col-6 mb-3">
+                                        <div class="col-6 mb-1">
                                             {{ form.youngs_modulus.label(class="form-label") }}
                                             {{ form.youngs_modulus(class="form-control") }}
                                         </div>
-                                        <div class="col-6 mb-3">
+                                        <div class="col-6 mb-1">
                                             {{ form.poissons_ratio.label(class="form-label") }}
                                             {{ form.poissons_ratio(class="form-control") }}
                                         </div>
@@ -186,12 +186,12 @@
                     </div>
 
                     <!-- 9-Point Crack Measurements -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header">
                             <h6 class="mb-0"><i class="bi bi-rulers"></i> 9-Point Crack Measurements (mm)</h6>
                         </div>
                         <div class="card-body">
-                            <p class="text-muted small mb-3">
+                            <p class="text-muted small mb-1">
                                 Enter pre-crack measurements across the specimen width. Surface points (a₁, a₉) are weighted 0.5 in average calculation.
                             </p>
                             <div class="row">
@@ -206,7 +206,7 @@
                     </div>
 
                     <!-- Test Parameters -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header"><h6 class="mb-0">Test Parameters</h6></div>
                         <div class="card-body">
                             <div class="row">
@@ -227,7 +227,7 @@
                     </div>
 
                     <!-- Pre-crack Data -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header bg-light">
                             <h6 class="mb-0"><i class="bi bi-activity"></i> Pre-crack Data (Optional)</h6>
                         </div>
@@ -239,26 +239,26 @@
                     </div>
 
                     <!-- Crack Surface Photos -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header bg-light">
                             <h6 class="mb-0"><i class="bi bi-camera"></i> Crack Surface Photos</h6>
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-4 mb-1">
                                     {{ form.photo_1.label(class="form-label") }}
                                     {{ form.photo_1(class="form-control", accept="image/*") }}
-                                    {{ form.photo_description_1(class="form-control mt-2", placeholder="Description (optional)") }}
+                                    {{ form.photo_description_1(class="form-control mt-1", placeholder="Description (optional)") }}
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-4 mb-1">
                                     {{ form.photo_2.label(class="form-label") }}
                                     {{ form.photo_2(class="form-control", accept="image/*") }}
-                                    {{ form.photo_description_2(class="form-control mt-2", placeholder="Description (optional)") }}
+                                    {{ form.photo_description_2(class="form-control mt-1", placeholder="Description (optional)") }}
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-4 mb-1">
                                     {{ form.photo_3.label(class="form-label") }}
                                     {{ form.photo_3(class="form-control", accept="image/*") }}
-                                    {{ form.photo_description_3(class="form-control mt-2", placeholder="Description (optional)") }}
+                                    {{ form.photo_description_3(class="form-control mt-1", placeholder="Description (optional)") }}
                                 </div>
                             </div>
                             <small class="text-muted">Upload photos of crack surface for inclusion in test report</small>
@@ -266,14 +266,14 @@
                     </div>
 
                     <!-- Uncertainty Parameters (ISO 17025) -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header bg-light">
                             <h6 class="mb-0"><i class="bi bi-percent"></i> Uncertainty Parameters (ISO 17025)</h6>
                         </div>
                         <div class="card-body">
                             <p class="text-muted small">Enter measurement uncertainties for ISO 17025 compliance reporting</p>
                             <div class="row">
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-4 mb-1">
                                     {{ form.force_uncertainty.label(class="form-label") }}
                                     <div class="input-group">
                                         {{ form.force_uncertainty(class="form-control") }}
@@ -281,7 +281,7 @@
                                     </div>
                                     <small class="text-muted">Load cell uncertainty</small>
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-4 mb-1">
                                     {{ form.displacement_uncertainty.label(class="form-label") }}
                                     <div class="input-group">
                                         {{ form.displacement_uncertainty(class="form-control") }}
@@ -289,7 +289,7 @@
                                     </div>
                                     <small class="text-muted">CMOD gage</small>
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-4 mb-1">
                                     {{ form.dimension_uncertainty.label(class="form-label") }}
                                     <div class="input-group">
                                         {{ form.dimension_uncertainty(class="form-control") }}
@@ -302,7 +302,7 @@
                     </div>
 
                     <!-- Notes -->
-                    <div class="mb-4">
+                    <div class="mb-2">
                         {{ form.notes.label(class="form-label") }}
                         {{ form.notes(class="form-control", rows=2) }}
                     </div>

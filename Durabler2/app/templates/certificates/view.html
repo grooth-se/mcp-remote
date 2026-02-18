@@ -3,14 +3,14 @@
 {% block title %}{{ cert.certificate_number }}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('certificates.index') }}">Certificates</a></li>
         <li class="breadcrumb-item active">{{ cert.certificate_number }}</li>
     </ol>
 </nav>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
     <div>
         <h2><i class="bi bi-journal-text"></i> {{ cert.certificate_number_with_rev }}</h2>
         <div>
@@ -33,12 +33,12 @@
 </div>
 
 <!-- Start New Test Section -->
-<div class="card mb-4 border-primary">
+<div class="card mb-2 border-primary">
     <div class="card-header bg-primary text-white">
         <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Start New Test</h5>
     </div>
     <div class="card-body">
-        <p class="text-muted mb-3">Select a test method to start a new test linked to this certificate:</p>
+        <p class="text-muted mb-1">Select a test method to start a new test linked to this certificate:</p>
         <div class="row g-2">
             <div class="col-md-4 col-lg-2">
                 <a href="{{ url_for('tensile.new') }}?certificate={{ cert.id }}" class="btn btn-outline-primary w-100 py-3">
@@ -83,7 +83,7 @@
 <div class="row">
     <!-- Certificate Details -->
     <div class="col-lg-8">
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-info-circle"></i> Certificate Details</h5>
             </div>
@@ -100,8 +100,8 @@
                             <dt class="col-5">Test Standard:</dt>
                             <dd class="col-7">{{ cert.test_standard or '-' }}</dd>
 
-                            <dt class="col-5">Provningsorder:</dt>
-                            <dd class="col-7">{{ cert.provningsorder or '-' }}</dd>
+                            <dt class="col-5">Test Order:</dt>
+                            <dd class="col-7">{{ cert.test_order or '-' }}</dd>
 
                             <dt class="col-5">Project Name:</dt>
                             <dd class="col-7">{{ cert.project_name or '-' }}</dd>
@@ -130,7 +130,7 @@
         </div>
 
         <!-- Test Article Information -->
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-box"></i> Test Article Information</h5>
             </div>
@@ -163,7 +163,7 @@
 
         <!-- Comment -->
         {% if cert.comment %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-chat-left-text"></i> Comment</h5>
             </div>
@@ -177,7 +177,7 @@
     <!-- Sidebar -->
     <div class="col-lg-4">
         <!-- Status Card -->
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-flag"></i> Certificate Status</h5>
             </div>
@@ -195,79 +195,167 @@
             </div>
         </div>
 
-        <!-- Report Approval Status -->
-        {% if approval_stats.total > 0 %}
-        <div class="card mb-4">
-            <div class="card-header {% if approval_stats.published == approval_stats.total %}bg-success text-white{% elif approval_stats.pending > 0 %}bg-warning{% else %}bg-light{% endif %}">
+        <!-- Certificate Approval Workflow -->
+        <div class="card mb-2">
+            <div class="card-header {% if cert.approval and cert.approval.status == 'PUBLISHED' %}bg-success text-white{% elif cert.approval and cert.approval.status == 'PENDING_REVIEW' %}bg-warning{% elif cert.approval and cert.approval.status == 'REJECTED' %}bg-danger text-white{% else %}bg-light{% endif %}">
                 <h5 class="mb-0">
                     <i class="bi bi-file-earmark-check"></i> Report Approval
-                    {% if approval_stats.published == approval_stats.total %}
-                    <span class="badge bg-light text-success ms-2">All Published</span>
-                    {% elif approval_stats.pending > 0 %}
-                    <span class="badge bg-danger text-white ms-2">{{ approval_stats.pending }} Pending</span>
+                    {% if cert.approval %}
+                    <span class="badge bg-{{ cert.approval.status_color }} ms-2">{{ cert.approval.status_label }}</span>
+                    {% else %}
+                    <span class="badge bg-secondary ms-2">Not Started</span>
                     {% endif %}
                 </h5>
             </div>
             <div class="card-body">
-                <div class="row text-center">
-                    {% if approval_stats.published > 0 %}
-                    <div class="col">
-                        <div class="fs-4 fw-bold text-primary">{{ approval_stats.published }}</div>
-                        <small class="text-muted">Published</small>
+                {% if cert.approval %}
+                    {# Status: PUBLISHED - Show download PDF #}
+                    {% if cert.approval.status == 'PUBLISHED' %}
+                    <div class="alert alert-success mb-1">
+                        <i class="bi bi-check-circle"></i> Report published and available
                     </div>
+                    <a href="{{ url_for('reports.download_pdf', cert_id=cert.id) }}" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-file-pdf"></i> Download Published PDF
+                    </a>
+                    {% if cert.approval.word_report_path %}
+                    <a href="{{ url_for('reports.download_word', cert_id=cert.id) }}" class="btn btn-outline-primary w-100 mb-2">
+                        <i class="bi bi-file-earmark-word"></i> Download Word Report
+                    </a>
                     {% endif %}
-                    {% if approval_stats.approved > 0 %}
-                    <div class="col">
-                        <div class="fs-4 fw-bold text-success">{{ approval_stats.approved }}</div>
-                        <small class="text-muted">Approved</small>
-                    </div>
+                    {% if current_user.can_approve %}
+                    <hr class="my-2">
+                    <form action="{{ url_for('reports.replace_pdf', cert_id=cert.id) }}" method="POST" enctype="multipart/form-data">
+                        <label class="form-label small text-muted mb-1">Replace signed PDF:</label>
+                        <div class="input-group input-group-sm">
+                            <input type="file" name="signed_pdf" class="form-control" accept=".pdf" required>
+                            <button type="submit" class="btn btn-outline-warning"
+                                    onclick="return confirm('Replace the signed PDF?')">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </button>
+                        </div>
+                    </form>
                     {% endif %}
-                    {% if approval_stats.pending > 0 %}
-                    <div class="col">
-                        <div class="fs-4 fw-bold text-warning">{{ approval_stats.pending }}</div>
-                        <small class="text-muted">Pending</small>
+
+                    {# Status: PENDING_REVIEW - Show review button for approvers #}
+                    {% elif cert.approval.status == 'PENDING_REVIEW' %}
+                    <div class="alert alert-warning mb-1">
+                        <i class="bi bi-hourglass-split"></i> Awaiting approval
                     </div>
+                    {% if current_user.can_approve %}
+                    <a href="{{ url_for('reports.review', cert_id=cert.id) }}" class="btn btn-warning w-100 mb-2">
+                        <i class="bi bi-check-square"></i> Review & Approve
+                    </a>
                     {% endif %}
-                    {% if approval_stats.rejected > 0 %}
-                    <div class="col">
-                        <div class="fs-4 fw-bold text-danger">{{ approval_stats.rejected }}</div>
-                        <small class="text-muted">Rejected</small>
-                    </div>
+                    {% if cert.approval.word_report_path %}
+                    <a href="{{ url_for('reports.download_word', cert_id=cert.id) }}" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-file-earmark-word"></i> Download Word Report
+                    </a>
                     {% endif %}
-                    {% if approval_stats.draft > 0 %}
-                    <div class="col">
-                        <div class="fs-4 fw-bold text-secondary">{{ approval_stats.draft }}</div>
-                        <small class="text-muted">Draft</small>
+
+                    {# Status: REJECTED - Show rejection reason and edit options #}
+                    {% elif cert.approval.status == 'REJECTED' %}
+                    <div class="alert alert-danger mb-1">
+                        <i class="bi bi-x-circle"></i> <strong>Rejected:</strong>
+                        {{ cert.approval.review_comments or 'No reason provided' }}
                     </div>
+                    {% if cert.approval.word_report_path %}
+                    <a href="{{ url_for('reports.download_word', cert_id=cert.id) }}" class="btn btn-primary w-100 mb-2">
+                        <i class="bi bi-download"></i> Download Word for Editing
+                    </a>
                     {% endif %}
-                    {% if approval_stats.total - approval_stats.with_approval > 0 %}
-                    <div class="col">
-                        <div class="fs-4 fw-bold text-muted">{{ approval_stats.total - approval_stats.with_approval }}</div>
-                        <small class="text-muted">Not Started</small>
+                    <form action="{{ url_for('reports.upload_word', cert_id=cert.id) }}" method="POST" enctype="multipart/form-data" class="mb-2">
+                        <div class="input-group">
+                            <input type="file" name="word_file" class="form-control form-control-sm" accept=".docx" required>
+                            <button type="submit" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-upload"></i> Upload Edited
+                            </button>
+                        </div>
+                    </form>
+                    <form action="{{ url_for('reports.submit', cert_id=cert.id) }}" method="POST">
+                        <button type="submit" class="btn btn-success w-100"
+                                onclick="return confirm('Submit report for approval?')">
+                            <i class="bi bi-send"></i> Re-submit for Approval
+                        </button>
+                    </form>
+
+                    {# Status: APPROVED - Waiting for signed PDF upload #}
+                    {% elif cert.approval.status == 'APPROVED' %}
+                    <div class="alert alert-success mb-1">
+                        <i class="bi bi-check-circle"></i> Approved - upload signed PDF to publish
                     </div>
+                    {% if current_user.can_approve %}
+                    <form action="{{ url_for('reports.replace_pdf', cert_id=cert.id) }}" method="POST" enctype="multipart/form-data">
+                        <div class="mb-2">
+                            <label for="signed_pdf" class="form-label">
+                                <i class="bi bi-file-pdf text-danger"></i> Upload Signed PDF
+                            </label>
+                            <input type="file" name="signed_pdf" id="signed_pdf" class="form-control" accept=".pdf" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-file-pdf"></i> Upload & Publish
+                        </button>
+                    </form>
                     {% endif %}
-                </div>
-                {% if approval_stats.published > 0 %}
-                <hr>
-                <div class="text-center">
-                    <small class="text-muted">
-                        <i class="bi bi-shield-check text-success"></i>
-                        {{ approval_stats.published }} of {{ approval_stats.total }} reports digitally signed
-                    </small>
-                    <div class="mt-2">
-                        <a href="{{ url_for('certificates.download_reports', cert_id=cert.id) }}"
-                           class="btn btn-sm btn-success">
-                            <i class="bi bi-file-zip"></i> Download All Signed PDFs
-                        </a>
+
+                    {# Status: DRAFT - Show edit/submit options #}
+                    {% else %}
+                    <div class="alert alert-secondary mb-1">
+                        <i class="bi bi-pencil"></i> Draft - ready for editing
                     </div>
-                </div>
+                    {% if cert.approval.word_report_path %}
+                    <a href="{{ url_for('reports.download_word', cert_id=cert.id) }}" class="btn btn-primary w-100 mb-2">
+                        <i class="bi bi-download"></i> Download Word for Editing
+                    </a>
+                    <form action="{{ url_for('reports.upload_word', cert_id=cert.id) }}" method="POST" enctype="multipart/form-data" class="mb-2">
+                        <div class="input-group">
+                            <input type="file" name="word_file" class="form-control form-control-sm" accept=".docx" required>
+                            <button type="submit" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-upload"></i> Upload Edited
+                            </button>
+                        </div>
+                    </form>
+                    <form action="{{ url_for('reports.submit', cert_id=cert.id) }}" method="POST">
+                        <button type="submit" class="btn btn-success w-100"
+                                onclick="return confirm('Submit report for approval?')">
+                            <i class="bi bi-send"></i> Submit for Approval
+                        </button>
+                    </form>
+                    {% else %}
+                    <form action="{{ url_for('reports.generate_report', cert_id=cert.id) }}" method="POST">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-file-earmark-word"></i> Generate Word Report
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% endif %}
+
+                {% else %}
+                    {# No approval started yet #}
+                    {% if test_records|length > 0 %}
+                    <p class="text-muted mb-1">Start the approval workflow:</p>
+                    <form action="{{ url_for('reports.generate_report', cert_id=cert.id) }}" method="POST" class="mb-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-file-earmark-word"></i> Generate Word Report
+                        </button>
+                    </form>
+                    <p class="text-muted small mb-1">Or upload an existing report:</p>
+                    <form action="{{ url_for('reports.upload_word_new', cert_id=cert.id) }}" method="POST" enctype="multipart/form-data">
+                        <div class="input-group">
+                            <input type="file" name="word_file" class="form-control form-control-sm" accept=".docx" required>
+                            <button type="submit" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-upload"></i> Upload
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <p class="text-muted mb-0">Add test records to this certificate before generating a report.</p>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>
-        {% endif %}
 
         <!-- Linked Tests / Test Reports -->
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header d-flex justify-content-between align-items-center bg-success text-white">
                 <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Test Reports</h5>
                 <span class="badge bg-light text-dark">{{ test_records|length }}</span>
@@ -281,12 +369,6 @@
                             <div>
                                 <strong>{{ test.test_id }}</strong>
                                 <span class="badge ms-1" style="background-color: {{ '#0d6efd' if test.test_method == 'TENSILE' else '#198754' if test.test_method == 'SONIC' else '#ffc107' if test.test_method == 'FCGR' else '#dc3545' if test.test_method == 'CTOD' else '#0dcaf0' if test.test_method == 'KIC' else '#6f42c1' if test.test_method == 'VICKERS' else '#6c757d' }}; color: {{ '#000' if test.test_method == 'FCGR' else '#fff' }}">{{ test.test_method }}</span>
-                                {# Approval Status Badge #}
-                                {% if test.approval %}
-                                <span class="badge bg-{{ test.approval.status_color }} ms-1">
-                                    {{ test.approval.status_label }}
-                                </span>
-                                {% endif %}
                                 <br>
                                 <small class="text-muted">
                                     {{ test.specimen_id or '-' }} |
@@ -294,95 +376,36 @@
                                 </small>
                             </div>
                             <div>
-                                {# Test View Button #}
-                                <div class="btn-group btn-group-sm mb-1">
+                                {# Test View Button - simplified, approval is at certificate level #}
+                                <div class="btn-group btn-group-sm">
                                     {% if test.test_method == 'TENSILE' %}
                                     <a href="{{ url_for('tensile.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{{ url_for('tensile.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                        <i class="bi bi-file-earmark-word"></i>
+                                        <i class="bi bi-eye"></i> View
                                     </a>
                                     {% elif test.test_method == 'SONIC' %}
                                     <a href="{{ url_for('sonic.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{{ url_for('sonic.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                        <i class="bi bi-file-earmark-word"></i>
+                                        <i class="bi bi-eye"></i> View
                                     </a>
                                     {% elif test.test_method == 'FCGR' %}
                                     <a href="{{ url_for('fcgr.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{{ url_for('fcgr.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                        <i class="bi bi-file-earmark-word"></i>
+                                        <i class="bi bi-eye"></i> View
                                     </a>
                                     {% elif test.test_method == 'CTOD' %}
                                     <a href="{{ url_for('ctod.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{{ url_for('ctod.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                        <i class="bi bi-file-earmark-word"></i>
+                                        <i class="bi bi-eye"></i> View
                                     </a>
                                     {% elif test.test_method == 'KIC' %}
                                     <a href="{{ url_for('kic.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{{ url_for('kic.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                        <i class="bi bi-file-earmark-word"></i>
+                                        <i class="bi bi-eye"></i> View
                                     </a>
                                     {% elif test.test_method == 'VICKERS' %}
                                     <a href="{{ url_for('vickers.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <a href="{{ url_for('vickers.report', test_id=test.id) }}" class="btn btn-outline-success" title="Generate Report">
-                                        <i class="bi bi-file-earmark-word"></i>
+                                        <i class="bi bi-eye"></i> View
                                     </a>
                                     {% else %}
                                     <button class="btn btn-outline-secondary" disabled title="View Test">
-                                        <i class="bi bi-eye"></i>
+                                        <i class="bi bi-eye"></i> View
                                     </button>
-                                    {% endif %}
-                                </div>
-                                {# Approval Workflow Buttons #}
-                                <div class="btn-group btn-group-sm">
-                                    {% if test.approval %}
-                                        {# Has approval record - show appropriate action #}
-                                        {% if test.approval.status == 'PUBLISHED' %}
-                                        <a href="{{ url_for('reports.download', id=test.approval.id) }}"
-                                           class="btn btn-success" title="Download Signed PDF">
-                                            <i class="bi bi-file-pdf"></i>
-                                        </a>
-                                        {% elif test.approval.status == 'APPROVED' and current_user.can_approve %}
-                                        <a href="{{ url_for('reports.sign', id=test.approval.id) }}"
-                                           class="btn btn-success" title="Sign & Publish">
-                                            <i class="bi bi-pen"></i>
-                                        </a>
-                                        {% elif test.approval.status == 'PENDING_REVIEW' and current_user.can_approve %}
-                                        <a href="{{ url_for('reports.review', id=test.approval.id) }}"
-                                           class="btn btn-warning" title="Review Report">
-                                            <i class="bi bi-check-square"></i>
-                                        </a>
-                                        {% elif test.approval.status in ['DRAFT', 'REJECTED'] and current_user.can_submit %}
-                                        <a href="{{ url_for('reports.view', id=test.approval.id) }}"
-                                           class="btn btn-outline-warning" title="Continue Approval">
-                                            <i class="bi bi-arrow-right"></i>
-                                        </a>
-                                        {% else %}
-                                        <a href="{{ url_for('reports.view', id=test.approval.id) }}"
-                                           class="btn btn-outline-secondary" title="View Approval Status">
-                                            <i class="bi bi-info-circle"></i>
-                                        </a>
-                                        {% endif %}
-                                    {% else %}
-                                        {# No approval record - show start approval button #}
-                                        {% if current_user.can_submit %}
-                                        <form action="{{ url_for('reports.create_from_test', test_id=test.id) }}" method="POST" class="d-inline">
-                                            <button type="submit" class="btn btn-outline-primary" title="Start Approval Workflow">
-                                                <i class="bi bi-play-circle"></i>
-                                            </button>
-                                        </form>
-                                        {% endif %}
                                     {% endif %}
                                 </div>
                             </div>
@@ -391,7 +414,7 @@
                     {% endfor %}
                 </div>
                 {% else %}
-                <div class="text-center py-4">
+                <div class="text-center py-2">
                     <i class="bi bi-folder-x display-4 text-muted"></i>
                     <p class="text-muted mt-2 mb-0">No tests linked yet.<br>Start a new test above.</p>
                 </div>

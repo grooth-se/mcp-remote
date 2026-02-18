@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col">
             <h1><i class="bi bi-shield-lock"></i> PDF Signing Configuration</h1>
             <nav aria-label="breadcrumb">
@@ -19,7 +19,7 @@
 
     <div class="row">
         <!-- Dependencies Status -->
-        <div class="col-lg-6 mb-4">
+        <div class="col-lg-6 mb-2">
             <div class="card h-100">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="bi bi-gear"></i> System Dependencies</h5>
@@ -104,7 +104,7 @@
                     </ul>
 
                     {% if not deps.can_convert or not deps.can_sign %}
-                    <div class="alert alert-info mt-3 mb-0">
+                    <div class="alert alert-info mt-1 mb-0">
                         <h6><i class="bi bi-info-circle"></i> Installation</h6>
                         <small>
                             {% if not deps.libreoffice %}
@@ -122,7 +122,7 @@
         </div>
 
         <!-- Certificate Status -->
-        <div class="col-lg-6 mb-4">
+        <div class="col-lg-6 mb-2">
             <div class="card h-100">
                 <div class="card-header {% if cert_info.exists %}bg-success text-white{% else %}bg-warning{% endif %}">
                     <h5 class="mb-0">
@@ -206,13 +206,13 @@
                 <div class="card-body text-center">
                     {% if deps.can_convert and deps.can_sign and cert_info.exists %}
                     <i class="bi bi-shield-check text-success display-1"></i>
-                    <h3 class="mt-3 text-success">PDF Signing Fully Configured</h3>
+                    <h3 class="mt-1 text-success">PDF Signing Fully Configured</h3>
                     <p class="text-muted">
                         Reports will be converted to PDF and digitally signed with the company X.509 certificate.
                     </p>
                     {% elif deps.can_convert %}
                     <i class="bi bi-shield-exclamation text-warning display-1"></i>
-                    <h3 class="mt-3 text-warning">PDF Conversion Available (No Digital Signing)</h3>
+                    <h3 class="mt-1 text-warning">PDF Conversion Available (No Digital Signing)</h3>
                     <p class="text-muted">
                         Reports will be converted to PDF but not cryptographically signed.
                         {% if not deps.can_sign %}Install signing libraries{% endif %}
@@ -221,7 +221,7 @@
                     </p>
                     {% else %}
                     <i class="bi bi-shield-x text-danger display-1"></i>
-                    <h3 class="mt-3 text-danger">PDF Signing Not Available</h3>
+                    <h3 class="mt-1 text-danger">PDF Signing Not Available</h3>
                     <p class="text-muted">
                         Install LibreOffice for PDF conversion and the signing libraries for digital signatures.
                     </p>

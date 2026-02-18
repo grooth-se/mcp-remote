@@ -39,13 +39,11 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
-    PORTAL_AUTH_ENABLED = False
 
 
 class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
-    PORTAL_AUTH_ENABLED = True
 
 
 config = {

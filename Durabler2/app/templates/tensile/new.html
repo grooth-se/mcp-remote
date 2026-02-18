@@ -3,7 +3,7 @@
 {% block title %}New Tensile Test{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('tensile.index') }}">Tensile Tests</a></li>
         <li class="breadcrumb-item active">New Test</li>
@@ -17,18 +17,18 @@
                 <h4 class="mb-0"><i class="bi bi-upload"></i> Upload Test Data</h4>
             </div>
             <div class="card-body">
-                <p class="text-muted mb-4">
+                <p class="text-muted mb-2">
                     Upload the CSV file exported from MTS TestSuite containing the force-displacement data.
                 </p>
 
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
 
-                    <div class="mb-4">
+                    <div class="mb-2">
                         <label class="form-label">{{ form.csv_file.label.text }}</label>
                         <div class="upload-area p-4 text-center">
-                            <i class="bi bi-file-earmark-spreadsheet display-4 text-muted mb-3"></i>
-                            <div class="mb-3">
+                            <i class="bi bi-file-earmark-spreadsheet display-4 text-muted mb-1"></i>
+                            <div class="mb-1">
                                 {{ form.csv_file(class="form-control", accept=".csv") }}
                             </div>
                             <small class="text-muted">
@@ -40,7 +40,7 @@
                         {% endfor %}
                     </div>
 
-                    <div class="mb-4">
+                    <div class="mb-2">
                         {{ form.certificate_id.label(class="form-label") }}
                         {{ form.certificate_id(class="form-select") }}
                         <small class="text-muted">

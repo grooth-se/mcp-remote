@@ -33,6 +33,9 @@ def create_app(config_name='default'):
     migrate.init_app(app, db)
     login_manager.init_app(app)
 
+    # Import all models for migrations and db.create_all()
+    from . import models  # noqa: F401
+
     # Configure login
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'
@@ -50,6 +53,7 @@ def create_app(config_name='default'):
     from .vickers import vickers_bp
     from .certificates import certificates_bp
     from .reports import reports_bp
+    from .statistics import statistics_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -62,9 +66,12 @@ def create_app(config_name='default'):
     app.register_blueprint(vickers_bp, url_prefix='/vickers')
     app.register_blueprint(certificates_bp, url_prefix='/certificates')
     app.register_blueprint(reports_bp, url_prefix='/reports')
+    app.register_blueprint(statistics_bp, url_prefix='/statistics')
 
-    # Create database tables (development only)
-    with app.app_context():
-        db.create_all()
+    # Create database tables in development
+    # In production/Docker, the entrypoint script handles this
+    if app.config.get('DEBUG'):
+        with app.app_context():
+            db.create_all()
 
     return app

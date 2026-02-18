@@ -24,7 +24,7 @@ class CertificateForm(FlaskForm):
     cert_date = DateField('Date', validators=[Optional()])
 
     # Test information
-    provningsorder = StringField('Provningsorder', validators=[Optional()])
+    test_order = StringField('Test Order', validators=[Optional()])
     project_name = StringField('Project Name', validators=[Optional()])
     test_standard = SelectField('Test Standard', choices=[
         ('', '-- Select --'),

@@ -296,11 +296,65 @@
         </div>
         {% endif %}
 
+        <!-- Validity Assessment -->
+        <div class="card mb-4">
+            <div class="card-header {% if geometry.get('is_valid') %}bg-success{% else %}bg-danger{% endif %} text-white">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Validity Assessment (ASTM E1290)</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <span class="badge {% if geometry.get('is_valid') %}bg-success{% else %}bg-danger{% endif %} fs-5 me-3">
+                        {% if geometry.get('is_valid') %}VALID{% else %}INVALID{% endif %}
+                    </span>
+                    <span class="text-muted">
+                        {% if geometry.get('is_valid') %}
+                        Test meets all ASTM E1290 validity requirements.
+                        {% else %}
+                        Test does not meet all ASTM E1290 validity requirements.
+                        {% endif %}
+                    </span>
+                </div>
+
+                {% set a_W = results.get('a_W_ratio') %}
+                {% if a_W %}
+                <h6>Validity Checks</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                        <span>a₀/W Ratio<br><small class="text-muted">Must be 0.45 - 0.70 per E1290</small></span>
+                        <span>
+                            <strong>{{ "%.3f"|format(a_W.value) }}</strong>
+                            <span class="badge {% if 0.45 <= a_W.value <= 0.70 %}bg-success{% else %}bg-danger{% endif %} ms-2">
+                                {% if 0.45 <= a_W.value <= 0.70 %}PASS{% else %}FAIL{% endif %}
+                            </span>
+                        </span>
+                    </li>
+                    {% if geometry.get('type') == 'SE(B)' and geometry.get('S') and geometry.get('W') %}
+                    {% set S_W = geometry.get('S') / geometry.get('W') %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                        <span>S/W Ratio<br><small class="text-muted">Should be ~4.0 (3.8-4.2)</small></span>
+                        <span>
+                            <strong>{{ "%.2f"|format(S_W) }}</strong>
+                            <span class="badge {% if 3.8 <= S_W <= 4.2 %}bg-success{% else %}bg-warning{% endif %} ms-2">
+                                {% if 3.8 <= S_W <= 4.2 %}PASS{% else %}NOTE{% endif %}
+                            </span>
+                        </span>
+                    </li>
+                    {% endif %}
+                </ul>
+                {% endif %}
+
+                {% if geometry.get('validity_summary') %}
+                <h6 class="mt-3">Detailed Summary</h6>
+                <pre class="mb-0 small" style="white-space: pre-wrap;">{{ geometry.get('validity_summary') }}</pre>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Validity Notes -->
         {% if test.notes %}
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Validity</h5>
+                <h5 class="mb-0"><i class="bi bi-journal-text"></i> Notes</h5>
             </div>
             <div class="card-body">
                 <pre class="mb-0" style="white-space: pre-wrap;">{{ test.notes }}</pre>

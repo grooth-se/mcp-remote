@@ -3,14 +3,14 @@
 {% block title %}{{ test.test_id }}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('tensile.index') }}">Tensile Tests</a></li>
         <li class="breadcrumb-item active">{{ test.test_id }}</li>
     </ol>
 </nav>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
     <div>
         <h2><i class="bi bi-arrow-down-up"></i> {{ test.test_id }}</h2>
         <span class="badge bg-{{ 'info' if test.status == 'ANALYZED' else 'success' if test.status == 'APPROVED' else 'warning' }}">
@@ -32,7 +32,7 @@
 
 <div class="row">
     <!-- Test Information -->
-    <div class="col-lg-4 mb-4">
+    <div class="col-lg-4 mb-2">
         <div class="card h-100">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-info-circle"></i> Test Information</h5>
@@ -65,7 +65,7 @@
     </div>
 
     <!-- Specimen Geometry -->
-    <div class="col-lg-4 mb-4">
+    <div class="col-lg-4 mb-2">
         <div class="card h-100">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-rulers"></i> Specimen Geometry</h5>
@@ -121,7 +121,7 @@
     </div>
 
     <!-- Primary Results Summary -->
-    <div class="col-lg-4 mb-4">
+    <div class="col-lg-4 mb-2">
         <div class="card h-100">
             <div class="card-header bg-success text-white">
                 <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Primary Results</h5>
@@ -235,7 +235,7 @@
 </div>
 
 <!-- Stress-Strain Plot -->
-<div class="card mb-4">
+<div class="card mb-2">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-graph-up"></i> Stress-Strain Curve</h5>
     </div>
@@ -257,7 +257,7 @@
 <div class="row">
     <!-- Displacement-based Results -->
     {% if results.get('E_disp') or results.get('Rp0.2_disp') or results.get('Rp0.5_disp') or results.get('ReH_disp') or results.get('ReL_disp') %}
-    <div class="col-md-4 mb-4">
+    <div class="col-md-4 mb-2">
         <div class="card h-100">
             <div class="card-header bg-secondary text-white">
                 <h6 class="mb-0"><i class="bi bi-arrows-vertical"></i> Displacement Results</h6>
@@ -305,7 +305,7 @@
 
     <!-- True Stress & Ludwik -->
     {% if results.get('True_stress_Rm') or results.get('True_stress_break') or results.get('K') %}
-    <div class="col-md-4 mb-4">
+    <div class="col-md-4 mb-2">
         <div class="card h-100">
             <div class="card-header bg-info text-white">
                 <h6 class="mb-0"><i class="bi bi-lightning"></i> True Stress & Hardening</h6>
@@ -347,7 +347,7 @@
 
     <!-- Rates -->
     {% if results.get('Stress_rate_Rp02') or results.get('Stress_rate_Rm') %}
-    <div class="col-md-4 mb-4">
+    <div class="col-md-4 mb-2">
         <div class="card h-100">
             <div class="card-header bg-warning text-dark">
                 <h6 class="mb-0"><i class="bi bi-speedometer2"></i> Test Rates</h6>
@@ -389,7 +389,7 @@
 </div>
 
 <!-- All Results Table with Uncertainty Details -->
-<div class="card mb-4">
+<div class="card mb-2">
     <div class="card-header">
         <h5 class="mb-0"><i class="bi bi-table"></i> All Calculated Results</h5>
     </div>

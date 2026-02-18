@@ -298,31 +298,38 @@ class CTODReportGenerator:
         heading.paragraph_format.space_before = Pt(12)
         heading.paragraph_format.space_after = Pt(6)
 
-        table = doc.add_table(rows=8, cols=4)
+        table = doc.add_table(rows=8, cols=5)
         table.style = 'Table Grid'
 
-        # Header row
-        result_headers = ['Parameter', 'Value', 'U (k=2)', 'Unit']
+        # Header row - new order: Parameter, Unit, Value, Requirement, U (k=2)
+        result_headers = ['Parameter', 'Unit', 'Value', 'Requirement', 'U (k=2)']
         for i, header in enumerate(result_headers):
             table.rows[0].cells[i].text = header
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
+        # Get CTOD requirement from data
+        ctod_req = data.get('ctod_req', data.get('delta_c_req', data.get('delta_u_req', data.get('delta_m_req', '-'))))
+
+        # Results data: (Parameter, Unit, Value, Requirement, Uncertainty)
         results_data = [
-            ('Pmax', data.get('P_max_value', '-'), data.get('P_max_uncertainty', '-'), 'kN'),
-            ('CMOD at Pmax', data.get('CMOD_max_value', '-'), data.get('CMOD_max_uncertainty', '-'), 'mm'),
-            ('Kmax', data.get('K_max_value', '-'), data.get('K_max_uncertainty', '-'), 'MPa√m'),
-            (f"CTOD ({data.get('ctod_type', 'δ')})", data.get('delta_c_value', data.get('delta_u_value', data.get('delta_m_value', '-'))),
-             data.get('delta_c_uncertainty', data.get('delta_u_uncertainty', data.get('delta_m_uncertainty', '-'))), 'mm'),
-            ('Compliance', data.get('compliance', '-'), '-', 'mm/kN'),
-            ('Crack Growth Δa', data.get('delta_a', '-'), '-', 'mm'),
-            ('Validity', data.get('validity_status', '-'), '-', '-'),
+            ('Pmax', 'kN', data.get('P_max_value', '-'), data.get('P_max_req', '-'), data.get('P_max_uncertainty', '-')),
+            ('CMOD at Pmax', 'mm', data.get('CMOD_max_value', '-'), data.get('CMOD_max_req', '-'), data.get('CMOD_max_uncertainty', '-')),
+            ('Kmax', 'MPa√m', data.get('K_max_value', '-'), data.get('K_max_req', '-'), data.get('K_max_uncertainty', '-')),
+            (f"CTOD ({data.get('ctod_type', 'δ')})", 'mm',
+             data.get('delta_c_value', data.get('delta_u_value', data.get('delta_m_value', '-'))),
+             ctod_req,
+             data.get('delta_c_uncertainty', data.get('delta_u_uncertainty', data.get('delta_m_uncertainty', '-')))),
+            ('Compliance', 'mm/kN', data.get('compliance', '-'), '-', '-'),
+            ('Crack Growth Δa', 'mm', data.get('delta_a', '-'), '-', '-'),
+            ('Validity', '-', data.get('validity_status', '-'), '-', '-'),
         ]
 
-        for i, (param, value, unc, unit) in enumerate(results_data):
+        for i, (param, unit, value, req, unc) in enumerate(results_data):
             table.rows[i+1].cells[0].text = param
-            table.rows[i+1].cells[1].text = str(value)
-            table.rows[i+1].cells[2].text = str(unc)
-            table.rows[i+1].cells[3].text = unit
+            table.rows[i+1].cells[1].text = unit
+            table.rows[i+1].cells[2].text = str(value)
+            table.rows[i+1].cells[3].text = str(req)
+            table.rows[i+1].cells[4].text = str(unc)
 
         # Compact table rows
         for row in table.rows:
@@ -372,7 +379,38 @@ class CTODReportGenerator:
         status_run = status_para.add_run(f"Status: {validity_status}")
         status_run.bold = True
 
+        # Add validity checks table
+        a_W_ratio = data.get('a_W_ratio', '-')
+        validity_table = doc.add_table(rows=2, cols=4)
+        validity_table.style = 'Table Grid'
+
+        # Header row
+        validity_headers = ['Check', 'Requirement', 'Actual', 'Result']
+        for i, header in enumerate(validity_headers):
+            validity_table.rows[0].cells[i].text = header
+            validity_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+        # a/W ratio check
+        try:
+            a_W_val = float(a_W_ratio)
+            a_W_pass = 0.45 <= a_W_val <= 0.70
+            a_W_result = 'PASS' if a_W_pass else 'FAIL'
+        except (ValueError, TypeError):
+            a_W_result = 'N/A'
+
+        validity_table.rows[1].cells[0].text = 'a₀/W Ratio'
+        validity_table.rows[1].cells[1].text = '0.45 - 0.70'
+        validity_table.rows[1].cells[2].text = str(a_W_ratio)
+        validity_table.rows[1].cells[3].text = a_W_result
+
+        # Compact table rows
+        for row in validity_table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
         if validity_statement:
+            doc.add_paragraph()  # Add spacing
             doc.add_paragraph(validity_statement)
 
         # Approval Signatures
@@ -610,6 +648,26 @@ class CTODReportGenerator:
             data['K_max_uncertainty'] = '-'
         data['K_max_req'] = '-'  # Requirement placeholder
 
+        # Parse CTOD requirement from test_info
+        requirement_str = test_info.get('requirement', '')
+        ctod_req = '-'
+        if requirement_str:
+            # Try to parse CTOD requirement from various formats
+            import re
+            # Match patterns like "CTOD: >0.15", "δ: ≥0.15mm", "CTOD >0.15 mm", etc.
+            patterns = [
+                r'CTOD[:\s]*([>≥<≤]?\s*[\d.]+)\s*(?:mm)?',
+                r'δ[:\s]*([>≥<≤]?\s*[\d.]+)\s*(?:mm)?',
+                r'delta[:\s]*([>≥<≤]?\s*[\d.]+)\s*(?:mm)?',
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, requirement_str, re.IGNORECASE)
+                if match:
+                    ctod_req = match.group(1).strip()
+                    if not ctod_req.startswith(('>','<','≥','≤')):
+                        ctod_req = '>' + ctod_req  # Default to minimum requirement
+                    break
+
         # CTOD results (CTODResult objects)
         ctod_type_reported = None
 
@@ -624,13 +682,17 @@ class CTODReportGenerator:
                 # Set reported type (prefer δc > δu > δm)
                 if ctod_type_reported is None:
                     ctod_type_reported = ctod_label
+                    data['ctod_req'] = ctod_req  # Set requirement for the reported CTOD type
             else:
                 data[f'{ctod_key}_value'] = '-'
                 data[f'{ctod_key}_uncertainty'] = '-'
                 data[f'{ctod_key}_valid'] = '-'
-            data[f'{ctod_key}_req'] = '-'  # Requirement placeholder for each CTOD type
+            data[f'{ctod_key}_req'] = ctod_req if ctod_type_reported == ctod_label else '-'
 
         data['ctod_type'] = ctod_type_reported or '-'
+        # Ensure ctod_req is set even if no CTOD result found
+        if 'ctod_req' not in data:
+            data['ctod_req'] = ctod_req
 
         # Compliance
         compliance = results.get('compliance')
@@ -651,10 +713,13 @@ class CTODReportGenerator:
         is_valid = results.get('is_valid', False)
         data['validity_status'] = 'VALID' if is_valid else 'INVALID'
         validity_summary = results.get('validity_summary', '')
+        # Convert Unicode symbols to plain text for Word compatibility
+        if validity_summary:
+            validity_summary = validity_summary.replace('✓', '[PASS]').replace('✗', '[FAIL]').replace('⚠', '[NOTE]')
         if is_valid:
             data['validity_statement'] = 'The test meets all validity requirements of ASTM E1290.'
         else:
-            data['validity_statement'] = f'The test does not meet all validity requirements. {validity_summary}'
+            data['validity_statement'] = f'The test does not meet all validity requirements.\n{validity_summary}'
 
         # Signatures (to be filled manually)
         data['tested_by'] = ''

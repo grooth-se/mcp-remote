@@ -3,14 +3,14 @@
 {% block title %}FCGR Test - {{ test.test_id }}{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('fcgr.index') }}">FCGR Tests</a></li>
         <li class="breadcrumb-item active">{{ test.test_id }}</li>
     </ol>
 </nav>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
     <div>
         <h2><i class="bi bi-graph-up"></i> {{ test.test_id }}</h2>
         <p class="text-muted mb-0">
@@ -36,12 +36,12 @@
     <!-- Left column: Results -->
     <div class="col-lg-4">
         <!-- Paris Law Results -->
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header bg-success text-white">
                 <h5 class="mb-0"><i class="bi bi-calculator"></i> Paris Law Results</h5>
             </div>
             <div class="card-body">
-                <div class="text-center mb-3">
+                <div class="text-center mb-1">
                     <small class="text-muted">da/dN = C × (ΔK)<sup>m</sup></small>
                 </div>
                 <table class="table table-sm mb-0">
@@ -92,7 +92,7 @@
         </div>
 
         <!-- ΔK Range -->
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-arrows-expand"></i> ΔK Range</h5>
             </div>
@@ -117,7 +117,7 @@
         </div>
 
         <!-- Test Summary -->
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Test Summary</h5>
             </div>
@@ -154,7 +154,7 @@
         </div>
 
         <!-- Specimen Geometry -->
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-rulers"></i> Specimen</h5>
             </div>
@@ -190,7 +190,7 @@
 
         <!-- Certificate Link -->
         {% if test.certificate %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header bg-info text-white">
                 <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Certificate</h5>
             </div>
@@ -207,7 +207,7 @@
     <div class="col-lg-8">
         <!-- Crack Length Plot -->
         {% if crack_plot %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Crack Length vs Cycles</h5>
             </div>
@@ -219,7 +219,7 @@
 
         <!-- Paris Law Plot -->
         {% if paris_plot %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header bg-success text-white">
                 <h5 class="mb-0"><i class="bi bi-graph-up"></i> Paris Law (da/dN vs ΔK)</h5>
             </div>
@@ -231,7 +231,7 @@
 
         <!-- Pre-crack Compliance -->
         {% if geometry.get('precrack') %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header {% if geometry.precrack.compliance.is_valid %}bg-success{% else %}bg-warning{% endif %} text-white">
                 <h5 class="mb-0"><i class="bi bi-check-circle"></i> Pre-crack Compliance (E647)</h5>
             </div>
@@ -258,7 +258,7 @@
 
         <!-- Uncertainty Budget -->
         {% if geometry.get('uncertainty_budget') %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header bg-info text-white">
                 <h5 class="mb-0"><i class="bi bi-calculator"></i> Uncertainty Budget (ISO 17025)</h5>
             </div>
@@ -284,14 +284,14 @@
 
         <!-- Crack Surface Photos -->
         {% if photo_urls %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-camera"></i> Crack Surface Photos</h5>
             </div>
             <div class="card-body">
                 <div class="row">
                     {% for photo in photo_urls %}
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-4 mb-1">
                         <img src="{{ photo.url }}" class="img-fluid rounded" alt="Crack photo">
                         {% if photo.description %}<p class="small text-muted mt-1 mb-0">{{ photo.description }}</p>{% endif %}
                     </div>
@@ -303,7 +303,7 @@
 
         <!-- Validity Notes -->
         {% if test.notes %}
-        <div class="card mb-4">
+        <div class="card mb-2">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-check-circle"></i> Validity</h5>
             </div>

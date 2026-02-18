@@ -3,7 +3,7 @@
 {% block title %}Vickers Tests{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
     <h2><i class="bi bi-diamond"></i> Vickers Hardness Tests</h2>
     <a href="{{ url_for('vickers.new') }}" class="btn btn-primary">
         <i class="bi bi-plus-circle"></i> New Test
@@ -72,7 +72,7 @@
         {% else %}
         <div class="text-center py-5">
             <i class="bi bi-diamond display-1 text-muted"></i>
-            <p class="text-muted mt-3">No Vickers tests yet.</p>
+            <p class="text-muted mt-1">No Vickers tests yet.</p>
             <a href="{{ url_for('vickers.new') }}" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Create First Test
             </a>

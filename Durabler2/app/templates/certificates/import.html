@@ -3,7 +3,7 @@
 {% block title %}Import Certificates{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('certificates.index') }}">Certificates</a></li>
         <li class="breadcrumb-item active">Import from Excel</li>
@@ -38,7 +38,7 @@
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
 
-                    <div class="mb-4">
+                    <div class="mb-2">
                         {{ form.excel_file.label(class="form-label") }}
                         {{ form.excel_file(class="form-control", accept=".xlsx,.xls") }}
                         {% for error in form.excel_file.errors %}
@@ -46,7 +46,7 @@
                         {% endfor %}
                     </div>
 
-                    <div class="mb-4">
+                    <div class="mb-2">
                         <div class="form-check">
                             {{ form.skip_existing(class="form-check-input") }}
                             {{ form.skip_existing.label(class="form-check-label") }}

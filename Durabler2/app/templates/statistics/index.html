@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-2"><i class="bi bi-graph-up"></i> Test Statistics</h2>
+
+    <!-- Quick Stats Row -->
+    <div class="row mb-2">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Tests</h5>
+                    <h2 class="display-6">{{ total_tests }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">This Month</h5>
+                    <h2 class="display-6">{{ tests_this_month }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">This Year</h5>
+                    <h2 class="display-6">{{ tests_this_year }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Query Form -->
+    <div class="card mb-2">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="bi bi-search"></i> Query Test Data</h5>
+        </div>
+        <div class="card-body">
+            <form id="queryForm">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Test Method</label>
+                        <select class="form-select" name="test_method" id="testMethod" required>
+                            <option value="">-- Select --</option>
+                            {% for method in test_methods %}
+                            <option value="{{ method }}">{{ method }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Parameter</label>
+                        <select class="form-select" name="parameter" id="parameter" required disabled>
+                            <option value="">-- Select Test Method First --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Material</label>
+                        <input type="text" class="form-control" name="material" id="material"
+                               list="materialList" placeholder="e.g., A182 F22">
+                        <datalist id="materialList">
+                            {% for mat in materials %}
+                            <option value="{{ mat }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Temperature Range</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="temp_min" placeholder="Min"
+                                   {% if temp_range[0] %}value="{{ temp_range[0]|int }}"{% endif %}>
+                            <span class="input-group-text">to</span>
+                            <input type="number" class="form-control" name="temp_max" placeholder="Max"
+                                   {% if temp_range[1] %}value="{{ temp_range[1]|int }}"{% endif %}>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3 mt-2">
+                    <div class="col-md-3">
+                        <label class="form-label">Date From</label>
+                        <input type="date" class="form-control" name="date_from"
+                               {% if date_range[0] %}value="{{ date_range[0].strftime('%Y-%m-%d') }}"{% endif %}>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Date To</label>
+                        <input type="date" class="form-control" name="date_to"
+                               {% if date_range[1] %}value="{{ date_range[1].strftime('%Y-%m-%d') }}"{% endif %}>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-calculator"></i> Calculate Statistics
+                        </button>
+                        <button type="button" class="btn btn-success" id="exportBtn" disabled>
+                            <i class="bi bi-download"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsSection" style="display: none;">
+        <!-- Statistics Summary -->
+        <div class="card mb-2">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Results: <span id="resultTitle"></span></h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-2">
+                        <div class="text-center p-2 bg-light rounded">
+                            <small class="text-muted">Count</small>
+                            <h3 id="statCount">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-2 bg-light rounded">
+                            <small class="text-muted">Mean</small>
+                            <h3 id="statMean">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-2 bg-light rounded">
+                            <small class="text-muted">Std Dev</small>
+                            <h3 id="statStdDev">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-2 bg-light rounded">
+                            <small class="text-muted">Min</small>
+                            <h3 id="statMin">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-2 bg-light rounded">
+                            <small class="text-muted">Max</small>
+                            <h3 id="statMax">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="text-center p-2 bg-light rounded">
+                            <small class="text-muted">Median</small>
+                            <h3 id="statMedian">-</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Chart -->
+        <div class="card mb-2">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Data Distribution</h5>
+            </div>
+            <div class="card-body">
+                <div id="chartContainer" style="height: 300px;"></div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-table"></i> Individual Results</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm" id="resultsTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Test ID</th>
+                                <th>Specimen</th>
+                                <th>Material</th>
+                                <th>Temp (C)</th>
+                                <th>Date</th>
+                                <th>Value</th>
+                                <th>Uncertainty</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Results Message -->
+    <div id="noResults" class="alert alert-info" style="display: none;">
+        <i class="bi bi-info-circle"></i> <span id="noResultsMessage">No results found.</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const testMethodSelect = document.getElementById('testMethod');
+    const parameterSelect = document.getElementById('parameter');
+    const queryForm = document.getElementById('queryForm');
+    const exportBtn = document.getElementById('exportBtn');
+    const resultsSection = document.getElementById('resultsSection');
+    const noResults = document.getElementById('noResults');
+
+    // When test method changes, load parameters
+    testMethodSelect.addEventListener('change', async function() {
+        const method = this.value;
+        parameterSelect.innerHTML = '<option value="">Loading...</option>';
+        parameterSelect.disabled = true;
+
+        if (!method) {
+            parameterSelect.innerHTML = '<option value="">-- Select Test Method First --</option>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`{{ url_for('statistics.get_parameters', test_method='PLACEHOLDER') }}`.replace('PLACEHOLDER', method));
+            const params = await response.json();
+
+            parameterSelect.innerHTML = '<option value="">-- Select Parameter --</option>';
+            params.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.name;
+                option.textContent = p.label;
+                parameterSelect.appendChild(option);
+            });
+            parameterSelect.disabled = false;
+        } catch (error) {
+            parameterSelect.innerHTML = '<option value="">Error loading parameters</option>';
+        }
+    });
+
+    // Form submission
+    queryForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        resultsSection.style.display = 'none';
+        noResults.style.display = 'none';
+
+        try {
+            const response = await fetch('{{ url_for("statistics.query") }}', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (result.error) {
+                noResults.querySelector('#noResultsMessage').textContent = result.error;
+                noResults.style.display = 'block';
+                exportBtn.disabled = true;
+                return;
+            }
+
+            if (result.count === 0) {
+                noResults.querySelector('#noResultsMessage').textContent = result.message || 'No results found.';
+                noResults.style.display = 'block';
+                exportBtn.disabled = true;
+                return;
+            }
+
+            // Update statistics
+            document.getElementById('resultTitle').textContent =
+                `${result.test_method} - ${result.parameter_label}`;
+            document.getElementById('statCount').textContent = result.stats.count;
+            document.getElementById('statMean').textContent = result.stats.mean.toFixed(4);
+            document.getElementById('statStdDev').textContent = result.stats.std_dev.toFixed(4);
+            document.getElementById('statMin').textContent = result.stats.min.toFixed(4);
+            document.getElementById('statMax').textContent = result.stats.max.toFixed(4);
+            document.getElementById('statMedian').textContent = result.stats.median.toFixed(4);
+
+            // Update table
+            const tbody = document.getElementById('resultsTableBody');
+            tbody.innerHTML = '';
+            result.data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.test_id || '-'}</td>
+                    <td>${row.specimen_id || '-'}</td>
+                    <td>${row.material || '-'}</td>
+                    <td>${row.temperature !== null ? row.temperature : '-'}</td>
+                    <td>${row.test_date || '-'}</td>
+                    <td><strong>${row.value !== null ? row.value.toFixed(4) : '-'}</strong></td>
+                    <td>${row.uncertainty !== null ? '±' + row.uncertainty.toFixed(4) : '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Create chart
+            const values = result.data.map(d => d.value).filter(v => v !== null);
+            const labels = result.data.map(d => d.specimen_id || d.test_id);
+
+            const trace = {
+                x: labels,
+                y: values,
+                type: 'bar',
+                marker: { color: '#0d6efd' }
+            };
+
+            const layout = {
+                margin: { t: 20, b: 50, l: 50, r: 20 },
+                xaxis: { title: 'Specimen' },
+                yaxis: { title: result.parameter_label },
+                shapes: [{
+                    type: 'line',
+                    x0: 0,
+                    x1: labels.length - 1,
+                    y0: result.stats.mean,
+                    y1: result.stats.mean,
+                    line: { color: 'red', width: 2, dash: 'dash' }
+                }]
+            };
+
+            Plotly.newPlot('chartContainer', [trace], layout);
+
+            resultsSection.style.display = 'block';
+            exportBtn.disabled = false;
+
+        } catch (error) {
+            noResults.querySelector('#noResultsMessage').textContent = 'Error executing query: ' + error.message;
+            noResults.style.display = 'block';
+        }
+    });
+
+    // Export button
+    exportBtn.addEventListener('click', function() {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("statistics.export") }}';
+
+        const formData = new FormData(queryForm);
+        for (let [key, value] of formData.entries()) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            form.appendChild(input);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    });
+});
+</script>
+{% endblock %}

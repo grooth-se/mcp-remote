@@ -3,7 +3,7 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row mb-2">
     <div class="col">
         <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
         <p class="text-muted">Welcome, {{ current_user.username }}. Select a test method to begin.</p>
@@ -16,7 +16,7 @@
     <div class="col-md-4 col-lg-3">
         <div class="card h-100 test-card">
             <div class="card-body text-center">
-                <i class="bi bi-arrow-down-up display-4 text-primary mb-3"></i>
+                <i class="bi bi-arrow-down-up display-4 text-primary mb-1"></i>
                 <h5 class="card-title">Tensile Testing</h5>
                 <p class="card-text text-muted small">ASTM E8/E8M, ISO 6892-1</p>
                 <a href="{{ url_for('tensile.index') }}" class="btn btn-primary stretched-link">Open</a>
@@ -28,7 +28,7 @@
     <div class="col-md-4 col-lg-3">
         <div class="card h-100 test-card">
             <div class="card-body text-center">
-                <i class="bi bi-soundwave display-4 text-success mb-3"></i>
+                <i class="bi bi-soundwave display-4 text-success mb-1"></i>
                 <h5 class="card-title">Sonic Resonance</h5>
                 <p class="card-text text-muted small">Modified ASTM E1875</p>
                 <a href="{{ url_for('sonic.index') }}" class="btn btn-success stretched-link">Open</a>
@@ -40,7 +40,7 @@
     <div class="col-md-4 col-lg-3">
         <div class="card h-100 test-card">
             <div class="card-body text-center">
-                <i class="bi bi-graph-up display-4 text-info mb-3"></i>
+                <i class="bi bi-graph-up display-4 text-info mb-1"></i>
                 <h5 class="card-title">FCGR</h5>
                 <p class="card-text text-muted small">ASTM E647</p>
                 <a href="{{ url_for('fcgr.index') }}" class="btn btn-info stretched-link">Open</a>
@@ -52,7 +52,7 @@
     <div class="col-md-4 col-lg-3">
         <div class="card h-100 test-card">
             <div class="card-body text-center">
-                <i class="bi bi-arrows-angle-expand display-4 text-warning mb-3"></i>
+                <i class="bi bi-arrows-angle-expand display-4 text-warning mb-1"></i>
                 <h5 class="card-title">CTOD</h5>
                 <p class="card-text text-muted small">ASTM E1820/E1290</p>
                 <a href="{{ url_for('ctod.index') }}" class="btn btn-warning stretched-link">Open</a>
@@ -64,7 +64,7 @@
     <div class="col-md-4 col-lg-3">
         <div class="card h-100 test-card">
             <div class="card-body text-center">
-                <i class="bi bi-lightning display-4 text-danger mb-3"></i>
+                <i class="bi bi-lightning display-4 text-danger mb-1"></i>
                 <h5 class="card-title">KIC</h5>
                 <p class="card-text text-muted small">ASTM E399</p>
                 <a href="{{ url_for('kic.index') }}" class="btn btn-danger stretched-link">Open</a>
@@ -76,7 +76,7 @@
     <div class="col-md-4 col-lg-3">
         <div class="card h-100 test-card">
             <div class="card-body text-center">
-                <i class="bi bi-diamond display-4 text-purple mb-3" style="color: #6f42c1;"></i>
+                <i class="bi bi-diamond display-4 text-purple mb-1" style="color: #6f42c1;"></i>
                 <h5 class="card-title">Vickers Hardness</h5>
                 <p class="card-text text-muted small">ISO 6507-1, ASTM E92</p>
                 <a href="{{ url_for('vickers.index') }}" class="btn stretched-link" style="background-color: #6f42c1; color: white;">Open</a>
@@ -88,7 +88,7 @@
     <div class="col-md-4 col-lg-3">
         <div class="card h-100 test-card">
             <div class="card-body text-center">
-                <i class="bi bi-journal-text display-4 text-dark mb-3"></i>
+                <i class="bi bi-journal-text display-4 text-dark mb-1"></i>
                 <h5 class="card-title">Certificate Register</h5>
                 <p class="card-text text-muted small">Search & Manage</p>
                 <a href="{{ url_for('certificates.index') }}" class="btn btn-dark stretched-link">Open</a>
@@ -98,7 +98,7 @@
 </div>
 
 <!-- Status Summary -->
-<div class="row g-4 mb-4">
+<div class="row g-4 mb-2">
     <div class="col-md-4">
         <div class="card bg-warning bg-opacity-10 border-warning">
             <div class="card-body">

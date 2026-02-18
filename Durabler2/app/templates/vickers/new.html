@@ -3,7 +3,7 @@
 {% block title %}New Vickers Test{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
+<nav aria-label="breadcrumb" class="mb-2">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ url_for('vickers.index') }}">Vickers Tests</a></li>
         <li class="breadcrumb-item active">New Test</li>
@@ -21,33 +21,33 @@
                     {{ form.hidden_tag() }}
 
                     <!-- Test Identification -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header bg-light">
                             <h6 class="mb-0"><i class="bi bi-tag"></i> Test Identification</h6>
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-6 mb-1">
                                     {{ form.certificate_id.label(class="form-label") }}
                                     {{ form.certificate_id(class="form-select") }}
                                     <small class="text-muted">Certificate number is a main trace number</small>
                                 </div>
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-6 mb-1">
                                     {{ form.specimen_id.label(class="form-label") }}
                                     {{ form.specimen_id(class="form-control") }}
                                     <small class="text-muted">Specimen SN is a main trace number</small>
                                 </div>
                             </div>
                             <div class="row">
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-4 mb-1">
                                     {{ form.material.label(class="form-label") }}
                                     {{ form.material(class="form-control", placeholder="e.g., S355J2") }}
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-4 mb-1">
                                     {{ form.test_date.label(class="form-label") }}
                                     {{ form.test_date(class="form-control", type="date") }}
                                 </div>
-                                <div class="col-md-4 mb-3">
+                                <div class="col-md-4 mb-1">
                                     {{ form.location_orientation.label(class="form-label") }}
                                     {{ form.location_orientation(class="form-control") }}
                                 </div>
@@ -56,25 +56,25 @@
                     </div>
 
                     <!-- Test Parameters -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header bg-light">
                             <h6 class="mb-0"><i class="bi bi-gear"></i> Test Parameters</h6>
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-3 mb-3">
+                                <div class="col-md-3 mb-1">
                                     {{ form.load_level.label(class="form-label") }}
                                     {{ form.load_level(class="form-select") }}
                                 </div>
-                                <div class="col-md-3 mb-3">
+                                <div class="col-md-3 mb-1">
                                     {{ form.dwell_time.label(class="form-label") }}
                                     {{ form.dwell_time(class="form-select") }}
                                 </div>
-                                <div class="col-md-3 mb-3">
+                                <div class="col-md-3 mb-1">
                                     {{ form.temperature.label(class="form-label") }}
                                     {{ form.temperature(class="form-control") }}
                                 </div>
-                                <div class="col-md-3 mb-3">
+                                <div class="col-md-3 mb-1">
                                     {{ form.num_readings.label(class="form-label") }}
                                     {{ form.num_readings(class="form-select", id="num_readings", onchange="updateReadingsTable()") }}
                                 </div>
@@ -83,12 +83,12 @@
                     </div>
 
                     <!-- Hardness Readings -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header bg-light">
                             <h6 class="mb-0"><i class="bi bi-list-ol"></i> Hardness Readings</h6>
                         </div>
                         <div class="card-body">
-                            <p class="text-muted small mb-3">
+                            <p class="text-muted small mb-1">
                                 Enter hardness readings. At least 3 readings recommended per ASTM E92.
                             </p>
                             <div class="table-responsive">
@@ -115,7 +115,7 @@
                     </div>
 
                     <!-- Photo Upload -->
-                    <div class="card mb-4">
+                    <div class="card mb-2">
                         <div class="card-header bg-light">
                             <h6 class="mb-0"><i class="bi bi-camera"></i> Indent Photo (Optional)</h6>
                         </div>
@@ -130,8 +130,44 @@
                         </div>
                     </div>
 
+                    <!-- Uncertainty Parameters (ISO 17025) -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-percent"></i> Uncertainty Parameters (ISO 17025)</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small">Enter measurement uncertainties for ISO 17025 compliance reporting</p>
+                            <div class="row">
+                                <div class="col-md-4 mb-1">
+                                    {{ form.force_uncertainty.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.force_uncertainty(class="form-control") }}
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Test force application</small>
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.diagonal_uncertainty.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.diagonal_uncertainty(class="form-control") }}
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Optical measurement</small>
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.machine_uncertainty.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.machine_uncertainty(class="form-control") }}
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Calibration certificate</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Notes -->
-                    <div class="mb-4">
+                    <div class="mb-2">
                         {{ form.notes.label(class="form-label") }}
                         {{ form.notes(class="form-control", rows=3, placeholder="Additional notes...") }}
                     </div>

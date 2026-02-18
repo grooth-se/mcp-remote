@@ -3,11 +3,12 @@ import os
 import json
 import io
 import base64
+import math
 from pathlib import Path
 from datetime import datetime
 
 from flask import (render_template, redirect, url_for, flash, request,
-                   current_app, session, send_file)
+                   current_app, session, send_file, Response)
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 import numpy as np
@@ -17,7 +18,7 @@ import plotly.io as pio
 from . import tensile_bp
 from .forms import CSVUploadForm, SpecimenForm, ReportForm
 from app.extensions import db
-from app.models import TestRecord, AnalysisResult, AuditLog, Certificate
+from app.models import TestRecord, AnalysisResult, AuditLog, Certificate, RawTestData, ReportFile
 
 # Import analysis utilities
 from utils.data_acquisition.mts_csv_parser import parse_mts_csv, MTSTestData
@@ -53,6 +54,58 @@ def calculate_area_uncertainty(diameter, d_unc=0.01):
     return np.pi * diameter * d_unc / 2
 
 
+def detect_break_point(stress, threshold=0.5):
+    """Detect specimen break point based on significant stress drop.
+
+    Parameters
+    ----------
+    stress : array
+        Stress data array
+    threshold : float
+        Fraction of max stress below which break is detected (default 0.5 = 50%)
+
+    Returns
+    -------
+    int or None
+        Index of break point, or None if no break detected
+    """
+    if len(stress) < 10:
+        return None
+
+    max_stress_idx = np.argmax(stress)
+    max_stress = stress[max_stress_idx]
+
+    # Look for first point after max where stress drops below threshold
+    for i in range(max_stress_idx + 1, len(stress)):
+        if stress[i] < max_stress * threshold:
+            return i
+
+    return None
+
+
+def truncate_at_break(strain, stress, break_threshold=0.5):
+    """Truncate stress-strain data at break point to clean up plots.
+
+    Parameters
+    ----------
+    strain : array
+        Strain data
+    stress : array
+        Stress data
+    break_threshold : float
+        Fraction of max stress for break detection (default 0.5)
+
+    Returns
+    -------
+    tuple
+        (truncated_strain, truncated_stress)
+    """
+    break_idx = detect_break_point(stress, break_threshold)
+    if break_idx is not None:
+        return strain[:break_idx], stress[:break_idx]
+    return strain, stress
+
+
 def create_stress_strain_plot(strain, stress, strain_disp=None, stress_disp=None,
                                rp02_strain=None, rp02_stress=None,
                                rm_strain=None, rm_stress=None,
@@ -62,20 +115,24 @@ def create_stress_strain_plot(strain, stress, strain_disp=None, stress_disp=None
     """Create interactive Plotly stress-strain chart."""
     fig = go.Figure()
 
+    # Truncate data at break point to avoid plotting post-fracture noise
+    strain_plot, stress_plot = truncate_at_break(strain, stress, break_threshold=0.5)
+
     # Main stress-strain curve (extensometer) - DARK RED
     fig.add_trace(go.Scatter(
-        x=strain * 100,  # Convert to %
-        y=stress,
+        x=strain_plot * 100,  # Convert to %
+        y=stress_plot,
         mode='lines',
         name='Extensometer',
         line=dict(color='#8B0000', width=2)  # Dark red
     ))
 
-    # Displacement curve - BLACK
+    # Displacement curve - BLACK (also truncate at break)
     if strain_disp is not None and stress_disp is not None:
+        strain_disp_plot, stress_disp_plot = truncate_at_break(strain_disp, stress_disp, break_threshold=0.5)
         fig.add_trace(go.Scatter(
-            x=strain_disp * 100,
-            y=stress_disp,
+            x=strain_disp_plot * 100,
+            y=stress_disp_plot,
             mode='lines',
             name='Displacement',
             line=dict(color='#000000', width=1.5)  # Black solid
@@ -615,6 +672,24 @@ def specimen():
             geometry['yield_method'] = yield_method
             geometry['use_displacement_only'] = use_displacement_only
 
+            # Store uncertainty inputs (ISO 17025)
+            geometry['uncertainty_inputs'] = {
+                'force_pct': form.force_uncertainty.data or 1.0,
+                'displacement_pct': form.displacement_uncertainty.data or 1.0,
+                'dimension_pct': form.dimension_uncertainty.data or 0.5
+            }
+
+            # Calculate uncertainty budget (simplified RSS)
+            force_u = (form.force_uncertainty.data or 1.0) / 100
+            disp_u = (form.displacement_uncertainty.data or 1.0) / 100
+            dim_u = (form.dimension_uncertainty.data or 0.5) / 100
+            combined_u = math.sqrt(force_u**2 + disp_u**2 + dim_u**2) * 100
+            geometry['uncertainty_budget'] = {
+                'combined': combined_u,
+                'coverage_factor': 2,
+                'expanded': combined_u * 2
+            }
+
             # Get certificate if linked
             certificate_id = session.get('tensile_certificate_id')
             cert_number = None
@@ -748,6 +823,20 @@ def specimen():
                     calculated_by_id=current_user.id
                 )
                 db.session.add(result)
+
+            # Store raw CSV data in database
+            csv_path = session.get('tensile_csv_path')
+            if csv_path and Path(csv_path).exists():
+                with open(csv_path, 'rb') as f:
+                    csv_raw = RawTestData(
+                        test_record_id=test_record.id,
+                        data_type='csv',
+                        original_filename=Path(csv_path).name,
+                        mime_type='text/csv',
+                        uploaded_by_id=current_user.id
+                    )
+                    csv_raw.set_data(f.read())
+                    db.session.add(csv_raw)
 
             # Audit log (only for new tests, re-analysis already logged above)
             if not reanalyze_id:
@@ -998,13 +1087,33 @@ def report(test_id):
 
             yield_type = geometry.get('yield_method', 'offset')
 
+            # Parse requirements from certificate
+            requirements = {}
+            if test.certificate and test.certificate.requirement:
+                req_text = test.certificate.requirement
+                import re
+                patterns = [
+                    (r'Rp0\.?2[:\s]*(.*?)(?:,|;|$)', 'Rp02'),
+                    (r'Rp0\.?5[:\s]*(.*?)(?:,|;|$)', 'Rp05'),
+                    (r'ReH[:\s]*(.*?)(?:,|;|$)', 'ReH'),
+                    (r'ReL[:\s]*(.*?)(?:,|;|$)', 'ReL'),
+                    (r'Rm[:\s]*(.*?)(?:,|;|$)', 'Rm'),
+                    (r'\bA[:\s]*(.*?)(?:,|;|$)', 'A'),
+                    (r'\bZ[:\s]*(.*?)(?:,|;|$)', 'Z'),
+                ]
+                for pattern, key in patterns:
+                    match = re.search(pattern, req_text, re.IGNORECASE)
+                    if match:
+                        requirements[key] = match.group(1).strip()
+
             # Prepare report data
             report_data = TensileReportGenerator.prepare_report_data(
                 test_info=test_info,
                 dimensions=dimensions,
                 results=results_for_report,
                 specimen_type=specimen_type,
-                yield_type=yield_type
+                yield_type=yield_type,
+                requirements=requirements
             )
 
             # Generate stress-strain chart image
@@ -1021,10 +1130,14 @@ def report(test_id):
                     stress, strain = analyzer.calculate_stress_strain(data.force, data.extension, area, L0)
                     stress_disp, strain_disp = analyzer.calculate_stress_strain(data.force, data.displacement, area, Lp)
 
+                    # Truncate data at break point to clean up report chart
+                    strain_plot, stress_plot = truncate_at_break(strain, stress, break_threshold=0.5)
+                    strain_disp_plot, stress_disp_plot = truncate_at_break(strain_disp, stress_disp, break_threshold=0.5)
+
                     # Create matplotlib figure for report
                     fig, ax = plt.subplots(figsize=(8, 5))
-                    ax.plot(strain * 100, stress, 'darkred', linewidth=1.5, label='Extensometer')
-                    ax.plot(strain_disp * 100, stress_disp, 'black', linewidth=1, label='Displacement')
+                    ax.plot(strain_plot * 100, stress_plot, 'darkred', linewidth=1.5, label='Extensometer')
+                    ax.plot(strain_disp_plot * 100, stress_disp_plot, 'black', linewidth=1, label='Displacement')
 
                     # Add result markers
                     rm_val = results.get('Rm')
