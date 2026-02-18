@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+instance/
+output/
+app/static/uploads/
+oldprogram/

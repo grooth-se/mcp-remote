@@ -1,0 +1,22 @@
+services:
+  accruedincome:
+    build: .
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${SECRET_KEY:-accrued-change-in-production}
+      - DATABASE_URL=sqlite:////data/accrued.db
+      - PORTAL_AUTH_ENABLED=${PORTAL_AUTH_ENABLED:-false}
+      - PORTAL_URL=${PORTAL_URL:-http://portal:5000}
+      - PORTAL_EXTERNAL_URL=${PORTAL_EXTERNAL_URL:-/}
+    volumes:
+      - accruedincome_data:/data
+      - accruedincome_uploads:/app/app/static/uploads
+      - accruedincome_output:/app/output
+    restart: unless-stopped
+
+volumes:
+  accruedincome_data:
+  accruedincome_uploads:
+  accruedincome_output:
