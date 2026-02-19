@@ -45,9 +45,11 @@ def validate_token_endpoint():
         target_app = Application.query.filter_by(app_code=app_code).first()
         if target_app:
             if user.is_admin:
-                # Admins get "admin" role if the app has roles, otherwise None
-                if target_app.get_available_roles():
-                    role = 'admin'
+                # Admins get first role containing "admin" (case-insensitive), or first role
+                available = target_app.get_available_roles()
+                if available:
+                    admin_role = next((r for r in available if 'admin' in r.lower()), None)
+                    role = admin_role or available[0]
             else:
                 perm = UserPermission.query.filter_by(
                     user_id=user.id, app_id=target_app.id

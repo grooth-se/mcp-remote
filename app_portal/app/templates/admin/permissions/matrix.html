@@ -32,7 +32,7 @@
                         <i class="bi bi-check-circle-fill text-success" title="Admin - all access"></i>
                         {% if app.get_available_roles() %}
                         <div class="mt-1">
-                            <span class="badge bg-secondary">admin</span>
+                            <span class="badge bg-secondary">Administrator</span>
                         </div>
                         {% endif %}
                         {% else %}
@@ -54,7 +54,7 @@
                                 {% for role in app.get_available_roles() %}
                                 <option value="{{ role }}"
                                     {{ 'selected' if perm and perm.role == role }}>
-                                    {{ role|capitalize }}
+                                    {{ role }}
                                 </option>
                                 {% endfor %}
                             </select>

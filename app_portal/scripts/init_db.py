@@ -27,8 +27,6 @@ DEFAULT_APPS = [
         'icon': 'bi-thermometer-half',
         'display_order': 2,
         'requires_gpu': True,
-        'available_roles': json.dumps(['admin', 'engineer']),
-        'default_role': 'engineer',
     },
     {
         'app_code': 'mpqpgenerator',
@@ -54,8 +52,8 @@ DEFAULT_APPS = [
         'internal_url': 'http://durabler2:5005',
         'icon': 'bi-clipboard2-data',
         'display_order': 5,
-        'available_roles': json.dumps(['admin', 'engineer', 'technician', 'viewer']),
-        'default_role': 'viewer',
+        'available_roles': json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
+        'default_role': 'Operator',
     },
     {
         'app_code': 'spinventory',

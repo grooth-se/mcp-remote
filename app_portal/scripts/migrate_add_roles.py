@@ -14,12 +14,8 @@ from app.extensions import db
 # Role definitions per app
 APP_ROLES = {
     'durabler2': {
-        'available_roles': json.dumps(['admin', 'engineer', 'technician', 'viewer']),
-        'default_role': 'viewer',
-    },
-    'heatsim': {
-        'available_roles': json.dumps(['admin', 'engineer']),
-        'default_role': 'engineer',
+        'available_roles': json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
+        'default_role': 'Operator',
     },
 }
 
