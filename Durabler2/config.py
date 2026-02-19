@@ -39,6 +39,12 @@ class Config:
     # Session
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
 
+    # Portal authentication
+    PORTAL_AUTH_ENABLED = os.environ.get('PORTAL_AUTH_ENABLED', '').lower() in ('true', '1', 'yes')
+    PORTAL_URL = os.environ.get('PORTAL_URL', 'http://portal:5000')
+    PORTAL_EXTERNAL_URL = os.environ.get('PORTAL_EXTERNAL_URL', '/')
+    APP_CODE = 'durabler2'
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""

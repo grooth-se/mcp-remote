@@ -68,6 +68,11 @@ def create_app(config_name='default'):
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(statistics_bp, url_prefix='/statistics')
 
+    # Portal authentication (when running behind app portal)
+    if app.config.get('PORTAL_AUTH_ENABLED'):
+        from .portal_auth import init_portal_auth
+        init_portal_auth(app)
+
     # Create database tables in development
     # In production/Docker, the entrypoint script handles this
     if app.config.get('DEBUG'):
