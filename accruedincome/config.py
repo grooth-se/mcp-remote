@@ -32,6 +32,9 @@ class Config:
     PORTAL_EXTERNAL_URL = os.environ.get('PORTAL_EXTERNAL_URL', '/')
     APP_CODE = 'accruedincome'
 
+    # MG5 Integration API
+    MG5_INTEGRATION_URL = os.environ.get('MG5_INTEGRATION_URL', 'http://mg5integration:5001')
+
     # Session
     PERMANENT_SESSION_LIFETIME = 8 * 60 * 60  # 8 hours
 

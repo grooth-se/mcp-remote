@@ -2,6 +2,7 @@
 
 import os
 import json
+import pickle
 import uuid
 import shutil
 from flask import (
@@ -14,6 +15,7 @@ import pandas as pd
 from . import upload_bp
 from app.extensions import db
 from app.models import UploadSession
+from app.calculation.services import IntegrationDataLoader
 
 # Required files from Monitor G5
 REQUIRED_FILES = {
@@ -227,6 +229,50 @@ def validate(session_id):
                           session=session,
                           validation=validation_results,
                           all_valid=all_valid)
+
+
+@upload_bp.route('/from-integration', methods=['POST'])
+def from_integration():
+    """Load data from MG5integration API instead of Excel files."""
+    try:
+        loader = IntegrationDataLoader()
+        dataframes = loader.load()
+    except ConnectionError as e:
+        flash(f'Could not connect to MG5 Integration: {e}', 'error')
+        return redirect(url_for('upload.index'))
+    except Exception as e:
+        flash(f'Error loading integration data: {e}', 'error')
+        return redirect(url_for('upload.index'))
+
+    # Create session with source='integration'
+    session_id = str(uuid.uuid4())
+    session = UploadSession(
+        session_id=session_id,
+        files_json=json.dumps({'source': 'integration'}),
+        status='validated'
+    )
+    db.session.add(session)
+    db.session.commit()
+
+    # Store dataframes in a temp file for the calculation step
+    upload_folder = os.path.join(
+        current_app.config['UPLOAD_FOLDER'], session_id
+    )
+    os.makedirs(upload_folder, exist_ok=True)
+    pickle_path = os.path.join(upload_folder, 'integration_data.pkl')
+    with open(pickle_path, 'wb') as f:
+        pickle.dump(dataframes, f)
+
+    flash('Data loaded from MG5 Integration successfully!', 'success')
+    return redirect(url_for('calculation.index'))
+
+
+@upload_bp.route('/integration-health')
+def integration_health():
+    """Check MG5integration API health (AJAX endpoint)."""
+    loader = IntegrationDataLoader()
+    result = loader.check_health()
+    return json.dumps(result), 200, {'Content-Type': 'application/json'}
 
 
 @upload_bp.route('/sessions')

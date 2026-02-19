@@ -285,7 +285,11 @@ def get_order_project_map():
 
 @api_bp.route('/accrued-income-data')
 def get_accrued_income_data():
-    """Returns all data needed for accrued income calculation in one call."""
+    """Returns all data needed for accrued income calculation in one call.
+
+    Includes pre-aggregated GL summary (income/cost by project) so the
+    consumer doesn't need raw verification rows.
+    """
     projects = Project.query.all()
     adjustments = ProjectAdjustment.query.all()
     time_data = TimeTracking.query.all()
@@ -293,8 +297,38 @@ def get_accrued_income_data():
     customer_orders = CustomerOrder.query.all()
     purchase_orders = PurchaseOrder.query.all()
     invoices = InvoiceLog.query.all()
-    verifications = Verification.query.all()
     rates = ExchangeRate.query.order_by(ExchangeRate.date.desc()).first()
+
+    # Pre-aggregate GL data by project:
+    # Income = accounts 3000-3999 (credit - debit)
+    # Cost = accounts 4000-6999 excl 4940/4950 (debit - credit)
+    from sqlalchemy import func
+    income_q = db.session.query(
+        Verification.project,
+        func.sum(Verification.credit - Verification.debit).label('net')
+    ).filter(
+        Verification.account >= 3000,
+        Verification.account <= 3999,
+        Verification.project.isnot(None),
+        Verification.project != ''
+    ).group_by(Verification.project).all()
+
+    cost_q = db.session.query(
+        Verification.project,
+        func.sum(Verification.debit - Verification.credit).label('net')
+    ).filter(
+        Verification.account >= 4000,
+        Verification.account <= 6999,
+        Verification.account != 4940,
+        Verification.account != 4950,
+        Verification.project.isnot(None),
+        Verification.project != ''
+    ).group_by(Verification.project).all()
+
+    gl_summary = {
+        'income_by_project': {row.project: float(row.net or 0) for row in income_q},
+        'cost_by_project': {row.project: float(row.net or 0) for row in cost_q},
+    }
 
     return jsonify({
         'projects': [p.to_dict() for p in projects],
@@ -304,7 +338,7 @@ def get_accrued_income_data():
         'customer_orders': [o.to_dict() for o in customer_orders],
         'purchase_orders': [o.to_dict() for o in purchase_orders],
         'invoice_log': [i.to_dict() for i in invoices],
-        'verifications_count': db.session.query(Verification).count(),
+        'gl_summary': gl_summary,
         'exchange_rates': rates.to_dict() if rates else None,
     })
 

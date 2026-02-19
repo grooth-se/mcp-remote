@@ -4,6 +4,22 @@
 {% block content %}
 <div class="row">
     <div class="col-lg-11 mx-auto">
+        <!-- Integration Load Card -->
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-database-down"></i> Load from MG5 Integration</span>
+                <span id="integrationStatus" class="badge bg-secondary">Checking...</span>
+            </div>
+            <div class="card-body py-2 d-flex align-items-center justify-content-between">
+                <small class="text-muted">Fetch all data directly from the MG5 Integration database — no Excel files needed.</small>
+                <form method="POST" action="{{ url_for('upload.from_integration') }}" id="integrationForm">
+                    <button type="submit" class="btn btn-sm btn-success" id="integrationBtn" disabled>
+                        <i class="bi bi-cloud-download"></i> Load from Integration
+                    </button>
+                </form>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-upload"></i> Load Monitor G5 Excel Files</span>
@@ -151,6 +167,32 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
         document.getElementById('uploadBtn').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         document.getElementById('uploadBtn').disabled = true;
     }
+});
+
+// Check MG5 integration health on page load
+fetch('{{ url_for("upload.integration_health") }}')
+    .then(r => r.json())
+    .then(data => {
+        const badge = document.getElementById('integrationStatus');
+        const btn = document.getElementById('integrationBtn');
+        if (data.ok) {
+            badge.className = 'badge bg-success';
+            badge.textContent = 'Connected';
+            btn.disabled = false;
+        } else {
+            badge.className = 'badge bg-danger';
+            badge.textContent = 'Offline';
+        }
+    })
+    .catch(() => {
+        document.getElementById('integrationStatus').className = 'badge bg-danger';
+        document.getElementById('integrationStatus').textContent = 'Offline';
+    });
+
+document.getElementById('integrationForm').addEventListener('submit', function() {
+    const btn = document.getElementById('integrationBtn');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Loading...';
+    btn.disabled = true;
 });
 </script>
 {% endblock %}

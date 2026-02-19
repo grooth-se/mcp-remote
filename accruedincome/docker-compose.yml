@@ -10,6 +10,7 @@ services:
       - PORTAL_AUTH_ENABLED=${PORTAL_AUTH_ENABLED:-false}
       - PORTAL_URL=${PORTAL_URL:-http://portal:5000}
       - PORTAL_EXTERNAL_URL=${PORTAL_EXTERNAL_URL:-/}
+      - MG5_INTEGRATION_URL=${MG5_INTEGRATION_URL:-http://mg5integration:5001}
     volumes:
       - accruedincome_data:/data
       - accruedincome_uploads:/app/app/static/uploads

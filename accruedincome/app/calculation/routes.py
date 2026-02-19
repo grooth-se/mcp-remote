@@ -1,6 +1,8 @@
 """Calculation blueprint routes."""
 
 import json
+import os
+import pickle
 from flask import (
     render_template, request, jsonify, flash,
     redirect, url_for, current_app
@@ -9,6 +11,25 @@ from . import calculation_bp
 from .services import AccruedIncomeCalculator
 from app.extensions import db
 from app.models import FactProjectMonthly, UploadSession
+
+
+def _load_integration_dataframes(session):
+    """Load pickled integration DataFrames for a session."""
+    upload_folder = os.path.join(
+        current_app.config['UPLOAD_FOLDER'], session.session_id
+    )
+    pickle_path = os.path.join(upload_folder, 'integration_data.pkl')
+    with open(pickle_path, 'rb') as f:
+        return pickle.load(f)
+
+
+def _is_integration_session(session):
+    """Check if upload session was loaded from MG5 integration."""
+    try:
+        files = json.loads(session.files_json)
+        return files.get('source') == 'integration'
+    except (json.JSONDecodeError, TypeError):
+        return False
 
 
 @calculation_bp.route('/')
@@ -30,12 +51,17 @@ def run():
     if not session:
         return jsonify({'status': 'error', 'message': 'Session not found'}), 404
 
-    files = json.loads(session.files_json)
     output_folder = str(current_app.config['OUTPUT_FOLDER'])
 
     try:
-        calculator = AccruedIncomeCalculator(files, output_folder)
-        result_df, closing_date = calculator.run()
+        if _is_integration_session(session):
+            dataframes = _load_integration_dataframes(session)
+            calculator = AccruedIncomeCalculator({}, output_folder)
+            result_df, closing_date = calculator.run(dataframes=dataframes)
+        else:
+            files = json.loads(session.files_json)
+            calculator = AccruedIncomeCalculator(files, output_folder)
+            result_df, closing_date = calculator.run()
 
         # Update session
         session.closing_date = closing_date
@@ -68,13 +94,18 @@ def store():
         flash('No calculated results to store', 'error')
         return redirect(url_for('calculation.index'))
 
-    files = json.loads(session.files_json)
     output_folder = str(current_app.config['OUTPUT_FOLDER'])
 
     try:
         # Re-run calculation to get DataFrame
-        calculator = AccruedIncomeCalculator(files, output_folder)
-        result_df, closing_date = calculator.run()
+        if _is_integration_session(session):
+            dataframes = _load_integration_dataframes(session)
+            calculator = AccruedIncomeCalculator({}, output_folder)
+            result_df, closing_date = calculator.run(dataframes=dataframes)
+        else:
+            files = json.loads(session.files_json)
+            calculator = AccruedIncomeCalculator(files, output_folder)
+            result_df, closing_date = calculator.run()
 
         # Delete existing records for this closing date
         FactProjectMonthly.query.filter_by(closing_date=closing_date).delete()

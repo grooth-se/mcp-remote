@@ -45,6 +45,7 @@ class AccruedIncomeCalculator:
         self.dataframes = {}
         self.result_df = None
         self.closing_date = None
+        self._gl_summary = None  # Pre-aggregated GL data (from integration)
 
     def normalize_columns(self, df):
         """Normalize Swedish column names to ASCII equivalents."""
@@ -89,6 +90,22 @@ class AccruedIncomeCalculator:
         # Remove first column from history (usually index)
         self.dataframes['Accuredhistory'] = \
             self.dataframes['Accuredhistory'].iloc[:, 1:]
+
+    def load_from_dataframes(self, dataframes: dict):
+        """Load pre-built DataFrames instead of reading Excel files.
+
+        Used by the integration loader to inject API-sourced data.
+
+        Args:
+            dataframes: Dict mapping file keys to pandas DataFrames.
+                        May include a 'gl_summary' key with pre-aggregated
+                        GL data (income_by_project, cost_by_project dicts).
+        """
+        # Extract gl_summary before storing DataFrames
+        if 'gl_summary' in dataframes:
+            self._gl_summary = dataframes.pop('gl_summary')
+
+        self.dataframes = dataframes
 
     def revaluate_purchase_orders(self):
         """Revaluate purchase orders at closing exchange rates."""
@@ -199,29 +216,47 @@ class AccruedIncomeCalculator:
         self.dataframes['projektuppf'] = df
 
     def extract_actual_from_gl(self):
-        """Extract actual income and cost from verification list (GL)."""
-        dfverl = self.dataframes['verlista']
+        """Extract actual income and cost from verification list (GL).
+
+        If pre-aggregated GL summary is available (from integration),
+        use it directly instead of processing raw verification rows.
+        """
         dfprojuppf = self.dataframes['projektuppf']
 
-        # Income: accounts 3000-3999
-        income_trans = dfverl[(dfverl['Konto'] >= 3000) & (dfverl['Konto'] <= 3999)]
-        actinkre = income_trans.groupby('Proj.')['Kredit'].sum()
-        actindeb = income_trans.groupby('Proj.')['Debet'].sum()
-        actincome = actinkre - actindeb
+        if self._gl_summary:
+            # Use pre-aggregated data from MG5integration API
+            income_map = self._gl_summary.get('income_by_project', {})
+            cost_map = self._gl_summary.get('cost_by_project', {})
 
-        # Cost: accounts 4000-6999, excluding 4940 and 4950
-        cost_trans = dfverl[
-            (dfverl['Konto'] >= 4000) &
-            (dfverl['Konto'] <= 6999) &
-            (dfverl['Konto'] != 4940) &
-            (dfverl['Konto'] != 4950)
-        ]
-        actcokre = cost_trans.groupby('Proj.')['Kredit'].sum()
-        actcodeb = cost_trans.groupby('Proj.')['Debet'].sum()
-        actcost = actcodeb - actcokre
+            dfprojuppf['act income'] = dfprojuppf.index.map(
+                lambda proj: income_map.get(str(proj), 0)
+            )
+            dfprojuppf['act cost'] = dfprojuppf.index.map(
+                lambda proj: cost_map.get(str(proj), 0)
+            )
+        else:
+            # Original path: process raw verlista Excel data
+            dfverl = self.dataframes['verlista']
 
-        dfprojuppf['act income'] = actincome
-        dfprojuppf['act cost'] = actcost
+            # Income: accounts 3000-3999
+            income_trans = dfverl[(dfverl['Konto'] >= 3000) & (dfverl['Konto'] <= 3999)]
+            actinkre = income_trans.groupby('Proj.')['Kredit'].sum()
+            actindeb = income_trans.groupby('Proj.')['Debet'].sum()
+            actincome = actinkre - actindeb
+
+            # Cost: accounts 4000-6999, excluding 4940 and 4950
+            cost_trans = dfverl[
+                (dfverl['Konto'] >= 4000) &
+                (dfverl['Konto'] <= 6999) &
+                (dfverl['Konto'] != 4940) &
+                (dfverl['Konto'] != 4950)
+            ]
+            actcokre = cost_trans.groupby('Proj.')['Kredit'].sum()
+            actcodeb = cost_trans.groupby('Proj.')['Debet'].sum()
+            actcost = actcodeb - actcokre
+
+            dfprojuppf['act income'] = actincome
+            dfprojuppf['act cost'] = actcost
 
         self.dataframes['projektuppf'] = dfprojuppf
 
@@ -447,14 +482,21 @@ class AccruedIncomeCalculator:
 
         self.dataframes['Accuredhistory'] = dfacchist
 
-    def run(self):
+    def run(self, dataframes=None):
         """Execute complete calculation pipeline.
+
+        Args:
+            dataframes: Optional dict of pre-built DataFrames (from integration).
+                        If provided, skips load_files() and uses these instead.
 
         Returns:
             tuple: (result_dataframe, closing_date)
         """
-        # Load all files
-        self.load_files()
+        # Load data from either pre-built DataFrames or Excel files
+        if dataframes:
+            self.load_from_dataframes(dataframes)
+        else:
+            self.load_files()
 
         # Step 1: Revaluate purchase orders
         self.revaluate_purchase_orders()
