@@ -50,20 +50,28 @@ def _ensure_local_user(portal_user):
         from app.models import User
 
         username = portal_user.get("username", "portal_user")
+        # Resolve role: prefer portal-provided role, then fall back to admin check
+        portal_role = portal_user.get("role") or ("admin" if portal_user.get("is_admin") else "engineer")
+
         user = User.query.filter_by(username=username).first()
         if not user:
-            role = "admin" if portal_user.get("is_admin") else "engineer"
-            user = User(username=username, role=role)
+            user = User(username=username, role=portal_role)
             if portal_user.get("display_name"):
                 user.full_name = portal_user["display_name"]
             # Generate a Durabler-style user_id
             if hasattr(User, "generate_user_id"):
-                user.user_id = User.generate_user_id(role)
+                user.user_id = User.generate_user_id(portal_role)
             if hasattr(user, "set_password"):
                 import secrets
                 user.set_password(secrets.token_hex(32))
             db.session.add(user)
             db.session.commit()
+        else:
+            # Sync role for existing users on every login
+            if getattr(user, "role", None) != portal_role:
+                user.role = portal_role
+                db.session.commit()
+
         login_user(user)
         return True
     except Exception:

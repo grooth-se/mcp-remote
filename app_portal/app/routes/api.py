@@ -39,6 +39,22 @@ def validate_token_endpoint():
             Application.id.in_(app_ids), Application.is_active == True  # noqa: E712
         ).all()]
 
+    # Resolve role for the requested app
+    role = None
+    if app_code:
+        target_app = Application.query.filter_by(app_code=app_code).first()
+        if target_app:
+            if user.is_admin:
+                # Admins get "admin" role if the app has roles, otherwise None
+                if target_app.get_available_roles():
+                    role = 'admin'
+            else:
+                perm = UserPermission.query.filter_by(
+                    user_id=user.id, app_id=target_app.id
+                ).first()
+                if perm:
+                    role = perm.role or target_app.default_role
+
     return jsonify({
         'valid': True,
         'user': {
@@ -46,6 +62,7 @@ def validate_token_endpoint():
             'username': user.username,
             'display_name': user.display_name,
             'is_admin': user.is_admin,
+            'role': role,
         },
         'permissions': permitted,
     })

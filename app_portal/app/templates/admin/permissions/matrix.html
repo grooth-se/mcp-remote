@@ -30,13 +30,36 @@
                     <td class="text-center">
                         {% if user.is_admin %}
                         <i class="bi bi-check-circle-fill text-success" title="Admin - all access"></i>
+                        {% if app.get_available_roles() %}
+                        <div class="mt-1">
+                            <span class="badge bg-secondary">admin</span>
+                        </div>
+                        {% endif %}
                         {% else %}
+                        {% set perm = perms.get((user.id, app.id)) %}
                         <div class="form-check d-flex justify-content-center">
                             <input type="checkbox" class="form-check-input perm-checkbox"
                                    data-user-id="{{ user.id }}"
                                    data-app-id="{{ app.id }}"
-                                   {{ 'checked' if perms.get((user.id, app.id)) }}>
+                                   data-has-roles="{{ 'true' if app.get_available_roles() else 'false' }}"
+                                   data-default-role="{{ app.default_role or '' }}"
+                                   {{ 'checked' if perm }}>
                         </div>
+                        {% if app.get_available_roles() %}
+                        <div class="role-select mt-1" style="{{ 'display:none' if not perm }}">
+                            <select class="form-select form-select-sm role-dropdown"
+                                    data-user-id="{{ user.id }}"
+                                    data-app-id="{{ app.id }}"
+                                    {{ 'disabled' if not perm }}>
+                                {% for role in app.get_available_roles() %}
+                                <option value="{{ role }}"
+                                    {{ 'selected' if perm and perm.role == role }}>
+                                    {{ role|capitalize }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
                         {% endif %}
                     </td>
                     {% endfor %}
@@ -52,29 +75,85 @@
 
 {% block extra_js %}
 <script>
+const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+const statusEl = document.getElementById('perm-status');
+
+function showStatus(msg) {
+    statusEl.textContent = msg;
+    setTimeout(() => statusEl.textContent = '', 2000);
+}
+
+// Toggle permission checkbox
 document.querySelectorAll('.perm-checkbox').forEach(cb => {
     cb.addEventListener('change', function() {
-        const userId = this.dataset.userId;
-        const appId = this.dataset.appId;
+        const userId = parseInt(this.dataset.userId);
+        const appId = parseInt(this.dataset.appId);
         const granted = this.checked;
-        const status = document.getElementById('perm-status');
+        const hasRoles = this.dataset.hasRoles === 'true';
+        const cell = this.closest('td');
+        const roleDiv = cell.querySelector('.role-select');
+        const roleSelect = cell.querySelector('.role-dropdown');
+
+        // Get selected role if granting access with roles
+        let role = null;
+        if (granted && hasRoles && roleSelect) {
+            role = roleSelect.value || this.dataset.defaultRole || null;
+        }
 
         fetch('{{ url_for("admin_permissions.update") }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                'X-CSRFToken': csrfToken
             },
-            body: JSON.stringify({ user_id: parseInt(userId), app_id: parseInt(appId), granted })
+            body: JSON.stringify({ user_id: userId, app_id: appId, granted, role })
         })
         .then(r => r.json())
         .then(data => {
-            status.textContent = `Permission ${data.status}.`;
-            setTimeout(() => status.textContent = '', 2000);
+            showStatus(`Permission ${data.status}.`);
+            if (roleDiv) {
+                if (granted) {
+                    roleDiv.style.display = '';
+                    roleSelect.disabled = false;
+                    if (data.role) roleSelect.value = data.role;
+                } else {
+                    roleDiv.style.display = 'none';
+                    roleSelect.disabled = true;
+                }
+            }
         })
         .catch(err => {
-            status.textContent = 'Error updating permission.';
+            showStatus('Error updating permission.');
             this.checked = !granted;
+        });
+    });
+});
+
+// Role dropdown change
+document.querySelectorAll('.role-dropdown').forEach(sel => {
+    sel.addEventListener('change', function() {
+        const userId = parseInt(this.dataset.userId);
+        const appId = parseInt(this.dataset.appId);
+        const role = this.value;
+
+        fetch('{{ url_for("admin_permissions.set_role") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ user_id: userId, app_id: appId, role })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'updated') {
+                showStatus(`Role updated to ${data.role}.`);
+            } else {
+                showStatus(data.error || 'Error updating role.');
+            }
+        })
+        .catch(err => {
+            showStatus('Error updating role.');
         });
     });
 });

@@ -8,6 +8,7 @@ class UserPermission(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     app_id = db.Column(db.Integer, db.ForeignKey('applications.id', ondelete='CASCADE'), nullable=False)
+    role = db.Column(db.String(50), nullable=True)
     granted_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     granted_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
