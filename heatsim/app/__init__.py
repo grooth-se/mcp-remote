@@ -50,6 +50,10 @@ def create_app(config_name='default'):
     login_manager.init_app(app)
     csrf.init_app(app)
 
+    # Portal auth middleware (ScriptNameMiddleware + token validation)
+    from .portal_auth import init_portal_auth
+    init_portal_auth(app)
+
     # Configure login
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'
