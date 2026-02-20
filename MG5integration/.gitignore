@@ -6,3 +6,6 @@ instance/
 .env
 *.xlsx
 data/excel_exports/
+*.png
+*.jpg
+*.jpeg
