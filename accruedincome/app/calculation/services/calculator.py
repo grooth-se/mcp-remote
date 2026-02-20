@@ -198,8 +198,9 @@ class AccruedIncomeCalculator:
             (df['Forvan. intakt'] - df['Utf., intakt'])
 
         # Clean up infinities and NaN
-        df.replace([np.inf, -np.inf], 0, inplace=True)
-        df.fillna(0, inplace=True)
+        numeric_cols = df.select_dtypes(include='number').columns
+        df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], 0)
+        df[numeric_cols] = df[numeric_cols].fillna(0)
 
         # Risk/contingency
         df['risk'] = df['accured income'] * df['complex']
@@ -210,8 +211,9 @@ class AccruedIncomeCalculator:
         df.loc[df['fardiggrad'] == 1, 'accured income'] = 0
         df.loc[df['incl'] == False, 'accured income'] = 0
 
-        df.replace([np.inf, -np.inf], 0, inplace=True)
-        df.fillna(0, inplace=True)
+        numeric_cols = df.select_dtypes(include='number').columns
+        df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], 0)
+        df[numeric_cols] = df[numeric_cols].fillna(0)
 
         self.dataframes['projektuppf'] = df
 
@@ -349,8 +351,9 @@ class AccruedIncomeCalculator:
         df = self.dataframes['projektuppf']
 
         # Clean up
-        df.replace([np.inf, -np.inf], 0, inplace=True)
-        df.fillna(0, inplace=True)
+        numeric_cols = df.select_dtypes(include='number').columns
+        df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], 0)
+        df[numeric_cols] = df[numeric_cols].fillna(0)
 
         # Remaining income with milestone adjustment
         df['Remaining income CUR'] = df['Milestone'] + \
@@ -410,8 +413,9 @@ class AccruedIncomeCalculator:
                'accured income CUR'] = 0
         df.loc[df['incl'] == False, 'accured income CUR'] = 0
 
-        df.replace([np.inf, -np.inf], 0, inplace=True)
-        df.fillna(0, inplace=True)
+        numeric_cols = df.select_dtypes(include='number').columns
+        df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], 0)
+        df[numeric_cols] = df[numeric_cols].fillna(0)
 
         self.dataframes['projektuppf'] = df
 
@@ -425,8 +429,9 @@ class AccruedIncomeCalculator:
         df['diffcost'] = df['Forvan. kostnad'] - df['Remaining cost'] - \
             df['act cost'] - df['CM cost'] - df['costcalcadj'] + df['puradj']
 
-        df.replace([np.inf, -np.inf], 0, inplace=True)
-        df.fillna(0, inplace=True)
+        numeric_cols = df.select_dtypes(include='number').columns
+        df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], 0)
+        df[numeric_cols] = df[numeric_cols].fillna(0)
 
         self.dataframes['projektuppf'] = df
 
