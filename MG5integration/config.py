@@ -6,6 +6,10 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    APP_CODE = os.environ.get('APP_CODE', 'mg5integration')
+    PORTAL_AUTH_ENABLED = os.environ.get('PORTAL_AUTH_ENABLED', 'false').lower() == 'true'
+    PORTAL_URL = os.environ.get('PORTAL_URL', 'http://portal:5000')
+    PORTAL_EXTERNAL_URL = os.environ.get('PORTAL_EXTERNAL_URL', '/')
 
     # Local storage
     SQLALCHEMY_DATABASE_URI = os.environ.get(

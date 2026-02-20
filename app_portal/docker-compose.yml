@@ -30,6 +30,7 @@ services:
       - FLASK_CONFIG=production
       - SECRET_KEY=${ACCRUEDINCOME_SECRET_KEY:-change-me}
       - DATABASE_URL=sqlite:////data/accrued.db
+      - APP_CODE=accruedincome
       - PORTAL_URL=http://portal:5000
       - PORTAL_EXTERNAL_URL=/
       - PORTAL_AUTH_ENABLED=true
@@ -47,6 +48,7 @@ services:
       - FLASK_CONFIG=production
       - SECRET_KEY=${DURABLER2_SECRET_KEY:-change-me}
       - DATABASE_URL=sqlite:////data/durabler.db
+      - APP_CODE=durabler2
       - PORTAL_URL=http://portal:5000
       - PORTAL_AUTH_ENABLED=true
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
@@ -65,6 +67,7 @@ services:
     environment:
       - FLASK_CONFIG=production
       - SECRET_KEY=${HEATSIM_SECRET_KEY:-change-me}
+      - APP_CODE=heatsim
       - PORTAL_URL=http://portal:5000
       - PORTAL_AUTH_ENABLED=true
     volumes:
@@ -80,6 +83,7 @@ services:
     environment:
       - FLASK_CONFIG=production
       - SECRET_KEY=${MG5_SECRET_KEY:-change-me}
+      - APP_CODE=mg5integration
       - PORTAL_URL=http://portal:5000
       - PORTAL_AUTH_ENABLED=true
     volumes:
@@ -92,6 +96,7 @@ services:
   spinventory:
     build: ../SPInventory
     environment:
+      - APP_CODE=spinventory
       - PORTAL_URL=http://portal:5000
       - PORTAL_AUTH_ENABLED=true
     volumes:

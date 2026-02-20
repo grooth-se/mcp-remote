@@ -10,6 +10,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
 
     # Portal authentication
+    APP_CODE = os.environ.get("APP_CODE", "heatsim")
     PORTAL_AUTH_ENABLED = os.environ.get("PORTAL_AUTH_ENABLED", "false").lower() == "true"
     PORTAL_URL = os.environ.get("PORTAL_URL", "http://portal:5000")
     PORTAL_EXTERNAL_URL = os.environ.get("PORTAL_EXTERNAL_URL", "/")
