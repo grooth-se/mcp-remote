@@ -139,6 +139,9 @@ def init_portal_auth(app):
             return
         if request.path.startswith("/static/"):
             return
+        # Allow internal API calls (container-to-container communication)
+        if request.path.startswith("/api/"):
+            return
         if not current_app.config.get("PORTAL_AUTH_ENABLED", False):
             return
 
