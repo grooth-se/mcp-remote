@@ -51,7 +51,7 @@ def _ensure_local_user(portal_user):
 
         username = portal_user.get("username", "portal_user")
         # Resolve role: prefer portal-provided role, then fall back to admin check
-        portal_role = portal_user.get("role") or ("Administrator" if portal_user.get("is_admin") else "Operator")
+        portal_role = portal_user.get("role") or ("admin" if portal_user.get("is_admin") else "operator")
 
         user = User.query.filter_by(username=username).first()
         if not user:

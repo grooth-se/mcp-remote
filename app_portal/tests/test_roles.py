@@ -4,53 +4,73 @@ from app.models.application import Application
 from app.models.permission import UserPermission
 from app.services.token_service import generate_token
 
+DURABLER_ROLES = {
+    'operator': 'Operator',
+    'engineer': 'Test Engineer',
+    'approver': 'Approver',
+    'admin': 'Administrator',
+}
+
 
 # --- Application model helpers ---
 
 def test_get_available_roles_empty(app, sample_app):
-    assert sample_app.get_available_roles() == []
+    assert sample_app.get_available_roles() == {}
 
 
-def test_get_available_roles_with_data(app, db):
+def test_get_available_roles_with_dict(app, db):
     application = Application(
         app_code='roleapp', app_name='Role App',
         internal_url='http://localhost:9000',
-        available_roles=json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        default_role='Operator',
+        available_roles=json.dumps(DURABLER_ROLES),
+        default_role='operator',
     )
     db.session.add(application)
     db.session.commit()
-    assert application.get_available_roles() == ['Administrator', 'Test Engineer', 'Approved', 'Operator']
-    assert application.default_role == 'Operator'
+    roles = application.get_available_roles()
+    assert roles == DURABLER_ROLES
+    assert application.default_role == 'operator'
+
+
+def test_get_available_roles_legacy_list(app, db):
+    """Legacy list format is converted to {value: value} dict."""
+    application = Application(
+        app_code='legacyapp', app_name='Legacy App',
+        internal_url='http://localhost:9000',
+        available_roles=json.dumps(['admin', 'viewer']),
+    )
+    db.session.add(application)
+    db.session.commit()
+    assert application.get_available_roles() == {'admin': 'admin', 'viewer': 'viewer'}
 
 
 def test_set_available_roles(app, sample_app, db):
-    sample_app.set_available_roles(['Administrator', 'Operator'])
+    sample_app.set_available_roles({'admin': 'Admin', 'user': 'User'})
     db.session.commit()
-    assert sample_app.get_available_roles() == ['Administrator', 'Operator']
+    assert sample_app.get_available_roles() == {'admin': 'Admin', 'user': 'User'}
 
 
 def test_set_available_roles_clears(app, sample_app, db):
-    sample_app.set_available_roles(['Administrator'])
+    sample_app.set_available_roles({'admin': 'Admin'})
     db.session.commit()
     sample_app.set_available_roles(None)
     db.session.commit()
-    assert sample_app.get_available_roles() == []
+    assert sample_app.get_available_roles() == {}
 
 
 def test_get_available_roles_invalid_json(app, sample_app, db):
     sample_app.available_roles = 'not-json'
     db.session.commit()
-    assert sample_app.get_available_roles() == []
+    assert sample_app.get_available_roles() == {}
 
 
 # --- UserPermission role column ---
 
 def test_permission_with_role(app, db, normal_user, sample_app):
-    perm = UserPermission(user_id=normal_user.id, app_id=sample_app.id, role='Test Engineer')
+    perm = UserPermission(user_id=normal_user.id, app_id=sample_app.id, role='engineer')
     db.session.add(perm)
     db.session.commit()
-    assert perm.role == 'Test Engineer'
+    assert perm.role == 'engineer'
 
 
 def test_permission_role_nullable(app, db, normal_user, sample_app):
@@ -67,12 +87,12 @@ def test_validate_token_returns_role_for_user(client, app, db, normal_user):
     application = Application(
         app_code='durabler2', app_name='Durabler2',
         internal_url='http://localhost:5005',
-        available_roles=json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        default_role='Operator',
+        available_roles=json.dumps(DURABLER_ROLES),
+        default_role='operator',
     )
     db.session.add(application)
     db.session.flush()
-    perm = UserPermission(user_id=normal_user.id, app_id=application.id, role='Test Engineer')
+    perm = UserPermission(user_id=normal_user.id, app_id=application.id, role='engineer')
     db.session.add(perm)
     db.session.commit()
 
@@ -84,7 +104,7 @@ def test_validate_token_returns_role_for_user(client, app, db, normal_user):
         content_type='application/json')
     data = resp.get_json()
     assert data['valid'] is True
-    assert data['user']['role'] == 'Test Engineer'
+    assert data['user']['role'] == 'engineer'
 
 
 def test_validate_token_returns_default_role(client, app, db, normal_user):
@@ -92,8 +112,8 @@ def test_validate_token_returns_default_role(client, app, db, normal_user):
     application = Application(
         app_code='durabler2', app_name='Durabler2',
         internal_url='http://localhost:5005',
-        available_roles=json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        default_role='Operator',
+        available_roles=json.dumps(DURABLER_ROLES),
+        default_role='operator',
     )
     db.session.add(application)
     db.session.flush()
@@ -109,16 +129,16 @@ def test_validate_token_returns_default_role(client, app, db, normal_user):
         content_type='application/json')
     data = resp.get_json()
     assert data['valid'] is True
-    assert data['user']['role'] == 'Operator'
+    assert data['user']['role'] == 'operator'
 
 
-def test_validate_token_admin_gets_administrator_role(client, app, db, admin_user):
-    """Admin users get role='Administrator' for apps with roles."""
+def test_validate_token_admin_gets_admin_role(client, app, db, admin_user):
+    """Admin users get role='admin' for apps with roles."""
     application = Application(
         app_code='durabler2', app_name='Durabler2',
         internal_url='http://localhost:5005',
-        available_roles=json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        default_role='Operator',
+        available_roles=json.dumps(DURABLER_ROLES),
+        default_role='operator',
     )
     db.session.add(application)
     db.session.commit()
@@ -131,7 +151,7 @@ def test_validate_token_admin_gets_administrator_role(client, app, db, admin_use
         content_type='application/json')
     data = resp.get_json()
     assert data['valid'] is True
-    assert data['user']['role'] == 'Administrator'
+    assert data['user']['role'] == 'admin'
 
 
 def test_validate_token_no_role_for_app_without_roles(client, app, db, normal_user, sample_app):
@@ -170,8 +190,8 @@ def test_grant_permission_with_role(logged_in_client, db, normal_user):
     application = Application(
         app_code='durabler2', app_name='Durabler2',
         internal_url='http://localhost:5005',
-        available_roles=json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        default_role='Operator',
+        available_roles=json.dumps(DURABLER_ROLES),
+        default_role='operator',
     )
     db.session.add(application)
     db.session.commit()
@@ -181,23 +201,23 @@ def test_grant_permission_with_role(logged_in_client, db, normal_user):
             'user_id': normal_user.id,
             'app_id': application.id,
             'granted': True,
-            'role': 'Test Engineer',
+            'role': 'engineer',
         }),
         content_type='application/json')
     data = resp.get_json()
     assert data['status'] == 'granted'
-    assert data['role'] == 'Test Engineer'
+    assert data['role'] == 'engineer'
 
     perm = UserPermission.query.filter_by(user_id=normal_user.id, app_id=application.id).first()
-    assert perm.role == 'Test Engineer'
+    assert perm.role == 'engineer'
 
 
 def test_grant_permission_uses_default_role(logged_in_client, db, normal_user):
     application = Application(
         app_code='durabler2', app_name='Durabler2',
         internal_url='http://localhost:5005',
-        available_roles=json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        default_role='Operator',
+        available_roles=json.dumps(DURABLER_ROLES),
+        default_role='operator',
     )
     db.session.add(application)
     db.session.commit()
@@ -211,7 +231,7 @@ def test_grant_permission_uses_default_role(logged_in_client, db, normal_user):
         content_type='application/json')
     data = resp.get_json()
     assert data['status'] == 'granted'
-    assert data['role'] == 'Operator'
+    assert data['role'] == 'operator'
 
 
 # --- Set role endpoint ---
@@ -220,12 +240,12 @@ def test_set_role(logged_in_client, db, normal_user):
     application = Application(
         app_code='durabler2', app_name='Durabler2',
         internal_url='http://localhost:5005',
-        available_roles=json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        default_role='Operator',
+        available_roles=json.dumps(DURABLER_ROLES),
+        default_role='operator',
     )
     db.session.add(application)
     db.session.flush()
-    perm = UserPermission(user_id=normal_user.id, app_id=application.id, role='Operator')
+    perm = UserPermission(user_id=normal_user.id, app_id=application.id, role='operator')
     db.session.add(perm)
     db.session.commit()
 
@@ -233,27 +253,27 @@ def test_set_role(logged_in_client, db, normal_user):
         data=json.dumps({
             'user_id': normal_user.id,
             'app_id': application.id,
-            'role': 'Test Engineer',
+            'role': 'approver',
         }),
         content_type='application/json')
     data = resp.get_json()
     assert data['status'] == 'updated'
-    assert data['role'] == 'Test Engineer'
+    assert data['role'] == 'approver'
 
     perm = UserPermission.query.filter_by(user_id=normal_user.id, app_id=application.id).first()
-    assert perm.role == 'Test Engineer'
+    assert perm.role == 'approver'
 
 
 def test_set_role_invalid_role(logged_in_client, db, normal_user):
     application = Application(
         app_code='durabler2', app_name='Durabler2',
         internal_url='http://localhost:5005',
-        available_roles=json.dumps(['Administrator', 'Operator']),
-        default_role='Operator',
+        available_roles=json.dumps(DURABLER_ROLES),
+        default_role='operator',
     )
     db.session.add(application)
     db.session.flush()
-    perm = UserPermission(user_id=normal_user.id, app_id=application.id, role='Operator')
+    perm = UserPermission(user_id=normal_user.id, app_id=application.id, role='operator')
     db.session.add(perm)
     db.session.commit()
 
@@ -272,7 +292,7 @@ def test_set_role_no_permission(logged_in_client, db, normal_user, sample_app):
         data=json.dumps({
             'user_id': normal_user.id,
             'app_id': sample_app.id,
-            'role': 'Administrator',
+            'role': 'admin',
         }),
         content_type='application/json')
     assert resp.status_code == 404
@@ -284,12 +304,12 @@ def test_permission_matrix_shows_roles(logged_in_client, db, normal_user):
     application = Application(
         app_code='durabler2', app_name='Durabler2',
         internal_url='http://localhost:5005',
-        available_roles=json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        default_role='Operator',
+        available_roles=json.dumps(DURABLER_ROLES),
+        default_role='operator',
     )
     db.session.add(application)
     db.session.flush()
-    perm = UserPermission(user_id=normal_user.id, app_id=application.id, role='Test Engineer')
+    perm = UserPermission(user_id=normal_user.id, app_id=application.id, role='engineer')
     db.session.add(perm)
     db.session.commit()
 

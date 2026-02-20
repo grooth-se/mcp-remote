@@ -27,10 +27,11 @@
                         {% endif %}
                     </td>
                     {% for app in apps %}
+                    {% set roles = app.get_available_roles() %}
                     <td class="text-center">
                         {% if user.is_admin %}
                         <i class="bi bi-check-circle-fill text-success" title="Admin - all access"></i>
-                        {% if app.get_available_roles() %}
+                        {% if roles %}
                         <div class="mt-1">
                             <span class="badge bg-secondary">Administrator</span>
                         </div>
@@ -41,20 +42,20 @@
                             <input type="checkbox" class="form-check-input perm-checkbox"
                                    data-user-id="{{ user.id }}"
                                    data-app-id="{{ app.id }}"
-                                   data-has-roles="{{ 'true' if app.get_available_roles() else 'false' }}"
+                                   data-has-roles="{{ 'true' if roles else 'false' }}"
                                    data-default-role="{{ app.default_role or '' }}"
                                    {{ 'checked' if perm }}>
                         </div>
-                        {% if app.get_available_roles() %}
+                        {% if roles %}
                         <div class="role-select mt-1" style="{{ 'display:none' if not perm }}">
                             <select class="form-select form-select-sm role-dropdown"
                                     data-user-id="{{ user.id }}"
                                     data-app-id="{{ app.id }}"
                                     {{ 'disabled' if not perm }}>
-                                {% for role in app.get_available_roles() %}
-                                <option value="{{ role }}"
-                                    {{ 'selected' if perm and perm.role == role }}>
-                                    {{ role }}
+                                {% for value, label in roles.items() %}
+                                <option value="{{ value }}"
+                                    {{ 'selected' if perm and perm.role == value }}>
+                                    {{ label }}
                                 </option>
                                 {% endfor %}
                             </select>
@@ -147,7 +148,7 @@ document.querySelectorAll('.role-dropdown').forEach(sel => {
         .then(r => r.json())
         .then(data => {
             if (data.status === 'updated') {
-                showStatus(`Role updated to ${data.role}.`);
+                showStatus(`Role updated.`);
             } else {
                 showStatus(data.error || 'Error updating role.');
             }

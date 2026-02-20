@@ -14,8 +14,13 @@ from app.extensions import db
 # Role definitions per app
 APP_ROLES = {
     'durabler2': {
-        'available_roles': json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        'default_role': 'Operator',
+        'available_roles': json.dumps({
+            'operator': 'Operator',
+            'engineer': 'Test Engineer',
+            'approver': 'Approver',
+            'admin': 'Administrator',
+        }),
+        'default_role': 'operator',
     },
 }
 

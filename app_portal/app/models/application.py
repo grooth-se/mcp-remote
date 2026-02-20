@@ -23,18 +23,28 @@ class Application(db.Model):
     permissions = db.relationship('UserPermission', back_populates='app', cascade='all, delete-orphan')
 
     def get_available_roles(self):
-        """Return list of available roles, or empty list if none configured."""
-        if not self.available_roles:
-            return []
-        try:
-            return json.loads(self.available_roles)
-        except (json.JSONDecodeError, TypeError):
-            return []
+        """Return available roles as dict {value: label}, or empty dict.
 
-    def set_available_roles(self, roles_list):
-        """Set available roles from a list of strings."""
-        if roles_list:
-            self.available_roles = json.dumps(roles_list)
+        Supports both formats:
+        - dict: {"operator": "Operator", "engineer": "Test Engineer"}
+        - list (legacy): ["admin", "engineer"] -> {"admin": "admin", ...}
+        """
+        if not self.available_roles:
+            return {}
+        try:
+            data = json.loads(self.available_roles)
+            if isinstance(data, dict):
+                return data
+            if isinstance(data, list):
+                return {v: v for v in data}
+            return {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def set_available_roles(self, roles):
+        """Set available roles from a dict {value: label} or None to clear."""
+        if roles:
+            self.available_roles = json.dumps(roles)
         else:
             self.available_roles = None
 

@@ -87,9 +87,9 @@ def set_role():
         return jsonify({'error': 'Permission not found'}), 404
 
     application = db.session.get(Application, app_id)
-    available = application.get_available_roles() if application else []
+    available = application.get_available_roles() if application else {}
     if available and role and role not in available:
-        return jsonify({'error': f'Invalid role. Must be one of: {available}'}), 400
+        return jsonify({'error': f'Invalid role. Must be one of: {list(available.keys())}'}), 400
 
     old_role = perm.role
     perm.role = role

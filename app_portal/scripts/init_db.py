@@ -52,8 +52,13 @@ DEFAULT_APPS = [
         'internal_url': 'http://durabler2:5005',
         'icon': 'bi-clipboard2-data',
         'display_order': 5,
-        'available_roles': json.dumps(['Administrator', 'Test Engineer', 'Approved', 'Operator']),
-        'default_role': 'Operator',
+        'available_roles': json.dumps({
+            'operator': 'Operator',
+            'engineer': 'Test Engineer',
+            'approver': 'Approver',
+            'admin': 'Administrator',
+        }),
+        'default_role': 'operator',
     },
     {
         'app_code': 'spinventory',
