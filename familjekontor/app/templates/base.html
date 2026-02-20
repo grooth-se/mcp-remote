@@ -31,17 +31,21 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('dashboard.') %}active{% endif %}" href="{{ url_for('dashboard.index') }}"><i class="bi bi-house"></i> Start</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('family.') %}active{% endif %}"
-                           href="{{ url_for('family.index') }}">
-                            <i class="bi bi-house-heart"></i> Översikt
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('dashboard.') or request.endpoint.startswith('family.') or request.endpoint.startswith('companies.') or request.endpoint.startswith('documents.') or request.endpoint.startswith('admin.')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-house"></i> Start
                         </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('companies.') %}active{% endif %}" href="{{ url_for('companies.index') }}"><i class="bi bi-building"></i> Företag</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('dashboard.index') }}"><i class="bi bi-house"></i> Dashboard</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('family.index') }}"><i class="bi bi-house-heart"></i> Översikt</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('companies.index') }}"><i class="bi bi-building"></i> Företag</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('documents.index') }}"><i class="bi bi-folder2-open"></i> Dokument</a></li>
+                            {% if current_user.is_admin %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.users') }}"><i class="bi bi-people"></i> Användare</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.audit_log') }}"><i class="bi bi-journal-check"></i> Revisionslogg</a></li>
+                            {% endif %}
+                        </ul>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {% if request.endpoint and (request.endpoint.startswith('accounting.') or request.endpoint.startswith('invoices.') or request.endpoint.startswith('recurring.') or request.endpoint.startswith('payments.') or request.endpoint.startswith('closing.') or request.endpoint.startswith('currency.') or request.endpoint.startswith('sie.')) %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
@@ -127,22 +131,8 @@
                         </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('documents.') %}active{% endif %}" href="{{ url_for('documents.index') }}"><i class="bi bi-folder2-open"></i> Dokument</a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint and request.endpoint.startswith('ai.') %}active{% endif %}" href="{{ url_for('ai.index') }}"><i class="bi bi-robot"></i> AI</a>
                     </li>
-                    {% if current_user.is_admin %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if request.endpoint and request.endpoint.startswith('admin.') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-gear"></i> Admin
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ url_for('admin.users') }}">Användare</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin.audit_log') }}">Revisionslogg</a></li>
-                        </ul>
-                    </li>
-                    {% endif %}
                 </ul>
                 <form class="d-flex mx-3 position-relative" id="global-search-form" autocomplete="off" onsubmit="return false;">
                     <input type="text" class="form-control form-control-sm" id="global-search-input"
