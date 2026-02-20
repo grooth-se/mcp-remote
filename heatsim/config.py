@@ -9,6 +9,11 @@ class Config:
     """Base configuration."""
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
 
+    # Portal authentication
+    PORTAL_AUTH_ENABLED = os.environ.get("PORTAL_AUTH_ENABLED", "false").lower() == "true"
+    PORTAL_URL = os.environ.get("PORTAL_URL", "http://portal:5000")
+    PORTAL_EXTERNAL_URL = os.environ.get("PORTAL_EXTERNAL_URL", "/")
+
     # SQLite for user management (primary database for Flask-SQLAlchemy)
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         f"sqlite:///{basedir / 'instance' / 'users.db'}"
@@ -65,6 +70,7 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     SQLALCHEMY_BINDS = {'materials': 'sqlite://'}
     WTF_CSRF_ENABLED = False
+    PORTAL_AUTH_ENABLED = False
 
 
 config = {
