@@ -37,9 +37,12 @@ def create_app(config_name='default'):
     from app.review import review_bp
     app.register_blueprint(review_bp, url_prefix='/review')
 
-    # Create tables
+    # Create tables only if database doesn't exist yet
     with app.app_context():
         from app import models  # noqa: F401
-        db.create_all()
+        import os
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        if not os.path.exists(db_path):
+            db.create_all()
 
     return app
