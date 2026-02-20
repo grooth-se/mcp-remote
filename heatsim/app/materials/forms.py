@@ -268,6 +268,13 @@ class SteelCompositionForm(FlaskForm):
         render_kw={'placeholder': '0.0', 'step': '0.0001'}
     )
 
+    # Tempering properties
+    hollomon_jaffe_c = FloatField(
+        'Hollomon-Jaffe Constant (Hp)',
+        validators=[Optional(), NumberRange(min=10, max=30)],
+        render_kw={'placeholder': '20.0', 'step': '0.1'}
+    )
+
     # Metadata
     source = StringField(
         'Data Source',

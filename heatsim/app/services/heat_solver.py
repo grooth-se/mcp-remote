@@ -904,7 +904,7 @@ class HeatSolver:
             return None
         t_500 = times[idx_500[0]]
 
-        return t_500 - t_800
+        return float(t_500 - t_800)
 
 
 class MultiPhaseHeatSolver:

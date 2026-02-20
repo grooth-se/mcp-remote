@@ -568,6 +568,7 @@ def composition(id):
         form.sulfur.data = existing.sulfur
         form.nitrogen.data = existing.nitrogen
         form.boron.data = existing.boron
+        form.hollomon_jaffe_c.data = existing.hollomon_jaffe_c
         form.source.data = existing.source
         form.notes.data = existing.notes
 
@@ -588,6 +589,7 @@ def composition(id):
                 'sulfur': form.sulfur.data or 0.0,
                 'nitrogen': form.nitrogen.data or 0.0,
                 'boron': form.boron.data or 0.0,
+                'hollomon_jaffe_c': form.hollomon_jaffe_c.data or 20.0,
                 'source': form.source.data,
                 'notes': form.notes.data,
             }
@@ -606,6 +608,7 @@ def composition(id):
             existing.sulfur = form.sulfur.data or 0.0
             existing.nitrogen = form.nitrogen.data or 0.0
             existing.boron = form.boron.data or 0.0
+            existing.hollomon_jaffe_c = form.hollomon_jaffe_c.data or 20.0
             existing.source = form.source.data
             existing.notes = form.notes.data
             if changes:
@@ -628,6 +631,7 @@ def composition(id):
                 sulfur=form.sulfur.data or 0.0,
                 nitrogen=form.nitrogen.data or 0.0,
                 boron=form.boron.data or 0.0,
+                hollomon_jaffe_c=form.hollomon_jaffe_c.data or 20.0,
                 source=form.source.data,
                 notes=form.notes.data
             )

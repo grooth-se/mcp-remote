@@ -1221,41 +1221,76 @@ def create_hardness_profile_plot(
     hv_values = [hardness_result.hardness_hv.get(p, 0) for p in positions]
     hrc_values = [hardness_result.hardness_hrc.get(p) for p in positions]
 
-    # Color gradient: blue (cool center) to red (hot surface)
-    colors = ['#3498db', '#2ecc71', '#f39c12', '#e74c3c']
+    # Check if tempered hardness data exists
+    has_tempered = bool(getattr(hardness_result, 'tempered_hardness_hv', None)
+                        and hardness_result.tempered_hardness_hv)
 
-    # Create bar chart
     x = np.arange(len(labels))
-    bars = ax.bar(x, hv_values, color=colors, edgecolor='black', linewidth=1.5)
 
-    # Add value labels on bars
-    for i, (bar, hv, hrc) in enumerate(zip(bars, hv_values, hrc_values)):
-        height = bar.get_height()
-        # HV value at top
-        ax.annotate(f'{hv:.0f} HV',
-                    xy=(bar.get_x() + bar.get_width() / 2, height),
-                    xytext=(0, 3),
-                    textcoords="offset points",
-                    ha='center', va='bottom', fontsize=12, fontweight='bold')
-        # HRC value inside bar
-        if hrc is not None:
-            ax.annotate(f'({hrc:.0f} HRC)',
-                        xy=(bar.get_x() + bar.get_width() / 2, height / 2),
-                        ha='center', va='center', fontsize=10, color='white',
-                        fontweight='bold')
+    if has_tempered:
+        # Grouped bar chart: as-quenched + tempered
+        bar_width = 0.35
+        tempered_hv = [hardness_result.tempered_hardness_hv.get(p, 0) for p in positions]
+        tempered_hrc = [hardness_result.tempered_hardness_hrc.get(p) for p in positions]
+
+        bars_q = ax.bar(x - bar_width/2, hv_values, bar_width, label='As-Quenched',
+                        color='#3498db', edgecolor='black', linewidth=1.2)
+        bars_t = ax.bar(x + bar_width/2, tempered_hv, bar_width, label='Tempered',
+                        color='#e67e22', edgecolor='black', linewidth=1.2)
+
+        # Labels on as-quenched bars
+        for bar, hv in zip(bars_q, hv_values):
+            height = bar.get_height()
+            ax.annotate(f'{hv:.0f}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3), textcoords="offset points",
+                        ha='center', va='bottom', fontsize=10, fontweight='bold',
+                        color='#2c3e50')
+
+        # Labels on tempered bars
+        for bar, hv in zip(bars_t, tempered_hv):
+            height = bar.get_height()
+            ax.annotate(f'{hv:.0f}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3), textcoords="offset points",
+                        ha='center', va='bottom', fontsize=10, fontweight='bold',
+                        color='#d35400')
+
+        ax.legend(loc='upper right', fontsize=10)
+        all_values = hv_values + tempered_hv
+    else:
+        # Single bar chart (original behavior)
+        colors = ['#3498db', '#2ecc71', '#f39c12', '#e74c3c']
+        bars = ax.bar(x, hv_values, color=colors, edgecolor='black', linewidth=1.5)
+
+        for i, (bar, hv, hrc) in enumerate(zip(bars, hv_values, hrc_values)):
+            height = bar.get_height()
+            ax.annotate(f'{hv:.0f} HV',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3), textcoords="offset points",
+                        ha='center', va='bottom', fontsize=12, fontweight='bold')
+            if hrc is not None:
+                ax.annotate(f'({hrc:.0f} HRC)',
+                            xy=(bar.get_x() + bar.get_width() / 2, height / 2),
+                            ha='center', va='center', fontsize=10, color='white',
+                            fontweight='bold')
+        all_values = hv_values
 
     # Styling
     ax.set_xticks(x)
     ax.set_xticklabels(labels, fontsize=12)
     ax.set_ylabel('Hardness (HV)', fontsize=12)
     ax.set_title(title, fontsize=14)
-    ax.set_ylim(0, max(hv_values) * 1.15 if hv_values else 600)
+    ax.set_ylim(0, max(all_values) * 1.15 if all_values else 600)
     ax.grid(True, axis='y', alpha=0.3)
 
-    # Add annotation box with CE and DI
+    # Add annotation box with CE and DI (and HJP if tempered)
     ce = hardness_result.carbon_equivalent
     di = hardness_result.ideal_diameter
     textstr = f'CE(IIW) = {ce:.3f}\nDI = {di:.2f} in'
+    if has_tempered:
+        hjp = getattr(hardness_result, 'hollomon_jaffe_parameter', 0)
+        textstr += f'\nHJP = {hjp:.0f}'
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
     ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,

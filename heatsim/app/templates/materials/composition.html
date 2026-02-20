@@ -119,6 +119,30 @@
 
             <div class="card mb-3">
                 <div class="card-header">
+                    <i class="bi bi-thermometer-half"></i> Tempering Properties
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.hollomon_jaffe_c.label.text }}</label>
+                            {{ form.hollomon_jaffe_c(class="form-control") }}
+                            {% if form.hollomon_jaffe_c.errors %}
+                            <div class="text-danger small">{{ form.hollomon_jaffe_c.errors[0] }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-8">
+                            <small class="text-muted">
+                                The Hollomon-Jaffe parameter (Hp) is a material constant used to predict
+                                tempered hardness. Typical values: 15-25 for low-alloy steels (default: 20).<br>
+                                <strong>HJP = T<sub>K</sub> &times; (Hp + log<sub>10</sub>(t<sub>hours</sub>))</strong>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">
                     <i class="bi bi-info-circle"></i> Metadata
                 </div>
                 <div class="card-body">
@@ -167,10 +191,15 @@
                             <td>Ideal Diameter (DI)</td>
                             <td class="fw-bold">{{ '%.2f'|format(existing.ideal_diameter_di) }} in</td>
                         </tr>
+                        <tr>
+                            <td>Hollomon-Jaffe Hp</td>
+                            <td class="fw-bold">{{ '%.1f'|format(existing.hollomon_jaffe_c or 20.0) }}</td>
+                        </tr>
                     </table>
                     <small class="text-muted">
                         CE(IIW) = C + Mn/6 + (Cr+Mo+V)/5 + (Ni+Cu)/15<br>
-                        Pcm = C + Si/30 + (Mn+Cu+Cr)/20 + Ni/60 + Mo/15 + V/10 + 5B
+                        Pcm = C + Si/30 + (Mn+Cu+Cr)/20 + Ni/60 + Mo/15 + V/10 + 5B<br>
+                        HJP = T<sub>K</sub> &times; (Hp + log<sub>10</sub>(t<sub>h</sub>))
                     </small>
                 </div>
             </div>

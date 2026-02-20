@@ -81,6 +81,23 @@ def create_app(config_name='default'):
     with app.app_context():
         db.create_all()
 
+        # Ensure new columns exist in materials DB (for upgrades without migration)
+        try:
+            import sqlalchemy as sa
+            mat_engine = db.engines.get('materials')
+            if mat_engine:
+                inspector = sa.inspect(mat_engine)
+                if 'steel_compositions' in inspector.get_table_names():
+                    cols = [c['name'] for c in inspector.get_columns('steel_compositions')]
+                    if 'hollomon_jaffe_c' not in cols:
+                        with mat_engine.connect() as conn:
+                            conn.execute(sa.text(
+                                'ALTER TABLE steel_compositions ADD COLUMN hollomon_jaffe_c FLOAT DEFAULT 20.0'
+                            ))
+                            conn.commit()
+        except Exception:
+            pass  # Non-critical — column may already exist
+
     # Maintenance mode handler
     @app.before_request
     def check_maintenance_mode():

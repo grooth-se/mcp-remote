@@ -500,6 +500,9 @@ class SteelComposition(db.Model):
     nitrogen = db.Column(db.Float, default=0.0)
     boron = db.Column(db.Float, default=0.0)
 
+    # Tempering properties
+    hollomon_jaffe_c = db.Column(db.Float, default=20.0)
+
     # Metadata
     source = db.Column(db.Text)
     notes = db.Column(db.Text)
@@ -641,6 +644,7 @@ class SteelComposition(db.Model):
             'S': self.sulfur or 0.0,
             'N': self.nitrogen or 0.0,
             'B': self.boron or 0.0,
+            'Hp': self.hollomon_jaffe_c or 20.0,
         }
 
     def __repr__(self) -> str:

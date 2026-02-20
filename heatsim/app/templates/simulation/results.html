@@ -1061,6 +1061,45 @@
                 </small>
                 {% endif %}
 
+                {% if hdata.tempered_hardness_hv and hdata.tempered_hardness_hv|length > 0 %}
+                <hr>
+                <h6 class="mt-2"><i class="bi bi-thermometer-half"></i> Tempered Hardness (Hollomon-Jaffe)</h6>
+                <div class="mb-2">
+                    <span class="badge bg-info text-dark me-1">HJP = {{ hdata.hollomon_jaffe_parameter|int }}</span>
+                    <span class="badge bg-secondary me-1">{{ hdata.tempering_temperature|int }} &deg;C</span>
+                    <span class="badge bg-secondary">{{ hdata.tempering_time|int }} min</span>
+                </div>
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>Position</th><th>As-Quenched HV</th><th>Tempered HV</th><th>Tempered HRC</th><th>Reduction</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for pos_key, pos_label in [('center','Center'), ('one_third','1/3 R'), ('two_thirds','2/3 R'), ('surface','Surface')] %}
+                        <tr>
+                            <td>{{ pos_label }}</td>
+                            <td>{{ hdata.hardness_hv[pos_key]|round(0)|int if hdata.hardness_hv.get(pos_key) else '-' }}</td>
+                            <td class="fw-bold">{{ hdata.tempered_hardness_hv[pos_key]|round(0)|int if hdata.tempered_hardness_hv.get(pos_key) else '-' }}</td>
+                            <td>{{ hdata.tempered_hardness_hrc[pos_key]|round(0)|int if hdata.tempered_hardness_hrc.get(pos_key) else '-' }}</td>
+                            <td>
+                                {% if hdata.hardness_hv.get(pos_key) and hdata.tempered_hardness_hv.get(pos_key) %}
+                                {% set reduction = ((hdata.hardness_hv[pos_key] - hdata.tempered_hardness_hv[pos_key]) / hdata.hardness_hv[pos_key] * 100) %}
+                                <span class="text-danger">-{{ reduction|round(1) }}%</span>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <small class="text-muted">
+                    HJP = T<sub>K</sub> &times; (Hp + log<sub>10</sub>(t<sub>h</sub>)). Higher HJP = more softening.
+                </small>
+                {% elif hdata.hardness_hv %}
+                <hr>
+                <div class="alert alert-secondary py-2 mb-0 small">
+                    <i class="bi bi-info-circle"></i> Enable tempering in heat treatment config to see tempered hardness prediction.
+                </div>
+                {% endif %}
+
                 {% else %}
                 <p class="text-muted">No hardness data available</p>
                 {% endif %}

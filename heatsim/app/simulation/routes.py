@@ -26,6 +26,7 @@ from app.services import (
     generate_simulation_report,
     generate_simulation_pdf_report
 )
+from app.services.hardness_predictor import HardnessPredictor, POSITION_KEYS
 from app.services.tc_data_parser import parse_tc_csv, validate_tc_csv
 from app.services.cad_geometry import analyze_step_file, CADAnalysisResult
 
@@ -922,7 +923,7 @@ def run(id):
             result_type='full_cycle',
             phase='full',
             location='center',
-            t_800_500=result.t8_5
+            t_800_500=float(result.t8_5) if result.t8_5 is not None else None
         )
         cycle_result.set_time_data(result.time.tolist())
         cycle_result.set_value_data(result.center_temp.tolist())
@@ -1012,7 +1013,7 @@ def run(id):
                     result_type='cooling_curve' if phase_result.phase_name in ('quenching', 'transfer', 'cooling') else 'heating_curve',
                     phase=phase_result.phase_name,
                     location='center',
-                    t_800_500=phase_result.t8_5
+                    t_800_500=float(phase_result.t8_5) if phase_result.t8_5 is not None else None
                 )
                 pr.set_time_data(phase_result.absolute_time.tolist())
                 pr.set_value_data(phase_result.center_temp.tolist())
@@ -1091,6 +1092,26 @@ def run(id):
                     phase='full',
                     location='all'
                 )
+                # Tempering hardness calculation
+                ht_config = sim.ht_config or {}
+                tempering_cfg = ht_config.get('tempering', {})
+                if tempering_cfg.get('enabled') and grade.composition:
+                    hp_c = grade.composition.hollomon_jaffe_c or 20.0
+                    temp_c = tempering_cfg.get('temperature', 550)
+                    hold_min = tempering_cfg.get('hold_time', 60)
+                    predictor = HardnessPredictor(grade.composition)
+                    hjp_val = 0.0
+                    for pos_key in POSITION_KEYS:
+                        hv_q = hardness_result.hardness_hv.get(pos_key, 0)
+                        if hv_q > 0:
+                            hv_t, hjp_val = predictor.tempered_hardness(hv_q, temp_c, hold_min, hp_c)
+                            hardness_result.tempered_hardness_hv[pos_key] = round(hv_t, 1)
+                            hrc_t = predictor.hv_to_hrc(hv_t)
+                            hardness_result.tempered_hardness_hrc[pos_key] = round(hrc_t, 1) if hrc_t else None
+                    hardness_result.hollomon_jaffe_parameter = round(hjp_val, 0)
+                    hardness_result.tempering_temperature = temp_c
+                    hardness_result.tempering_time = hold_min
+
                 hardness_sim_result.set_data(hardness_result.to_dict())
                 hardness_sim_result.plot_image = visualization.create_hardness_profile_plot(
                     hardness_result,
@@ -2540,7 +2561,7 @@ def _run_simulation(sim):
             result_type='full_cycle',
             phase='full',
             location='center',
-            t_800_500=result.t8_5
+            t_800_500=float(result.t8_5) if result.t8_5 is not None else None
         )
         cycle_result.set_time_data(result.time.tolist())
         cycle_result.set_value_data(result.center_temp.tolist())
@@ -2650,6 +2671,26 @@ def _run_simulation(sim):
                     phase='full',
                     location='all'
                 )
+                # Tempering hardness calculation
+                ht_config = sim.ht_config or {}
+                tempering_cfg = ht_config.get('tempering', {})
+                if tempering_cfg.get('enabled') and grade.composition:
+                    hp_c = grade.composition.hollomon_jaffe_c or 20.0
+                    temp_c = tempering_cfg.get('temperature', 550)
+                    hold_min = tempering_cfg.get('hold_time', 60)
+                    predictor = HardnessPredictor(grade.composition)
+                    hjp_val = 0.0
+                    for pos_key in POSITION_KEYS:
+                        hv_q = hardness_result.hardness_hv.get(pos_key, 0)
+                        if hv_q > 0:
+                            hv_t, hjp_val = predictor.tempered_hardness(hv_q, temp_c, hold_min, hp_c)
+                            hardness_result.tempered_hardness_hv[pos_key] = round(hv_t, 1)
+                            hrc_t = predictor.hv_to_hrc(hv_t)
+                            hardness_result.tempered_hardness_hrc[pos_key] = round(hrc_t, 1) if hrc_t else None
+                    hardness_result.hollomon_jaffe_parameter = round(hjp_val, 0)
+                    hardness_result.tempering_temperature = temp_c
+                    hardness_result.tempering_time = hold_min
+
                 hardness_sim_result.set_data(hardness_result.to_dict())
                 hardness_sim_result.plot_image = visualization.create_hardness_profile_plot(
                     hardness_result,

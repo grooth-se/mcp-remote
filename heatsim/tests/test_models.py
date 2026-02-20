@@ -103,6 +103,21 @@ class TestSteelComposition:
         assert d['Mn'] == 0.70
         assert 'Si' in d
 
+    def test_hollomon_jaffe_c_default(self, db, sample_steel_grade):
+        comp = self._make(db, sample_steel_grade)
+        # Default should be 20.0 (column default)
+        assert comp.hollomon_jaffe_c == 20.0 or comp.hollomon_jaffe_c is None
+        # to_dict always returns 20.0 as fallback
+        assert comp.to_dict()['Hp'] == 20.0
+
+    def test_hollomon_jaffe_c_in_to_dict(self, db, sample_steel_grade):
+        comp = self._make(db, sample_steel_grade)
+        comp.hollomon_jaffe_c = 18.5
+        db.session.commit()
+        d = comp.to_dict()
+        assert 'Hp' in d
+        assert d['Hp'] == 18.5
+
 
 class TestMaterialProperty:
     def test_set_data_round_trip(self, db, sample_steel_grade):

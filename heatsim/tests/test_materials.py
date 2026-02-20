@@ -283,6 +283,38 @@ class TestComposition:
             follow_redirects=True)
         assert rv.status_code == 200
 
+    def test_composition_form_hp_field(self, logged_in_client, sample_steel_grade):
+        """Composition form should render the Hollomon-Jaffe Hp field."""
+        rv = logged_in_client.get(f'/materials/{sample_steel_grade.id}/composition')
+        assert rv.status_code == 200
+        assert b'Hollomon-Jaffe' in rv.data
+
+    def test_composition_route_saves_hp(self, logged_in_client, sample_steel_grade, db):
+        """POST with Hp value should persist hollomon_jaffe_c."""
+        rv = logged_in_client.post(f'/materials/{sample_steel_grade.id}/composition', data={
+            'carbon': '0.40',
+            'manganese': '0.70',
+            'silicon': '0.25',
+            'chromium': '0.80',
+            'nickel': '1.80',
+            'molybdenum': '0.25',
+            'vanadium': '0',
+            'tungsten': '0',
+            'copper': '0',
+            'phosphorus': '0',
+            'sulfur': '0',
+            'nitrogen': '0',
+            'boron': '0',
+            'hollomon_jaffe_c': '18.5',
+            'source': '',
+            'notes': '',
+        }, follow_redirects=True)
+        assert rv.status_code == 200
+        comp = SteelComposition.query.filter_by(
+            steel_grade_id=sample_steel_grade.id).first()
+        assert comp is not None
+        assert comp.hollomon_jaffe_c == 18.5
+
 
 class TestHistory:
     def test_renders(self, logged_in_client, sample_steel_grade):

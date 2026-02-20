@@ -61,6 +61,12 @@ class HardnessResult:
     ys_mpa: Dict[str, float] = field(default_factory=dict)
     elongation_pct: Dict[str, float] = field(default_factory=dict)
     toughness_rating: Dict[str, str] = field(default_factory=dict)
+    # Tempered hardness
+    tempered_hardness_hv: Dict[str, float] = field(default_factory=dict)
+    tempered_hardness_hrc: Dict[str, float] = field(default_factory=dict)
+    hollomon_jaffe_parameter: float = 0.0
+    tempering_temperature: float = 0.0
+    tempering_time: float = 0.0
 
     def to_dict(self) -> dict:
         """Convert to dictionary for storage."""
@@ -76,6 +82,11 @@ class HardnessResult:
             'ys_mpa': self.ys_mpa,
             'elongation_pct': self.elongation_pct,
             'toughness_rating': self.toughness_rating,
+            'tempered_hardness_hv': self.tempered_hardness_hv,
+            'tempered_hardness_hrc': self.tempered_hardness_hrc,
+            'hollomon_jaffe_parameter': self.hollomon_jaffe_parameter,
+            'tempering_temperature': self.tempering_temperature,
+            'tempering_time': self.tempering_time,
         }
 
 
@@ -343,6 +354,67 @@ class HardnessPredictor:
             return 'acceptable'
         else:
             return 'good'
+
+    def tempered_hardness(
+        self,
+        hv_quenched: float,
+        tempering_temp_c: float,
+        hold_time_min: float,
+        hp_constant: float = 20.0
+    ) -> tuple:
+        """Calculate tempered hardness using Hollomon-Jaffe parameter.
+
+        HJP = T_K * (Hp + log10(t_hours))
+
+        Uses a Grange-Baughman type softening approach: the fractional
+        reduction from as-quenched to equilibrium (ferrite-pearlite) hardness
+        is determined by normalizing HJP against a carbon-dependent scale.
+
+        Parameters
+        ----------
+        hv_quenched : float
+            As-quenched Vickers hardness
+        tempering_temp_c : float
+            Tempering temperature in degrees Celsius
+        hold_time_min : float
+            Hold time at tempering temperature in minutes
+        hp_constant : float
+            Hollomon-Jaffe material constant (default 20.0)
+
+        Returns
+        -------
+        tuple of (float, float)
+            (tempered hardness in HV, HJP value)
+        """
+        # Convert to Kelvin and hours
+        T_K = tempering_temp_c + 273.15
+        t_hours = max(hold_time_min / 60.0, 1e-6)
+
+        # Calculate Hollomon-Jaffe Parameter
+        hjp = T_K * (hp_constant + math.log10(t_hours))
+
+        # Equilibrium floor: ferrite-pearlite hardness from composition
+        C = self.comp['C']
+        hv_floor = 42 + 223 * C + 53 * self.comp.get('Si', 0) + 30 * self.comp.get('Mn', 0)
+        hv_floor = max(hv_floor, 100.0)
+
+        # Softening fraction based on HJP
+        # Calibrated so that HJP ~12000 gives minimal softening,
+        # HJP ~20000 gives near-complete softening to equilibrium.
+        # Sigmoid: fraction = 1 / (1 + exp(-k*(hjp - hjp_mid)))
+        # hjp_mid depends on carbon: higher C steels resist tempering slightly more
+        hjp_mid = 15000 + 5000 * C  # ~15500 for 0.1%C, ~17000 for 0.4%C
+        k = 0.0005  # Controls steepness of softening curve
+
+        softening_fraction = 1.0 / (1.0 + math.exp(-k * (hjp - hjp_mid)))
+
+        # Tempered hardness: interpolate between quenched and floor
+        hv_tempered = hv_quenched - softening_fraction * (hv_quenched - hv_floor)
+
+        # Clamp: can't be harder than quenched, can't be softer than floor
+        hv_tempered = max(min(hv_tempered, hv_quenched), hv_floor)
+
+        return (hv_tempered, hjp)
 
     def hv_to_hrc(self, hv: float) -> Optional[float]:
         """Convert Vickers hardness to Rockwell C.
