@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ prop.property_name }}{% endblock %}
+
+{% block breadcrumbs %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{{ render_breadcrumbs([('Fastigheter', url_for('realestate.index')), (prop.property_name, none)]) }}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-house"></i> {{ prop.property_name }}</h2>
+    <div>
+        {% if not current_user.is_readonly %}
+        <a href="{{ url_for('realestate.edit', prop_id=prop.id) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Redigera</a>
+        {% endif %}
+        <a href="{{ url_for('realestate.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Tillbaka</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header">Fastighetsinformation</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Beteckning</dt><dd class="col-sm-7">{{ prop.fastighetsbeteckning or '—' }}</dd>
+                    <dt class="col-sm-5">Adress</dt><dd class="col-sm-7">{{ prop.street_address or '—' }}, {{ prop.postal_code or '' }} {{ prop.city or '' }}</dd>
+                    <dt class="col-sm-5">Taxeringsvärde</dt><dd class="col-sm-7">{{ (prop.taxeringsvarde or 0)|sek }} SEK{% if prop.taxeringsvarde_year %} ({{ prop.taxeringsvarde_year }}){% endif %}</dd>
+                    <dt class="col-sm-5">Fastighetsskattesats</dt><dd class="col-sm-7">{{ '%.2f'|format((prop.property_tax_rate or 0) * 100) }}%</dd>
+                    {% if prop.asset %}<dt class="col-sm-5">Anläggningstillgång</dt><dd class="col-sm-7">{{ prop.asset.name }}</dd>{% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header">Ekonomi</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Beräknad fastighetsskatt</dt><dd class="col-sm-7 fw-bold">{{ tax|sek }} SEK/år</dd>
+                    <dt class="col-sm-5">Hyresintäkt YTD</dt><dd class="col-sm-7 fw-bold">{{ rental_income|sek }} SEK</dd>
+                    <dt class="col-sm-5">Månadshyra mål</dt><dd class="col-sm-7">{{ (prop.monthly_rent_target or 0)|sek }} SEK/mån</dd>
+                    <dt class="col-sm-5">Hyresintäktskonto</dt><dd class="col-sm-7">{{ prop.rent_account or '3910' }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if prop.notes %}
+<div class="card mb-3">
+    <div class="card-header">Anteckningar</div>
+    <div class="card-body">{{ prop.notes }}</div>
+</div>
+{% endif %}
+{% endblock %}

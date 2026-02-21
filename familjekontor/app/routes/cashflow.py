@@ -5,7 +5,8 @@ from app.models.accounting import FiscalYear
 from app.models.company import Company
 from app.services.cashflow_service import (
     get_cash_flow_statement, get_monthly_cash_flow,
-    get_cash_flow_forecast, export_cashflow_to_excel,
+    get_cash_flow_forecast, get_enhanced_cash_flow_forecast,
+    export_cashflow_to_excel,
 )
 
 cashflow_bp = Blueprint('cashflow', __name__)
@@ -74,3 +75,30 @@ def excel_export():
                      download_name=f'Kassaflodesanalys_{company.name}_{fiscal_year.year}.xlsx',
                      as_attachment=True,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@cashflow_bp.route('/forecast')
+@login_required
+def forecast():
+    company_id = session.get('active_company_id')
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+
+    company = db.session.get(Company, company_id)
+    fiscal_years = FiscalYear.query.filter_by(company_id=company_id).order_by(FiscalYear.year.desc()).all()
+
+    fiscal_year_id = request.args.get('fiscal_year_id', type=int)
+    if not fiscal_year_id and fiscal_years:
+        fiscal_year_id = fiscal_years[0].id
+
+    forecast_data = None
+    fiscal_year = None
+    if fiscal_year_id:
+        fiscal_year = db.session.get(FiscalYear, fiscal_year_id)
+        forecast_data = get_enhanced_cash_flow_forecast(company_id, fiscal_year_id)
+
+    return render_template('cashflow/forecast.html',
+                           forecast_data=forecast_data, company=company,
+                           fiscal_year=fiscal_year, fiscal_years=fiscal_years,
+                           current_fy_id=fiscal_year_id)

@@ -22,6 +22,8 @@ from app.models.saved_report import SavedReport
 from app.models.notification import Notification
 from app.models.favorite import UserFavorite
 from app.models.payment_file import PaymentFile, PaymentInstruction
+from app.models.cost_center import CostCenter
+from app.models.real_estate import RealEstate
 
 __all__ = [
     'User', 'Company',
@@ -45,4 +47,6 @@ __all__ = [
     'Notification',
     'UserFavorite',
     'PaymentFile', 'PaymentInstruction',
+    'CostCenter',
+    'RealEstate',
 ]

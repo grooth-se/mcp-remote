@@ -151,6 +151,13 @@
 </div>
 {% endif %}
 
+{% if anomaly_count > 0 %}
+<div class="alert alert-warning mb-4">
+    <strong><i class="bi bi-shield-exclamation"></i> {{ anomaly_count }} anomali{{ 'er' if anomaly_count > 1 else '' }} upptäckt{{ 'a' if anomaly_count > 1 else '' }}</strong>
+    <a href="{{ url_for('dashboard.anomalies') }}" class="alert-link ms-2">Visa detaljer</a>
+</div>
+{% endif %}
+
 {# Charts Row #}
 <div class="row mb-4">
     <div class="col-md-6">

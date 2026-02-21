@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Kontomappningar — {{ supplier.name }}{% endblock %}
+
+{% block breadcrumbs %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{{ render_breadcrumbs([
+    ('Leverantörer', url_for('invoices.suppliers')),
+    (supplier.name, none),
+    ('Kontomappningar', none),
+]) }}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-lightbulb"></i> Kontomappningar — {{ supplier.name }}</h2>
+    <a href="{{ url_for('invoices.suppliers') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Tillbaka
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-book"></i> Inlärda mappningar
+    </div>
+    <div class="card-body">
+        <p class="text-muted">
+            Systemet lär sig vilka konton som ska användas baserat på godkända fakturor.
+            Mappningarna används för att föreslå konton vid framtida fakturor från denna leverantör.
+        </p>
+
+        {% if mappings %}
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Beskrivning</th>
+                    <th>Konto</th>
+                    {% if not current_user.is_readonly %}
+                    <th style="width: 100px;">Åtgärd</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for desc, acct in mappings.items() %}
+                <tr>
+                    <td>{{ desc }}</td>
+                    <td><span class="badge bg-primary">{{ acct }}</span></td>
+                    {% if not current_user.is_readonly %}
+                    <td>
+                        <form method="POST" action="{{ url_for('invoices.delete_supplier_mapping', supplier_id=supplier.id) }}"
+                              onsubmit="return confirm('Ta bort denna mappning?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="description_key" value="{{ desc }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Inga mappningar har lärts in ännu.
+            Godkänn leverantörsfakturor för att systemet ska lära sig.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

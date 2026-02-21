@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Skatteplanering - PsalmGears{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-lightbulb"></i> Skatteplanering</h2>
+    <div>
+        <a href="{{ url_for('tax.tax_planning_group') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-building"></i> Alla bolag
+        </a>
+        <a href="{{ url_for('tax.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Skatteöversikt
+        </a>
+    </div>
+</div>
+
+{% if planning_data and planning_data.recommendations %}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body text-center">
+                <small class="text-muted">Företagstyp</small>
+                <h4>{{ planning_data.company_type }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body text-center">
+                <small class="text-muted">Räkenskapsår</small>
+                <h4>{{ planning_data.fiscal_year.year }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body text-center">
+                <small class="text-muted">Inkomstbasbelopp (IBB)</small>
+                <h4>{{ "{:,.0f}".format(planning_data.ibb) }} kr</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% for rec in planning_data.recommendations %}
+<div class="card mb-3 border-{% if rec.status == 'green' %}success{% elif rec.status == 'yellow' %}warning{% else %}danger{% endif %}">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>{{ rec.title }}</strong>
+        <span class="badge bg-{% if rec.status == 'green' %}success{% elif rec.status == 'yellow' %}warning text-dark{% else %}danger{% endif %}">
+            {% if rec.status == 'green' %}Optimalt{% elif rec.status == 'yellow' %}Överväg{% else %}Åtgärd krävs{% endif %}
+        </span>
+    </div>
+    <div class="card-body">
+        <p>{{ rec.summary }}</p>
+
+        {% if rec.area == 'salary_vs_dividend' and rec.details %}
+        <div class="row text-center mt-3">
+            <div class="col-md-3">
+                <div class="fs-5 fw-bold">{{ "{:,.0f}".format(rec.details.total_salary) }} kr</div>
+                <small class="text-muted">Utbetald lön</small>
+            </div>
+            <div class="col-md-3">
+                <div class="fs-5 fw-bold">{{ "{:,.0f}".format(rec.details.total_dividends) }} kr</div>
+                <small class="text-muted">Utdelning</small>
+            </div>
+            <div class="col-md-3">
+                <div class="fs-5 fw-bold">{{ "{:,.0f}".format(rec.details.salary_threshold) }} kr</div>
+                <small class="text-muted">Lönekrav (6 IBB)</small>
+            </div>
+            <div class="col-md-3">
+                <div class="fs-5 fw-bold">{{ "{:,.0f}".format(rec.details.forenklingsregel) }} kr</div>
+                <small class="text-muted">Förenklingsregeln</small>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if rec.area == 'loss_carryforward' and rec.details.deficit_history %}
+        <table class="table table-sm mt-3">
+            <thead>
+                <tr>
+                    <th>År</th>
+                    <th class="text-end">Beskattningsbart resultat</th>
+                    <th class="text-end">Avdrag utnyttjat</th>
+                    <th class="text-end">Kvarvarande underskott</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in rec.details.deficit_history %}
+                <tr>
+                    <td>{{ h.year }}</td>
+                    <td class="text-end">{{ "{:,.0f}".format(h.taxable_income) }} kr</td>
+                    <td class="text-end">{{ "{:,.0f}".format(h.deficit_used) }} kr</td>
+                    <td class="text-end fw-bold">{{ "{:,.0f}".format(h.remaining_deficit) }} kr</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if rec.area == 'asset_timing' and rec.details %}
+        <div class="progress mt-3" style="height: 20px;">
+            <div class="progress-bar bg-{% if rec.status == 'green' %}success{% elif rec.status == 'yellow' %}warning{% else %}danger{% endif %}"
+                 style="width: {{ rec.details.depreciation_pct }}%">
+                {{ rec.details.depreciation_pct }}%
+            </div>
+        </div>
+        <small class="text-muted">{{ rec.details.months_remaining }} av {{ rec.details.total_months }} månader kvar</small>
+        {% endif %}
+
+        {% if rec.area == 'group_structure' and rec.details %}
+        {% if rec.details.in_group %}
+        <span class="badge bg-success mt-2"><i class="bi bi-check-circle"></i> I koncern</span>
+        {% else %}
+        <div class="row text-center mt-3">
+            {% if rec.details.total_dividends > 0 %}
+            <div class="col-md-6">
+                <div class="fs-5 fw-bold">{{ "{:,.0f}".format(rec.details.total_dividends) }} kr</div>
+                <small class="text-muted">Utdelning</small>
+            </div>
+            {% endif %}
+            {% if rec.details.net_income > 0 %}
+            <div class="col-md-6">
+                <div class="fs-5 fw-bold">{{ "{:,.0f}".format(rec.details.net_income) }} kr</div>
+                <small class="text-muted">Årets resultat</small>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Ingen planeringsdata tillgänglig.
+    Kontrollera att det finns ett aktivt räkenskapsår.
+</div>
+{% endif %}
+{% endblock %}

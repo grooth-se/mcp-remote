@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Affärsanalys</title>
+    <style>
+        @page { size: A4; margin: 20mm; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 10pt; color: #333; line-height: 1.5; }
+        h1 { font-size: 18pt; color: #1a5276; border-bottom: 2px solid #1a5276; padding-bottom: 6px; margin-bottom: 16px; }
+        h2 { font-size: 13pt; color: #1a5276; margin-top: 20px; margin-bottom: 8px; }
+        .meta { font-size: 9pt; color: #666; margin-bottom: 16px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 8pt; color: white; }
+        .badge-ai { background-color: #17a2b8; }
+        .badge-template { background-color: #6c757d; }
+        .section { margin-bottom: 20px; page-break-inside: avoid; }
+        .section-title { background-color: #f8f9fa; padding: 6px 12px; border-left: 4px solid #1a5276; font-weight: bold; margin-bottom: 8px; }
+        .metrics { display: flex; justify-content: space-around; margin: 10px 0; }
+        .metric { text-align: center; }
+        .metric-value { font-size: 16pt; font-weight: bold; color: #1a5276; }
+        .metric-label { font-size: 8pt; color: #666; }
+        .narrative { margin: 8px 0; font-size: 10pt; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 8pt; color: #999; border-top: 1px solid #ddd; padding-top: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Affärsanalys</h1>
+    <div class="meta">
+        {{ analysis.company.name }} | Räkenskapsår {{ analysis.fiscal_year.year }}
+        | {{ analysis.fiscal_year.start_date }} - {{ analysis.fiscal_year.end_date }}
+        <span class="badge {% if analysis.has_ai %}badge-ai{% else %}badge-template{% endif %}">
+            {% if analysis.has_ai %}AI-genererad{% else %}Mallbaserad{% endif %}
+        </span>
+    </div>
+
+    {% for section in analysis.sections %}
+    <div class="section">
+        <div class="section-title">{{ section.title }}</div>
+
+        {% if section.data_points %}
+        <div class="metrics">
+            {% for key, value in section.data_points.items() %}
+            {% if value is not none %}
+            <div class="metric">
+                <div class="metric-value">
+                    {% if value is number and value != value|int %}
+                        {{ "%.1f"|format(value) }}{% if key in ('gross_margin', 'net_margin', 'roe') %}%{% endif %}
+                    {% elif value is number %}
+                        {{ "{:,.0f}".format(value) }}{% if key == 'total_cash_flow' %} kr{% endif %}
+                    {% else %}
+                        {{ value }}
+                    {% endif %}
+                </div>
+                <div class="metric-label">
+                    {% if key == 'gross_margin' %}Bruttomarginal
+                    {% elif key == 'net_margin' %}Nettomarginal
+                    {% elif key == 'roe' %}ROE
+                    {% elif key == 'current_ratio' %}Balanslikviditet
+                    {% elif key == 'quick_ratio' %}Kassalikviditet
+                    {% elif key == 'total_cash_flow' %}Kassaflöde
+                    {% elif key == 'dso' %}DSO (dagar)
+                    {% elif key == 'dpo' %}DPO (dagar)
+                    {% elif key == 'current_year' %}Innevarande år
+                    {% elif key == 'prior_year' %}Föregående år
+                    {% else %}{{ key }}
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="narrative">{{ section.narrative }}</div>
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+        {{ analysis.company.name }} | Org.nr: {{ analysis.company.org_number }}
+        | Genererad av PsalmGears
+    </div>
+</body>
+</html>

@@ -55,6 +55,7 @@
                             <li><a class="dropdown-item" href="{{ url_for('accounting.index') }}">Verifikationer</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('accounting.new_verification') }}">Ny verifikation</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('accounting.trial_balance') }}">Råbalans</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('accounting.cost_centers') }}"><i class="bi bi-diagram-2"></i> Kostnadsställen</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><h6 class="dropdown-header">Fakturor</h6></li>
                             <li><a class="dropdown-item" href="{{ url_for('invoices.supplier_invoices') }}">Leverantörsfakturor</a></li>
@@ -106,6 +107,7 @@
                             <li><a class="dropdown-item" href="{{ url_for('tax.deadlines_index') }}">Deadlines</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('tax.payments_index') }}">Skattebetalningar</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('tax.deklaration_index') }}"><i class="bi bi-file-earmark-text"></i> Inkomstdeklaration</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('tax.tax_planning') }}"><i class="bi bi-lightbulb"></i> Skatteplanering</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><h6 class="dropdown-header">Lön</h6></li>
                             <li><a class="dropdown-item" href="{{ url_for('salary.index') }}">Löneöversikt</a></li>
@@ -123,6 +125,7 @@
                             <li><a class="dropdown-item" href="{{ url_for('consolidation.index') }}"><i class="bi bi-diagram-3"></i> Koncernrapporter</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('assets.index') }}"><i class="bi bi-box-seam"></i> Anläggningstillgångar</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('investments.index') }}"><i class="bi bi-graph-up"></i> Investeringar</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('realestate.index') }}"><i class="bi bi-house"></i> Fastigheter</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('governance.board') }}"><i class="bi bi-people"></i> Styrelse</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('governance.shares') }}"><i class="bi bi-pie-chart"></i> Aktiebok</a></li>

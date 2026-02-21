@@ -93,3 +93,53 @@ def pdf(report_type):
                      download_name=f'{report_type}_{company.name}_{fy.year}.pdf',
                      as_attachment=True,
                      mimetype='application/pdf')
+
+
+@report_center_bp.route('/business-analysis')
+@login_required
+def business_analysis():
+    company_id = session.get('active_company_id')
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+
+    fiscal_year_id = request.args.get('fiscal_year_id', type=int)
+    if not fiscal_year_id:
+        fy = FiscalYear.query.filter_by(
+            company_id=company_id, status='open'
+        ).order_by(FiscalYear.year.desc()).first()
+        fiscal_year_id = fy.id if fy else None
+
+    analysis = None
+    if fiscal_year_id:
+        from app.services.business_analysis_service import generate_business_analysis
+        analysis = generate_business_analysis(company_id, fiscal_year_id)
+
+    return render_template('report_center/business_analysis.html', analysis=analysis)
+
+
+@report_center_bp.route('/business-analysis/pdf')
+@login_required
+def business_analysis_pdf():
+    company_id = session.get('active_company_id')
+    fiscal_year_id = request.args.get('fiscal_year_id', type=int)
+
+    if not company_id or not fiscal_year_id:
+        flash('Välj företag och räkenskapsår.', 'warning')
+        return redirect(url_for('report_center.business_analysis'))
+
+    from app.services.business_analysis_service import get_business_analysis_pdf
+    output = get_business_analysis_pdf(company_id, fiscal_year_id)
+
+    if output is None:
+        flash('PDF kunde inte genereras (WeasyPrint ej tillgänglig).', 'warning')
+        return redirect(url_for('report_center.business_analysis',
+                                fiscal_year_id=fiscal_year_id))
+
+    company = db.session.get(Company, company_id)
+    fy = db.session.get(FiscalYear, fiscal_year_id)
+
+    return send_file(output,
+                     download_name=f'Affarsanalys_{company.name}_{fy.year}.pdf',
+                     as_attachment=True,
+                     mimetype='application/pdf')

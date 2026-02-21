@@ -17,10 +17,19 @@ class Supplier(db.Model):
     bic = db.Column(db.String(11))
     default_currency = db.Column(db.String(3), default='SEK')
     active = db.Column(db.Boolean, default=True)
+    learned_mappings = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     invoices = db.relationship('SupplierInvoice', backref='supplier', lazy='dynamic')
     company = db.relationship('Company', backref='suppliers')
+
+    def learn_mapping(self, description, account_number):
+        """Record a description→account mapping for this supplier."""
+        mappings = dict(self.learned_mappings or {})
+        key = description.strip().lower()
+        if key:
+            mappings[key] = account_number
+            self.learned_mappings = mappings
 
     def __repr__(self):
         return f'<Supplier {self.name}>'

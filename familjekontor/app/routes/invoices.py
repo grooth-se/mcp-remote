@@ -332,6 +332,19 @@ def approve_supplier_invoice(invoice_id):
             old_values={'status': 'pending'}, new_values={'status': 'approved'},
         )
         db.session.add(audit)
+
+        # Learn supplier→account mapping from verification rows
+        if invoice.verification and invoice.supplier_id:
+            from app.services.ai_service import record_supplier_mapping
+            for row in invoice.verification.rows:
+                acct = row.account
+                if acct and acct.account_number[:2] not in ('24', '26', '15'):
+                    # Record expense/revenue account mapping
+                    desc = row.description or invoice.invoice_number or ''
+                    if desc:
+                        record_supplier_mapping(invoice.supplier_id, desc, acct.account_number)
+                    break
+
         db.session.commit()
         flash('Fakturan har godkänts.', 'success')
     return redirect(url_for('invoices.supplier_invoices'))
@@ -850,6 +863,62 @@ def supplier_invoices_csv():
     return send_file(output, as_attachment=True,
                      download_name='leverantorsfakturor.csv',
                      mimetype='text/csv')
+
+
+@invoices_bp.route('/suppliers/<int:supplier_id>/mappings')
+@login_required
+def supplier_mappings(supplier_id):
+    company_id = session.get('active_company_id')
+    supplier = db.session.get(Supplier, supplier_id)
+    if not supplier or supplier.company_id != company_id:
+        flash('Leverantör hittades inte.', 'danger')
+        return redirect(url_for('invoices.suppliers'))
+
+    from app.services.ai_service import get_supplier_mappings
+    mappings = get_supplier_mappings(supplier_id)
+    return render_template('invoices/supplier_mappings.html',
+                           supplier=supplier, mappings=mappings)
+
+
+@invoices_bp.route('/suppliers/<int:supplier_id>/mappings/delete', methods=['POST'])
+@login_required
+def delete_supplier_mapping(supplier_id):
+    company_id = session.get('active_company_id')
+    supplier = db.session.get(Supplier, supplier_id)
+    if not supplier or supplier.company_id != company_id:
+        flash('Leverantör hittades inte.', 'danger')
+        return redirect(url_for('invoices.suppliers'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('invoices.supplier_mappings', supplier_id=supplier_id))
+
+    key = request.form.get('description_key', '')
+    from app.services.ai_service import delete_supplier_mapping as del_mapping
+    if del_mapping(supplier_id, key):
+        flash('Mappning borttagen.', 'success')
+    else:
+        flash('Mappningen hittades inte.', 'danger')
+    return redirect(url_for('invoices.supplier_mappings', supplier_id=supplier_id))
+
+
+@invoices_bp.route('/customer/<int:customer_id>/vat-suggestion')
+@login_required
+def customer_vat_suggestion(customer_id):
+    """JSON endpoint: suggest VAT type based on customer country/VAT number."""
+    company_id = session.get('active_company_id')
+    customer = db.session.get(Customer, customer_id)
+    if not customer or customer.company_id != company_id:
+        return jsonify({'error': 'Kund hittades inte'}), 404
+
+    from app.services.vat_service import get_vat_type_for_customer, get_vat_display_text
+    vat_type = get_vat_type_for_customer(customer.country, customer.vat_number)
+    display_text = get_vat_display_text(vat_type)
+    return jsonify({
+        'vat_type': vat_type,
+        'display_text': display_text,
+        'country': customer.country,
+        'vat_number': customer.vat_number,
+    })
 
 
 @invoices_bp.route('/customer-invoices/export-csv')

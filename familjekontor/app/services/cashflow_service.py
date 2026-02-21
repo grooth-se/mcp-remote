@@ -316,6 +316,143 @@ def export_cashflow_to_excel(cf_data, company_name, fiscal_year):
     return output
 
 
+def get_enhanced_cash_flow_forecast(company_id, fiscal_year_id, forecast_months=3):
+    """Enhanced cash flow forecast with seasonal patterns, known obligations,
+    and confidence intervals.
+
+    Returns dict with actual, forecast, confidence_upper, confidence_lower,
+    known_obligations, labels.
+    """
+    import statistics
+
+    fy = db.session.get(FiscalYear, fiscal_year_id)
+    monthly = get_monthly_cash_flow(company_id, fiscal_year_id)
+
+    # Find actual months with data
+    actual_months = [i for i, v in enumerate(monthly['net']) if v != 0]
+
+    if not actual_months:
+        return {
+            'labels': monthly['labels'],
+            'actual': monthly['net'],
+            'forecast': [None] * 12,
+            'confidence_upper': [None] * 12,
+            'confidence_lower': [None] * 12,
+            'known_obligations': [0.0] * 12,
+            'avg_monthly_cf': 0.0,
+            'has_seasonal': False,
+        }
+
+    last_month = max(actual_months)
+    data_values = [monthly['net'][i] for i in actual_months]
+    avg_cf = sum(data_values) / len(data_values)
+
+    # Compute stddev for confidence intervals
+    if len(data_values) >= 2:
+        try:
+            stddev = statistics.stdev(data_values)
+        except statistics.StatisticsError:
+            stddev = 0.0
+    else:
+        stddev = 0.0
+
+    # Seasonal patterns from prior year
+    seasonal_factors = {}
+    has_seasonal = False
+    prior_fy = (FiscalYear.query
+                .filter_by(company_id=company_id)
+                .filter(FiscalYear.year < fy.year)
+                .order_by(FiscalYear.year.desc())
+                .first())
+
+    if prior_fy:
+        prior_monthly = get_monthly_cash_flow(company_id, prior_fy.id)
+        prior_values = prior_monthly['net']
+        prior_data = [i for i, v in enumerate(prior_values) if v != 0]
+        if prior_data:
+            prior_avg = sum(prior_values[i] for i in prior_data) / len(prior_data)
+            if abs(prior_avg) > 0.01:
+                for m in range(12):
+                    seasonal_factors[m] = prior_values[m] / prior_avg if prior_values[m] != 0 else 1.0
+                has_seasonal = True
+
+    # Known obligations: pending supplier invoices + recurring templates + tax payments
+    known_obligations = [0.0] * 12
+    _add_known_obligations(company_id, fy, known_obligations)
+
+    # Build forecast
+    forecast = [None] * 12
+    confidence_upper = [None] * 12
+    confidence_lower = [None] * 12
+
+    for i in range(last_month + 1, min(last_month + 1 + forecast_months, 12)):
+        base = avg_cf
+
+        # Apply seasonal factor if available
+        if has_seasonal and i in seasonal_factors:
+            base = avg_cf * seasonal_factors[i]
+
+        # Add known obligations
+        base += known_obligations[i]
+
+        forecast[i] = round(base, 2)
+        confidence_upper[i] = round(base + stddev, 2)
+        confidence_lower[i] = round(base - stddev, 2)
+
+    return {
+        'labels': monthly['labels'],
+        'actual': monthly['net'],
+        'forecast': forecast,
+        'confidence_upper': confidence_upper,
+        'confidence_lower': confidence_lower,
+        'known_obligations': [round(v, 2) for v in known_obligations],
+        'avg_monthly_cf': round(avg_cf, 2),
+        'has_seasonal': has_seasonal,
+    }
+
+
+def _add_known_obligations(company_id, fy, obligations):
+    """Add known future payments to monthly obligations array."""
+    from app.models.invoice import SupplierInvoice
+    from app.models.recurring_invoice import RecurringInvoiceTemplate
+    from app.models.tax import TaxPayment
+
+    # Pending supplier invoices due within FY
+    pending = SupplierInvoice.query.filter_by(
+        company_id=company_id, status='pending'
+    ).filter(
+        SupplierInvoice.due_date >= fy.start_date,
+        SupplierInvoice.due_date <= fy.end_date,
+    ).all()
+
+    for inv in pending:
+        if inv.due_date and inv.total_amount:
+            month_idx = inv.due_date.month - 1
+            obligations[month_idx] -= float(inv.total_amount)
+
+    # Recurring invoice templates (expected income)
+    templates = RecurringInvoiceTemplate.query.filter_by(
+        company_id=company_id, active=True
+    ).all()
+
+    for tmpl in templates:
+        if tmpl.next_date and fy.start_date <= tmpl.next_date <= fy.end_date:
+            total = sum(float(li.unit_price or 0) * float(li.quantity or 1) for li in tmpl.line_items)
+            if total > 0:
+                month_idx = tmpl.next_date.month - 1
+                obligations[month_idx] += total
+
+    # Historical tax payments for recurring months (use prior year pattern)
+    prior_payments = TaxPayment.query.filter_by(company_id=company_id).filter(
+        db.extract('year', TaxPayment.payment_date) == fy.year - 1,
+    ).all()
+
+    for tp in prior_payments:
+        if tp.payment_date and tp.amount:
+            month_idx = tp.payment_date.month - 1
+            obligations[month_idx] -= float(tp.amount)
+
+
 def _classify_counterparts(account_numbers):
     """Classify a verification by its non-cash counterpart accounts.
 

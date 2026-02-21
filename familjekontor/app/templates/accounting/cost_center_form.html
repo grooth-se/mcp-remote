@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}{% if cc %}Redigera{% else %}Nytt{% endif %} kostnadsställe{% endblock %}
+
+{% block breadcrumbs %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{{ render_breadcrumbs([
+    ('Bokföring', url_for('accounting.index')),
+    ('Kostnadsställen', url_for('accounting.cost_centers')),
+    ('Redigera' if cc else 'Nytt', none),
+]) }}
+{% endblock %}
+
+{% block content %}
+<h2>{% if cc %}<i class="bi bi-pencil"></i> Redigera{% else %}<i class="bi bi-plus"></i> Nytt{% endif %} kostnadsställe</h2>
+
+<div class="card mt-3">
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="code" class="form-label">Kod</label>
+                    <input type="text" class="form-control" id="code" name="code"
+                           value="{{ cc.code if cc else '' }}" required maxlength="20">
+                </div>
+                <div class="col-md-8">
+                    <label for="name" class="form-label">Namn</label>
+                    <input type="text" class="form-control" id="name" name="name"
+                           value="{{ cc.name if cc else '' }}" required maxlength="200">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check"></i> {{ 'Spara' if cc else 'Skapa' }}
+            </button>
+            <a href="{{ url_for('accounting.cost_centers') }}" class="btn btn-outline-secondary">Avbryt</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

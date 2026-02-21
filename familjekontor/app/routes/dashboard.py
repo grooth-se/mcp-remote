@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, session, redirect, url_for, jsonify, request
+from flask import Blueprint, render_template, session, redirect, url_for, jsonify, request, flash
 from flask_login import login_required, current_user
 from app.extensions import limiter
 from app.services.company_service import get_company_summary
@@ -23,6 +23,7 @@ def index():
     fy_progress = None
     multi_company = None
     recurring_due = 0
+    anomaly_count = 0
 
     # Seed default favorites on first visit
     from app.services.favorite_service import seed_default_favorites, get_user_favorites
@@ -52,6 +53,13 @@ def index():
             salary_overview = get_salary_overview(company_id)
             fy_progress = get_fiscal_year_progress(company_id, fy.id)
 
+            try:
+                from app.services.anomaly_service import detect_anomalies
+                anomaly_result = detect_anomalies(company_id, fy.id)
+                anomaly_count = anomaly_result.get('total_count', 0)
+            except Exception:
+                anomaly_count = 0
+
         from app.services.dashboard_service import get_recurring_due_count
         recurring_due = get_recurring_due_count(company_id)
 
@@ -78,6 +86,7 @@ def index():
                            fy_progress=fy_progress,
                            multi_company=multi_company,
                            recurring_due=recurring_due,
+                           anomaly_count=anomaly_count,
                            user_favorites=user_favorites)
 
 
@@ -120,6 +129,30 @@ def api_cash_flow_chart():
     from app.services.dashboard_service import get_cash_flow_data
     data = get_cash_flow_data(company_id, summary['active_fiscal_year'].id)
     return jsonify(data)
+
+
+@dashboard_bp.route('/anomalies')
+@login_required
+def anomalies():
+    company_id = session.get('active_company_id')
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+
+    from app.models.accounting import FiscalYear
+    fy = FiscalYear.query.filter_by(
+        company_id=company_id, status='open'
+    ).order_by(FiscalYear.year.desc()).first()
+
+    anomaly_data = None
+    if fy:
+        try:
+            from app.services.anomaly_service import detect_anomalies
+            anomaly_data = detect_anomalies(company_id, fy.id)
+        except Exception:
+            anomaly_data = None
+
+    return render_template('dashboard/anomalies.html', anomaly_data=anomaly_data)
 
 
 @dashboard_bp.route('/api/search')

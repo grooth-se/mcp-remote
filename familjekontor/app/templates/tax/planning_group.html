@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Skatteplanering - Alla bolag - PsalmGears{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-building"></i> Skatteplanering - Alla bolag</h2>
+    <a href="{{ url_for('tax.tax_planning') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Tillbaka
+    </a>
+</div>
+
+{% if overview %}
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Bolag</th>
+                <th>Typ</th>
+                <th>Räkenskapsår</th>
+                <th>Status</th>
+                <th class="text-end">Rekommendationer</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in overview %}
+            <tr>
+                <td><strong>{{ item.company.name }}</strong></td>
+                <td>{{ item.company.company_type }}</td>
+                <td>{{ item.fiscal_year.year if item.fiscal_year else '-' }}</td>
+                <td>
+                    <span class="badge bg-{% if item.status == 'green' %}success{% elif item.status == 'yellow' %}warning text-dark{% elif item.status == 'red' %}danger{% else %}secondary{% endif %}">
+                        {% if item.status == 'green' %}OK{% elif item.status == 'yellow' %}Överväg{% elif item.status == 'red' %}Åtgärd{% else %}N/A{% endif %}
+                    </span>
+                </td>
+                <td class="text-end">{{ item.recommendation_count if item.recommendation_count is defined else '-' }}</td>
+            </tr>
+            {% if item.recommendations is defined %}
+            {% for rec in item.recommendations %}
+            <tr class="table-light">
+                <td colspan="2" class="ps-4">
+                    <small>{{ rec.title }}</small>
+                </td>
+                <td colspan="2">
+                    <small>{{ rec.summary[:100] }}{% if rec.summary|length > 100 %}...{% endif %}</small>
+                </td>
+                <td class="text-end">
+                    <span class="badge bg-{% if rec.status == 'green' %}success{% elif rec.status == 'yellow' %}warning text-dark{% else %}danger{% endif %} badge-sm">
+                        {{ rec.status }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Inga bolag hittades.
+</div>
+{% endif %}
+{% endblock %}

@@ -703,3 +703,32 @@ def deklaration_sru_export(return_id):
     filename = f'{tr.return_type}_{tr.tax_year}.sru'
     return send_file(output, as_attachment=True, download_name=filename,
                      mimetype='text/plain')
+
+
+# ---------------------------------------------------------------------------
+# Tax planning
+# ---------------------------------------------------------------------------
+
+@tax_bp.route('/planning')
+@login_required
+def tax_planning():
+    company_id, company, active_fy = _get_active_context()
+    if not company:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('dashboard.index'))
+    if not active_fy:
+        flash('Inget aktivt räkenskapsår.', 'warning')
+        return redirect(url_for('tax.index'))
+
+    from app.services.tax_planning_service import get_tax_planning_suggestions
+    planning_data = get_tax_planning_suggestions(company_id, active_fy.id)
+
+    return render_template('tax/planning.html', planning_data=planning_data)
+
+
+@tax_bp.route('/planning/group')
+@login_required
+def tax_planning_group():
+    from app.services.tax_planning_service import get_group_tax_overview
+    overview = get_group_tax_overview()
+    return render_template('tax/planning_group.html', overview=overview)

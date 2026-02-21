@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Kassaflödesprognos - PsalmGears{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-graph-up-arrow"></i> Kassaflödesprognos</h2>
+    <div>
+        <a href="{{ url_for('cashflow.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Kassaflödesanalys
+        </a>
+    </div>
+</div>
+
+{% if fiscal_years %}
+<form method="get" class="mb-4">
+    <div class="row align-items-end">
+        <div class="col-md-4">
+            <label class="form-label">Räkenskapsår</label>
+            <select name="fiscal_year_id" class="form-select" onchange="this.form.submit()">
+                {% for fy in fiscal_years %}
+                <option value="{{ fy.id }}" {% if fy.id == current_fy_id %}selected{% endif %}>
+                    {{ fy.year }} ({{ fy.start_date }} - {{ fy.end_date }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+</form>
+{% endif %}
+
+{% if forecast_data %}
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-bg-primary">
+            <div class="card-body text-center">
+                <h6>Genomsnittligt kassaflöde/mån</h6>
+                <h3>{{ "{:,.0f}".format(forecast_data.avg_monthly_cf) }} kr</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-{% if forecast_data.has_seasonal %}success{% else %}secondary{% endif %}">
+            <div class="card-body text-center">
+                <h6>Säsongsmönster</h6>
+                <h3>{% if forecast_data.has_seasonal %}Ja{% else %}Nej{% endif %}</h3>
+                <small>{% if forecast_data.has_seasonal %}Baserat på föregående år{% else %}Ingen historik{% endif %}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-info">
+            <div class="card-body text-center">
+                <h6>Kända åtaganden</h6>
+                <h3>{{ "{:,.0f}".format(forecast_data.known_obligations|sum) }} kr</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <canvas id="forecastChart" height="300"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Månadsdetaljer</div>
+    <div class="table-responsive">
+        <table class="table table-sm table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>Månad</th>
+                    <th class="text-end">Faktiskt</th>
+                    <th class="text-end">Prognos</th>
+                    <th class="text-end">Övre gräns</th>
+                    <th class="text-end">Undre gräns</th>
+                    <th class="text-end">Kända åtaganden</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i in range(12) %}
+                <tr>
+                    <td>{{ forecast_data.labels[i] }}</td>
+                    <td class="text-end">{% if forecast_data.actual[i] %}{{ "{:,.0f}".format(forecast_data.actual[i]) }}{% else %}-{% endif %}</td>
+                    <td class="text-end fw-bold">{% if forecast_data.forecast[i] is not none %}{{ "{:,.0f}".format(forecast_data.forecast[i]) }}{% else %}-{% endif %}</td>
+                    <td class="text-end text-muted">{% if forecast_data.confidence_upper[i] is not none %}{{ "{:,.0f}".format(forecast_data.confidence_upper[i]) }}{% else %}-{% endif %}</td>
+                    <td class="text-end text-muted">{% if forecast_data.confidence_lower[i] is not none %}{{ "{:,.0f}".format(forecast_data.confidence_lower[i]) }}{% else %}-{% endif %}</td>
+                    <td class="text-end">{% if forecast_data.known_obligations[i] %}{{ "{:,.0f}".format(forecast_data.known_obligations[i]) }}{% else %}-{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Ingen data tillgänglig. Välj ett räkenskapsår.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if forecast_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script>
+const labels = {{ forecast_data.labels|tojson }};
+const actual = {{ forecast_data.actual|tojson }};
+const forecast = {{ forecast_data.forecast|tojson }};
+const upper = {{ forecast_data.confidence_upper|tojson }};
+const lower = {{ forecast_data.confidence_lower|tojson }};
+
+const ctx = document.getElementById('forecastChart').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Faktiskt kassaflöde',
+                data: actual,
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                order: 2,
+            },
+            {
+                label: 'Prognos',
+                data: forecast,
+                type: 'line',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                borderWidth: 2,
+                pointStyle: 'circle',
+                pointRadius: 5,
+                fill: false,
+                order: 1,
+            },
+            {
+                label: 'Konfidensintervall (övre)',
+                data: upper,
+                type: 'line',
+                borderColor: 'rgba(255, 99, 132, 0.3)',
+                borderDash: [5, 5],
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                order: 0,
+            },
+            {
+                label: 'Konfidensintervall (undre)',
+                data: lower,
+                type: 'line',
+                borderColor: 'rgba(255, 99, 132, 0.3)',
+                borderDash: [5, 5],
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: '-1',
+                backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                order: 0,
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            title: { display: true, text: 'Kassaflöde - Faktiskt & Prognos' },
+        },
+        scales: {
+            y: { title: { display: true, text: 'SEK' } }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

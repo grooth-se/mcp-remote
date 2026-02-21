@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Fastighetsregister{% endblock %}
+
+{% block breadcrumbs %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{{ render_breadcrumbs([('Bolagsstyrning', none), ('Fastigheter', none)]) }}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-house"></i> Fastighetsregister</h2>
+    {% if not current_user.is_readonly %}
+    <a href="{{ url_for('realestate.new') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus"></i> Ny fastighet</a>
+    {% endif %}
+</div>
+
+{% if summaries %}
+<div class="card">
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Namn</th>
+                    <th>Beteckning</th>
+                    <th>Ort</th>
+                    <th class="text-end">Taxeringsvärde</th>
+                    <th class="text-end">Fastighetsskatt</th>
+                    <th class="text-end">Hyresintäkt YTD</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in summaries %}
+                <tr>
+                    <td><a href="{{ url_for('realestate.view', prop_id=s.id) }}">{{ s.property_name }}</a></td>
+                    <td>{{ s.fastighetsbeteckning or '—' }}</td>
+                    <td>{{ s.city or '—' }}</td>
+                    <td class="text-end">{{ s.taxeringsvarde|sek }}</td>
+                    <td class="text-end">{{ s.property_tax|sek }}</td>
+                    <td class="text-end">{{ s.rental_income_ytd|sek }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info"><i class="bi bi-info-circle"></i> Inga fastigheter registrerade.</div>
+{% endif %}
+{% endblock %}

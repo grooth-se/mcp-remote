@@ -61,6 +61,7 @@ def create_app(config_name=None):
     from app.routes.batch import batch_bp
     from app.routes.favorites import favorites_bp
     from app.routes.family import family_bp
+    from app.routes.real_estate import realestate_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -95,6 +96,7 @@ def create_app(config_name=None):
     app.register_blueprint(batch_bp, url_prefix='/batch')
     app.register_blueprint(favorites_bp, url_prefix='/favorites')
     app.register_blueprint(family_bp, url_prefix='/family')
+    app.register_blueprint(realestate_bp, url_prefix='/assets/real-estate')
 
     # Jinja2 globals and filters
     from datetime import datetime

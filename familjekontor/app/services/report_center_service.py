@@ -120,6 +120,16 @@ def get_available_reports():
             'has_excel': False,
             'category': 'Skatt & Lön',
         },
+        {
+            'key': 'business_analysis',
+            'name': 'Affärsanalys',
+            'icon': 'bi-clipboard-data',
+            'description': 'AI-genererad/mallbaserad affärsanalys med nyckeltal, kassaflöde och trender',
+            'url_name': 'report_center.business_analysis',
+            'has_pdf': True,
+            'has_excel': False,
+            'category': 'Analys',
+        },
     ]
 
 

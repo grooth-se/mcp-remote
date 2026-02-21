@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}Anomalidetektering - PsalmGears{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-shield-exclamation"></i> Anomalidetektering</h2>
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Tillbaka till Dashboard
+    </a>
+</div>
+
+{% if anomaly_data %}
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card text-bg-{% if anomaly_data.total_count > 0 %}warning{% else %}success{% endif %}">
+            <div class="card-body text-center">
+                <h3>{{ anomaly_data.total_count }}</h3>
+                <small>Totalt</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3>{{ anomaly_data.amount_outliers|length }}</h3>
+                <small>Beloppsavvikelser</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3>{{ anomaly_data.duplicate_payments|length }}</h3>
+                <small>Dubbelbetalningar</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3>{{ anomaly_data.weekend_bookings|length }}</h3>
+                <small>Helgbokningar</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3>{{ anomaly_data.round_number_bias|length }}</h3>
+                <small>Jämna belopp</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3>{{ anomaly_data.missing_sequences|length }}</h3>
+                <small>Luckor i serie</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-outliers" type="button">
+            Beloppsavvikelser <span class="badge bg-secondary">{{ anomaly_data.amount_outliers|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-duplicates" type="button">
+            Dubbelbetalningar <span class="badge bg-secondary">{{ anomaly_data.duplicate_payments|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-weekends" type="button">
+            Helgbokningar <span class="badge bg-secondary">{{ anomaly_data.weekend_bookings|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-round" type="button">
+            Jämna belopp <span class="badge bg-secondary">{{ anomaly_data.round_number_bias|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sequences" type="button">
+            Luckor i serie <span class="badge bg-secondary">{{ anomaly_data.missing_sequences|length }}</span>
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    {# Amount Outliers #}
+    <div class="tab-pane fade show active" id="tab-outliers">
+        {% if anomaly_data.amount_outliers %}
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Verifikation</th>
+                        <th>Konto</th>
+                        <th class="text-end">Belopp</th>
+                        <th class="text-end">Medel</th>
+                        <th class="text-end">Stddev</th>
+                        <th class="text-end">Gränsvärde</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in anomaly_data.amount_outliers %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('accounting.view_verification', verification_id=o.verification_id) }}">
+                                #{{ o.verification_id }}
+                            </a>
+                        </td>
+                        <td>{{ o.account_number }} {{ o.account_name }}</td>
+                        <td class="text-end fw-bold text-danger">{{ "{:,.2f}".format(o.amount) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(o.mean) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(o.stddev) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(o.cutoff) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-success"><i class="bi bi-check-circle"></i> Inga beloppsavvikelser hittades.</div>
+        {% endif %}
+    </div>
+
+    {# Duplicate Payments #}
+    <div class="tab-pane fade" id="tab-duplicates">
+        {% if anomaly_data.duplicate_payments %}
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Leverantör</th>
+                        <th class="text-end">Belopp</th>
+                        <th>Faktura A</th>
+                        <th>Faktura B</th>
+                        <th class="text-end">Dagar emellan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in anomaly_data.duplicate_payments %}
+                    <tr>
+                        <td>{{ d.supplier_name }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(d.amount) }}</td>
+                        <td>{{ d.invoice_a }}</td>
+                        <td>{{ d.invoice_b }}</td>
+                        <td class="text-end">{{ d.days_apart }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-success"><i class="bi bi-check-circle"></i> Inga potentiella dubbelbetalningar hittades.</div>
+        {% endif %}
+    </div>
+
+    {# Weekend Bookings #}
+    <div class="tab-pane fade" id="tab-weekends">
+        {% if anomaly_data.weekend_bookings %}
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Verifikation</th>
+                        <th>Datum</th>
+                        <th>Dag</th>
+                        <th>Beskrivning</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for w in anomaly_data.weekend_bookings %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('accounting.view_verification', verification_id=w.verification_id) }}">
+                                {{ w.verification_number }}
+                            </a>
+                        </td>
+                        <td>{{ w.date }}</td>
+                        <td><span class="badge bg-warning text-dark">{{ w.day_name }}</span></td>
+                        <td>{{ w.description }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-success"><i class="bi bi-check-circle"></i> Inga helgbokningar hittades.</div>
+        {% endif %}
+    </div>
+
+    {# Round Number Bias #}
+    <div class="tab-pane fade" id="tab-round">
+        {% if anomaly_data.round_number_bias %}
+        {% for r in anomaly_data.round_number_bias %}
+        <div class="alert alert-warning">
+            <strong><i class="bi bi-exclamation-triangle"></i> Jämna belopp-bias detekterad</strong><br>
+            {{ r.round_count }} av {{ r.total_count }} transaktioner ({{ r.percentage }}%)
+            är jämnt delbara med 1 000 kr. Tröskelvärde: {{ r.threshold }}%.
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="alert alert-success"><i class="bi bi-check-circle"></i> Ingen jämna belopp-bias detekterad.</div>
+        {% endif %}
+    </div>
+
+    {# Missing Sequences #}
+    <div class="tab-pane fade" id="tab-sequences">
+        {% if anomaly_data.missing_sequences %}
+        <div class="alert alert-warning mb-3">
+            <strong><i class="bi bi-exclamation-triangle"></i> {{ anomaly_data.missing_sequences|length }} saknade verifikationsnummer</strong>
+        </div>
+        <div class="row">
+            {% for m in anomaly_data.missing_sequences %}
+            <div class="col-auto mb-2">
+                <span class="badge bg-danger fs-6">#{{ m.missing_number }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-success"><i class="bi bi-check-circle"></i> Inga luckor i verifikationsnummerserien.</div>
+        {% endif %}
+    </div>
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Ingen data tillgänglig. Kontrollera att det finns ett aktivt räkenskapsår med verifikationer.
+</div>
+{% endif %}
+{% endblock %}

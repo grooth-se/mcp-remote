@@ -107,6 +107,12 @@
         </tr>
     </table>
 
+    {% if invoice.vat_type in ('reverse_charge', 'export') %}
+    <div style="margin-top: 16px; padding: 8px 12px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; font-size: 9pt;">
+        <strong>{% if invoice.vat_type == 'reverse_charge' %}Omvänd skattskyldighet - Köparen är skyldig att redovisa moms{% elif invoice.vat_type == 'export' %}Momsfri export{% endif %}</strong>
+    </div>
+    {% endif %}
+
     <div class="payment-info">
         <h4>Betalningsinformation</h4>
         <p>

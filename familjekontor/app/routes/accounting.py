@@ -259,6 +259,149 @@ def export_csv():
                      mimetype='text/csv')
 
 
+# === Cost Centers ===
+
+@accounting_bp.route('/cost-centers')
+@login_required
+def cost_centers():
+    company_id = session.get('active_company_id')
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+
+    from app.services.cost_center_service import get_cost_centers
+    ccs = get_cost_centers(company_id, active_only=False)
+    return render_template('accounting/cost_centers.html', cost_centers=ccs)
+
+
+@accounting_bp.route('/cost-centers/new', methods=['GET', 'POST'])
+@login_required
+def cost_center_new():
+    company_id = session.get('active_company_id')
+    if not company_id:
+        return redirect(url_for('companies.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('accounting.cost_centers'))
+
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip()
+        name = request.form.get('name', '').strip()
+        if not code or not name:
+            flash('Kod och namn krävs.', 'danger')
+            return render_template('accounting/cost_center_form.html', cc=None)
+
+        from app.services.cost_center_service import create_cost_center
+        try:
+            cc = create_cost_center(company_id, code, name)
+            flash(f'Kostnadsställe {cc.code} skapat.', 'success')
+            return redirect(url_for('accounting.cost_centers'))
+        except Exception:
+            db.session.rollback()
+            flash('Kod finns redan.', 'danger')
+
+    return render_template('accounting/cost_center_form.html', cc=None)
+
+
+@accounting_bp.route('/cost-centers/<int:cc_id>/edit', methods=['GET', 'POST'])
+@login_required
+def cost_center_edit(cc_id):
+    company_id = session.get('active_company_id')
+    from app.models.cost_center import CostCenter
+    cc = db.session.get(CostCenter, cc_id)
+    if not cc or cc.company_id != company_id:
+        flash('Kostnadsställe hittades inte.', 'danger')
+        return redirect(url_for('accounting.cost_centers'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('accounting.cost_centers'))
+
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip()
+        name = request.form.get('name', '').strip()
+        if not code or not name:
+            flash('Kod och namn krävs.', 'danger')
+            return render_template('accounting/cost_center_form.html', cc=cc)
+
+        from app.services.cost_center_service import update_cost_center
+        try:
+            update_cost_center(cc_id, code=code, name=name)
+            flash('Kostnadsställe uppdaterat.', 'success')
+            return redirect(url_for('accounting.cost_centers'))
+        except Exception:
+            db.session.rollback()
+            flash('Uppdatering misslyckades.', 'danger')
+
+    return render_template('accounting/cost_center_form.html', cc=cc)
+
+
+@accounting_bp.route('/cost-centers/<int:cc_id>/delete', methods=['POST'])
+@login_required
+def cost_center_delete(cc_id):
+    company_id = session.get('active_company_id')
+    from app.models.cost_center import CostCenter
+    cc = db.session.get(CostCenter, cc_id)
+    if not cc or cc.company_id != company_id:
+        flash('Kostnadsställe hittades inte.', 'danger')
+        return redirect(url_for('accounting.cost_centers'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('accounting.cost_centers'))
+
+    from app.services.cost_center_service import delete_cost_center
+    delete_cost_center(cc_id)
+    flash('Kostnadsställe inaktiverat.', 'success')
+    return redirect(url_for('accounting.cost_centers'))
+
+
+@accounting_bp.route('/cost-centers/report')
+@login_required
+def cost_center_report():
+    company_id = session.get('active_company_id')
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+
+    fiscal_years = FiscalYear.query.filter_by(company_id=company_id).order_by(FiscalYear.year.desc()).all()
+    fiscal_year_id = request.args.get('fiscal_year_id', type=int)
+    if not fiscal_year_id and fiscal_years:
+        fiscal_year_id = fiscal_years[0].id
+
+    summaries = []
+    if fiscal_year_id:
+        from app.services.cost_center_service import get_all_cost_centers_pnl
+        summaries = get_all_cost_centers_pnl(company_id, fiscal_year_id)
+
+    return render_template('accounting/cost_center_report.html',
+                           summaries=summaries, fiscal_years=fiscal_years,
+                           current_fy_id=fiscal_year_id)
+
+
+@accounting_bp.route('/cost-centers/<code>/drilldown')
+@login_required
+def cost_center_drilldown(code):
+    company_id = session.get('active_company_id')
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+
+    fiscal_year_id = request.args.get('fiscal_year_id', type=int)
+    if not fiscal_year_id:
+        fy = FiscalYear.query.filter_by(company_id=company_id, status='open').first()
+        fiscal_year_id = fy.id if fy else None
+
+    pnl = None
+    if fiscal_year_id:
+        from app.services.cost_center_service import get_cost_center_pnl
+        pnl = get_cost_center_pnl(company_id, fiscal_year_id, code)
+
+    return render_template('accounting/cost_center_report.html',
+                           drilldown_code=code, pnl=pnl,
+                           fiscal_years=FiscalYear.query.filter_by(company_id=company_id).order_by(FiscalYear.year.desc()).all(),
+                           current_fy_id=fiscal_year_id,
+                           summaries=None)
+
+
 @accounting_bp.route('/trial-balance')
 @login_required
 def trial_balance():

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Affärsanalys - PsalmGears{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        <i class="bi bi-clipboard-data"></i> Affärsanalys
+        {% if analysis and analysis.has_ai %}
+        <span class="badge bg-info ms-2" style="font-size: 0.5em;">AI-genererad</span>
+        {% else %}
+        <span class="badge bg-secondary ms-2" style="font-size: 0.5em;">Mallbaserad</span>
+        {% endif %}
+    </h2>
+    <div>
+        {% if analysis %}
+        <a href="{{ url_for('report_center.business_analysis_pdf', fiscal_year_id=analysis.fiscal_year.id) }}"
+           class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-file-earmark-pdf"></i> PDF
+        </a>
+        {% endif %}
+        <a href="{{ url_for('report_center.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Rapportcenter
+        </a>
+    </div>
+</div>
+
+{% if analysis %}
+<div class="row mb-3">
+    <div class="col-md-6">
+        <dl class="row mb-0">
+            <dt class="col-4">Företag</dt><dd class="col-8">{{ analysis.company.name }}</dd>
+            <dt class="col-4">Räkenskapsår</dt><dd class="col-8">{{ analysis.fiscal_year.year }}</dd>
+        </dl>
+    </div>
+</div>
+
+{% for section in analysis.sections %}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="{{ section.icon }}"></i> {{ section.title }}
+    </div>
+    <div class="card-body">
+        {% if section.data_points %}
+        <div class="row text-center mb-3">
+            {% for key, value in section.data_points.items() %}
+            {% if value is not none %}
+            <div class="col">
+                <div class="fs-5 fw-bold">
+                    {% if value is number and value != value|int %}
+                        {{ "%.1f"|format(value) }}{% if key in ('gross_margin', 'net_margin', 'roe') %}%{% endif %}
+                    {% elif value is number %}
+                        {{ "{:,.0f}".format(value) }}{% if key == 'total_cash_flow' %} kr{% endif %}
+                    {% else %}
+                        {{ value }}
+                    {% endif %}
+                </div>
+                <small class="text-muted">
+                    {% if key == 'gross_margin' %}Bruttomarginal
+                    {% elif key == 'net_margin' %}Nettomarginal
+                    {% elif key == 'roe' %}ROE
+                    {% elif key == 'current_ratio' %}Balanslikviditet
+                    {% elif key == 'quick_ratio' %}Kassalikviditet
+                    {% elif key == 'total_cash_flow' %}Kassaflöde
+                    {% elif key == 'dso' %}DSO (dagar)
+                    {% elif key == 'dpo' %}DPO (dagar)
+                    {% elif key == 'current_year' %}Innevarande år
+                    {% elif key == 'prior_year' %}Föregående år
+                    {% else %}{{ key }}
+                    {% endif %}
+                </small>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <p class="mb-0">{{ section.narrative }}</p>
+    </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Ingen analysdata tillgänglig. Kontrollera att det finns ett aktivt räkenskapsår med verifikationer.
+</div>
+{% endif %}
+{% endblock %}

@@ -135,13 +135,14 @@ ACCOUNT_PATTERNS = {
 }
 
 
-def suggest_account(description, amount=None, transaction_type=None):
+def suggest_account(description, amount=None, transaction_type=None, supplier_id=None):
     """Suggest a BAS account for a bank transaction.
 
     Args:
         description: Transaction description text.
         amount: Transaction amount (positive/negative).
         transaction_type: Optional hint ('expense', 'income').
+        supplier_id: Optional supplier ID to check learned mappings first.
 
     Returns:
         Dict with account_number, account_name, confidence, reasoning.
@@ -149,7 +150,13 @@ def suggest_account(description, amount=None, transaction_type=None):
     if not description:
         return None
 
-    # Try regex patterns first
+    # Check supplier learned mappings first (highest confidence)
+    if supplier_id:
+        mapping = _check_supplier_mappings(supplier_id, description)
+        if mapping:
+            return mapping
+
+    # Try regex patterns
     desc_lower = description.lower()
     for pattern, (acct_num, acct_name) in ACCOUNT_PATTERNS.items():
         if re.search(pattern, desc_lower):
@@ -173,6 +180,89 @@ def suggest_account(description, amount=None, transaction_type=None):
             return result
 
     return None
+
+
+def _check_supplier_mappings(supplier_id, description):
+    """Check supplier's learned mappings for a matching description."""
+    from app.models.invoice import Supplier
+
+    supplier = db.session.get(Supplier, supplier_id)
+    if not supplier or not supplier.learned_mappings:
+        return None
+
+    desc_lower = description.strip().lower()
+    mappings = supplier.learned_mappings
+
+    # Exact match
+    if desc_lower in mappings:
+        acct_num = mappings[desc_lower]
+        return {
+            'account_number': acct_num,
+            'account_name': f'Konto {acct_num}',
+            'confidence': 0.95,
+            'reasoning': f'Inlärd mappning från leverantör {supplier.name}',
+        }
+
+    # Substring match — check if any learned key is contained in description
+    for key, acct_num in mappings.items():
+        if key in desc_lower or desc_lower in key:
+            return {
+                'account_number': acct_num,
+                'account_name': f'Konto {acct_num}',
+                'confidence': 0.90,
+                'reasoning': f'Delvis matchning från leverantör {supplier.name}',
+            }
+
+    return None
+
+
+def record_supplier_mapping(supplier_id, description, account_number):
+    """Record a description→account mapping for a supplier.
+
+    Returns True on success, False if supplier not found.
+    """
+    from app.models.invoice import Supplier
+
+    supplier = db.session.get(Supplier, supplier_id)
+    if not supplier:
+        return False
+
+    supplier.learn_mapping(description, account_number)
+    db.session.commit()
+    return True
+
+
+def get_supplier_mappings(supplier_id):
+    """Get all learned mappings for a supplier.
+
+    Returns dict of {description: account_number} or empty dict.
+    """
+    from app.models.invoice import Supplier
+
+    supplier = db.session.get(Supplier, supplier_id)
+    if not supplier or not supplier.learned_mappings:
+        return {}
+    return dict(supplier.learned_mappings)
+
+
+def delete_supplier_mapping(supplier_id, description_key):
+    """Delete a single mapping from a supplier's learned mappings.
+
+    Returns True on success, False if not found.
+    """
+    from app.models.invoice import Supplier
+
+    supplier = db.session.get(Supplier, supplier_id)
+    if not supplier or not supplier.learned_mappings:
+        return False
+
+    mappings = dict(supplier.learned_mappings)
+    if description_key in mappings:
+        del mappings[description_key]
+        supplier.learned_mappings = mappings if mappings else None
+        db.session.commit()
+        return True
+    return False
 
 
 def batch_categorize(transactions):
