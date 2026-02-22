@@ -42,14 +42,16 @@ def update_bank_account(account_id, **kwargs):
 # Column mappings for different bank CSV formats
 BANK_FORMATS = {
     'seb': {
-        'date': 'Bokforingsdatum',
-        'description': 'Text/mottagare',
-        'amount': 'Belopp',
-        'balance': 'Saldo',
+        'date': 'Bokförd',
+        'description': 'Text',
+        'amount_in': 'Insättningar',
+        'amount_out': 'Uttag',
+        'balance': 'Bokfört saldo',
         'delimiter': ';',
-        'encoding': 'latin-1',
+        'encoding': 'utf-8',
         'date_format': '%Y-%m-%d',
         'decimal_sep': ',',
+        'split_amount': True,
     },
     'swedbank': {
         'date': 'Transaktionsdag',
@@ -104,7 +106,14 @@ def parse_bank_csv(file_content, bank_format='generic'):
     encoding = fmt.get('encoding', 'utf-8')
 
     if isinstance(file_content, bytes):
-        file_content = file_content.decode(encoding, errors='replace')
+        # Try UTF-8 first (handles BOM), fall back to specified encoding
+        try:
+            file_content = file_content.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            file_content = file_content.decode(encoding, errors='replace')
+    else:
+        # Strip BOM from string content
+        file_content = file_content.lstrip('\ufeff')
 
     reader = csv.DictReader(io.StringIO(file_content), delimiter=fmt['delimiter'])
     transactions = []
@@ -112,7 +121,15 @@ def parse_bank_csv(file_content, bank_format='generic'):
     for row in reader:
         txn_date = _parse_date(row.get(fmt['date'], ''), fmt['date_format'])
         description = row.get(fmt['description'], '').strip()
-        amount = _parse_amount(row.get(fmt['amount'], ''), fmt['decimal_sep'])
+
+        if fmt.get('split_amount'):
+            # SEB format: separate Insättningar (deposits) and Uttag (withdrawals)
+            amount_in = _parse_amount(row.get(fmt['amount_in'], ''), fmt['decimal_sep'])
+            amount_out = _parse_amount(row.get(fmt['amount_out'], ''), fmt['decimal_sep'])
+            amount = amount_in + amount_out  # Uttag already negative from CSV
+        else:
+            amount = _parse_amount(row.get(fmt['amount'], ''), fmt['decimal_sep'])
+
         balance = _parse_amount(row.get(fmt['balance'], ''), fmt['decimal_sep'])
 
         if txn_date and description:

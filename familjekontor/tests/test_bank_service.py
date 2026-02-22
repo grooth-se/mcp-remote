@@ -68,12 +68,25 @@ class TestBankAccount:
 
 class TestCSVParsing:
     def test_parse_seb_csv(self):
-        csv = 'Bokforingsdatum;Text/mottagare;Belopp;Saldo\n' \
-              '2025-03-15;Hyra;-5 000,00;95 000,00\n'
+        csv = 'Bokförd;Valutadatum;Text;Typ;Insättningar;Uttag;Bokfört saldo\n' \
+              '2025-03-15;2025-03-15;Hyra;Betalning (bg/pg);;-5 000,00;95 000,00\n'
         txns = parse_bank_csv(csv, 'seb')
         assert len(txns) == 1
         assert txns[0]['transaction_date'] == date(2025, 3, 15)
         assert txns[0]['amount'] == Decimal('-5000.00')
+
+    def test_parse_seb_csv_deposit(self):
+        csv = 'Bokförd;Valutadatum;Text;Typ;Insättningar;Uttag;Bokfört saldo\n' \
+              '2025-03-20;2025-03-20;Kundbetalning;Bankgirobetalning;10 000,00;;105 000,00\n'
+        txns = parse_bank_csv(csv, 'seb')
+        assert len(txns) == 1
+        assert txns[0]['amount'] == Decimal('10000.00')
+
+    def test_parse_seb_csv_with_bom(self):
+        csv = '\ufeffBokförd;Valutadatum;Text;Typ;Insättningar;Uttag;Bokfört saldo\n' \
+              '2025-03-15;2025-03-15;Hyra;Annan;;-5 000,00;95 000,00\n'
+        txns = parse_bank_csv(csv, 'seb')
+        assert len(txns) == 1
 
     def test_parse_swedbank_csv(self):
         csv = 'Transaktionsdag;Beskrivning;Belopp;Saldo\n' \
