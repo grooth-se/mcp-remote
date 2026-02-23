@@ -54,6 +54,7 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
+    PROPAGATE_EXCEPTIONS = True
     # In production, set SECRET_KEY via environment variable
 
 

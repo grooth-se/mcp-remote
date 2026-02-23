@@ -72,4 +72,6 @@ exec gunicorn \
     --timeout 120 \
     --access-logfile - \
     --error-logfile - \
+    --capture-output \
+    --log-level info \
     "run:app"
