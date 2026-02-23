@@ -487,12 +487,15 @@ class AccruedIncomeCalculator:
 
         self.dataframes['Accuredhistory'] = dfacchist
 
-    def run(self, dataframes=None):
+    def run(self, dataframes=None, closing_date=None):
         """Execute complete calculation pipeline.
 
         Args:
             dataframes: Optional dict of pre-built DataFrames (from integration).
                         If provided, skips load_files() and uses these instead.
+            closing_date: Optional closing date override (YYYY-MM-DD string).
+                          If provided, uses this instead of extracting from
+                          projectadjustments.
 
         Returns:
             tuple: (result_dataframe, closing_date)
@@ -536,14 +539,17 @@ class AccruedIncomeCalculator:
         # Get result and closing date
         self.result_df = self.dataframes['projektuppf']
 
-        # Extract closing date
-        self.result_df['closing'] = pd.to_datetime(
-            self.result_df['closing'], errors='coerce')
-        closing_dates = self.result_df['closing'].dropna()
-        if len(closing_dates) > 0:
-            self.closing_date = closing_dates.iloc[0].strftime('%Y-%m-%d')
+        # Extract closing date (use override if provided)
+        if closing_date:
+            self.closing_date = closing_date
         else:
-            self.closing_date = pd.Timestamp.now().strftime('%Y-%m-%d')
+            self.result_df['closing'] = pd.to_datetime(
+                self.result_df['closing'], errors='coerce')
+            closing_dates = self.result_df['closing'].dropna()
+            if len(closing_dates) > 0:
+                self.closing_date = closing_dates.iloc[0].strftime('%Y-%m-%d')
+            else:
+                self.closing_date = pd.Timestamp.now().strftime('%Y-%m-%d')
 
         # Export to Excel
         report_path = os.path.join(

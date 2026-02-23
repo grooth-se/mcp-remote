@@ -12,7 +12,9 @@
             </div>
             <div class="card-body py-2 d-flex align-items-center justify-content-between">
                 <small class="text-muted">Fetch all data directly from the MG5 Integration database — no Excel files needed.</small>
-                <form method="POST" action="{{ url_for('upload.from_integration') }}" id="integrationForm">
+                <form method="POST" action="{{ url_for('upload.from_integration') }}" id="integrationForm" class="d-flex align-items-center gap-2">
+                    <input type="date" class="form-control form-control-sm" name="closing_date"
+                           style="width:140px;" title="Closing date (leave blank to auto-detect)">
                     <button type="submit" class="btn btn-sm btn-success" id="integrationBtn" disabled>
                         <i class="bi bi-cloud-download"></i> Load from Integration
                     </button>

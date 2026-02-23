@@ -234,6 +234,8 @@ def validate(session_id):
 @upload_bp.route('/from-integration', methods=['POST'])
 def from_integration():
     """Load data from MG5integration API instead of Excel files."""
+    closing_date = request.form.get('closing_date', '').strip() or None
+
     try:
         loader = IntegrationDataLoader()
         dataframes = loader.load()
@@ -244,11 +246,14 @@ def from_integration():
         flash(f'Error loading integration data: {e}', 'error')
         return redirect(url_for('upload.index'))
 
-    # Create session with source='integration'
+    # Create session with source='integration' and optional closing_date
     session_id = str(uuid.uuid4())
+    files_meta = {'source': 'integration'}
+    if closing_date:
+        files_meta['closing_date'] = closing_date
     session = UploadSession(
         session_id=session_id,
-        files_json=json.dumps({'source': 'integration'}),
+        files_json=json.dumps(files_meta),
         status='validated'
     )
     db.session.add(session)

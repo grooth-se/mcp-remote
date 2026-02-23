@@ -3,6 +3,7 @@
 import json
 import os
 import pickle
+import pandas as pd
 from flask import (
     render_template, request, jsonify, flash,
     redirect, url_for, current_app
@@ -32,6 +33,79 @@ def _is_integration_session(session):
         return False
 
 
+def _get_session_closing_date(session):
+    """Get closing_date stored in the session metadata (from integration form)."""
+    try:
+        files = json.loads(session.files_json)
+        return files.get('closing_date')
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def _import_accrued_history(calculator, current_closing_date):
+    """Import historical rows from Accuredhistory into FactProjectMonthly.
+
+    Imports all historical closing dates that differ from the current one
+    and don't already exist in the database.
+    """
+    hist_df = calculator.dataframes.get('Accuredhistory')
+    if hist_df is None or hist_df.empty:
+        return
+
+    # Ensure closing is datetime for formatting
+    hist_df = hist_df.copy()
+    hist_df['closing'] = pd.to_datetime(hist_df['closing'], errors='coerce')
+
+    # Get unique historical closing dates (excluding current)
+    hist_dates = hist_df['closing'].dropna().dt.strftime('%Y-%m-%d').unique()
+    existing_dates = set(FactProjectMonthly.get_closing_dates())
+
+    for hist_date in hist_dates:
+        if hist_date == current_closing_date:
+            continue  # Already stored by the main loop
+        if hist_date in existing_dates:
+            continue  # Already in DB from a previous import
+
+        date_rows = hist_df[
+            hist_df['closing'].dt.strftime('%Y-%m-%d') == hist_date
+        ]
+
+        for _, row in date_rows.iterrows():
+            proj_num = str(row.get('Projektnummer', ''))
+            if not proj_num:
+                continue
+
+            def _fval(col, default=0):
+                v = row.get(col, default)
+                try:
+                    return float(v) if pd.notna(v) else default
+                except (ValueError, TypeError):
+                    return default
+
+            project = FactProjectMonthly(
+                closing_date=hist_date,
+                project_number=proj_num,
+                project_name=str(row.get('Benamning', '') or ''),
+                customer_name=str(row.get('Kundnamn', '') or ''),
+                actual_cost_cur=_fval('actcost CUR'),
+                actual_income_cur=_fval('actincome CUR'),
+                accrued_income_cur=_fval('accured income CUR'),
+                total_cost_cur=_fval('totalcost CUR'),
+                total_income_cur=_fval('totalincome CUR'),
+                contingency_cur=_fval('contingency CUR'),
+                include_in_accrued=bool(row.get('incl', True)),
+                contingency_factor=_fval('complex'),
+                completion_cur=_fval('completion CUR'),
+                completion_cur1=_fval('completion CUR1'),
+                profit_margin_cur=_fval('profit margin CUR'),
+                remaining_income=_fval('Remaining income'),
+                remaining_cost=_fval('Remaining cost'),
+                actual_income=_fval('act income'),
+                actual_cost=_fval('act cost'),
+            )
+            db.session.add(project)
+
+
 @calculation_bp.route('/')
 def index():
     """Calculation setup page."""
@@ -46,10 +120,18 @@ def index():
 def run():
     """Execute calculation (AJAX endpoint)."""
     session_id = request.form.get('session_id')
+    closing_date_override = (
+        request.form.get('closing_date', '').strip()
+        or None
+    )
     session = UploadSession.query.filter_by(session_id=session_id).first()
 
     if not session:
         return jsonify({'status': 'error', 'message': 'Session not found'}), 404
+
+    # Fall back to closing_date stored in session metadata (integration form)
+    if not closing_date_override:
+        closing_date_override = _get_session_closing_date(session)
 
     output_folder = str(current_app.config['OUTPUT_FOLDER'])
 
@@ -57,11 +139,13 @@ def run():
         if _is_integration_session(session):
             dataframes = _load_integration_dataframes(session)
             calculator = AccruedIncomeCalculator({}, output_folder)
-            result_df, closing_date = calculator.run(dataframes=dataframes)
+            result_df, closing_date = calculator.run(
+                dataframes=dataframes, closing_date=closing_date_override)
         else:
             files = json.loads(session.files_json)
             calculator = AccruedIncomeCalculator(files, output_folder)
-            result_df, closing_date = calculator.run()
+            result_df, closing_date = calculator.run(
+                closing_date=closing_date_override)
 
         # Update session
         session.closing_date = closing_date
@@ -88,11 +172,19 @@ def run():
 def store():
     """Store calculation results to database."""
     session_id = request.form.get('session_id')
+    closing_date_override = (
+        request.form.get('closing_date', '').strip()
+        or None
+    )
     session = UploadSession.query.filter_by(session_id=session_id).first()
 
     if not session or session.status != 'calculated':
         flash('No calculated results to store', 'error')
         return redirect(url_for('calculation.index'))
+
+    # Fall back to closing_date stored in session metadata (integration form)
+    if not closing_date_override:
+        closing_date_override = _get_session_closing_date(session)
 
     output_folder = str(current_app.config['OUTPUT_FOLDER'])
 
@@ -101,11 +193,13 @@ def store():
         if _is_integration_session(session):
             dataframes = _load_integration_dataframes(session)
             calculator = AccruedIncomeCalculator({}, output_folder)
-            result_df, closing_date = calculator.run(dataframes=dataframes)
+            result_df, closing_date = calculator.run(
+                dataframes=dataframes, closing_date=closing_date_override)
         else:
             files = json.loads(session.files_json)
             calculator = AccruedIncomeCalculator(files, output_folder)
-            result_df, closing_date = calculator.run()
+            result_df, closing_date = calculator.run(
+                closing_date=closing_date_override)
 
         # Delete existing records for this closing date
         FactProjectMonthly.query.filter_by(closing_date=closing_date).delete()
@@ -171,6 +265,9 @@ def store():
                 diff_cost=float(row.get('diffcost', 0) or 0),
             )
             db.session.add(project)
+
+        # Import historical data from Accuredhistory into DB
+        _import_accrued_history(calculator, closing_date)
 
         session.status = 'stored'
         db.session.commit()

@@ -33,13 +33,20 @@
                             <td>{{ session.closing_date or '-' }}</td>
                             <td>
                                 {% if session.status in ['validated', 'uploaded'] %}
-                                <button class="btn btn-success btn-sm"
-                                        onclick="runCalculation('{{ session.session_id }}')">
-                                    <i class="bi bi-play"></i> Calculate
-                                </button>
+                                <div class="d-flex align-items-center gap-1">
+                                    <input type="date" class="form-control form-control-sm"
+                                           id="closing_date_{{ session.session_id }}"
+                                           style="width:140px;"
+                                           title="Closing date (leave blank to auto-detect)">
+                                    <button class="btn btn-success btn-sm"
+                                            onclick="runCalculation('{{ session.session_id }}')">
+                                        <i class="bi bi-play"></i> Calculate
+                                    </button>
+                                </div>
                                 {% elif session.status == 'calculated' %}
                                 <form method="POST" action="{{ url_for('calculation.store') }}" style="display:inline;">
                                     <input type="hidden" name="session_id" value="{{ session.session_id }}">
+                                    <input type="hidden" name="closing_date" id="store_closing_date_{{ session.session_id }}" value="">
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="bi bi-database"></i> Store to DB
                                     </button>
@@ -84,14 +91,21 @@
 function runCalculation(sessionId) {
     const resultDiv = document.getElementById('calcResult');
     const spinner = document.getElementById('calcSpinner');
+    const dateInput = document.getElementById('closing_date_' + sessionId);
+    const closingDate = dateInput ? dateInput.value : '';
 
     spinner.style.display = 'block';
     resultDiv.innerHTML = '';
 
+    let body = 'session_id=' + sessionId;
+    if (closingDate) {
+        body += '&closing_date=' + encodeURIComponent(closingDate);
+    }
+
     fetch('{{ url_for("calculation.run") }}', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'session_id=' + sessionId
+        body: body
     })
     .then(response => response.json())
     .then(data => {
@@ -108,6 +122,7 @@ function runCalculation(sessionId) {
                     <hr>
                     <form method="POST" action="{{ url_for('calculation.store') }}">
                         <input type="hidden" name="session_id" value="${sessionId}">
+                        <input type="hidden" name="closing_date" value="${closingDate}">
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-database"></i> Store Results to Database
                         </button>
