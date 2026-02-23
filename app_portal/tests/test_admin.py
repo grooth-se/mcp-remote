@@ -22,6 +22,7 @@ def test_create_user(logged_in_client):
         'email': 'new@test.com',
         'password': 'newpass12',
         'is_admin': False,
+        'durabler_role': '',
     }, follow_redirects=True)
     assert b'newuser' in resp.data
     assert b'created' in resp.data
@@ -32,6 +33,7 @@ def test_create_user_duplicate(logged_in_client, normal_user):
         'username': 'testuser',
         'display_name': 'Dup',
         'password': 'pass1234',
+        'durabler_role': '',
     }, follow_redirects=True)
     assert b'already exists' in resp.data
 
@@ -40,6 +42,7 @@ def test_edit_user(logged_in_client, normal_user):
     resp = logged_in_client.post(f'/admin/users/{normal_user.id}/edit', data={
         'display_name': 'Updated Name',
         'email': 'updated@test.com',
+        'durabler_role': '',
     }, follow_redirects=True)
     assert b'User updated' in resp.data
 

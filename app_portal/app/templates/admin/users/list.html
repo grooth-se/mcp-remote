@@ -17,7 +17,8 @@
                     <th>Username</th>
                     <th>Display Name</th>
                     <th>Email</th>
-                    <th>Role</th>
+                    <th>Portal Role</th>
+                    <th>Durabler2 Role</th>
                     <th>Status</th>
                     <th>Last Login</th>
                     <th class="text-end">Actions</th>
@@ -34,6 +35,16 @@
                         <span class="badge bg-danger">Admin</span>
                         {% else %}
                         <span class="badge bg-secondary">User</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% set role_key = user_roles.get(user.id) %}
+                        {% if user.is_admin %}
+                        <span class="badge bg-danger">Administrator</span>
+                        {% elif role_key %}
+                        <span class="badge bg-info text-dark">{{ durabler_roles.get(role_key, role_key) }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
                         {% endif %}
                     </td>
                     <td>
