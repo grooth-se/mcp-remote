@@ -39,9 +39,7 @@
                     </td>
                     <td>
                         {% set role_key = user_roles.get(user.id) %}
-                        {% if user.is_admin %}
-                        <span class="badge bg-danger">Administrator</span>
-                        {% elif role_key %}
+                        {% if role_key %}
                         <span class="badge bg-info text-dark">{{ durabler_roles.get(role_key, role_key) }}</span>
                         {% else %}
                         <span class="text-muted">-</span>
