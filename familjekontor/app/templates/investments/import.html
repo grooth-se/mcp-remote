@@ -10,7 +10,7 @@
 ]) }}
 {% endblock %}
 {% block content %}
-<h2><i class="bi bi-upload"></i> Importera Nordnet CSV — {{ portfolio.name }}</h2>
+<h2><i class="bi bi-upload"></i> Importera CSV — {{ portfolio.name }}</h2>
 
 <div class="card mt-3">
     <div class="card-body">
@@ -19,7 +19,7 @@
             <div class="mb-3">
                 <label class="form-label">{{ form.csv_file.label.text }} <span class="text-danger">*</span></label>
                 {{ form.csv_file(class="form-control") }}
-                <small class="text-muted">Exportera transaktioner från Nordnet som CSV-fil.</small>
+                <small class="text-muted">Stödda format: Nordnet transaktioner (CSV) och SEB kontoutdrag (CSV).</small>
             </div>
             {% if not preview %}
             <button type="submit" name="action" value="preview" class="btn btn-outline-primary"><i class="bi bi-eye"></i> Förhandsgranska</button>

@@ -1,4 +1,4 @@
-"""Investment/portfolio service: portfolios, holdings, transactions, Nordnet CSV."""
+"""Investment/portfolio service: portfolios, holdings, transactions, CSV import."""
 
 import csv
 import io
@@ -503,7 +503,7 @@ def update_holding_metadata(holding_id, data):
 
 
 # ---------------------------------------------------------------------------
-# Nordnet CSV Import
+# CSV Import (Nordnet + SEB bank statement)
 # ---------------------------------------------------------------------------
 
 NORDNET_TYPE_MAP = {
@@ -520,35 +520,103 @@ NORDNET_TYPE_MAP = {
     'UTTAG': 'uttag',
 }
 
+# SEB bank statement type mapping based on Typ + amount sign
+SEB_TYPE_MAP = {
+    'BETALNING (BG/PG)': 'uttag',
+    'BANKGIROBETALNING': 'insattning',
+    'ÖVERFÖRING': None,  # determined by sign
+    'ANNAN': None,       # determined by sign
+    'INTERNATIONELL BETALNING': None,  # determined by sign
+    'SEPA': None,        # determined by sign
+}
 
-def parse_nordnet_csv(file_storage):
-    """Parse Nordnet CSV export.
 
-    Nordnet uses semicolon delimiter, Latin-1 encoding, Swedish headers.
-    Returns list of dicts ready for import.
+def _decode_csv_bytes(raw):
+    """Decode CSV bytes with proper encoding detection.
+
+    Tries UTF-8 first (handles BOM correctly), then Latin-1 fallback.
     """
-    raw = file_storage.read()
-
-    # Try Latin-1 first (Nordnet default), then UTF-8
-    for encoding in ('latin-1', 'utf-8', 'cp1252'):
+    # Try UTF-8 first (handles BOM via utf-8-sig)
+    for encoding in ('utf-8-sig', 'utf-8', 'latin-1', 'cp1252'):
         try:
             text = raw.decode(encoding)
-            break
+            # Strip any remaining BOM
+            text = text.lstrip('\ufeff')
+            return text
         except (UnicodeDecodeError, AttributeError):
             continue
-    else:
-        raise ValueError('Kunde inte avkoda CSV-filen')
+    raise ValueError('Kunde inte avkoda CSV-filen')
+
+
+def _detect_csv_format(headers):
+    """Detect CSV format from header column names.
+
+    Returns 'nordnet', 'seb', or None.
+    """
+    normalized = {h.strip().lower() for h in headers if h}
+
+    # Nordnet: has Bokföringsdag/Handelsdag + Transaktionstyp + Värdepapper
+    nordnet_markers = {'bokföringsdag', 'handelsdag', 'transaktionstyp',
+                       'transaktionstext', 'värdepapper'}
+    if normalized & nordnet_markers:
+        return 'nordnet'
+
+    # SEB bank statement: has Bokförd + Insättningar + Uttag
+    seb_markers = {'bokförd', 'insättningar', 'uttag'}
+    if seb_markers.issubset(normalized):
+        return 'seb'
+
+    return None
+
+
+def parse_csv(file_storage):
+    """Auto-detect CSV format and parse transactions.
+
+    Supports Nordnet stock transaction exports and SEB bank statements.
+    Returns list of dicts ready for import.
+    Raises ValueError with descriptive message if format is unsupported.
+    """
+    raw = file_storage.read()
+    text = _decode_csv_bytes(raw)
 
     reader = csv.DictReader(io.StringIO(text), delimiter=';')
+    if not reader.fieldnames:
+        raise ValueError('CSV-filen saknar kolumnrubriker')
 
+    fmt = _detect_csv_format(reader.fieldnames)
+
+    if fmt == 'nordnet':
+        return _parse_nordnet_rows(reader)
+    elif fmt == 'seb':
+        return _parse_seb_rows(reader)
+    else:
+        cols = ', '.join(h for h in reader.fieldnames if h)
+        raise ValueError(
+            f'Okänt CSV-format. Hittade kolumner: {cols}. '
+            f'Stödda format: Nordnet (Bokföringsdag, Transaktionstyp, ...) '
+            f'och SEB kontoutdrag (Bokförd, Insättningar, Uttag, ...).'
+        )
+
+
+def parse_nordnet_csv(file_storage):
+    """Parse Nordnet CSV export (legacy entry point).
+
+    Delegates to parse_csv which auto-detects format.
+    """
+    return parse_csv(file_storage)
+
+
+def _parse_nordnet_rows(reader):
+    """Parse rows from a Nordnet CSV DictReader."""
     transactions = []
     for row in reader:
-        # Normalize column names (strip whitespace, BOM)
-        row = {k.strip().lstrip('\ufeff'): v.strip() for k, v in row.items() if k}
+        row = {k.strip().lstrip('\ufeff'): (v.strip() if v else '')
+               for k, v in row.items() if k}
 
-        # Find relevant columns (Nordnet header names)
-        tx_date = _parse_nordnet_date(row.get('Bokföringsdag') or row.get('Handelsdag') or '')
-        tx_type_raw = (row.get('Transaktionstyp') or row.get('Transaktionstext') or '').upper()
+        tx_date = _parse_csv_date(
+            row.get('Bokföringsdag') or row.get('Handelsdag') or '')
+        tx_type_raw = (row.get('Transaktionstyp')
+                       or row.get('Transaktionstext') or '').upper()
         tx_type = NORDNET_TYPE_MAP.get(tx_type_raw)
 
         if not tx_date or not tx_type:
@@ -556,10 +624,11 @@ def parse_nordnet_csv(file_storage):
 
         name = row.get('Värdepapper') or row.get('ISIN') or ''
         isin = row.get('ISIN') or ''
-        quantity = _parse_nordnet_number(row.get('Antal') or '0')
-        price = _parse_nordnet_number(row.get('Kurs') or '0')
-        amount = _parse_nordnet_number(row.get('Belopp') or '0')
-        commission = abs(_parse_nordnet_number(row.get('Courtage') or row.get('Avgifter') or '0'))
+        quantity = _parse_swedish_number(row.get('Antal') or '0')
+        price = _parse_swedish_number(row.get('Kurs') or '0')
+        amount = _parse_swedish_number(row.get('Belopp') or '0')
+        commission = abs(_parse_swedish_number(
+            row.get('Courtage') or row.get('Avgifter') or '0'))
         currency = row.get('Valuta') or 'SEK'
 
         if not name and not amount:
@@ -581,8 +650,60 @@ def parse_nordnet_csv(file_storage):
     return transactions
 
 
-def _parse_nordnet_date(s):
-    """Parse date from Nordnet format YYYY-MM-DD."""
+def _parse_seb_rows(reader):
+    """Parse rows from a SEB bank statement CSV DictReader.
+
+    Columns: Bokförd, Valutadatum, Text, Typ, Insättningar, Uttag, Bokfört saldo.
+    Maps deposits to 'insattning' and withdrawals to 'uttag'.
+    """
+    transactions = []
+    for row in reader:
+        row = {k.strip().lstrip('\ufeff'): (v.strip() if v else '')
+               for k, v in row.items() if k}
+
+        tx_date = _parse_csv_date(row.get('Bokförd') or '')
+        if not tx_date:
+            continue
+
+        deposit = _parse_swedish_number(row.get('Insättningar') or '0')
+        withdrawal = _parse_swedish_number(row.get('Uttag') or '0')
+        text = row.get('Text') or ''
+        typ = (row.get('Typ') or '').upper()
+
+        # Determine transaction type and amount
+        if deposit and deposit > 0:
+            tx_type = 'insattning'
+            amount = deposit
+        elif withdrawal and withdrawal != 0:
+            tx_type = 'uttag'
+            amount = abs(withdrawal)
+        else:
+            continue
+
+        # Override type based on SEB Typ column if we have a specific mapping
+        mapped = SEB_TYPE_MAP.get(typ)
+        if mapped:
+            tx_type = mapped
+
+        transactions.append({
+            'transaction_date': tx_date,
+            'transaction_type': tx_type,
+            'name': text,
+            'isin': None,
+            'quantity': None,
+            'price_per_unit': None,
+            'amount': amount,
+            'commission': Decimal('0'),
+            'currency': 'SEK',
+            'instrument_type': 'aktie',
+            'note': typ,
+        })
+
+    return transactions
+
+
+def _parse_csv_date(s):
+    """Parse date from YYYY-MM-DD format."""
     s = s.strip()
     if not s:
         return None
@@ -593,8 +714,14 @@ def _parse_nordnet_date(s):
         return None
 
 
-def _parse_nordnet_number(s):
-    """Parse Nordnet number: uses comma as decimal, optional spaces as thousands."""
+# Keep old names as aliases for backward compatibility
+_parse_nordnet_date = _parse_csv_date
+
+
+def _parse_swedish_number(s):
+    """Parse Swedish number: comma as decimal, optional spaces as thousands."""
+    if not s:
+        return Decimal('0')
     s = s.strip().replace('\xa0', '').replace(' ', '')
     if not s or s == '-':
         return Decimal('0')
@@ -605,9 +732,13 @@ def _parse_nordnet_number(s):
         return Decimal('0')
 
 
+# Keep old name as alias for backward compatibility
+_parse_nordnet_number = _parse_swedish_number
+
+
 def import_nordnet_transactions(portfolio_id, transactions, fiscal_year_id=None,
                                  created_by=None):
-    """Bulk import parsed Nordnet transactions with dedup."""
+    """Bulk import parsed transactions with dedup."""
     portfolio = db.session.get(InvestmentPortfolio, portfolio_id)
     if not portfolio:
         raise ValueError('Portfölj hittades inte')

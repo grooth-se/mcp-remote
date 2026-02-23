@@ -15,7 +15,7 @@ from app.services.investment_service import (
     update_holding_metadata,
     create_transaction, get_portfolio_summary,
     get_dividend_income_summary, get_interest_income_summary,
-    parse_nordnet_csv, import_nordnet_transactions,
+    parse_nordnet_csv, parse_csv, import_nordnet_transactions,
 )
 
 
@@ -471,6 +471,63 @@ class TestNordnetParsing:
         assert len(transactions) == 1
         assert float(transactions[0]['quantity']) == 1000
         assert float(transactions[0]['amount']) == 220500
+
+
+class TestSEBParsing:
+    def test_parse_seb_bank_statement(self, logged_in_client):
+        _setup_company(logged_in_client)
+        csv_content = (
+            'Bokförd;Valutadatum;Text;Typ;Insättningar;Uttag;Bokfört saldo\n'
+            '2025-06-11;2025-06-11;SKATTEVERKET;Betalning (bg/pg);;-20915,00;50608,35\n'
+            '2025-02-28;2025-02-28;BG 172-7676;Bankgirobetalning;31632,00;;87748,60\n'
+            '2025-02-24;2025-02-24;LÅN;Överföring;;-25000,00;56116,60\n'
+        )
+        file = io.BytesIO(csv_content.encode('utf-8'))
+        transactions = parse_csv(file)
+
+        assert len(transactions) == 3
+        assert transactions[0]['transaction_type'] == 'uttag'
+        assert float(transactions[0]['amount']) == 20915
+        assert transactions[0]['name'] == 'SKATTEVERKET'
+
+        assert transactions[1]['transaction_type'] == 'insattning'
+        assert float(transactions[1]['amount']) == 31632
+
+        assert transactions[2]['transaction_type'] == 'uttag'
+        assert float(transactions[2]['amount']) == 25000
+
+    def test_parse_seb_with_utf8_bom(self, logged_in_client):
+        _setup_company(logged_in_client)
+        csv_content = (
+            '\ufeffBokförd;Valutadatum;Text;Typ;Insättningar;Uttag;Bokfört saldo\n'
+            '2025-01-10;2025-01-10;LÅN;Annan;100000,00;;233727,96\n'
+        )
+        file = io.BytesIO(csv_content.encode('utf-8-sig'))
+        transactions = parse_csv(file)
+
+        assert len(transactions) == 1
+        assert transactions[0]['transaction_type'] == 'insattning'
+        assert float(transactions[0]['amount']) == 100000
+
+    def test_unsupported_format_raises(self, logged_in_client):
+        _setup_company(logged_in_client)
+        csv_content = 'Datum;Beskrivning;Summa\n2025-01-01;Test;100\n'
+        file = io.BytesIO(csv_content.encode('utf-8'))
+        import pytest
+        with pytest.raises(ValueError, match='Okänt CSV-format'):
+            parse_csv(file)
+
+    def test_auto_detect_nordnet(self, logged_in_client):
+        _setup_company(logged_in_client)
+        csv_content = (
+            'Bokföringsdag;Transaktionstyp;Värdepapper;ISIN;Antal;Kurs;Belopp;Courtage;Valuta\n'
+            '2024-03-15;KÖPT;Investor B;SE0000107419;100;200,50;20050,00;39,00;SEK\n'
+        )
+        file = io.BytesIO(csv_content.encode('latin-1'))
+        transactions = parse_csv(file)
+
+        assert len(transactions) == 1
+        assert transactions[0]['transaction_type'] == 'kop'
 
 
 class TestNordnetImport:

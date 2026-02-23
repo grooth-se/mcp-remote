@@ -15,7 +15,7 @@ from app.services.investment_service import (
     update_holding_metadata,
     create_transaction, get_portfolio_summary,
     get_dividend_income_summary, get_interest_income_summary,
-    parse_nordnet_csv, import_nordnet_transactions,
+    parse_csv, import_nordnet_transactions,
 )
 
 investments_bp = Blueprint('investments', __name__)
@@ -190,15 +190,17 @@ def import_csv(portfolio_id):
 
         if action == 'preview':
             try:
-                preview = parse_nordnet_csv(form.csv_file.data)
+                preview = parse_csv(form.csv_file.data)
                 if not preview:
                     flash('Inga transaktioner hittades i filen.', 'warning')
             except ValueError as e:
                 flash(str(e), 'danger')
+            except Exception as e:
+                flash(f'Fel vid läsning av CSV-fil: {e}', 'danger')
         elif action == 'confirm':
             # Re-parse (file not persisted between requests)
             try:
-                transactions = parse_nordnet_csv(form.csv_file.data)
+                transactions = parse_csv(form.csv_file.data)
                 result = import_nordnet_transactions(
                     portfolio_id, transactions,
                     fiscal_year_id=active_fy.id if active_fy else None,
@@ -210,6 +212,9 @@ def import_csv(portfolio_id):
                                         portfolio_id=portfolio_id))
             except ValueError as e:
                 flash(str(e), 'danger')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Fel vid import: {e}', 'danger')
 
     return render_template('investments/import.html', form=form,
                            portfolio=portfolio, preview=preview,
