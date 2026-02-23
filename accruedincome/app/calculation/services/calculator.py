@@ -483,10 +483,12 @@ class AccruedIncomeCalculator:
 
         # Add project number as column (it's currently the index)
         if not df.empty:
-            df.insert(0, 'Projektnummer', df.index)
+            df = df.reset_index(names='Projektnummer')
 
         # Combine with history
-        dfacchist = pd.concat([dfacchist, df])
+        dfs = [d.dropna(axis=1, how='all') for d in [dfacchist, df]
+               if d is not None and not d.empty]
+        dfacchist = pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
 
         # Create charts folder
         charts_folder = os.path.join(self.output_folder, 'charts')
