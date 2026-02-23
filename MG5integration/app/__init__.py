@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, redirect, url_for
 from config import config
 from app.extensions import db
 
@@ -22,6 +22,10 @@ def create_app(config_name='default'):
 
     from app.review import review_bp
     app.register_blueprint(review_bp, url_prefix='/review')
+
+    @app.route('/')
+    def index():
+        return redirect(url_for('admin.dashboard'))
 
     # Create tables only if database doesn't exist yet
     with app.app_context():
