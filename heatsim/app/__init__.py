@@ -103,6 +103,7 @@ def create_app(config_name='default'):
             pass  # Non-critical — column may already exist
 
         # Reset any simulations stuck in 'running' status (from worker crashes/timeouts)
+        # Leave 'queued' jobs as-is so the worker re-picks them up
         try:
             mat_engine = db.engines.get('materials')
             if mat_engine:
@@ -112,13 +113,23 @@ def create_app(config_name='default'):
                         "error_message = 'Server restarted while simulation was running' "
                         "WHERE status = 'running'"
                     ))
-                    if result.rowcount > 0:
+                    weld_result = conn.execute(sa.text(
+                        "UPDATE weld_projects SET status = 'failed', "
+                        "error_message = 'Server restarted while simulation was running' "
+                        "WHERE status = 'running'"
+                    ))
+                    total = result.rowcount + weld_result.rowcount
+                    if total > 0:
                         conn.commit()
                         app.logger.info(
-                            f'Reset {result.rowcount} stuck simulation(s) to failed'
+                            f'Reset {total} stuck job(s) to failed'
                         )
         except Exception:
             pass  # Table may not exist yet
+
+        # Start background job queue worker thread
+        from app.services.job_queue import start_worker
+        start_worker(app)
 
     # Maintenance mode handler
     @app.before_request

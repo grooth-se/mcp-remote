@@ -13,12 +13,13 @@ from app.extensions import db
 # Project status constants
 STATUS_DRAFT = 'draft'
 STATUS_CONFIGURED = 'configured'
+STATUS_QUEUED = 'queued'
 STATUS_RUNNING = 'running'
 STATUS_COMPLETED = 'completed'
 STATUS_FAILED = 'failed'
 STATUS_CANCELLED = 'cancelled'
 
-PROJECT_STATUSES = [STATUS_DRAFT, STATUS_CONFIGURED, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED, STATUS_CANCELLED]
+PROJECT_STATUSES = [STATUS_DRAFT, STATUS_CONFIGURED, STATUS_QUEUED, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED, STATUS_CANCELLED]
 
 # Welding process types
 PROCESS_GTAW = 'gtaw'
@@ -156,6 +157,7 @@ class WeldProject(db.Model):
         classes = {
             STATUS_DRAFT: 'bg-secondary',
             STATUS_CONFIGURED: 'bg-info',
+            STATUS_QUEUED: 'bg-info',
             STATUS_RUNNING: 'bg-warning',
             STATUS_COMPLETED: 'bg-success',
             STATUS_FAILED: 'bg-danger',
@@ -173,7 +175,7 @@ class WeldProject(db.Model):
     @property
     def can_run(self) -> bool:
         """Check if project can be run."""
-        return (self.status in [STATUS_CONFIGURED, STATUS_FAILED, STATUS_CANCELLED] and
+        return (self.status in [STATUS_CONFIGURED, STATUS_FAILED, STATUS_CANCELLED, STATUS_COMPLETED] and
                 self.total_strings > 0)
 
     @property

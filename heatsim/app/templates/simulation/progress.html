@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Simulation Progress - {{ sim.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('simulation.index') }}">Simulations</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('simulation.view', id=sim.id) }}">{{ sim.name }}</a></li>
+                <li class="breadcrumb-item active">Progress</li>
+            </ol>
+        </nav>
+        <h2><i class="bi bi-hourglass-split"></i> Simulation Progress</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Queued state -->
+        <div class="card mb-4" id="queuedCard" style="{% if sim.status != 'queued' %}display:none{% endif %}">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-clock-history display-1 text-info"></i>
+                <h3 class="mt-3">Queued</h3>
+                <p class="text-muted" id="queueMessage">
+                    {% if queue_position %}
+                    Position {{ queue_position }} in queue
+                    {% else %}
+                    Waiting for worker...
+                    {% endif %}
+                </p>
+                <p class="text-muted" id="runningInfo"></p>
+                <form method="POST" action="{{ url_for('simulation.cancel', id=sim.id) }}" class="mt-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Running state -->
+        <div class="card mb-4" id="runningCard" style="{% if sim.status != 'running' %}display:none{% endif %}">
+            <div class="card-body text-center py-5">
+                <div class="spinner-border text-warning mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Running...</span>
+                </div>
+                <h3>Running</h3>
+                <p class="text-muted" id="elapsedTime">Computing...</p>
+            </div>
+        </div>
+
+        <!-- Completed state -->
+        <div class="card mb-4" id="completedCard" style="{% if sim.status != 'completed' %}display:none{% endif %}">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-check-circle display-1 text-success"></i>
+                <h3 class="mt-3">Completed</h3>
+                <p class="text-muted">Redirecting to results...</p>
+            </div>
+        </div>
+
+        <!-- Failed state -->
+        <div class="card mb-4" id="failedCard" style="{% if sim.status != 'failed' %}display:none{% endif %}">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-exclamation-triangle display-1 text-danger"></i>
+                <h3 class="mt-3">Failed</h3>
+                <p class="text-danger" id="errorMessage">{{ sim.error_message or '' }}</p>
+                <a href="{{ url_for('simulation.view', id=sim.id) }}" class="btn btn-outline-primary mt-3">
+                    <i class="bi bi-arrow-left"></i> Back to Simulation
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Simulation Info -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Simulation</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>{{ sim.name }}</strong></p>
+                <table class="table table-sm">
+                    <tr><td>Geometry</td><td>{{ sim.geometry_label }}</td></tr>
+                    <tr><td>Steel Grade</td><td>{{ sim.steel_grade.display_name if sim.steel_grade else '-' }}</td></tr>
+                    <tr>
+                        <td>Status</td>
+                        <td><span class="badge {{ sim.status_badge_class }}" id="statusBadge">{{ sim.status|title }}</span></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const simId = {{ sim.id }};
+let polling = true;
+
+function updateProgress() {
+    if (!polling) return;
+
+    fetch("{{ url_for('simulation.progress_status', id=sim.id) }}")
+        .then(response => response.json())
+        .then(data => {
+            const status = data.status;
+
+            // Show/hide cards based on status
+            document.getElementById('queuedCard').style.display = status === 'queued' ? '' : 'none';
+            document.getElementById('runningCard').style.display = status === 'running' ? '' : 'none';
+            document.getElementById('completedCard').style.display = status === 'completed' ? '' : 'none';
+            document.getElementById('failedCard').style.display = status === 'failed' ? '' : 'none';
+
+            // Update status badge
+            const badge = document.getElementById('statusBadge');
+            badge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+
+            if (status === 'queued') {
+                const pos = data.queue_position;
+                document.getElementById('queueMessage').textContent = pos
+                    ? 'Position ' + pos + ' in queue'
+                    : 'Waiting for worker...';
+
+                if (data.running_job) {
+                    document.getElementById('runningInfo').textContent =
+                        'Currently running: ' + data.running_job.name;
+                }
+            }
+
+            if (status === 'running' && data.elapsed_seconds) {
+                const mins = Math.floor(data.elapsed_seconds / 60);
+                const secs = Math.floor(data.elapsed_seconds % 60);
+                document.getElementById('elapsedTime').textContent =
+                    'Elapsed: ' + mins + 'm ' + secs + 's';
+            }
+
+            if (status === 'failed') {
+                document.getElementById('errorMessage').textContent = data.error_message || 'Unknown error';
+                polling = false;
+            }
+
+            if (status === 'completed') {
+                polling = false;
+                setTimeout(() => {
+                    window.location.href = "{{ url_for('simulation.view', id=sim.id) }}";
+                }, 1500);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching progress:', error);
+        });
+}
+
+// Poll every 2 seconds
+setInterval(updateProgress, 2000);
+
+// Initial update
+updateProgress();
+</script>
+{% endblock %}

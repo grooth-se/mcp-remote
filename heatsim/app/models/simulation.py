@@ -13,11 +13,12 @@ from app.extensions import db
 # Status constants
 STATUS_DRAFT = 'draft'
 STATUS_READY = 'ready'
+STATUS_QUEUED = 'queued'
 STATUS_RUNNING = 'running'
 STATUS_COMPLETED = 'completed'
 STATUS_FAILED = 'failed'
 
-STATUSES = [STATUS_DRAFT, STATUS_READY, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED]
+STATUSES = [STATUS_DRAFT, STATUS_READY, STATUS_QUEUED, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED]
 
 # Geometry type constants
 GEOMETRY_CYLINDER = 'cylinder'
@@ -365,6 +366,7 @@ class Simulation(db.Model):
         classes = {
             STATUS_DRAFT: 'bg-secondary',
             STATUS_READY: 'bg-info',
+            STATUS_QUEUED: 'bg-info',
             STATUS_RUNNING: 'bg-warning',
             STATUS_COMPLETED: 'bg-success',
             STATUS_FAILED: 'bg-danger',

@@ -11,7 +11,7 @@ from app.extensions import db
 from app.models import SteelGrade, PhaseDiagram, MeasuredData, HeatTreatmentTemplate, AuditLog, SimulationSnapshot
 from app.models.simulation import (
     Simulation, SimulationResult,
-    STATUS_DRAFT, STATUS_READY, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
+    STATUS_DRAFT, STATUS_READY, STATUS_QUEUED, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
     GEOMETRY_TYPES, GEOMETRY_CAD, PROCESS_TYPES, DEFAULT_HTC,
     QUENCH_MEDIA, QUENCH_MEDIA_LABELS, AGITATION_LEVELS, AGITATION_LABELS,
     FURNACE_ATMOSPHERES, FURNACE_ATMOSPHERE_LABELS, calculate_quench_htc
@@ -799,7 +799,7 @@ def drift_check(id):
 @simulation_bp.route('/<int:id>/run', methods=['POST'])
 @login_required
 def run(id):
-    """Execute the simulation."""
+    """Enqueue the simulation for background execution."""
     sim = Simulation.query.get_or_404(id)
 
     if sim.user_id != current_user.id:
@@ -810,448 +810,82 @@ def run(id):
         flash('Simulation is not ready to run.', 'warning')
         return redirect(url_for('simulation.view', id=id))
 
-    try:
-        # Create immutable snapshot of all inputs
-        from app.services.snapshot_service import SnapshotService
-        snapshot = SnapshotService.create_snapshot(sim)
+    sim.status = STATUS_QUEUED
+    sim.error_message = None
+    db.session.commit()
 
-        sim.status = STATUS_RUNNING
-        sim.started_at = datetime.utcnow()
-        sim.error_message = None
-        db.session.commit()
-        AuditLog.log('run_simulation', resource_type='simulation',
-                      resource_id=sim.id, resource_name=sim.name)
+    AuditLog.log('run_simulation', resource_type='simulation',
+                  resource_id=sim.id, resource_name=sim.name)
 
-        # Check solver type: COMSOL or built-in
-        solver_type = sim.solver_dict.get('solver_type', 'builtin')
+    flash('Simulation queued.', 'info')
+    return redirect(url_for('simulation.progress', id=id))
 
-        if solver_type == 'comsol':
-            # ---------- COMSOL 3D FEM path ----------
-            from app.services.comsol import (
-                COMSOLClient, MockCOMSOLClient, COMSOLNotAvailableError,
-                HeatTreatmentSolver, MockHeatTreatmentSolver,
-                HeatTreatmentResultsExtractor
-            )
 
-            # Try real COMSOL, fall back to mock
-            try:
-                client = COMSOLClient()
-                if not client.is_available:
-                    raise COMSOLNotAvailableError("mph not available")
-                comsol_solver = HeatTreatmentSolver(client, sim, snapshot)
-                current_app.logger.info("Using real COMSOL solver")
-            except (COMSOLNotAvailableError, Exception):
-                current_app.logger.info("COMSOL not available, using mock solver")
-                comsol_solver = MockHeatTreatmentSolver(sim, snapshot)
+@simulation_bp.route('/<int:id>/progress')
+@login_required
+def progress(id):
+    """View simulation progress / queue status."""
+    sim = Simulation.query.get_or_404(id)
 
-            # Run COMSOL/mock solver
-            solver_results = comsol_solver.solve()
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
 
-            # Extract and store results as SimulationResult records
-            extractor = HeatTreatmentResultsExtractor(sim, snapshot)
-            extractor.extract_and_store(solver_results, db_session=db.session)
+    from app.services.job_queue import get_queue_position
+    queue_position = get_queue_position('simulation', sim.id)
 
-            # Update simulation status
-            sim.status = STATUS_COMPLETED
-            sim.completed_at = datetime.utcnow()
+    return render_template(
+        'simulation/progress.html',
+        sim=sim,
+        queue_position=queue_position,
+    )
 
-            # Update snapshot with summary
-            summary = solver_results.get('summary', {})
-            snapshot.t_800_500 = summary.get('t_800_500')
-            SnapshotService.finalize_snapshot(snapshot, 'completed')
-            new_results = SimulationResult.query.filter_by(snapshot_id=snapshot.id).all()
-            SnapshotService.update_summary(snapshot, new_results)
-            db.session.commit()
 
-            flash('COMSOL simulation completed successfully!', 'success')
-            return redirect(url_for('simulation.view', id=id))
+@simulation_bp.route('/<int:id>/progress/status')
+@login_required
+def progress_status(id):
+    """JSON endpoint for AJAX polling of simulation progress."""
+    from flask import jsonify
+    sim = Simulation.query.get_or_404(id)
 
-        # ---------- Built-in 1D FDM path ----------
-        # Build geometry (use equivalent geometry for CAD types)
-        if sim.geometry_type == GEOMETRY_CAD:
-            # For CAD geometry, use the equivalent type and params (already in meters)
-            equiv_type = sim.cad_equivalent_type or 'cylinder'
-            equiv_params = sim.cad_equivalent_geometry_dict
-            geometry = create_geometry(equiv_type, equiv_params)
-        else:
-            # geometry_dict stores values in meters
-            geometry = create_geometry(sim.geometry_type, sim.geometry_dict)
+    if sim.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
 
-        # Build solver config
-        solver_config = SolverConfig.from_dict(sim.solver_dict)
+    from app.services.job_queue import get_queue_position, get_queue_status
+    queue_position = get_queue_position('simulation', sim.id)
+    queue_info = get_queue_status()
 
-        # Get material properties
-        grade = sim.steel_grade
-        k_prop = grade.get_property('thermal_conductivity')
-        cp_prop = grade.get_property('specific_heat')
-        rho_prop = grade.get_property('density')
-        emiss_prop = grade.get_property('emissivity')
+    elapsed = None
+    if sim.started_at:
+        elapsed = (datetime.utcnow() - sim.started_at).total_seconds()
 
-        density = 7850
-        if rho_prop:
-            density = rho_prop.data_dict.get('value', 7850)
+    return jsonify({
+        'status': sim.status,
+        'queue_position': queue_position,
+        'running_job': queue_info['running'],
+        'elapsed_seconds': elapsed,
+        'error_message': sim.error_message,
+    })
 
-        emissivity = 0.85
-        if emiss_prop:
-            emissivity = emiss_prop.data_dict.get('value', 0.85)
 
-        # Get heat treatment config
-        ht_config = sim.ht_config
-        if not ht_config:
-            ht_config = sim.create_default_ht_config()
+@simulation_bp.route('/<int:id>/cancel', methods=['POST'])
+@login_required
+def cancel(id):
+    """Cancel a queued simulation (returns it to ready status)."""
+    sim = Simulation.query.get_or_404(id)
 
-        # Create multi-phase solver
-        solver = MultiPhaseHeatSolver(geometry, config=solver_config)
-        solver.set_material(k_prop, cp_prop, density, emissivity)
-        solver.configure_from_ht_config(ht_config)
+    if sim.user_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('simulation.index'))
 
-        # Determine initial temperature
-        heating_config = ht_config.get('heating', {})
-        if heating_config.get('enabled', False):
-            initial_temp = heating_config.get('initial_temperature', 25.0)
-        else:
-            initial_temp = heating_config.get('target_temperature', sim.initial_temperature or 850.0)
+    if sim.status != STATUS_QUEUED:
+        flash('Only queued simulations can be cancelled.', 'warning')
+        return redirect(url_for('simulation.view', id=id))
 
-        # Run simulation
-        result = solver.solve(initial_temperature=initial_temp)
+    sim.status = STATUS_READY
+    db.session.commit()
 
-        # Get phase diagram for transformation temps
-        diagram = grade.phase_diagrams.first()
-        trans_temps = diagram.temps_dict if diagram else {}
-
-        # Store full heat treatment cycle result
-        cycle_result = SimulationResult(
-            simulation_id=sim.id,
-            snapshot_id=snapshot.id,
-            result_type='full_cycle',
-            phase='full',
-            location='center',
-            t_800_500=float(result.t8_5) if result.t8_5 is not None else None
-        )
-        cycle_result.set_time_data(result.time.tolist())
-        cycle_result.set_value_data(result.center_temp.tolist())
-
-        # Store multi-position temperature data for CCT overlay
-        n_pos = result.temperature.shape[1] if result.temperature.ndim > 1 else 1
-        if n_pos > 1:
-            # Extract 4 key positions: center, 1/3R, 2/3R, surface
-            idx_center = 0
-            idx_one_third = n_pos // 3
-            idx_two_thirds = 2 * n_pos // 3
-            idx_surface = n_pos - 1
-            multi_pos_data = {
-                'positions': ['center', 'one_third', 'two_thirds', 'surface'],
-                'center': result.temperature[:, idx_center].tolist(),
-                'one_third': result.temperature[:, idx_one_third].tolist(),
-                'two_thirds': result.temperature[:, idx_two_thirds].tolist(),
-                'surface': result.temperature[:, idx_surface].tolist(),
-            }
-            cycle_result.set_data(multi_pos_data)
-
-        # Build furnace/ambient temperature list for plotting (with ramp info)
-        furnace_temps = []
-        if result.phase_results:
-            for pr in result.phase_results:
-                if pr.time.size < 2:
-                    continue
-
-                temp = None
-                phase_name = pr.phase_name
-                cold_furnace = False
-                furnace_start_temp = None
-                ramp_rate = 0
-
-                # Get furnace/ambient temperature from ht_config for each phase
-                if phase_name == 'heating':
-                    heating_cfg = ht_config.get('heating', {})
-                    temp = heating_cfg.get('target_temperature')
-                    cold_furnace = heating_cfg.get('cold_furnace', False)
-                    furnace_start_temp = heating_cfg.get('furnace_start_temperature', 25.0)
-                    ramp_rate = heating_cfg.get('furnace_ramp_rate', 0)
-                elif phase_name == 'transfer':
-                    temp = ht_config.get('transfer', {}).get('ambient_temperature')
-                elif phase_name == 'quenching':
-                    temp = ht_config.get('quenching', {}).get('media_temperature')
-                elif phase_name == 'tempering':
-                    tempering_cfg = ht_config.get('tempering', {})
-                    temp = tempering_cfg.get('temperature')
-                    cold_furnace = tempering_cfg.get('cold_furnace', False)
-                    furnace_start_temp = tempering_cfg.get('furnace_start_temperature', 25.0)
-                    ramp_rate = tempering_cfg.get('furnace_ramp_rate', 0)
-                elif phase_name == 'cooling':
-                    # Cooling after tempering - use ambient temperature
-                    temp = ht_config.get('transfer', {}).get('ambient_temperature', 25.0)
-
-                if temp is not None:
-                    furnace_temps.append({
-                        'start_time': pr.start_time,
-                        'end_time': pr.end_time,
-                        'temperature': temp,
-                        'phase_name': phase_name,
-                        'cold_furnace': cold_furnace,
-                        'furnace_start_temperature': furnace_start_temp if furnace_start_temp else temp,
-                        'furnace_ramp_rate': ramp_rate
-                    })
-
-        # Create comprehensive plot with phase markers (4 radial positions)
-        cycle_result.plot_image = visualization.create_heat_treatment_cycle_plot(
-            result.time,
-            result.temperature,
-            phase_results=result.phase_results,
-            title=f'Heat Treatment Cycle - {sim.name}',
-            transformation_temps=trans_temps,
-            furnace_temps=furnace_temps
-        )
-        db.session.add(cycle_result)
-
-        # Store individual phase results with T vs Time plots
-        if result.phase_results:
-            for phase_result in result.phase_results:
-                if not phase_result.time.size or len(phase_result.time) < 2:
-                    continue
-
-                pr = SimulationResult(
-                    simulation_id=sim.id,
-                    snapshot_id=snapshot.id,
-                    result_type='cooling_curve' if phase_result.phase_name in ('quenching', 'transfer', 'cooling') else 'heating_curve',
-                    phase=phase_result.phase_name,
-                    location='center',
-                    t_800_500=float(phase_result.t8_5) if phase_result.t8_5 is not None else None
-                )
-                pr.set_time_data(phase_result.absolute_time.tolist())
-                pr.set_value_data(phase_result.center_temp.tolist())
-
-                # Generate T vs Time plot for this phase
-                if phase_result.temperature.size > 0:
-                    pr.plot_image = visualization.create_heat_treatment_cycle_plot(
-                        phase_result.time,
-                        phase_result.temperature,
-                        phase_results=None,
-                        title=f'{phase_result.phase_name.title()} - {sim.name}',
-                        transformation_temps=trans_temps
-                    )
-                db.session.add(pr)
-
-        # Store temperature profile result
-        profile_result = SimulationResult(
-            simulation_id=sim.id,
-            snapshot_id=snapshot.id,
-            result_type='temperature_profile',
-            phase='full',
-            location='all'
-        )
-
-        # Generate profile plot at selected times
-        n_times = len(result.time)
-        time_indices = [0, n_times//4, n_times//2, 3*n_times//4, n_times-1]
-        time_indices = [i for i in time_indices if i < n_times]
-
-        is_cylindrical = sim.geometry_type in ['cylinder', 'ring', 'hollow_cylinder']
-        profile_result.plot_image = visualization.create_temperature_profile_plot(
-            result.positions,
-            result.temperature,
-            result.time,
-            time_indices,
-            title=f'Temperature Profile - {sim.name}',
-            is_cylindrical=is_cylindrical
-        )
-        db.session.add(profile_result)
-
-        # Phase transformation prediction (based on quenching cooling)
-        tracker = None
-        if diagram:
-            tracker = PhaseTracker(diagram)
-            phases = tracker.predict_phases(result.time, result.center_temp, result.t8_5)
-
-            phase_result = SimulationResult(
-                simulation_id=sim.id,
-                snapshot_id=snapshot.id,
-                result_type='phase_fraction',
-                phase='full',
-                location='center'
-            )
-            phase_result.set_phase_fractions(phases.to_dict())
-            phase_result.plot_image = visualization.create_phase_fraction_plot(
-                phases.to_dict(),
-                title=f'Predicted Phase Fractions - {sim.name}'
-            )
-            db.session.add(phase_result)
-
-        # Hardness prediction (requires composition and phase diagram)
-        if diagram and grade.composition:
-            try:
-                hardness_result = predict_hardness_profile(
-                    composition=grade.composition,
-                    temperatures=result.temperature,
-                    times=result.time,
-                    phase_tracker=tracker
-                )
-
-                # Store hardness result
-                hardness_sim_result = SimulationResult(
-                    simulation_id=sim.id,
-                    snapshot_id=snapshot.id,
-                    result_type='hardness_prediction',
-                    phase='full',
-                    location='all'
-                )
-                # Tempering hardness calculation
-                ht_config = sim.ht_config or {}
-                tempering_cfg = ht_config.get('tempering', {})
-                if tempering_cfg.get('enabled') and grade.composition:
-                    hp_c = grade.composition.hollomon_jaffe_c or 20.0
-                    temp_c = tempering_cfg.get('temperature', 550)
-                    hold_min = tempering_cfg.get('hold_time', 60)
-                    predictor = HardnessPredictor(grade.composition)
-                    hjp_val = 0.0
-                    for pos_key in POSITION_KEYS:
-                        hv_q = hardness_result.hardness_hv.get(pos_key, 0)
-                        if hv_q > 0:
-                            hv_t, hjp_val = predictor.tempered_hardness(hv_q, temp_c, hold_min, hp_c)
-                            hardness_result.tempered_hardness_hv[pos_key] = round(hv_t, 1)
-                            hrc_t = predictor.hv_to_hrc(hv_t)
-                            hardness_result.tempered_hardness_hrc[pos_key] = round(hrc_t, 1) if hrc_t else None
-                    hardness_result.hollomon_jaffe_parameter = round(hjp_val, 0)
-                    hardness_result.tempering_temperature = temp_c
-                    hardness_result.tempering_time = hold_min
-
-                hardness_sim_result.set_data(hardness_result.to_dict())
-                hardness_sim_result.plot_image = visualization.create_hardness_profile_plot(
-                    hardness_result,
-                    title=f'Predicted Hardness - {sim.name}'
-                )
-                db.session.add(hardness_sim_result)
-            except Exception as e:
-                # Log but don't fail simulation if hardness prediction fails
-                current_app.logger.warning(f'Hardness prediction failed: {e}')
-
-        # Cooling rate plot
-        rate_result = SimulationResult(
-            simulation_id=sim.id,
-            snapshot_id=snapshot.id,
-            result_type='cooling_rate',
-            phase='full',
-            location='all'
-        )
-        rate_result.plot_image = visualization.create_cooling_rate_plot(
-            result.time,
-            result.center_temp,
-            result.surface_temp,
-            title=f'Cooling Rate - {sim.name}'
-        )
-        db.session.add(rate_result)
-
-        # Generate dT/dt plots for heating and quenching phases
-        if result.phase_results:
-            for phase_result in result.phase_results:
-                if phase_result.phase_name not in ('heating', 'quenching', 'tempering'):
-                    continue
-                if not phase_result.time.size or len(phase_result.time) < 3:
-                    continue
-
-                phase_label = phase_result.phase_name.title()
-
-                # dT/dt vs Time plot
-                dtdt_time_result = SimulationResult(
-                    simulation_id=sim.id,
-                    snapshot_id=snapshot.id,
-                    result_type='dTdt_vs_time',
-                    phase=phase_result.phase_name,
-                    location='all'
-                )
-                dtdt_time_result.plot_image = visualization.create_dTdt_vs_time_plot(
-                    phase_result.time,
-                    phase_result.temperature,
-                    title=f'dT/dt vs Time ({phase_label}) - {sim.name}',
-                    phase_name=phase_result.phase_name
-                )
-                db.session.add(dtdt_time_result)
-
-                # dT/dt vs Temperature plot
-                dtdt_temp_result = SimulationResult(
-                    simulation_id=sim.id,
-                    snapshot_id=snapshot.id,
-                    result_type='dTdt_vs_temp',
-                    phase=phase_result.phase_name,
-                    location='all'
-                )
-                dtdt_temp_result.plot_image = visualization.create_dTdt_vs_temperature_plot(
-                    phase_result.time,
-                    phase_result.temperature,
-                    title=f'dT/dt vs Temperature ({phase_label}) - {sim.name}',
-                    phase_name=phase_result.phase_name
-                )
-                db.session.add(dtdt_temp_result)
-
-        # Generate absorbed power plots for heating and tempering phases
-        if result.phase_results:
-            import numpy as np
-
-            # Calculate mass from geometry
-            mass = geometry.volume * density  # kg
-
-            # Create Cp interpolation function
-            def get_cp_at_temp(temp):
-                """Get specific heat at given temperature."""
-                if cp_prop:
-                    if cp_prop.property_type == 'constant':
-                        return cp_prop.data_dict.get('value', 500.0)
-                    elif cp_prop.property_type == 'curve':
-                        from app.services.property_evaluator import evaluate_property
-                        val = evaluate_property(cp_prop, temperature=temp)
-                        return val if val else 500.0
-                return 500.0  # Default specific heat
-
-            for phase_result in result.phase_results:
-                # Only generate for heating and tempering phases
-                if phase_result.phase_name not in ('heating', 'tempering'):
-                    continue
-                if not phase_result.time.size or len(phase_result.time) < 3:
-                    continue
-
-                phase_label = phase_result.phase_name.title()
-
-                # Get Cp values at center temperatures
-                center_temp = phase_result.center_temp
-                cp_values = np.array([get_cp_at_temp(t) for t in center_temp])
-
-                # Create absorbed power plot
-                power_result = SimulationResult(
-                    simulation_id=sim.id,
-                    snapshot_id=snapshot.id,
-                    result_type='absorbed_power',
-                    phase=phase_result.phase_name,
-                    location='all'
-                )
-                power_result.plot_image = visualization.create_absorbed_power_plot(
-                    phase_result.time,
-                    phase_result.temperature,
-                    mass=mass,
-                    cp_values=cp_values,
-                    title=f'Absorbed Power ({phase_label}) - {sim.name}',
-                    phase_name=phase_result.phase_name
-                )
-                db.session.add(power_result)
-
-        sim.status = STATUS_COMPLETED
-        sim.completed_at = datetime.utcnow()
-
-        # Finalize snapshot with summary metrics
-        SnapshotService.finalize_snapshot(snapshot, 'completed')
-        new_results = SimulationResult.query.filter_by(snapshot_id=snapshot.id).all()
-        SnapshotService.update_summary(snapshot, new_results)
-        db.session.commit()
-
-        flash('Simulation completed successfully!', 'success')
-
-    except Exception as e:
-        sim.status = STATUS_FAILED
-        sim.error_message = str(e)
-        if snapshot:
-            SnapshotService.finalize_snapshot(snapshot, 'failed', str(e))
-        db.session.commit()
-        flash(f'Simulation failed: {str(e)}', 'danger')
-
+    flash('Simulation cancelled.', 'info')
     return redirect(url_for('simulation.view', id=id))
 
 

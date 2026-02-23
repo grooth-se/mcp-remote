@@ -13,7 +13,7 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models.weld_project import (
     WeldProject, WeldString, WeldResult,
-    STATUS_DRAFT, STATUS_CONFIGURED, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
+    STATUS_DRAFT, STATUS_CONFIGURED, STATUS_QUEUED, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
     STRING_PENDING, STRING_COMPLETED,
     RESULT_THERMAL_CYCLE, RESULT_COOLING_RATE,
 )
@@ -307,62 +307,20 @@ def run(id):
         for result in project.results.all():
             db.session.delete(result)
 
+        # Enqueue for background execution
+        use_mock = form.use_mock_solver.data
+        project.status = STATUS_QUEUED
+        project.progress_percent = 0.0
+        project.current_string = 0
+        project.error_message = None
+        # Store mock preference as a flag in progress_message (worker reads + clears it)
+        project.progress_message = 'mock:' if use_mock else 'Queued...'
         db.session.commit()
 
-        # Start simulation
-        use_mock = form.use_mock_solver.data
-        try:
-            _run_simulation(project, use_mock=use_mock)
-            flash('Simulation started.', 'success')
-        except Exception as e:
-            flash(f'Failed to start simulation: {e}', 'danger')
-            logger.exception("Simulation start failed")
-
+        flash('Simulation queued.', 'info')
         return redirect(url_for('welding.progress', id=id))
 
     return render_template('welding/run.html', form=form, project=project)
-
-
-def _run_simulation(project: WeldProject, use_mock: bool = False):
-    """Run the simulation (synchronously for now).
-
-    In production, this would be run as a background task.
-    """
-    from app.services.comsol import COMSOLClient, COMSOLNotAvailableError
-    from app.services.comsol.client import MockCOMSOLClient
-    from app.services.comsol.sequential_solver import SequentialSolver, MockSequentialSolver
-    from app.services.comsol.model_builder import WeldModelBuilder
-
-    results_folder = current_app.config.get('RESULTS_FOLDER', 'data/results')
-
-    if use_mock:
-        # Use mock solver for testing
-        client = MockCOMSOLClient()
-        builder = WeldModelBuilder(client)
-        solver = MockSequentialSolver(client, builder, results_folder)
-    else:
-        # Try real COMSOL
-        try:
-            client = COMSOLClient()
-            client.connect()
-            builder = WeldModelBuilder(client)
-            solver = SequentialSolver(client, builder, results_folder)
-        except COMSOLNotAvailableError:
-            # Fall back to mock
-            logger.warning("COMSOL not available, using mock solver")
-            client = MockCOMSOLClient()
-            builder = WeldModelBuilder(client)
-            solver = MockSequentialSolver(client, builder, results_folder)
-
-    try:
-        # Run simulation
-        solver.run_project(project, db_session=db.session)
-    finally:
-        if hasattr(client, 'disconnect'):
-            try:
-                client.disconnect()
-            except Exception:
-                pass
 
 
 @welding_bp.route('/<int:id>/progress')
@@ -398,12 +356,16 @@ def progress_status(id):
             'duration': string.duration_seconds,
         })
 
+    from app.services.job_queue import get_queue_position
+    queue_position = get_queue_position('weld', project.id)
+
     return jsonify({
         'status': project.status,
         'current_string': project.current_string,
         'total_strings': project.total_strings,
         'progress_percent': project.progress_percent,
         'progress_message': project.progress_message,
+        'queue_position': queue_position,
         'strings': strings_data,
     })
 

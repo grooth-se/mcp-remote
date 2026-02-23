@@ -18,8 +18,17 @@
 
 <div class="row">
     <div class="col-md-8">
+        <!-- Queued state -->
+        <div class="card mb-4" id="queuedCard" style="{% if project.status != 'queued' %}display:none{% endif %}">
+            <div class="card-body text-center py-4">
+                <i class="bi bi-clock-history display-4 text-info"></i>
+                <h4 class="mt-2">Queued</h4>
+                <p class="text-muted" id="queueMessage">Waiting for worker...</p>
+            </div>
+        </div>
+
         <!-- Progress Overview -->
-        <div class="card mb-4">
+        <div class="card mb-4" id="progressCard" style="{% if project.status == 'queued' %}display:none{% endif %}">
             <div class="card-header">
                 <h5 class="mb-0">Overall Progress</h5>
             </div>
@@ -123,6 +132,7 @@
                 <h5 class="mb-0">Status Legend</h5>
             </div>
             <div class="card-body">
+                <p><span class="badge bg-info">Queued</span> Waiting in queue</p>
                 <p><span class="badge bg-secondary">Pending</span> Waiting to start</p>
                 <p><span class="badge bg-warning">Running</span> Currently simulating</p>
                 <p><span class="badge bg-success">Completed</span> Finished successfully</p>
@@ -144,17 +154,30 @@ function updateProgress() {
     fetch(`{{ url_for('welding.progress_status', id=project.id) }}`)
         .then(response => response.json())
         .then(data => {
-            // Update overall progress
-            document.getElementById('progressPercent').textContent = data.progress_percent.toFixed(0) + '%';
-            document.getElementById('progressBar').style.width = data.progress_percent + '%';
-            document.getElementById('progressMessage').textContent = data.progress_message || '';
-            document.getElementById('currentString').textContent = data.current_string;
-            document.getElementById('totalStrings').textContent = data.total_strings;
+            const isQueued = data.status === 'queued';
 
-            // Update status badge
-            const statusBadge = document.getElementById('statusBadge');
-            statusBadge.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
-            statusBadge.className = 'badge bg-' + getStatusColor(data.status);
+            // Toggle queued card vs progress card
+            document.getElementById('queuedCard').style.display = isQueued ? '' : 'none';
+            document.getElementById('progressCard').style.display = isQueued ? 'none' : '';
+
+            if (isQueued && data.queue_position) {
+                document.getElementById('queueMessage').textContent =
+                    'Position ' + data.queue_position + ' in queue';
+            }
+
+            if (!isQueued) {
+                // Update overall progress
+                document.getElementById('progressPercent').textContent = data.progress_percent.toFixed(0) + '%';
+                document.getElementById('progressBar').style.width = data.progress_percent + '%';
+                document.getElementById('progressMessage').textContent = data.progress_message || '';
+                document.getElementById('currentString').textContent = data.current_string;
+                document.getElementById('totalStrings').textContent = data.total_strings;
+
+                // Update status badge
+                const statusBadge = document.getElementById('statusBadge');
+                statusBadge.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+                statusBadge.className = 'badge bg-' + getStatusColor(data.status);
+            }
 
             // Update strings
             data.strings.forEach(string => {
@@ -193,6 +216,7 @@ function updateProgress() {
 
 function getStatusColor(status) {
     switch (status) {
+        case 'queued': return 'info';
         case 'pending': return 'secondary';
         case 'running': return 'warning';
         case 'completed': return 'success';
