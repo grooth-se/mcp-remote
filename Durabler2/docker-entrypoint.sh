@@ -62,7 +62,13 @@ with app.app_context():
         db.session.commit()
         print(f'Admin user \"{admin_username}\" created.')
     else:
-        print(f'Admin user \"{admin_username}\" already exists.')
+        # Ensure admin user always has admin role
+        if existing.role != 'admin':
+            existing.role = 'admin'
+            db.session.commit()
+            print(f'Admin user \"{admin_username}\" role corrected to admin.')
+        else:
+            print(f'Admin user \"{admin_username}\" already exists.')
 "
 
 echo "=== Starting Gunicorn ==="
