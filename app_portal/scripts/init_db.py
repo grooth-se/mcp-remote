@@ -53,12 +53,10 @@ DEFAULT_APPS = [
         'icon': 'bi-clipboard2-data',
         'display_order': 5,
         'available_roles': json.dumps({
-            'operator': 'Operator',
-            'engineer': 'Test Engineer',
+            'testoperator': 'Test Operator',
             'approver': 'Approver',
-            'admin': 'Administrator',
         }),
-        'default_role': 'operator',
+        'default_role': 'testoperator',
     },
     {
         'app_code': 'spinventory',
