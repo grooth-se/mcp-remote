@@ -206,8 +206,11 @@ def import_csv(portfolio_id):
                     fiscal_year_id=active_fy.id if active_fy else None,
                     created_by=current_user.id,
                 )
-                flash(f'Importerade {result["imported"]} transaktioner '
-                      f'({result["skipped"]} redan befintliga).', 'success')
+                msg = (f'Importerade {result["imported"]} transaktioner '
+                       f'({result["skipped"]} redan befintliga).')
+                if result.get('errors'):
+                    msg += f' {len(result["errors"])} kunde inte importeras.'
+                flash(msg, 'success' if not result.get('errors') else 'warning')
                 return redirect(url_for('investments.portfolio_view',
                                         portfolio_id=portfolio_id))
             except ValueError as e:

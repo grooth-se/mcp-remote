@@ -509,15 +509,37 @@ def update_holding_metadata(holding_id, data):
 NORDNET_TYPE_MAP = {
     'KÖPT': 'kop',
     'KÖP': 'kop',
+    'KÖP VALUTA': 'kop',
     'SÅLT': 'salj',
     'SÄLJ': 'salj',
+    'SÄLJ VALUTA': 'salj',
     'UTDELNING': 'utdelning',
     'RÄNTOR': 'ranta',
     'RÄNTA': 'ranta',
+    'KAP RÄNTA': 'ranta',
+    'KAP. DEB RÄNTA': 'avgift',
+    'RÄNTEKUPONG': 'kupong',
     'AVGIFT': 'avgift',
+    'KÄLLSKATT': 'avgift',
     'PRELIMINÄRSKATT': 'avgift',
     'INSÄTTNING': 'insattning',
     'UTTAG': 'uttag',
+    'INLÖSEN LIKVID': 'salj',
+    'FÖRFALL OBL LIKVID': 'salj',
+    'TECKNING LIKVID': 'kop',
+    'DECIMALER LIKVID': 'salj',
+}
+
+# Nordnet VP (securities) movements — no cash, skip during import
+NORDNET_VP_SKIP = {
+    'BYTE INLÄGG VP', 'BYTE UTTAG VP',
+    'TILLDELNING INLÄGG', 'TECKNING INLÄGG VP', 'TECKNING UT RÄTTER',
+    'SPLIT INLÄGG VP', 'SPLIT UTTAG VP',
+    'OMVANDLING INLÄGG VP', 'OMVANDLING UTTAG VP',
+    'INLÖSEN UTTAG VP', 'INLÄGG FISSION', 'INLÄGG VP',
+    'DECIMALER UTTAG VP', 'RENSNING UTTAG VP',
+    'EM INLÄGG VP', 'EM UTTAG VP',
+    'UTDELNING INLÄGG VP', 'FÖRFALL OBL UTTAG',
 }
 
 # SEB bank statement type mapping based on Typ + amount sign
@@ -534,13 +556,18 @@ SEB_TYPE_MAP = {
 def _decode_csv_bytes(raw):
     """Decode CSV bytes with proper encoding detection.
 
-    Tries UTF-8 first (handles BOM correctly), then Latin-1 fallback.
+    Handles UTF-16 (Nordnet full export), UTF-8 (with BOM), and Latin-1.
     """
-    # Try UTF-8 first (handles BOM via utf-8-sig)
+    # Detect UTF-16 by BOM
+    if raw[:2] in (b'\xff\xfe', b'\xfe\xff'):
+        text = raw.decode('utf-16')
+        text = text.lstrip('\ufeff')
+        return text
+
+    # Try UTF-8 first (handles BOM via utf-8-sig), then Latin-1 fallback
     for encoding in ('utf-8-sig', 'utf-8', 'latin-1', 'cp1252'):
         try:
             text = raw.decode(encoding)
-            # Strip any remaining BOM
             text = text.lstrip('\ufeff')
             return text
         except (UnicodeDecodeError, AttributeError):
@@ -569,17 +596,27 @@ def _detect_csv_format(headers):
     return None
 
 
+def _detect_delimiter(text):
+    """Auto-detect CSV delimiter from the first line."""
+    first_line = text.split('\n', 1)[0]
+    if '\t' in first_line:
+        return '\t'
+    return ';'
+
+
 def parse_csv(file_storage):
     """Auto-detect CSV format and parse transactions.
 
-    Supports Nordnet stock transaction exports and SEB bank statements.
+    Supports Nordnet stock transaction exports (semicolon or tab-delimited,
+    Latin-1 or UTF-16) and SEB bank statements.
     Returns list of dicts ready for import.
     Raises ValueError with descriptive message if format is unsupported.
     """
     raw = file_storage.read()
     text = _decode_csv_bytes(raw)
+    delimiter = _detect_delimiter(text)
 
-    reader = csv.DictReader(io.StringIO(text), delimiter=';')
+    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     if not reader.fieldnames:
         raise ValueError('CSV-filen saknar kolumnrubriker')
 
@@ -607,7 +644,12 @@ def parse_nordnet_csv(file_storage):
 
 
 def _parse_nordnet_rows(reader):
-    """Parse rows from a Nordnet CSV DictReader."""
+    """Parse rows from a Nordnet CSV DictReader.
+
+    Handles both basic Nordnet CSV (semicolon, Latin-1) and the full
+    'transactions and notes export' (tab-delimited, UTF-16, 30 columns).
+    Skips VP-only movements (splits, swaps, etc.) that have no cash effect.
+    """
     transactions = []
     for row in reader:
         row = {k.strip().lstrip('\ufeff'): (v.strip() if v else '')
@@ -617,9 +659,16 @@ def _parse_nordnet_rows(reader):
             row.get('Bokföringsdag') or row.get('Handelsdag') or '')
         tx_type_raw = (row.get('Transaktionstyp')
                        or row.get('Transaktionstext') or '').upper()
-        tx_type = NORDNET_TYPE_MAP.get(tx_type_raw)
 
-        if not tx_date or not tx_type:
+        if not tx_date:
+            continue
+
+        # Skip VP-only movements (no cash effect)
+        if tx_type_raw in NORDNET_VP_SKIP:
+            continue
+
+        tx_type = NORDNET_TYPE_MAP.get(tx_type_raw)
+        if not tx_type:
             continue
 
         name = row.get('Värdepapper') or row.get('ISIN') or ''
@@ -627,8 +676,10 @@ def _parse_nordnet_rows(reader):
         quantity = _parse_swedish_number(row.get('Antal') or '0')
         price = _parse_swedish_number(row.get('Kurs') or '0')
         amount = _parse_swedish_number(row.get('Belopp') or '0')
+        # Courtage or Total Avgift (full export uses both)
         commission = abs(_parse_swedish_number(
-            row.get('Courtage') or row.get('Avgifter') or '0'))
+            row.get('Courtage') or row.get('Total Avgift')
+            or row.get('Avgifter') or '0'))
         currency = row.get('Valuta') or 'SEK'
 
         if not name and not amount:
@@ -746,6 +797,7 @@ def import_nordnet_transactions(portfolio_id, transactions, fiscal_year_id=None,
     batch_id = str(uuid.uuid4())[:8]
     imported = 0
     skipped = 0
+    errors = []
 
     for tx_data in transactions:
         # Dedup: check if same date+type+amount+name already exists
@@ -762,7 +814,12 @@ def import_nordnet_transactions(portfolio_id, transactions, fiscal_year_id=None,
 
         tx_data['import_batch'] = batch_id
         tx_data['fiscal_year_id'] = fiscal_year_id
-        create_transaction(portfolio_id, tx_data, created_by=created_by)
-        imported += 1
+        try:
+            create_transaction(portfolio_id, tx_data, created_by=created_by)
+            imported += 1
+        except (ValueError, Exception) as e:
+            db.session.rollback()
+            errors.append(f"{tx_data['transaction_date']} {tx_data.get('name','')}: {e}")
 
-    return {'imported': imported, 'skipped': skipped, 'batch_id': batch_id}
+    return {'imported': imported, 'skipped': skipped, 'errors': errors,
+            'batch_id': batch_id}
