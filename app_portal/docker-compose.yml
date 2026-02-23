@@ -97,13 +97,18 @@ services:
   spinventory:
     build: ../SPInventory
     environment:
+      - SECRET_KEY=${SPINVENTORY_SECRET_KEY:-change-me}
       - APP_CODE=spinventory
       - PORTAL_URL=http://portal:5000
+      - PORTAL_EXTERNAL_URL=/
       - PORTAL_AUTH_ENABLED=true
+      - MG5_DATABASE_PATH=/app/mg5_data/monitor_data.db
     volumes:
       - spinventory_data:/app/data
+      - mg5_data:/app/mg5_data:ro
     depends_on:
       - portal
+      - mg5integration
     restart: unless-stopped
 
   # --- Uncomment when ready ---
