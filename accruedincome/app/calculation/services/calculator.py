@@ -113,6 +113,11 @@ class AccruedIncomeCalculator:
         dfinkop = self.dataframes['inkoporderforteckning']
         dfprojuppf = self.dataframes['projektuppf']
 
+        if dfinkop.empty or dfval.empty:
+            dfprojuppf['Remaining cost'] = 0
+            self.dataframes['projektuppf'] = dfprojuppf
+            return
+
         # Get latest exchange rates
         dfinkop['act cur'] = float(dfval['SEK'].iloc[-1])
         dfinkop.loc[dfinkop['Valuta'] == 'DKK', 'act cur'] = \
@@ -147,6 +152,14 @@ class AccruedIncomeCalculator:
         """Apply adjustments from projectadjustments.xlsx."""
         dfprojadj = self.dataframes['projectadjustments'].copy()
         dfprojuppf = self.dataframes['projektuppf'].copy()
+
+        if dfprojuppf.empty:
+            for col in ['incl', 'complex', 'incomeadj', 'costcalcadj',
+                        'puradj', 'closing']:
+                dfprojuppf[col] = None
+            self.dataframes['projektuppf'] = dfprojuppf
+            self.dataframes['projectadjustments'] = dfprojadj
+            return
 
         # Set index on project number
         dfprojuppf.set_index('Projektnummer', inplace=True)
@@ -267,6 +280,11 @@ class AccruedIncomeCalculator:
         dftid = self.dataframes['tiduppfoljning']
         dfprojuppf = self.dataframes['projektuppf']
 
+        if dftid.empty:
+            dfprojuppf['CM cost'] = 0
+            self.dataframes['projektuppf'] = dfprojuppf
+            return
+
         # Calculate cost from hours
         dftid['CM cost'] = dftid['Utfall'] * self.HOUR_COST
         dfprojuppf['CM cost'] = dftid.groupby('Projektnummer')['CM cost'].sum()
@@ -280,6 +298,12 @@ class AccruedIncomeCalculator:
         dfkund = self.dataframes['kundorderforteckning']
         dfcoref = self.dataframes['CO_proj_crossref']
         dfprojuppf = self.dataframes['projektuppf']
+
+        if dfkund.empty or dfval.empty:
+            dfprojuppf['Remaining income'] = 0
+            dfprojuppf['Remaining income val.'] = 0
+            self.dataframes['projektuppf'] = dfprojuppf
+            return
 
         # Standardize column name
         dfkund.rename(columns={'Ordernummer': 'ordernummer'}, inplace=True)
@@ -320,6 +344,12 @@ class AccruedIncomeCalculator:
         dfkund = self.dataframes['kundorderforteckning']
         dfprojuppf = self.dataframes['projektuppf']
 
+        if dfmile.empty:
+            dfprojuppf['Milestone'] = 0
+            dfprojuppf['Milestone CUR'] = 0
+            self.dataframes['projektuppf'] = dfprojuppf
+            return
+
         dfmile.rename(columns={'Ordernummer': 'ordernummer'}, inplace=True)
 
         # Mark milestone articles (F100, F110, F120, F130)
@@ -329,19 +359,24 @@ class AccruedIncomeCalculator:
             dfmile.loc[dfmile['Artikel - Artikelnummer'] == article, 'sortkey'] = 1
 
         # Map milestones to projects
-        for index, row in dfmile.iterrows():
-            order_num = dfmile['ordernummer'].values[index]
-            matches = dfkund.index[dfkund['ordernummer'] == order_num].tolist()
-            if matches:
-                project = dfkund['Projekt'].values[matches[0]]
-                dfmile.at[index, 'Projekt'] = project
+        if not dfkund.empty and 'ordernummer' in dfkund.columns:
+            for index, row in dfmile.iterrows():
+                order_num = dfmile['ordernummer'].values[index]
+                matches = dfkund.index[dfkund['ordernummer'] == order_num].tolist()
+                if matches:
+                    project = dfkund['Projekt'].values[matches[0]]
+                    dfmile.at[index, 'Projekt'] = project
 
         # Filter to milestones only
         dfmile = dfmile[dfmile['sortkey'].notna()]
 
         # Aggregate by project
-        dfprojuppf['Milestone'] = dfmile.groupby('Projekt')['Belopp'].sum()
-        dfprojuppf['Milestone CUR'] = dfmile.groupby('Projekt')['Belopp val.'].sum()
+        if 'Projekt' in dfmile.columns:
+            dfprojuppf['Milestone'] = dfmile.groupby('Projekt')['Belopp'].sum()
+            dfprojuppf['Milestone CUR'] = dfmile.groupby('Projekt')['Belopp val.'].sum()
+        else:
+            dfprojuppf['Milestone'] = 0
+            dfprojuppf['Milestone CUR'] = 0
 
         self.dataframes['faktureringslogg'] = dfmile
         self.dataframes['projektuppf'] = dfprojuppf
@@ -440,11 +475,15 @@ class AccruedIncomeCalculator:
         df = self.dataframes['projektuppf'].copy()
         dfacchist = self.dataframes['Accuredhistory']
 
+        if df.empty and (dfacchist is None or dfacchist.empty):
+            return
+
         # Ensure closing is datetime
         df['closing'] = pd.to_datetime(df['closing'], errors='coerce')
 
         # Add project number as column (it's currently the index)
-        df.insert(0, 'Projektnummer', df.index)
+        if not df.empty:
+            df.insert(0, 'Projektnummer', df.index)
 
         # Combine with history
         dfacchist = pd.concat([dfacchist, df])
@@ -505,6 +544,14 @@ class AccruedIncomeCalculator:
             self.load_from_dataframes(dataframes)
         else:
             self.load_files()
+
+        # Early return if no project data to calculate
+        if self.dataframes.get('projektuppf') is None or \
+                self.dataframes['projektuppf'].empty:
+            self.result_df = pd.DataFrame()
+            self.closing_date = closing_date or \
+                pd.Timestamp.now().strftime('%Y-%m-%d')
+            return self.result_df, self.closing_date
 
         # Step 1: Revaluate purchase orders
         self.revaluate_purchase_orders()
