@@ -35,4 +35,10 @@ def create_app(config_name='default'):
         if not os.path.exists(db_path):
             db.create_all()
 
+        # Mark any stale 'running' imports as interrupted (e.g. after crash)
+        from app.services.import_service import ImportService
+        cleaned = ImportService.cleanup_stale_runs()
+        if cleaned:
+            app.logger.warning(f'Marked {cleaned} stale extraction(s) as interrupted')
+
     return app
