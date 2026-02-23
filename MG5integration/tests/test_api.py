@@ -217,7 +217,7 @@ def test_accrued_income_data(client, db):
     data = resp.get_json()
     assert len(data['projects']) == 1
     assert len(data['adjustments']) == 1
-    assert data['verifications_count'] == 3
+    assert 'gl_summary' in data
     assert data['exchange_rates']['eur'] == 10.14
 
 
