@@ -55,8 +55,12 @@ def run():
     session['comparison_current'] = current_date
     session['comparison_previous'] = previous_date
 
+    # Convert DataFrame rows to list of dicts for template iteration
+    rows = result['detail'].to_dict('records') if not result['detail'].empty else []
+
     return render_template('comparison/results.html',
                           result=result,
+                          rows=rows,
                           current_date=current_date,
                           previous_date=previous_date)
 

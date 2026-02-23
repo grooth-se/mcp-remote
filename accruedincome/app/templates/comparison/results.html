@@ -86,23 +86,30 @@
                     {% set delta_revenue = result.summary_curr.total_revenue - result.summary_prev.total_revenue %}
                     {% set delta_margin = result.summary_curr.total_gross_margin - result.summary_prev.total_gross_margin %}
                     {% set delta_accrued = result.summary_curr.total_accrued - result.summary_prev.total_accrued %}
+                    {% set delta_contingency = result.summary_curr.total_contingency - result.summary_prev.total_contingency %}
 
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <h6 class="text-muted">Revenue Change</h6>
                         <h3 class="{% if delta_revenue >= 0 %}text-success{% else %}text-danger{% endif %}">
                             {% if delta_revenue >= 0 %}+{% endif %}{{ "{:,.0f}".format(delta_revenue) }}
                         </h3>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <h6 class="text-muted">Margin Change</h6>
                         <h3 class="{% if delta_margin >= 0 %}text-success{% else %}text-danger{% endif %}">
                             {% if delta_margin >= 0 %}+{% endif %}{{ "{:,.0f}".format(delta_margin) }}
                         </h3>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <h6 class="text-muted">Accrued Change</h6>
                         <h3 class="{% if delta_accrued >= 0 %}text-success{% else %}text-danger{% endif %}">
                             {% if delta_accrued >= 0 %}+{% endif %}{{ "{:,.0f}".format(delta_accrued) }}
+                        </h3>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-muted">Contingency Change</h6>
+                        <h3 class="{% if delta_contingency >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if delta_contingency >= 0 %}+{% endif %}{{ "{:,.0f}".format(delta_contingency) }}
                         </h3>
                     </div>
                 </div>
@@ -111,47 +118,348 @@
     </div>
 </div>
 
-<!-- Project Details -->
+<!-- Tabbed Report Views -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-table"></i> Project-Level Changes</span>
+        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="revenue-tab" data-bs-toggle="tab" data-bs-target="#revenue" type="button" role="tab">
+                    <i class="bi bi-currency-dollar"></i> Revenue
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="profit-tab" data-bs-toggle="tab" data-bs-target="#profit" type="button" role="tab">
+                    <i class="bi bi-graph-up-arrow"></i> Profit
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="orderbook-tab" data-bs-toggle="tab" data-bs-target="#orderbook" type="button" role="tab">
+                    <i class="bi bi-journal-text"></i> Order Book
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="booking-tab" data-bs-toggle="tab" data-bs-target="#booking" type="button" role="tab">
+                    <i class="bi bi-calculator"></i> Booking
+                </button>
+            </li>
+        </ul>
         <a href="{{ url_for('comparison.export', current_date=current_date, previous_date=previous_date) }}"
-           class="btn btn-success btn-sm">
+           class="btn btn-success btn-sm ms-2">
             <i class="bi bi-download"></i> Export to Excel
         </a>
     </div>
+
     <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-striped table-sm">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Project</th>
-                        <th class="text-end">Revenue (Curr)</th>
-                        <th class="text-end">Revenue (Prev)</th>
-                        <th class="text-end">Delta</th>
-                        <th class="text-end">Accrued (Curr)</th>
-                        <th class="text-end">Accrued (Prev)</th>
-                        <th class="text-end">Delta</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in result.detail.to_dict('records') %}
-                    <tr>
-                        <td><code>{{ row.project_number }}</code></td>
-                        <td class="text-end">{{ "{:,.0f}".format(row.total_income_curr or 0) }}</td>
-                        <td class="text-end">{{ "{:,.0f}".format(row.total_income_prev or 0) }}</td>
-                        <td class="text-end {% if (row.delta_revenue or 0) >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            {{ "{:+,.0f}".format(row.delta_revenue or 0) }}
-                        </td>
-                        <td class="text-end">{{ "{:,.0f}".format(row.accrued_income_curr or 0) }}</td>
-                        <td class="text-end">{{ "{:,.0f}".format(row.accrued_income_prev or 0) }}</td>
-                        <td class="text-end {% if (row.delta_accrued or 0) >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            {{ "{:+,.0f}".format(row.delta_accrued or 0) }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="tab-content">
+
+            <!-- Revenue Tab -->
+            <div class="tab-pane fade show active" id="revenue" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th rowspan="2">Project</th>
+                                <th colspan="3" class="text-center border-end">Total Income</th>
+                                <th colspan="3" class="text-center border-end">Accrued Income</th>
+                                <th colspan="3" class="text-center">Remaining Income</th>
+                            </tr>
+                            <tr>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end border-end">Delta</th>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end border-end">Delta</th>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end">Delta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set ns = namespace(
+                                ti_c=0, ti_p=0, ti_d=0,
+                                ai_c=0, ai_p=0, ai_d=0,
+                                ri_c=0, ri_p=0, ri_d=0
+                            ) %}
+                            {% for row in rows %}
+                            {% set ns.ti_c = ns.ti_c + row.total_income_curr %}
+                            {% set ns.ti_p = ns.ti_p + row.total_income_prev %}
+                            {% set ns.ti_d = ns.ti_d + row.delta_total_income %}
+                            {% set ns.ai_c = ns.ai_c + row.accrued_income_curr %}
+                            {% set ns.ai_p = ns.ai_p + row.accrued_income_prev %}
+                            {% set ns.ai_d = ns.ai_d + row.delta_accrued_income %}
+                            {% set ns.ri_c = ns.ri_c + row.remaining_income_curr %}
+                            {% set ns.ri_p = ns.ri_p + row.remaining_income_prev %}
+                            {% set ns.ri_d = ns.ri_d + row.delta_remaining_income %}
+                            <tr>
+                                <td><code>{{ row.project_number }}</code></td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.total_income_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.total_income_prev) }}</td>
+                                <td class="text-end border-end {% if row.delta_total_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_total_income) }}
+                                </td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.accrued_income_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.accrued_income_prev) }}</td>
+                                <td class="text-end border-end {% if row.delta_accrued_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_accrued_income) }}
+                                </td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.remaining_income_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.remaining_income_prev) }}</td>
+                                <td class="text-end {% if row.delta_remaining_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_remaining_income) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-secondary">
+                            <tr>
+                                <th>TOTAL</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns.ti_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns.ti_p) }}</th>
+                                <th class="text-end border-end {% if ns.ti_d >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns.ti_d) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns.ai_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns.ai_p) }}</th>
+                                <th class="text-end border-end {% if ns.ai_d >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns.ai_d) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns.ri_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns.ri_p) }}</th>
+                                <th class="text-end {% if ns.ri_d >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns.ri_d) }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Profit Tab -->
+            <div class="tab-pane fade" id="profit" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th rowspan="2">Project</th>
+                                <th colspan="3" class="text-center border-end">Total Income</th>
+                                <th colspan="3" class="text-center border-end">Total Cost</th>
+                                <th colspan="3" class="text-center">Profit/Loss</th>
+                            </tr>
+                            <tr>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end border-end">Delta</th>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end border-end">Delta</th>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end">Delta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set ns2 = namespace(
+                                ti_c=0, ti_p=0, ti_d=0,
+                                tc_c=0, tc_p=0, tc_d=0,
+                                pp_c=0, pp_p=0, pp_d=0
+                            ) %}
+                            {% for row in rows %}
+                            {% set ns2.ti_c = ns2.ti_c + row.total_income_curr %}
+                            {% set ns2.ti_p = ns2.ti_p + row.total_income_prev %}
+                            {% set ns2.ti_d = ns2.ti_d + row.delta_total_income %}
+                            {% set ns2.tc_c = ns2.tc_c + row.total_cost_curr %}
+                            {% set ns2.tc_p = ns2.tc_p + row.total_cost_prev %}
+                            {% set ns2.tc_d = ns2.tc_d + row.delta_total_cost %}
+                            {% set ns2.pp_c = ns2.pp_c + row.project_profit_curr %}
+                            {% set ns2.pp_p = ns2.pp_p + row.project_profit_prev %}
+                            {% set ns2.pp_d = ns2.pp_d + row.delta_project_profit %}
+                            <tr>
+                                <td><code>{{ row.project_number }}</code></td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.total_income_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.total_income_prev) }}</td>
+                                <td class="text-end border-end {% if row.delta_total_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_total_income) }}
+                                </td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.total_cost_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.total_cost_prev) }}</td>
+                                <td class="text-end border-end {% if row.delta_total_cost <= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_total_cost) }}
+                                </td>
+                                <td class="text-end {% if row.project_profit_curr < 0 %}text-danger{% endif %}">
+                                    <strong>{{ "{:,.0f}".format(row.project_profit_curr) }}</strong>
+                                </td>
+                                <td class="text-end {% if row.project_profit_prev < 0 %}text-danger{% endif %}">
+                                    {{ "{:,.0f}".format(row.project_profit_prev) }}
+                                </td>
+                                <td class="text-end {% if row.delta_project_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_project_profit) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-secondary">
+                            <tr>
+                                <th>TOTAL</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns2.ti_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns2.ti_p) }}</th>
+                                <th class="text-end border-end {% if ns2.ti_d >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns2.ti_d) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns2.tc_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns2.tc_p) }}</th>
+                                <th class="text-end border-end {% if ns2.tc_d <= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns2.tc_d) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns2.pp_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns2.pp_p) }}</th>
+                                <th class="text-end {% if ns2.pp_d >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns2.pp_d) }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Order Book Tab -->
+            <div class="tab-pane fade" id="orderbook" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th rowspan="2">Project</th>
+                                <th colspan="3" class="text-center border-end">Remaining Income</th>
+                                <th colspan="3" class="text-center border-end">Remaining Cost</th>
+                                <th colspan="3" class="text-center">Completion %</th>
+                            </tr>
+                            <tr>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end border-end">Delta</th>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end border-end">Delta</th>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end">Delta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set ns3 = namespace(
+                                ri_c=0, ri_p=0, ri_d=0,
+                                rc_c=0, rc_p=0, rc_d=0
+                            ) %}
+                            {% for row in rows %}
+                            {% set ns3.ri_c = ns3.ri_c + row.remaining_income_curr %}
+                            {% set ns3.ri_p = ns3.ri_p + row.remaining_income_prev %}
+                            {% set ns3.ri_d = ns3.ri_d + row.delta_remaining_income %}
+                            {% set ns3.rc_c = ns3.rc_c + row.remaining_cost_curr %}
+                            {% set ns3.rc_p = ns3.rc_p + row.remaining_cost_prev %}
+                            {% set ns3.rc_d = ns3.rc_d + row.delta_remaining_cost %}
+                            <tr>
+                                <td><code>{{ row.project_number }}</code></td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.remaining_income_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.remaining_income_prev) }}</td>
+                                <td class="text-end border-end {% if row.delta_remaining_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_remaining_income) }}
+                                </td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.remaining_cost_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.remaining_cost_prev) }}</td>
+                                <td class="text-end border-end {% if row.delta_remaining_cost <= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_remaining_cost) }}
+                                </td>
+                                <td class="text-end">{{ "{:.0%}".format(row.completion_curr) }}</td>
+                                <td class="text-end">{{ "{:.0%}".format(row.completion_prev) }}</td>
+                                <td class="text-end {% if row.delta_completion >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+.0%}".format(row.delta_completion) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-secondary">
+                            <tr>
+                                <th>TOTAL</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns3.ri_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns3.ri_p) }}</th>
+                                <th class="text-end border-end {% if ns3.ri_d >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns3.ri_d) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns3.rc_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns3.rc_p) }}</th>
+                                <th class="text-end border-end {% if ns3.rc_d <= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns3.rc_d) }}</th>
+                                <th colspan="3"></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Booking Tab -->
+            <div class="tab-pane fade" id="booking" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th rowspan="2">Project</th>
+                                <th colspan="3" class="text-center border-end">Accrued Income</th>
+                                <th colspan="3" class="text-center border-end">Contingency</th>
+                                <th colspan="3" class="text-center">Net Booking</th>
+                            </tr>
+                            <tr>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end border-end">Delta</th>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end border-end">Delta</th>
+                                <th class="text-end">Curr</th>
+                                <th class="text-end">Prev</th>
+                                <th class="text-end">Delta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set ns4 = namespace(
+                                ai_c=0, ai_p=0, ai_d=0,
+                                co_c=0, co_p=0, co_d=0,
+                                nb_c=0, nb_p=0, nb_d=0
+                            ) %}
+                            {% for row in rows %}
+                            {% if row.accrued_income_curr != 0 or row.accrued_income_prev != 0 or row.contingency_curr != 0 or row.contingency_prev != 0 %}
+                            {% set ns4.ai_c = ns4.ai_c + row.accrued_income_curr %}
+                            {% set ns4.ai_p = ns4.ai_p + row.accrued_income_prev %}
+                            {% set ns4.ai_d = ns4.ai_d + row.delta_accrued_income %}
+                            {% set ns4.co_c = ns4.co_c + row.contingency_curr %}
+                            {% set ns4.co_p = ns4.co_p + row.contingency_prev %}
+                            {% set ns4.co_d = ns4.co_d + row.delta_contingency %}
+                            {% set ns4.nb_c = ns4.nb_c + row.net_booking_curr %}
+                            {% set ns4.nb_p = ns4.nb_p + row.net_booking_prev %}
+                            {% set ns4.nb_d = ns4.nb_d + row.delta_net_booking %}
+                            <tr>
+                                <td><code>{{ row.project_number }}</code></td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.accrued_income_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.accrued_income_prev) }}</td>
+                                <td class="text-end border-end {% if row.delta_accrued_income >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_accrued_income) }}
+                                </td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.contingency_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.contingency_prev) }}</td>
+                                <td class="text-end border-end {% if row.delta_contingency >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_contingency) }}
+                                </td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.net_booking_curr) }}</td>
+                                <td class="text-end">{{ "{:,.0f}".format(row.net_booking_prev) }}</td>
+                                <td class="text-end {% if row.delta_net_booking >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ "{:+,.0f}".format(row.delta_net_booking) }}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-secondary">
+                            <tr>
+                                <th>TOTAL</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns4.ai_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns4.ai_p) }}</th>
+                                <th class="text-end border-end {% if ns4.ai_d >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns4.ai_d) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns4.co_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns4.co_p) }}</th>
+                                <th class="text-end border-end {% if ns4.co_d >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns4.co_d) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns4.nb_c) }}</th>
+                                <th class="text-end">{{ "{:,.0f}".format(ns4.nb_p) }}</th>
+                                <th class="text-end {% if ns4.nb_d >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:+,.0f}".format(ns4.nb_d) }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>

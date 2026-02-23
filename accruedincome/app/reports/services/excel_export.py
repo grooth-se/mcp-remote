@@ -37,6 +37,29 @@ def _style_currency(ws, col_letter, start_row, end_row):
         cell.alignment = Alignment(horizontal='right')
 
 
+def _write_comparison_sheet(ws, df, cols, headers):
+    """Write a comparison sheet with selected columns and custom headers."""
+    export_cols = [c for c in cols if c in df.columns]
+    for c_idx, header in enumerate(headers[:len(export_cols)], 1):
+        ws.cell(row=1, column=c_idx, value=header)
+    _style_header(ws, 1, len(export_cols))
+
+    for r_idx, (_, row) in enumerate(df[export_cols].iterrows(), 2):
+        for c_idx, col in enumerate(export_cols, 1):
+            ws.cell(row=r_idx, column=c_idx, value=row[col])
+
+    # Totals row
+    total_row = len(df) + 2
+    ws.cell(row=total_row, column=1, value='TOTAL')
+    ws.cell(row=total_row, column=1).font = Font(bold=True)
+    for c_idx, col in enumerate(export_cols, 1):
+        if c_idx > 2:  # skip project_number and project_name
+            total = df[col].sum()
+            ws.cell(row=total_row, column=c_idx, value=total)
+            ws.cell(row=total_row, column=c_idx).font = Font(bold=True)
+            ws.cell(row=total_row, column=c_idx).number_format = '#,##0'
+
+
 def export_comparison_to_excel(comparison_result: dict) -> BytesIO:
     """Export comparison results to Excel workbook.
 
@@ -84,43 +107,75 @@ def export_comparison_to_excel(comparison_result: dict) -> BytesIO:
         ws_summary[f'C{i}'] = prev_val
         ws_summary[f'D{i}'] = curr_val - prev_val
 
-    # Sheet 2: KPI Report 1 (Revenue/COGS/GM)
-    ws_report1 = wb.create_sheet('Revenue Report')
-    report1_df = generate_kpi_report1(current_date)
-    if not report1_df.empty:
-        for r_idx, row in enumerate(dataframe_to_rows(report1_df, index=False, header=True), 1):
-            for c_idx, value in enumerate(row, 1):
-                ws_report1.cell(row=r_idx, column=c_idx, value=value)
-        _style_header(ws_report1, 1, len(report1_df.columns))
-
-    # Sheet 3: KPI Report 2 (Valuation)
-    ws_report2 = wb.create_sheet('Valuation Report')
-    report2_df = generate_kpi_report2(current_date)
-    if not report2_df.empty:
-        for r_idx, row in enumerate(dataframe_to_rows(report2_df, index=False, header=True), 1):
-            for c_idx, value in enumerate(row, 1):
-                ws_report2.cell(row=r_idx, column=c_idx, value=value)
-        _style_header(ws_report2, 1, len(report2_df.columns))
-
-    # Sheet 4: Deltas
-    ws_delta = wb.create_sheet('Period Changes')
     detail_df = comparison_result['detail']
-    if not detail_df.empty:
-        # Select key columns for export
-        delta_cols = [
-            'project_number', 'project_name',
-            'total_income_curr', 'total_income_prev', 'delta_revenue',
-            'total_cost_curr', 'total_cost_prev', 'delta_cost',
-            'gross_margin_curr', 'gross_margin_prev', 'delta_gross_margin',
-            'accrued_income_curr', 'accrued_income_prev', 'delta_accrued',
-        ]
-        export_cols = [c for c in delta_cols if c in detail_df.columns]
-        delta_export = detail_df[export_cols]
 
-        for r_idx, row in enumerate(dataframe_to_rows(delta_export, index=False, header=True), 1):
-            for c_idx, value in enumerate(row, 1):
-                ws_delta.cell(row=r_idx, column=c_idx, value=value)
-        _style_header(ws_delta, 1, len(export_cols))
+    # Sheet 2: Revenue Comparison
+    ws_rev = wb.create_sheet('Revenue Comparison')
+    if not detail_df.empty:
+        rev_cols = [
+            'project_number', 'project_name',
+            'total_income_curr', 'total_income_prev', 'delta_total_income',
+            'accrued_income_curr', 'accrued_income_prev', 'delta_accrued_income',
+            'remaining_income_curr', 'remaining_income_prev', 'delta_remaining_income',
+        ]
+        rev_headers = [
+            'Project', 'Name',
+            f'Total Income ({current_date})', f'Total Income ({previous_date})', 'Delta',
+            f'Accrued ({current_date})', f'Accrued ({previous_date})', 'Delta',
+            f'Remaining ({current_date})', f'Remaining ({previous_date})', 'Delta',
+        ]
+        _write_comparison_sheet(ws_rev, detail_df, rev_cols, rev_headers)
+
+    # Sheet 3: Profit Comparison
+    ws_profit = wb.create_sheet('Profit Comparison')
+    if not detail_df.empty:
+        profit_cols = [
+            'project_number', 'project_name',
+            'total_income_curr', 'total_income_prev', 'delta_total_income',
+            'total_cost_curr', 'total_cost_prev', 'delta_total_cost',
+            'project_profit_curr', 'project_profit_prev', 'delta_project_profit',
+        ]
+        profit_headers = [
+            'Project', 'Name',
+            f'Income ({current_date})', f'Income ({previous_date})', 'Delta',
+            f'Cost ({current_date})', f'Cost ({previous_date})', 'Delta',
+            f'Profit ({current_date})', f'Profit ({previous_date})', 'Delta',
+        ]
+        _write_comparison_sheet(ws_profit, detail_df, profit_cols, profit_headers)
+
+    # Sheet 4: Order Book Comparison
+    ws_ob = wb.create_sheet('Order Book Comparison')
+    if not detail_df.empty:
+        ob_cols = [
+            'project_number', 'project_name',
+            'remaining_income_curr', 'remaining_income_prev', 'delta_remaining_income',
+            'remaining_cost_curr', 'remaining_cost_prev', 'delta_remaining_cost',
+            'completion_curr', 'completion_prev', 'delta_completion',
+        ]
+        ob_headers = [
+            'Project', 'Name',
+            f'Rem. Income ({current_date})', f'Rem. Income ({previous_date})', 'Delta',
+            f'Rem. Cost ({current_date})', f'Rem. Cost ({previous_date})', 'Delta',
+            f'Completion ({current_date})', f'Completion ({previous_date})', 'Delta',
+        ]
+        _write_comparison_sheet(ws_ob, detail_df, ob_cols, ob_headers)
+
+    # Sheet 5: Booking Comparison
+    ws_book = wb.create_sheet('Booking Comparison')
+    if not detail_df.empty:
+        book_cols = [
+            'project_number', 'project_name',
+            'accrued_income_curr', 'accrued_income_prev', 'delta_accrued_income',
+            'contingency_curr', 'contingency_prev', 'delta_contingency',
+            'net_booking_curr', 'net_booking_prev', 'delta_net_booking',
+        ]
+        book_headers = [
+            'Project', 'Name',
+            f'Accrued ({current_date})', f'Accrued ({previous_date})', 'Delta',
+            f'Contingency ({current_date})', f'Contingency ({previous_date})', 'Delta',
+            f'Net Booking ({current_date})', f'Net Booking ({previous_date})', 'Delta',
+        ]
+        _write_comparison_sheet(ws_book, detail_df, book_cols, book_headers)
 
     # Adjust column widths
     for ws in wb.worksheets:
