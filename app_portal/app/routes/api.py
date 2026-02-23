@@ -44,18 +44,13 @@ def validate_token_endpoint():
     if app_code:
         target_app = Application.query.filter_by(app_code=app_code).first()
         if target_app:
-            if user.is_admin:
-                # Admins get first role containing "admin" (case-insensitive), or first role
-                available = target_app.get_available_roles()
-                if available:
-                    admin_role = next((r for r in available if 'admin' in r.lower()), None)
-                    role = admin_role or available[0]
-            else:
-                perm = UserPermission.query.filter_by(
-                    user_id=user.id, app_id=target_app.id
-                ).first()
-                if perm:
-                    role = perm.role or target_app.default_role
+            perm = UserPermission.query.filter_by(
+                user_id=user.id, app_id=target_app.id
+            ).first()
+            if perm:
+                role = perm.role or target_app.default_role
+            elif user.is_admin:
+                role = target_app.default_role
 
     return jsonify({
         'valid': True,
