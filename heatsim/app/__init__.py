@@ -102,6 +102,24 @@ def create_app(config_name='default'):
         except Exception:
             pass  # Non-critical — column may already exist
 
+        # Reset any simulations stuck in 'running' status (from worker crashes/timeouts)
+        try:
+            mat_engine = db.engines.get('materials')
+            if mat_engine:
+                with mat_engine.connect() as conn:
+                    result = conn.execute(sa.text(
+                        "UPDATE simulations SET status = 'failed', "
+                        "error_message = 'Server restarted while simulation was running' "
+                        "WHERE status = 'running'"
+                    ))
+                    if result.rowcount > 0:
+                        conn.commit()
+                        app.logger.info(
+                            f'Reset {result.rowcount} stuck simulation(s) to failed'
+                        )
+        except Exception:
+            pass  # Table may not exist yet
+
     # Maintenance mode handler
     @app.before_request
     def check_maintenance_mode():

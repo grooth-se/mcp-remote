@@ -387,6 +387,9 @@ def heat_treatment(id):
         sim.ambient_temperature = ht_config['quenching']['media_temperature']
 
         sim.status = STATUS_READY
+        sim.started_at = None
+        sim.completed_at = None
+        sim.error_message = None
         db.session.commit()
 
         flash('Heat treatment configured successfully.', 'success')
