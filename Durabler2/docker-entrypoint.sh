@@ -37,13 +37,41 @@ os.environ.setdefault('FLASK_CONFIG', 'production')
 
 from app import create_app, db
 from app.models import User
+from sqlalchemy import inspect, text
 
 app = create_app(os.environ.get('FLASK_CONFIG', 'production'))
 
 with app.app_context():
-    # Create all tables (fresh start)
+    # Auto-migrate: add missing columns to existing tables
+    # db.create_all() only creates NEW tables, not new columns
+    insp = inspect(db.engine)
+    existing_tables = insp.get_table_names()
+
+    for table in db.metadata.sorted_tables:
+        if table.name in existing_tables:
+            existing_cols = {c['name'] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name not in existing_cols:
+                    col_type = col.type.compile(db.engine.dialect)
+                    default = ''
+                    if col.default is not None:
+                        val = col.default.arg
+                        if isinstance(val, bool):
+                            default = f' DEFAULT {1 if val else 0}'
+                        elif isinstance(val, (int, float)):
+                            default = f' DEFAULT {val}'
+                        elif isinstance(val, str):
+                            default = f\" DEFAULT '{val}'\"
+                    elif col.nullable:
+                        default = ' DEFAULT NULL'
+                    sql = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}{default}'
+                    print(f'  Adding column: {table.name}.{col.name} ({col_type})')
+                    db.session.execute(text(sql))
+            db.session.commit()
+
+    # Create any entirely new tables
     db.create_all()
-    print('Database tables created.')
+    print('Database tables ready.')
 
     # Create admin user if it doesn't exist
     admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
