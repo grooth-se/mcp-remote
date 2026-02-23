@@ -76,7 +76,7 @@ class User(UserMixin, db.Model):
     @property
     def can_submit(self) -> bool:
         """Check if user can submit reports for approval."""
-        return self.role in [ROLE_ENGINEER, ROLE_APPROVER, ROLE_ADMIN]
+        return self.role in [ROLE_OPERATOR, ROLE_ENGINEER, ROLE_APPROVER, ROLE_ADMIN]
 
     @property
     def is_admin(self) -> bool:
@@ -179,7 +179,7 @@ def engineer_required(f):
             flash('Please log in to access this page.', 'warning')
             return redirect(url_for('auth.login'))
         if not current_user.can_submit:
-            flash('Test Engineer access required.', 'danger')
+            flash('Access denied.', 'danger')
             return redirect(url_for('main.dashboard'))
         return f(*args, **kwargs)
     return decorated_function
