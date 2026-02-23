@@ -19,6 +19,23 @@ with app.app_context():
     db.create_all()
     print('Database tables created.')
 
+    # Ensure new columns exist (for upgrades without migration)
+    import sqlalchemy as sa
+    inspector = sa.inspect(db.engine)
+    with db.engine.connect() as conn:
+        app_cols = [c['name'] for c in inspector.get_columns('applications')]
+        if 'available_roles' not in app_cols:
+            conn.execute(sa.text('ALTER TABLE applications ADD COLUMN available_roles TEXT'))
+            print('  Added available_roles column')
+        if 'default_role' not in app_cols:
+            conn.execute(sa.text('ALTER TABLE applications ADD COLUMN default_role VARCHAR(50)'))
+            print('  Added default_role column')
+        perm_cols = [c['name'] for c in inspector.get_columns('user_permissions')]
+        if 'role' not in perm_cols:
+            conn.execute(sa.text('ALTER TABLE user_permissions ADD COLUMN role VARCHAR(50)'))
+            print('  Added role column to user_permission')
+        conn.commit()
+
     # Seed default applications
     from scripts.init_db import DEFAULT_APPS
     for app_data in DEFAULT_APPS:
