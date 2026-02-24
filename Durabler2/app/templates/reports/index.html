@@ -118,7 +118,7 @@
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     {% if report.status == 'PENDING_REVIEW' and current_user.can_approve %}
-                                    <a href="{{ url_for('reports.review', id=report.id) }}"
+                                    <a href="{{ url_for('reports.review', cert_id=report.certificate_id) }}"
                                        class="btn btn-warning" title="Review">
                                         <i class="bi bi-check-square"></i>
                                     </a>

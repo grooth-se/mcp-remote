@@ -127,7 +127,7 @@
                 </div>
                 <div class="card-body d-grid gap-2">
                     {% if approval.can_submit and current_user.can_submit %}
-                    <form action="{{ url_for('reports.submit', id=approval.id) }}" method="POST">
+                    <form action="{{ url_for('reports.submit', cert_id=approval.certificate_id) }}" method="POST">
                         <button type="submit" class="btn btn-primary w-100"
                                 onclick="return confirm('Submit this report for approval?')">
                             <i class="bi bi-send"></i> Submit for Approval
@@ -136,7 +136,7 @@
                     {% endif %}
 
                     {% if approval.can_review and current_user.can_approve %}
-                    <a href="{{ url_for('reports.review', id=approval.id) }}" class="btn btn-warning">
+                    <a href="{{ url_for('reports.review', cert_id=approval.certificate_id) }}" class="btn btn-warning">
                         <i class="bi bi-check-square"></i> Review Report
                     </a>
                     {% endif %}
