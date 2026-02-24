@@ -142,6 +142,11 @@
                     <i class="bi bi-calculator"></i> Booking
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="charts-tab" data-bs-toggle="tab" data-bs-target="#charts" type="button" role="tab">
+                    <i class="bi bi-bar-chart-fill"></i> Charts
+                </button>
+            </li>
         </ul>
         <a href="{{ url_for('comparison.export', current_date=current_date, previous_date=previous_date) }}"
            class="btn btn-success btn-sm ms-2">
@@ -460,6 +465,46 @@
                 </div>
             </div>
 
+            <!-- Charts Tab -->
+            <div class="tab-pane fade" id="charts" role="tabpanel">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Portfolio Overview</div>
+                            <div class="card-body">
+                                <canvas id="chartOverview" height="280"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Profit Delta by Project</div>
+                            <div class="card-body">
+                                <canvas id="chartProfitDelta" height="280"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Revenue by Project</div>
+                            <div class="card-body">
+                                <canvas id="chartRevenue" height="280"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Booking by Project</div>
+                            <div class="card-body">
+                                <canvas id="chartBooking" height="280"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -469,4 +514,182 @@
         <i class="bi bi-arrow-left"></i> New Comparison
     </a>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    // Data from template
+    const labels = {{ rows | map(attribute='project_number') | list | tojson }};
+    const currDate = {{ current_date | tojson }};
+    const prevDate = {{ previous_date | tojson }};
+
+    const data = {
+        totalIncomeCurr: {{ rows | map(attribute='total_income_curr') | list | tojson }},
+        totalIncomePrev: {{ rows | map(attribute='total_income_prev') | list | tojson }},
+        totalCostCurr: {{ rows | map(attribute='total_cost_curr') | list | tojson }},
+        totalCostPrev: {{ rows | map(attribute='total_cost_prev') | list | tojson }},
+        profitCurr: {{ rows | map(attribute='project_profit_curr') | list | tojson }},
+        profitPrev: {{ rows | map(attribute='project_profit_prev') | list | tojson }},
+        profitDelta: {{ rows | map(attribute='delta_project_profit') | list | tojson }},
+        accruedCurr: {{ rows | map(attribute='accrued_income_curr') | list | tojson }},
+        accruedPrev: {{ rows | map(attribute='accrued_income_prev') | list | tojson }},
+        contingencyCurr: {{ rows | map(attribute='contingency_curr') | list | tojson }},
+        contingencyPrev: {{ rows | map(attribute='contingency_prev') | list | tojson }},
+    };
+
+    const sum = arr => arr.reduce((a, b) => a + b, 0);
+
+    const currColor = 'rgba(13, 110, 253, 0.7)';
+    const prevColor = 'rgba(108, 117, 125, 0.5)';
+    const currBorder = 'rgb(13, 110, 253)';
+    const prevBorder = 'rgb(108, 117, 125)';
+
+    let chartsInitialized = false;
+
+    function initCharts() {
+        if (chartsInitialized) return;
+        chartsInitialized = true;
+
+        // 1. Portfolio Overview — grouped bar of aggregate totals
+        new Chart(document.getElementById('chartOverview'), {
+            type: 'bar',
+            data: {
+                labels: ['Revenue', 'Cost', 'Margin', 'Accrued', 'Contingency'],
+                datasets: [
+                    {
+                        label: currDate,
+                        data: [
+                            sum(data.totalIncomeCurr),
+                            sum(data.totalCostCurr),
+                            sum(data.totalIncomeCurr) - sum(data.totalCostCurr),
+                            sum(data.accruedCurr),
+                            sum(data.contingencyCurr),
+                        ],
+                        backgroundColor: currColor,
+                        borderColor: currBorder,
+                        borderWidth: 1,
+                    },
+                    {
+                        label: prevDate,
+                        data: [
+                            sum(data.totalIncomePrev),
+                            sum(data.totalCostPrev),
+                            sum(data.totalIncomePrev) - sum(data.totalCostPrev),
+                            sum(data.accruedPrev),
+                            sum(data.contingencyPrev),
+                        ],
+                        backgroundColor: prevColor,
+                        borderColor: prevBorder,
+                        borderWidth: 1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'top' } },
+                scales: { y: { ticks: { callback: v => (v / 1000).toLocaleString() + 'k' } } },
+            },
+        });
+
+        // 2. Profit Delta — horizontal bar per project (green/red)
+        const profitDeltaColors = data.profitDelta.map(v => v >= 0 ? 'rgba(25, 135, 84, 0.7)' : 'rgba(220, 53, 69, 0.7)');
+        const profitDeltaBorders = data.profitDelta.map(v => v >= 0 ? 'rgb(25, 135, 84)' : 'rgb(220, 53, 69)');
+        new Chart(document.getElementById('chartProfitDelta'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Profit Change',
+                    data: data.profitDelta,
+                    backgroundColor: profitDeltaColors,
+                    borderColor: profitDeltaBorders,
+                    borderWidth: 1,
+                }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { x: { ticks: { callback: v => (v / 1000).toLocaleString() + 'k' } } },
+            },
+        });
+
+        // 3. Revenue by Project — grouped bar
+        new Chart(document.getElementById('chartRevenue'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: currDate,
+                        data: data.totalIncomeCurr,
+                        backgroundColor: currColor,
+                        borderColor: currBorder,
+                        borderWidth: 1,
+                    },
+                    {
+                        label: prevDate,
+                        data: data.totalIncomePrev,
+                        backgroundColor: prevColor,
+                        borderColor: prevBorder,
+                        borderWidth: 1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'top' } },
+                scales: { y: { ticks: { callback: v => (v / 1000).toLocaleString() + 'k' } } },
+            },
+        });
+
+        // 4. Booking by Project — grouped bar (accrued curr/prev + contingency curr/prev)
+        new Chart(document.getElementById('chartBooking'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Accrued ' + currDate,
+                        data: data.accruedCurr,
+                        backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                        borderColor: 'rgb(25, 135, 84)',
+                        borderWidth: 1,
+                    },
+                    {
+                        label: 'Accrued ' + prevDate,
+                        data: data.accruedPrev,
+                        backgroundColor: 'rgba(25, 135, 84, 0.3)',
+                        borderColor: 'rgb(25, 135, 84)',
+                        borderWidth: 1,
+                    },
+                    {
+                        label: 'Contingency ' + currDate,
+                        data: data.contingencyCurr,
+                        backgroundColor: 'rgba(255, 193, 7, 0.7)',
+                        borderColor: 'rgb(255, 193, 7)',
+                        borderWidth: 1,
+                    },
+                    {
+                        label: 'Contingency ' + prevDate,
+                        data: data.contingencyPrev,
+                        backgroundColor: 'rgba(255, 193, 7, 0.3)',
+                        borderColor: 'rgb(255, 193, 7)',
+                        borderWidth: 1,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'top' } },
+                scales: { y: { ticks: { callback: v => (v / 1000).toLocaleString() + 'k' } } },
+            },
+        });
+    }
+
+    // Initialize charts when Charts tab is shown (lazy render for correct sizing)
+    const chartsTab = document.getElementById('charts-tab');
+    chartsTab.addEventListener('shown.bs.tab', initCharts);
+})();
+</script>
 {% endblock %}
