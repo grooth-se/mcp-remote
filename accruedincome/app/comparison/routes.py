@@ -9,7 +9,9 @@ from . import comparison_bp
 from app.models import FactProjectMonthly
 from app.reports.services.report_analysis import (
     compare_two_months,
-    get_all_closing_dates
+    get_all_closing_dates,
+    generate_trend_data,
+    get_all_project_numbers,
 )
 from app.reports.services.excel_export import export_comparison_to_excel
 
@@ -93,3 +95,19 @@ def export():
         as_attachment=True,
         download_name=filename
     )
+
+
+@comparison_bp.route('/trends')
+def trends():
+    """Multi-period trend charts page."""
+    # Parse optional project filter
+    projects_param = request.args.get('projects', '')
+    selected_projects = [p.strip() for p in projects_param.split(',') if p.strip()] if projects_param else []
+
+    trend = generate_trend_data(project_filter=selected_projects or None)
+    all_projects = get_all_project_numbers()
+
+    return render_template('comparison/trends.html',
+                          trend=trend,
+                          all_projects=all_projects,
+                          selected_projects=selected_projects)

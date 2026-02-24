@@ -121,6 +121,68 @@ def generate_summary_sheet(closing_date: str) -> dict:
     }
 
 
+def generate_trend_data(project_filter=None) -> dict:
+    """Aggregate portfolio-level totals per closing date for trend charts.
+
+    Args:
+        project_filter: Optional list of project numbers to include.
+
+    Returns:
+        Dict with lists keyed by metric name, one value per closing date (ascending).
+    """
+    closing_dates = FactProjectMonthly.get_closing_dates()  # descending
+    closing_dates = list(reversed(closing_dates))  # ascending for charts
+
+    dates = []
+    revenue = []
+    cost = []
+    profit = []
+    accrued = []
+    contingency = []
+    remaining_income = []
+    remaining_cost = []
+    project_count = []
+
+    for cd in closing_dates:
+        projects = FactProjectMonthly.get_by_closing_date(cd)
+        if project_filter:
+            projects = [p for p in projects if p.project_number in project_filter]
+
+        if not projects:
+            continue
+
+        dates.append(cd)
+        rev = sum(p.total_income_cur or 0 for p in projects)
+        cst = sum(p.total_cost_cur or 0 for p in projects)
+        revenue.append(rev)
+        cost.append(cst)
+        profit.append(rev - cst)
+        accrued.append(sum(p.accrued_income_cur or 0 for p in projects))
+        contingency.append(sum(p.contingency_cur or 0 for p in projects))
+        remaining_income.append(sum(p.remaining_income or 0 for p in projects))
+        remaining_cost.append(sum(p.remaining_cost or 0 for p in projects))
+        project_count.append(len(projects))
+
+    return {
+        'dates': dates,
+        'revenue': revenue,
+        'cost': cost,
+        'profit': profit,
+        'accrued': accrued,
+        'contingency': contingency,
+        'remaining_income': remaining_income,
+        'remaining_cost': remaining_cost,
+        'project_count': project_count,
+    }
+
+
+def get_all_project_numbers():
+    """Return all distinct project numbers across all closing dates."""
+    results = db.session.query(FactProjectMonthly.project_number).distinct()\
+        .order_by(FactProjectMonthly.project_number).all()
+    return [r[0] for r in results]
+
+
 def _project_to_dict(p, suffix):
     """Convert a FactProjectMonthly to a dict with suffixed column names."""
     return {
