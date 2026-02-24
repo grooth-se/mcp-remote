@@ -7,6 +7,12 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
+    libx11-6 \
+    libxrender1 \
+    libxext6 \
+    libgl1 \
+    libglib2.0-0 \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies (cadquery needs native OCP - skip if unavailable)
@@ -24,6 +30,8 @@ RUN mkdir -p instance data/uploads data/geometries data/results
 # Set environment variables
 ENV FLASK_CONFIG=production
 ENV PYTHONUNBUFFERED=1
+ENV PYVISTA_OFF_SCREEN=true
+ENV DISPLAY=:99
 
 # Expose port
 EXPOSE 5000

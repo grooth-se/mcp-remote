@@ -23,6 +23,10 @@ with app.app_context():
         print(f'Materials DB: {len(tables)} tables ready.')
 "
 
+# Start virtual framebuffer for PyVista off-screen rendering
+echo "Starting Xvfb..."
+Xvfb :99 -screen 0 1024x768x24 &
+
 echo "=== Starting Gunicorn ==="
 exec gunicorn \
     --bind 0.0.0.0:5000 \
