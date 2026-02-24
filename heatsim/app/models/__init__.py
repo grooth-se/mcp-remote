@@ -40,6 +40,10 @@ from .measured_data import MeasuredData
 from .snapshot import SimulationSnapshot
 from .material_changelog import MaterialChangeLog
 from .system_setting import SystemSetting
+from .application import Application
+from .permission import UserPermission
+from .session import UserSession
+from .access_log import AccessLog
 from .audit_log import (
     AuditLog,
     ACTION_LOGIN, ACTION_LOGOUT,
@@ -91,6 +95,11 @@ __all__ = [
     'MaterialChangeLog',
     # System settings
     'SystemSetting',
+    # Portal models
+    'Application',
+    'UserPermission',
+    'UserSession',
+    'AccessLog',
     # Audit log
     'AuditLog',
     'ACTION_LOGIN', 'ACTION_LOGOUT',

@@ -16,6 +16,7 @@ psycopg2-binary>=2.9.0
 # Security
 Werkzeug>=3.0.0
 python-dotenv>=1.0.0
+PyJWT>=2.8.0
 
 # Production Server
 gunicorn>=22.0.0

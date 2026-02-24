@@ -42,9 +42,23 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256))
+    display_name = db.Column(db.String(120))
     role = db.Column(db.String(20), default=ROLE_ENGINEER)
+    is_active_user = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+
+    # Portal relationships
+    permissions = db.relationship('UserPermission', back_populates='user',
+                                  foreign_keys='UserPermission.user_id',
+                                  cascade='all, delete-orphan')
+    sessions = db.relationship('UserSession', back_populates='user',
+                               cascade='all, delete-orphan')
+
+    @property
+    def is_active(self) -> bool:
+        """Override Flask-Login's is_active to use is_active_user column."""
+        return self.is_active_user if self.is_active_user is not None else True
 
     @property
     def is_admin(self) -> bool:
@@ -67,6 +81,31 @@ class User(UserMixin, db.Model):
     def update_last_login(self) -> None:
         """Update last login timestamp."""
         self.last_login = datetime.utcnow()
+
+    def has_app_permission(self, app_code: str) -> bool:
+        """Check if user has permission to access an application."""
+        if self.is_admin:
+            return True
+        from .application import Application
+        from .permission import UserPermission
+        return db.session.query(UserPermission).join(Application).filter(
+            UserPermission.user_id == self.id,
+            Application.app_code == app_code,
+            Application.is_active == True,  # noqa: E712
+        ).first() is not None
+
+    def get_permitted_apps(self):
+        """Return list of Application objects the user can access."""
+        from .application import Application
+        if self.is_admin:
+            return Application.query.filter_by(is_active=True).order_by(
+                Application.display_order).all()
+        from .permission import UserPermission
+        app_ids = [p.app_id for p in
+                   UserPermission.query.filter_by(user_id=self.id).all()]
+        return Application.query.filter(
+            Application.id.in_(app_ids), Application.is_active == True  # noqa: E712
+        ).order_by(Application.display_order).all()
 
     def __repr__(self) -> str:
         return f'<User {self.username}>'

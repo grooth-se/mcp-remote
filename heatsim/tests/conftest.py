@@ -11,6 +11,8 @@ from app.models import (
     GEOMETRY_CYLINDER,
 )
 from app.models.simulation import PROCESS_QUENCH_WATER
+from app.models.application import Application
+from app.models.permission import UserPermission
 
 
 @pytest.fixture(scope='session')
@@ -76,6 +78,30 @@ def admin_client(client, admin_user):
         'password': 'adminpass',
     })
     return client
+
+
+@pytest.fixture()
+def normal_user(db):
+    """User with engineer role (alias for portal test compatibility)."""
+    user = User(username='normaluser', role=ROLE_ENGINEER)
+    user.set_password('normalpass')
+    db.session.add(user)
+    db.session.commit()
+    return user
+
+
+@pytest.fixture()
+def sample_app(db):
+    """A portal application for permission tests."""
+    app = Application(
+        app_code='testapp',
+        app_name='Test Application',
+        internal_url='http://localhost:5001',
+        is_active=True,
+    )
+    db.session.add(app)
+    db.session.commit()
+    return app
 
 
 @pytest.fixture()
