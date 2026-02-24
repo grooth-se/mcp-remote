@@ -23,7 +23,7 @@ DEFAULT_APPS = [
         'app_code': 'heatsim',
         'app_name': 'HeatSim',
         'description': 'Materials simulation platform',
-        'internal_url': 'http://heatsim:5002',
+        'internal_url': 'http://heatsim:5000',
         'icon': 'bi-thermometer-half',
         'display_order': 2,
         'requires_gpu': True,
@@ -32,7 +32,7 @@ DEFAULT_APPS = [
         'app_code': 'mpqpgenerator',
         'app_name': 'MPQP Generator',
         'description': 'Manufacturing document generator',
-        'internal_url': 'http://mpqpgenerator:5003',
+        'internal_url': 'http://mpqpgenerator:5000',
         'icon': 'bi-file-earmark-text',
         'display_order': 3,
         'requires_gpu': True,
@@ -41,7 +41,7 @@ DEFAULT_APPS = [
         'app_code': 'mg5integration',
         'app_name': 'MG5 Integrator',
         'description': 'Monitor G5 data integration',
-        'internal_url': 'http://mg5integration:5004',
+        'internal_url': 'http://mg5integration:5001',
         'icon': 'bi-plug',
         'display_order': 4,
     },
@@ -49,7 +49,7 @@ DEFAULT_APPS = [
         'app_code': 'durabler2',
         'app_name': 'Durabler2',
         'description': 'Material testing and certification',
-        'internal_url': 'http://durabler2:5005',
+        'internal_url': 'http://durabler2:5000',
         'icon': 'bi-clipboard2-data',
         'display_order': 5,
         'available_roles': json.dumps({
@@ -62,7 +62,7 @@ DEFAULT_APPS = [
         'app_code': 'spinventory',
         'app_name': 'SPInventory',
         'description': 'Spare parts inventory management',
-        'internal_url': 'http://spinventory:5006',
+        'internal_url': 'http://spinventory:5000',
         'icon': 'bi-box-seam',
         'display_order': 6,
     },
@@ -70,7 +70,7 @@ DEFAULT_APPS = [
         'app_code': 'heattreattracker',
         'app_name': 'Heat Treatment Tracker',
         'description': 'Heat treatment process tracking',
-        'internal_url': 'http://heattreattracker:5007',
+        'internal_url': 'http://heattreattracker:5000',
         'icon': 'bi-fire',
         'display_order': 7,
     },
@@ -91,7 +91,18 @@ def init_db():
                 db.session.add(application)
                 print(f"  Added: {app_data['app_name']}")
             else:
-                print(f"  Exists: {app_data['app_name']}")
+                # Update existing app with current values
+                updated_fields = []
+                for key, value in app_data.items():
+                    if key == 'app_code':
+                        continue
+                    if getattr(existing, key, None) != value:
+                        setattr(existing, key, value)
+                        updated_fields.append(key)
+                if updated_fields:
+                    print(f"  Updated: {app_data['app_name']} ({', '.join(updated_fields)})")
+                else:
+                    print(f"  Exists: {app_data['app_name']} (no changes)")
 
         db.session.commit()
         print(f"\nDone. {Application.query.count()} applications in database.")

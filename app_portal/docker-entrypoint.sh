@@ -36,7 +36,7 @@ with app.app_context():
             print('  Added role column to user_permission')
         conn.commit()
 
-    # Seed default applications
+    # Seed default applications (insert new, update existing)
     from scripts.init_db import DEFAULT_APPS
     for app_data in DEFAULT_APPS:
         existing = Application.query.filter_by(app_code=app_data['app_code']).first()
@@ -44,6 +44,13 @@ with app.app_context():
             application = Application(**app_data)
             db.session.add(application)
             print(f'  Added: {app_data[\"app_name\"]}')
+        else:
+            for key, value in app_data.items():
+                if key == 'app_code':
+                    continue
+                if getattr(existing, key, None) != value:
+                    setattr(existing, key, value)
+                    print(f'  Updated {app_data[\"app_name\"]}: {key}')
     db.session.commit()
 
     # Create admin user if none exists

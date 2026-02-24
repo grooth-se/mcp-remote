@@ -10,7 +10,10 @@ def check_health(internal_url):
         req = urllib.request.Request(internal_url, method='GET')
         urllib.request.urlopen(req, timeout=timeout)
         return True
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError):
+    except urllib.error.HTTPError:
+        # Any HTTP response (302 redirect, 403, etc.) means the app is running
+        return True
+    except (urllib.error.URLError, OSError):
         return False
 
 
