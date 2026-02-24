@@ -23,6 +23,19 @@
     </nav>
 
     <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="mb-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
         <div class="row mb-4">
             <div class="col-md-4">
                 <div class="card border-primary">
@@ -55,12 +68,34 @@
             </div>
         </div>
 
+        <!-- Multi-file upload card -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning bg-opacity-10">
+                        <h5 class="mb-0"><i class="bi bi-cloud-upload"></i> Upload Excel Files</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-2">Drop one or more Monitor G5 Excel exports here. Files are auto-detected by filename and imported immediately.</p>
+                        <form method="POST" action="{{ url_for('admin.upload_multiple') }}" enctype="multipart/form-data" class="upload-form">
+                            <div class="input-group">
+                                <input type="file" class="form-control" name="files" multiple accept=".xlsx">
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="bi bi-upload"></i> Upload &amp; Import
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row mb-4">
             <div class="col">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Data Tables</h5>
-                        <form method="POST" action="{{ url_for('admin.run_import') }}">
+                        <form method="POST" action="{{ url_for('admin.run_import') }}" class="upload-form">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-cloud-download"></i> Run Full Import
                             </button>
@@ -72,17 +107,48 @@
                                 <tr>
                                     <th>Table</th>
                                     <th class="text-end">Records</th>
+                                    <th>Source File</th>
+                                    <th>Upload</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for table, count in counts.items() %}
+                                {% set ext_key = counts_to_key.get(table) %}
                                 <tr>
                                     <td>
                                         <a href="{{ url_for('review.table_detail', table_key=table) }}" class="text-decoration-none">
-                                            {{ table }}
+                                            {% if ext_key and upload_info.get(ext_key) %}
+                                                {{ upload_info[ext_key].label }}
+                                            {% else %}
+                                                {{ table }}
+                                            {% endif %}
                                         </a>
                                     </td>
                                     <td class="text-end">{{ "{:,}".format(count) }}</td>
+                                    <td>
+                                        {% if ext_key and file_status.get(ext_key) %}
+                                            {% if file_status[ext_key].exists %}
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle"></i> {{ file_status[ext_key].modified }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="bi bi-x-circle"></i> No file
+                                                </span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ext_key %}
+                                        <form method="POST" action="{{ url_for('admin.upload_single') }}" enctype="multipart/form-data" class="d-flex gap-1 upload-form">
+                                            <input type="hidden" name="table_key" value="{{ ext_key }}">
+                                            <input type="file" name="file" accept=".xlsx" class="form-control form-control-sm" style="max-width:200px;">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-upload"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -126,19 +192,18 @@
         </div>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="container mt-3">
-        {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // Show spinner overlay on upload/import form submit
+    document.querySelectorAll('.upload-form').forEach(function(form) {
+        form.addEventListener('submit', function() {
+            var btn = form.querySelector('button[type="submit"]');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Importing...';
+            }
+        });
+    });
+    </script>
 </body>
 </html>

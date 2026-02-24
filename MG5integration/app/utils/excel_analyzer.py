@@ -209,6 +209,24 @@ COLUMN_MAPPINGS = {
     },
 }
 
+# Human-readable labels and canonical filenames for upload UI
+UPLOAD_TABLE_INFO = {
+    'kontoplan': {'label': 'Kontoplan (Chart of Accounts)', 'canonical_filename': 'kontoplan.xlsx'},
+    'verlista': {'label': 'Verlista (Journal Entries)', 'canonical_filename': 'verlista.xlsx'},
+    'projektuppf': {'label': 'Projektuppföljning (Project Follow-up)', 'canonical_filename': 'projektuppf.xlsx'},
+    'projectadjustments': {'label': 'Project Adjustments', 'canonical_filename': 'projectadjustments.xlsx'},
+    'tiduppfoljning': {'label': 'Tiduppföljning (Time Tracking)', 'canonical_filename': 'tiduppfoljning.xlsx'},
+    'CO_proj_crossref': {'label': 'CO-Project Cross Reference', 'canonical_filename': 'CO_proj_crossref.xlsx'},
+    'kundorderforteckning': {'label': 'Kundorderförteckning (Customer Orders)', 'canonical_filename': 'kundorderforteckning.xlsx'},
+    'inkoporderforteckning': {'label': 'Inköpsorderförteckning (Purchase Orders)', 'canonical_filename': 'inkoporderforteckning.xlsx'},
+    'offertforteckning': {'label': 'Offertförteckning (Quotes)', 'canonical_filename': 'Offertförteckning.xlsx'},
+    'orderingang': {'label': 'Orderingång (Order Intake)', 'canonical_filename': 'Orderingång.xlsx'},
+    'faktureringslogg': {'label': 'Faktureringslogg (Invoice Log)', 'canonical_filename': 'faktureringslogg.xlsx'},
+    'valutakurser': {'label': 'Valutakurser (Exchange Rates)', 'canonical_filename': 'valutakurser.xlsx'},
+    'artikellista': {'label': 'Artikellista (Articles)', 'canonical_filename': 'Artikellista.xlsx'},
+    'min_stock': {'label': 'Min Stock per Artikel', 'canonical_filename': 'Min stock.xlsx'},
+}
+
 # Map file name patterns to mapping keys
 FILE_PATTERN_MAP = {
     'kontoplan': 'kontoplan',
