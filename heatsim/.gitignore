@@ -71,3 +71,10 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Data files and assets not part of the codebase
+*.stp
+*.csv
+*.jpg
+*.png
+=*
