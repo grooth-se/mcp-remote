@@ -29,7 +29,7 @@
                 <select name="source" class="form-select">
                     <option value="">All Sources</option>
                     <option value="Standard" {{ 'selected' if current_source == 'Standard' }}>Standard (Literature)</option>
-                    <option value="Subseatec" {{ 'selected' if current_source == 'Subseatec' }}>Subseatec (Proprietary)</option>
+                    <option value="Subseatec" {{ 'selected' if current_source == 'Subseatec' }}>Proprietary (In-house)</option>
                 </select>
             </div>
             <div class="col-md-4">
@@ -89,7 +89,7 @@
                         {% if grade.is_standard %}
                         <span class="badge bg-secondary">Standard</span>
                         {% else %}
-                        <span class="badge bg-primary">Subseatec</span>
+                        <span class="badge bg-primary">Proprietary</span>
                         {% endif %}
                     </td>
                     <td class="text-muted small">{{ grade.description|truncate(50) if grade.description else '-' }}</td>
