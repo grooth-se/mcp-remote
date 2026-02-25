@@ -24,7 +24,7 @@ def run_weld_simulation(project_id: int) -> None:
         logger.error("Weld project %d not found", project_id)
         return
 
-    from app.services.comsol import COMSOLClient, COMSOLNotAvailableError
+    from app.services.comsol import COMSOLClient, COMSOLNotAvailableError, COMSOLError
     from app.services.comsol.client import MockCOMSOLClient
     from app.services.comsol.sequential_solver import SequentialSolver, MockSequentialSolver
     from app.services.comsol.model_builder import WeldModelBuilder
@@ -48,7 +48,7 @@ def run_weld_simulation(project_id: int) -> None:
             client.connect()
             builder = WeldModelBuilder(client)
             solver = SequentialSolver(client, builder, results_folder)
-        except COMSOLNotAvailableError:
+        except (COMSOLNotAvailableError, COMSOLError):
             logger.warning("COMSOL not available, using mock solver")
             client = MockCOMSOLClient()
             builder = WeldModelBuilder(client)
