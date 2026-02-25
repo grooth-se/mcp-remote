@@ -2,6 +2,8 @@
 
 import os
 import json
+import urllib.request
+import urllib.error
 import pandas as pd
 from flask import render_template, request, current_app, send_file, flash, redirect, url_for
 from . import reports_bp
@@ -11,6 +13,60 @@ from .services.financial_reports import FinancialReportGenerator
 from .services.project_reports import ProjectReportGenerator
 from .services.chart_generator import generate_project_charts, generate_single_chart
 from .services.commentary_generator import CommentaryGenerator
+
+
+def _load_verlista_df(session):
+    """Load verlista DataFrame from file or MG5 integration API.
+
+    Returns a DataFrame with columns expected by FinancialReportGenerator,
+    or None if unavailable.
+    """
+    files = json.loads(session.files_json)
+
+    # Excel-based session: read from file
+    verlista_path = files.get('verlista')
+    if verlista_path and os.path.exists(verlista_path):
+        return pd.read_excel(verlista_path, engine='openpyxl')
+
+    # Integration session: fetch from MG5 API (paginated)
+    if files.get('source') == 'integration':
+        base_url = current_app.config.get(
+            'MG5_INTEGRATION_URL', 'http://mg5integration:5001')
+        all_items = []
+        page = 1
+        while True:
+            url = f'{base_url}/api/verifications?per_page=1000&page={page}'
+            req = urllib.request.Request(url)
+            req.add_header('Accept', 'application/json')
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    data = json.loads(resp.read())
+            except (urllib.error.URLError, Exception):
+                break
+
+            items = data.get('items', [])
+            if not items:
+                break
+            all_items.extend(items)
+            total_pages = data.get('pages', 1)
+            if page >= total_pages:
+                break
+            page += 1
+
+        if not all_items:
+            return None
+
+        rows = []
+        for v in all_items:
+            rows.append({
+                'Konto': v.get('account'),
+                'Debet': v.get('debit', 0) or 0,
+                'Kredit': v.get('credit', 0) or 0,
+                'datum': v.get('date'),
+            })
+        return pd.DataFrame(rows)
+
+    return None
 
 
 @reports_bp.route('/')
@@ -184,15 +240,10 @@ def financial_generate():
         return redirect(url_for('reports.financial'))
 
     try:
-        files = json.loads(session.files_json)
-        verlista_path = files.get('verlista')
-
-        if not verlista_path or not os.path.exists(verlista_path):
-            flash('Verlista file not found.', 'error')
+        verlista_df = _load_verlista_df(session)
+        if verlista_df is None or verlista_df.empty:
+            flash('Verlista data not available.', 'error')
             return redirect(url_for('reports.financial'))
-
-        # Load verlista
-        verlista_df = pd.read_excel(verlista_path, engine='openpyxl')
 
         # Generate reports
         generator = FinancialReportGenerator(verlista_df)
@@ -350,10 +401,11 @@ def export_financial():
         return redirect(url_for('reports.financial'))
 
     try:
-        files = json.loads(session.files_json)
-        verlista_path = files.get('verlista')
+        verlista_df = _load_verlista_df(session)
+        if verlista_df is None or verlista_df.empty:
+            flash('Verlista data not available.', 'error')
+            return redirect(url_for('reports.financial'))
 
-        verlista_df = pd.read_excel(verlista_path, engine='openpyxl')
         generator = FinancialReportGenerator(verlista_df)
 
         pnl_data = generator.generate_pnl_report(start_date, end_date)
