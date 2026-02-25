@@ -902,25 +902,56 @@ def goldak_multipass(id):
         return redirect(url_for('welding.configure', id=id))
 
     form = GoldakMultiPassForm()
-    multipass_data = None
 
     if form.validate_on_submit():
-        try:
-            from app.services.goldak_multipass import GoldakMultiPassSolver
+        # Enqueue for background execution
+        project.status = STATUS_QUEUED
+        project.progress_percent = 0.0
+        project.error_message = None
+        project.started_at = None
+        project.completed_at = None
+        project.progress_message = (
+            f'goldak:{form.grid_resolution.data}'
+            f':{str(form.compare_methods.data).lower()}'
+        )
+        db.session.commit()
+        flash('Goldak multi-pass simulation queued.', 'info')
+        return redirect(url_for('welding.goldak_multipass', id=id))
 
-            solver = GoldakMultiPassSolver.with_preset(
-                project,
-                preset=form.grid_resolution.data,
-                compare=form.compare_methods.data,
-            )
-            result = solver.run()
-            multipass_data = result.to_dict()
-        except Exception as e:
-            flash(f'Multi-pass Goldak simulation failed: {e}', 'danger')
-            logger.exception("Goldak multi-pass failed")
+    # Check if goldak multipass is running/queued
+    is_goldak_running = (
+        project.status in (STATUS_QUEUED, STATUS_RUNNING)
+        and (project.progress_message or '').startswith(('goldak', 'Pass ', 'Initializing Goldak'))
+    )
+
+    # Load stored result if available
+    stored_result = project.results.filter_by(result_type='goldak_multipass').first()
+    multipass_data = json.loads(stored_result.time_data) if stored_result else None
 
     return render_template(
         'welding/goldak_multipass.html',
         project=project, form=form,
         multipass_data=multipass_data,
+        is_goldak_running=is_goldak_running,
     )
+
+
+@welding_bp.route('/<int:id>/goldak/multipass/status')
+@login_required
+def goldak_multipass_status(id):
+    """Get goldak multipass progress status (JSON for AJAX polling)."""
+    project = WeldProject.query.get_or_404(id)
+
+    if project.user_id != current_user.id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    from app.services.job_queue import get_queue_position
+    queue_position = get_queue_position('weld', project.id) if project.status == STATUS_QUEUED else None
+
+    return jsonify({
+        'status': project.status,
+        'progress_percent': project.progress_percent,
+        'progress_message': project.progress_message,
+        'queue_position': queue_position,
+        'error_message': project.error_message,
+    })

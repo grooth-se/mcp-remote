@@ -28,15 +28,16 @@
 
                     <div class="mb-3">
                         {{ form.grid_resolution.label(class="form-label") }}
-                        {{ form.grid_resolution(class="form-select") }}
+                        {{ form.grid_resolution(class="form-select", disabled=is_goldak_running) }}
                     </div>
 
                     <div class="mb-3 form-check">
-                        {{ form.compare_methods(class="form-check-input") }}
+                        {{ form.compare_methods(class="form-check-input", disabled=is_goldak_running) }}
                         {{ form.compare_methods.label(class="form-check-label") }}
                     </div>
 
-                    <button type="submit" class="btn btn-success w-100">
+                    <button type="submit" class="btn btn-success w-100"
+                            id="btn-run" {% if is_goldak_running %}disabled{% endif %}>
                         <i class="bi bi-play-fill"></i> Run Multi-Pass
                     </button>
                 </form>
@@ -59,7 +60,87 @@
 
     <!-- Results -->
     <div class="col-md-9">
-        {% if multipass_data %}
+        {% if is_goldak_running %}
+        <!-- Queued / Running state -->
+        <div class="card mb-4" id="progress-card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    <span id="progress-title">
+                        {% if project.status == 'queued' %}Queued{% else %}Running{% endif %}
+                    </span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="queue-info" {% if project.status != 'queued' %}style="display:none"{% endif %}>
+                    <p class="mb-2"><i class="bi bi-clock"></i> Waiting in queue&hellip;
+                        <span id="queue-position"></span>
+                    </p>
+                </div>
+                <div id="running-info" {% if project.status != 'running' %}style="display:none"{% endif %}>
+                    <div class="progress mb-2" style="height: 24px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             id="progress-bar" role="progressbar"
+                             style="width: {{ project.progress_percent or 0 }}%"
+                             aria-valuenow="{{ project.progress_percent or 0 }}"
+                             aria-valuemin="0" aria-valuemax="100">
+                            <span id="progress-pct">{{ "%.0f"|format(project.progress_percent or 0) }}%</span>
+                        </div>
+                    </div>
+                    <p class="text-muted mb-0" id="progress-msg">{{ project.progress_message or '' }}</p>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        (function() {
+            const statusUrl = "{{ url_for('welding.goldak_multipass_status', id=project.id) }}";
+            const pageUrl = "{{ url_for('welding.goldak_multipass', id=project.id) }}";
+
+            function poll() {
+                fetch(statusUrl)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'completed') {
+                            window.location.href = pageUrl;
+                            return;
+                        }
+                        if (data.status === 'failed') {
+                            document.getElementById('progress-card').innerHTML =
+                                '<div class="card-header"><h5 class="mb-0 text-danger">' +
+                                '<i class="bi bi-x-circle"></i> Failed</h5></div>' +
+                                '<div class="card-body"><p>' +
+                                (data.error_message || 'Unknown error') +
+                                '</p><a href="' + pageUrl + '" class="btn btn-outline-primary btn-sm">' +
+                                '<i class="bi bi-arrow-clockwise"></i> Back</a></div>';
+                            return;
+                        }
+                        if (data.status === 'running') {
+                            document.getElementById('queue-info').style.display = 'none';
+                            document.getElementById('running-info').style.display = '';
+                            document.getElementById('progress-title').textContent = 'Running';
+                            var pct = Math.round(data.progress_percent || 0);
+                            document.getElementById('progress-bar').style.width = pct + '%';
+                            document.getElementById('progress-pct').textContent = pct + '%';
+                            document.getElementById('progress-msg').textContent = data.progress_message || '';
+                        }
+                        if (data.status === 'queued') {
+                            document.getElementById('queue-info').style.display = '';
+                            document.getElementById('running-info').style.display = 'none';
+                            if (data.queue_position !== null) {
+                                document.getElementById('queue-position').textContent =
+                                    '(position ' + data.queue_position + ')';
+                            }
+                        }
+                        setTimeout(poll, 2000);
+                    })
+                    .catch(() => setTimeout(poll, 5000));
+            }
+            poll();
+        })();
+        </script>
+
+        {% elif multipass_data %}
 
         <!-- Per-Pass Summary Table -->
         <div class="card mb-4">

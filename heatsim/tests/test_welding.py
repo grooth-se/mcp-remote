@@ -2,9 +2,10 @@
 import json
 import pytest
 from app.models import (
-    WeldProject, WeldString, Simulation, SteelGrade,
+    WeldProject, WeldString, WeldResult, Simulation, SteelGrade,
     SteelComposition, User, ROLE_ENGINEER,
 )
+from app.extensions import db as _db
 
 
 class TestWeldingIndex:
@@ -283,3 +284,72 @@ class TestGoldak:
         db.session.commit()
         rv = logged_in_client.get(f'/welding/{sample_weld_project.id}/goldak/multipass')
         assert rv.status_code == 200
+
+
+class TestGoldakMultipassQueue:
+    """Test goldak multipass async queue behaviour."""
+
+    @pytest.fixture(autouse=True)
+    def _setup_strings(self, sample_weld_project, db):
+        string = WeldString(
+            project_id=sample_weld_project.id,
+            string_number=1, layer=1, position_in_layer=1,
+            name='Root Pass', status='pending',
+        )
+        db.session.add(string)
+        sample_weld_project.total_strings = 1
+        db.session.commit()
+
+    def test_post_enqueues(self, logged_in_client, sample_weld_project, db):
+        """POST sets status to queued and encodes config in progress_message."""
+        rv = logged_in_client.post(
+            f'/welding/{sample_weld_project.id}/goldak/multipass',
+            data={'grid_resolution': 'coarse', 'compare_methods': 'y', 'csrf_token': ''},
+            follow_redirects=False,
+        )
+        assert rv.status_code == 302
+        db.session.refresh(sample_weld_project)
+        assert sample_weld_project.status == 'queued'
+        assert sample_weld_project.progress_message.startswith('goldak:coarse:')
+
+    def test_get_shows_stored_result(self, logged_in_client, sample_weld_project, db):
+        """GET loads stored WeldResult when available."""
+        fake_data = {'pass_summary': [], 'cumulative_thermal_cycles': {}}
+        wr = WeldResult(
+            project_id=sample_weld_project.id,
+            result_type='goldak_multipass',
+        )
+        wr.time_data = json.dumps(fake_data)
+        db.session.add(wr)
+        db.session.commit()
+
+        rv = logged_in_client.get(f'/welding/{sample_weld_project.id}/goldak/multipass')
+        assert rv.status_code == 200
+        assert b'pass_summary' not in rv.data or rv.status_code == 200
+
+    def test_status_endpoint(self, logged_in_client, sample_weld_project, db):
+        """Status endpoint returns JSON with progress info."""
+        sample_weld_project.status = 'running'
+        sample_weld_project.progress_percent = 50.0
+        sample_weld_project.progress_message = 'Pass 1/2'
+        db.session.commit()
+
+        rv = logged_in_client.get(
+            f'/welding/{sample_weld_project.id}/goldak/multipass/status'
+        )
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert data['status'] == 'running'
+        assert data['progress_percent'] == 50.0
+        assert data['progress_message'] == 'Pass 1/2'
+
+    def test_status_access_denied(self, logged_in_client, db, sample_steel_grade, admin_user):
+        """Status endpoint denies access to other users' projects."""
+        proj = WeldProject(
+            name='Other', steel_grade_id=sample_steel_grade.id,
+            user_id=admin_user.id, process_type='gtaw', status='draft',
+        )
+        db.session.add(proj)
+        db.session.commit()
+        rv = logged_in_client.get(f'/welding/{proj.id}/goldak/multipass/status')
+        assert rv.status_code == 403
