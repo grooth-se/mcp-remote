@@ -24,6 +24,11 @@ def create_app(config_name='default'):
     config_obj = config[config_name]
     app.config.from_object(config_obj)
 
+    # Use NullPool for SQLite to avoid cross-thread connection sharing issues
+    # (gunicorn threads + background job_queue worker thread)
+    from sqlalchemy.pool import NullPool
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'poolclass': NullPool}
+
     # Configure PostgreSQL binds for materials database (Phase 2)
     # Falls back to SQLite in development if PostgreSQL not configured
     postgres_password = os.environ.get('POSTGRES_PASSWORD', '')
@@ -32,8 +37,14 @@ def create_app(config_name='default'):
         app.config['SQLALCHEMY_BINDS'] = {'materials': postgres_uri}
     else:
         # Fallback to SQLite for development without PostgreSQL
+        # Use dict-based bind config so NullPool applies to the materials bind too
         materials_db = os.path.join(app.instance_path, 'materials.db')
-        app.config['SQLALCHEMY_BINDS'] = {'materials': f'sqlite:///{materials_db}'}
+        app.config['SQLALCHEMY_BINDS'] = {
+            'materials': {
+                'url': f'sqlite:///{materials_db}',
+                'poolclass': NullPool,
+            }
+        }
 
     # Ensure folders exist
     os.makedirs(app.instance_path, exist_ok=True)
