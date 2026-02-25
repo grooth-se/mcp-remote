@@ -14,12 +14,25 @@ with app.app_context():
     db.create_all()
     print('All database tables created.')
 
-    # Check materials bind tables
+    # Auto-migrate: add missing columns to existing tables
     import sqlalchemy as sa
+    inspector = sa.inspect(db.engine)
+    with db.engine.connect() as conn:
+        if 'users' in inspector.get_table_names():
+            cols = [c['name'] for c in inspector.get_columns('users')]
+            if 'display_name' not in cols:
+                conn.execute(sa.text('ALTER TABLE users ADD COLUMN display_name VARCHAR(120)'))
+                print('  Added display_name column to users')
+            if 'is_active_user' not in cols:
+                conn.execute(sa.text('ALTER TABLE users ADD COLUMN is_active_user BOOLEAN DEFAULT 1'))
+                print('  Added is_active_user column to users')
+            conn.commit()
+
+    # Check materials bind tables
     mat_engine = db.engines.get('materials')
     if mat_engine:
-        inspector = sa.inspect(mat_engine)
-        tables = inspector.get_table_names()
+        mat_inspector = sa.inspect(mat_engine)
+        tables = mat_inspector.get_table_names()
         print(f'Materials DB: {len(tables)} tables ready.')
 "
 
@@ -33,4 +46,4 @@ exec gunicorn \
     --timeout 300 \
     --workers 1 \
     --threads 4 \
-    "run:app"
+    "app:create_app('production')"

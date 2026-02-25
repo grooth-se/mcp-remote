@@ -56,6 +56,11 @@ def stop_worker() -> None:
 
 def _worker_loop(app: Flask) -> None:
     """Main worker loop — polls DB for queued jobs every POLL_INTERVAL seconds."""
+    # Ensure materials tables exist before polling
+    with app.app_context():
+        db.create_all()
+        logger.info("Worker thread: database tables verified")
+
     while not _shutdown_event.is_set():
         try:
             with app.app_context():
