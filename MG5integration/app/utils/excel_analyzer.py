@@ -284,8 +284,21 @@ def get_mapping_for_file(filename):
 
 
 def find_file_for_key(folder_path, key):
-    """Find the Excel file matching a mapping key in the folder."""
+    """Find the Excel file matching a mapping key in the folder.
+
+    Prefers the canonical upload filename (exact match) over pattern match
+    so that newly uploaded files are found before older originals.
+    """
     folder = Path(folder_path)
+
+    # 1. Try canonical filename first (from upload)
+    info = UPLOAD_TABLE_INFO.get(key)
+    if info:
+        canonical = folder / info['canonical_filename']
+        if canonical.exists():
+            return canonical
+
+    # 2. Fall back to pattern match
     for pattern, mapping_key in FILE_PATTERN_MAP.items():
         if mapping_key == key:
             for f in folder.glob('*.xlsx'):
