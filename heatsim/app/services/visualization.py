@@ -1383,6 +1383,8 @@ CCT_COLORS = {
     'austenite': '#9467bd',    # Purple
 }
 
+PHASE_FILL_ALPHA = 0.12
+
 
 def create_cct_overlay_plot(
     times: np.ndarray,
@@ -1422,42 +1424,63 @@ def create_cct_overlay_plot(
     bytes
         PNG image data
     """
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(14, 8))
 
-    # If source image provided, use as background
-    if source_image:
-        try:
-            from PIL import Image
-            import io as io_module
-            img = Image.open(io_module.BytesIO(source_image))
-            # Note: User would need to calibrate the image axes
-            # For now, we'll skip background image and just plot curves
-        except Exception:
-            pass  # Continue without background image
+    x_min = 0.1  # Start at 0.1 seconds for log scale
+    x_max = max(times) if len(times) > 0 else 10000
 
-    # Plot digitized CCT curves if available
+    # --- Shaded phase regions (lowest z-order) ---
     if curves:
         for phase, phase_curves in curves.items():
+            if not isinstance(phase_curves, dict):
+                continue
             color = CCT_COLORS.get(phase, '#333333')
 
-            if isinstance(phase_curves, dict):
-                # Start curve
-                if 'start' in phase_curves and phase_curves['start']:
-                    start_data = np.array(phase_curves['start'])
-                    if len(start_data) > 1:
-                        ax.plot(start_data[:, 0], start_data[:, 1],
-                                color=color, linewidth=2, linestyle='-',
-                                label=f'{phase.title()} start')
+            has_start = 'start' in phase_curves and phase_curves['start'] and len(phase_curves['start']) > 1
+            has_finish = 'finish' in phase_curves and phase_curves['finish'] and len(phase_curves['finish']) > 1
 
-                # Finish curve
-                if 'finish' in phase_curves and phase_curves['finish']:
-                    finish_data = np.array(phase_curves['finish'])
-                    if len(finish_data) > 1:
-                        ax.plot(finish_data[:, 0], finish_data[:, 1],
-                                color=color, linewidth=2, linestyle='--',
-                                label=f'{phase.title()} finish')
+            if has_start and has_finish:
+                start_data = np.array(phase_curves['start'])
+                finish_data = np.array(phase_curves['finish'])
 
-    # Plot transformation temperature lines
+                # Interpolate onto common temperature grid
+                t_lo = max(start_data[:, 1].min(), finish_data[:, 1].min())
+                t_hi = min(start_data[:, 1].max(), finish_data[:, 1].max())
+                if t_hi > t_lo:
+                    common_temps = np.linspace(t_lo, t_hi, 200)
+                    start_times = np.interp(common_temps, start_data[:, 1][::-1], start_data[:, 0][::-1])
+                    finish_times = np.interp(common_temps, finish_data[:, 1][::-1], finish_data[:, 0][::-1])
+                    ax.fill_betweenx(common_temps, start_times, finish_times,
+                                     alpha=PHASE_FILL_ALPHA, color=color,
+                                     label=f'{phase.title()} region', zorder=1)
+
+    # Martensite horizontal band
+    ms = transformation_temps.get('Ms')
+    mf = transformation_temps.get('Mf')
+    if ms is not None and mf is not None:
+        ax.axhspan(mf, ms, alpha=0.10, color='#d62728', zorder=1,
+                   label='Martensite region')
+
+    # --- C-curves (z-order 3) ---
+    if curves:
+        for phase, phase_curves in curves.items():
+            if not isinstance(phase_curves, dict):
+                continue
+            color = CCT_COLORS.get(phase, '#333333')
+
+            if 'start' in phase_curves and phase_curves['start']:
+                start_data = np.array(phase_curves['start'])
+                if len(start_data) > 1:
+                    ax.plot(start_data[:, 0], start_data[:, 1],
+                            color=color, linewidth=2, linestyle='-', zorder=3)
+
+            if 'finish' in phase_curves and phase_curves['finish']:
+                finish_data = np.array(phase_curves['finish'])
+                if len(finish_data) > 1:
+                    ax.plot(finish_data[:, 0], finish_data[:, 1],
+                            color=color, linewidth=2, linestyle='--', zorder=3)
+
+    # --- Transformation temperature lines (z-order 4) ---
     temp_lines = [
         ('Ac3', transformation_temps.get('Ac3'), '#9467bd', 'Ac3'),
         ('Ac1', transformation_temps.get('Ac1'), '#8c564b', 'Ac1'),
@@ -1466,32 +1489,26 @@ def create_cct_overlay_plot(
         ('Mf', transformation_temps.get('Mf'), '#e377c2', 'Mf'),
     ]
 
-    x_min = 0.1  # Start at 0.1 seconds for log scale
-    x_max = max(times) if len(times) > 0 else 10000
-
     for name, temp, color, label in temp_lines:
         if temp is not None:
             ax.axhline(y=temp, color=color, linestyle=':', linewidth=1.5,
-                      alpha=0.7, label=f'{label} = {temp:.0f}°C')
+                      alpha=0.7, label=f'{label} = {temp:.0f}°C', zorder=4)
 
-    # Plot cooling curves (thick lines)
+    # --- Cooling curves (z-order 10, on top) ---
     if temperatures.ndim == 1:
-        # Single curve
         valid_mask = times > 0
         ax.plot(times[valid_mask], temperatures[valid_mask],
                 'k-', linewidth=3, label='Cooling curve (center)', zorder=10)
     else:
-        # Multiple positions
         n_pos = temperatures.shape[1]
         pos_colors = ['#000000', '#555555', '#888888', '#bbbbbb']
         pos_labels = positions if positions else ['Center', '1/3 R', '2/3 R', 'Surface']
 
         for i in range(min(n_pos, 4)):
             valid_mask = times > 0
-            idx = [0, n_pos//3, 2*n_pos//3, n_pos-1][i] if n_pos > 1 else 0
-            ax.plot(times[valid_mask], temperatures[valid_mask, idx],
+            ax.plot(times[valid_mask], temperatures[valid_mask, i],
                     color=pos_colors[i], linewidth=2.5,
-                    label=f'Cooling curve ({pos_labels[i]})', zorder=10)
+                    label=f'{pos_labels[i]}', zorder=10)
 
     # Formatting
     ax.set_xscale('log')
@@ -1499,7 +1516,6 @@ def create_cct_overlay_plot(
     ax.set_ylabel('Temperature (°C)', fontsize=12)
     ax.set_title(title, fontsize=14)
 
-    # Set axis limits
     if len(times) > 0:
         ax.set_xlim(x_min, x_max * 1.5)
 
@@ -1510,16 +1526,8 @@ def create_cct_overlay_plot(
     )
     ax.set_ylim(y_min, y_max * 1.1)
 
-    # Legend outside plot
-    ax.legend(loc='upper right', fontsize=9, framealpha=0.9)
+    ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1), fontsize=9, framealpha=0.9)
     ax.grid(True, alpha=0.3, which='both')
-
-    # Add phase region labels if curves exist
-    if curves:
-        # Add text labels in approximate phase regions
-        pass  # Could add later for better visualization
-
-    plt.tight_layout()
 
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')

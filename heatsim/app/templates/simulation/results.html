@@ -722,26 +722,13 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-graph-up"></i> Cooling Curves on CCT Diagram</span>
-                <div class="btn-group btn-group-sm" role="group">
-                    <input type="radio" class="btn-check" name="cctView" id="cctMulti" checked onchange="switchCCT('multi')">
-                    <label class="btn btn-outline-primary" for="cctMulti" title="Show all positions">
-                        <i class="bi bi-layers"></i> Multi
-                    </label>
-                    <input type="radio" class="btn-check" name="cctView" id="cctCenter" onchange="switchCCT('center')">
-                    <label class="btn btn-outline-primary" for="cctCenter" title="Show center only">
-                        <i class="bi bi-dot"></i> Center
-                    </label>
-                    <a href="{{ url_for('simulation.cct_overlay_multi_position', id=sim.id) }}"
-                       class="btn btn-outline-secondary" target="_blank" title="Open in new tab">
-                        <i class="bi bi-arrows-fullscreen"></i>
-                    </a>
-                </div>
+                <a href="{{ url_for('simulation.cct_overlay', id=sim.id) }}"
+                   class="btn btn-sm btn-outline-secondary" target="_blank" title="Open in new tab">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </a>
             </div>
             <div class="card-body text-center">
-                <img id="cctPlotImg"
-                     src="{{ url_for('simulation.cct_overlay_multi_position', id=sim.id) }}"
-                     data-multi="{{ url_for('simulation.cct_overlay_multi_position', id=sim.id) }}"
-                     data-center="{{ url_for('simulation.cct_overlay_quenching', id=sim.id) }}"
+                <img src="{{ url_for('simulation.cct_overlay', id=sim.id) }}"
                      class="img-fluid" alt="CCT Overlay">
             </div>
         </div>
@@ -774,7 +761,7 @@
                     </tbody>
                 </table>
                 <p class="small mb-2">
-                    <strong>Multi-position view</strong> shows cooling curves at:
+                    Shows transfer and quenching cooling curves at four radial positions:
                 </p>
                 <ul class="small text-muted mb-2">
                     <li><strong>Center</strong> - slowest cooling</li>
@@ -783,7 +770,7 @@
                     <li><strong>Surface</strong> - fastest cooling</li>
                 </ul>
                 <small class="text-muted">
-                    This shows hardenability variation through the cross-section.
+                    Shaded regions show predicted phase transformation zones.
                 </small>
             </div>
         </div>
@@ -1246,18 +1233,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-
-// CCT view toggle
-function switchCCT(view) {
-    const img = document.getElementById('cctPlotImg');
-    if (!img) return;
-
-    if (view === 'multi') {
-        img.src = img.dataset.multi;
-    } else {
-        img.src = img.dataset.center;
-    }
-}
 
 // VTK snapshot selector
 function updateVtkSnapshot(select, phaseName) {

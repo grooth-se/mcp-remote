@@ -1043,7 +1043,7 @@ def _get_cct_curves_for_grade(grade, diagram):
 @simulation_bp.route('/<int:id>/cct-overlay')
 @login_required
 def cct_overlay(id):
-    """Generate CCT diagram with cooling curve overlay (center only)."""
+    """Generate CCT diagram with transfer+quenching cooling curves at 4 radial positions."""
     import numpy as np
 
     sim = Simulation.query.get_or_404(id)
@@ -1053,152 +1053,76 @@ def cct_overlay(id):
     if sim.status != STATUS_COMPLETED:
         return Response('Simulation not completed', status=400)
 
-    # Get simulation result data
+    # Load full_cycle result (has multi-position data)
     cycle_result = sim.results.filter_by(result_type='full_cycle').first()
     if not cycle_result:
         return Response('No simulation results', status=404)
 
-    times = np.array(cycle_result.time_array)
-    temps = np.array(cycle_result.value_array)
+    full_times = np.array(cycle_result.time_array)
 
-    # Get phase diagram for this steel grade
-    grade = sim.steel_grade
-    diagram = grade.phase_diagrams.first()
-
-    if not diagram:
-        return Response('No phase diagram available for this steel grade', status=404)
-
-    # Get transformation temperatures and curves
-    trans_temps = diagram.temps_dict
-    curves = _get_cct_curves_for_grade(grade, diagram)
-
-    # Get source image if available
-    source_image = diagram.source_image
-
-    # Generate CCT overlay plot
-    plot_data = visualization.create_cct_overlay_plot(
-        times=times,
-        temperatures=temps,
-        transformation_temps=trans_temps,
-        curves=curves if curves else None,
-        source_image=source_image,
-        title=f'CCT Diagram - {sim.name} ({grade.designation})'
-    )
-
-    response = Response(plot_data, mimetype='image/png')
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    return response
-
-
-@simulation_bp.route('/<int:id>/cct-overlay/quenching')
-@login_required
-def cct_overlay_quenching(id):
-    """Generate CCT diagram with quenching phase cooling curve only."""
-    import numpy as np
-
-    sim = Simulation.query.get_or_404(id)
-    if sim.user_id != current_user.id:
-        return Response('Access denied', status=403)
-
-    if sim.status != STATUS_COMPLETED:
-        return Response('Simulation not completed', status=400)
-
-    # Get quenching phase result
+    # Determine transfer+quench time window from individual phase results
+    transfer_result = sim.results.filter_by(
+        result_type='cooling_curve', phase='transfer'
+    ).first()
     quench_result = sim.results.filter_by(
-        result_type='cooling_curve',
-        phase='quenching'
+        result_type='cooling_curve', phase='quenching'
     ).first()
 
-    if not quench_result:
-        # Fall back to full cycle
-        quench_result = sim.results.filter_by(result_type='full_cycle').first()
+    if quench_result:
+        q_times = np.array(quench_result.time_array)
+        t_end = q_times[-1] if len(q_times) > 0 else full_times[-1]
 
-    if not quench_result:
-        return Response('No simulation results', status=404)
+        if transfer_result:
+            tr_times = np.array(transfer_result.time_array)
+            t_start = tr_times[0] if len(tr_times) > 0 else q_times[0]
+        else:
+            t_start = q_times[0] if len(q_times) > 0 else 0.0
+    else:
+        # No quench result — fall back to full cycle
+        t_start = 0.0
+        t_end = full_times[-1]
 
-    times = np.array(quench_result.time_array)
-    temps = np.array(quench_result.value_array)
+    # Mask to transfer+quench window
+    mask = (full_times >= t_start) & (full_times <= t_end)
+    sliced_times = full_times[mask] - t_start  # zero-base
 
-    # Adjust times to start from quench start (t=0 at quench)
-    if quench_result.phase == 'quenching':
-        times = times - times[0] if len(times) > 0 else times
+    # Build multi-position temperature array
+    multi_pos_data = cycle_result.data_dict
+    if multi_pos_data and 'center' in multi_pos_data:
+        full_center = np.array(multi_pos_data['center'])
+        full_one_third = np.array(multi_pos_data['one_third'])
+        full_two_thirds = np.array(multi_pos_data['two_thirds'])
+        full_surface = np.array(multi_pos_data['surface'])
+
+        temps = np.column_stack([
+            full_center[mask],
+            full_one_third[mask],
+            full_two_thirds[mask],
+            full_surface[mask],
+        ])
+        positions = ['Center', '1/3 R', '2/3 R', 'Surface']
+    else:
+        # Fall back to center-only
+        full_vals = np.array(cycle_result.value_array)
+        temps = full_vals[mask]
+        positions = None
 
     # Get phase diagram
     grade = sim.steel_grade
     diagram = grade.phase_diagrams.first()
 
     if not diagram:
-        return Response('No phase diagram available', status=404)
-
-    trans_temps = diagram.temps_dict
-    curves = _get_cct_curves_for_grade(grade, diagram)
-
-    plot_data = visualization.create_cct_overlay_plot(
-        times=times,
-        temperatures=temps,
-        transformation_temps=trans_temps,
-        curves=curves if curves else None,
-        title=f'CCT Diagram (Quenching) - {sim.name}'
-    )
-
-    response = Response(plot_data, mimetype='image/png')
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    return response
-
-
-@simulation_bp.route('/<int:id>/cct-overlay/multi-position')
-@login_required
-def cct_overlay_multi_position(id):
-    """Generate CCT diagram with multi-position cooling curves (center, 1/3R, 2/3R, surface)."""
-    import numpy as np
-
-    sim = Simulation.query.get_or_404(id)
-    if sim.user_id != current_user.id:
-        return Response('Access denied', status=403)
-
-    if sim.status != STATUS_COMPLETED:
-        return Response('Simulation not completed', status=400)
-
-    # Get simulation result data
-    cycle_result = sim.results.filter_by(result_type='full_cycle').first()
-    if not cycle_result:
-        return Response('No simulation results', status=404)
-
-    times = np.array(cycle_result.time_array)
-
-    # Check for multi-position data
-    multi_pos_data = cycle_result.data_dict
-    if multi_pos_data and 'center' in multi_pos_data:
-        # Build multi-position temperature array [time, position]
-        temps = np.column_stack([
-            np.array(multi_pos_data['center']),
-            np.array(multi_pos_data['one_third']),
-            np.array(multi_pos_data['two_thirds']),
-            np.array(multi_pos_data['surface']),
-        ])
-        positions = ['Center', '1/3 R', '2/3 R', 'Surface']
-    else:
-        # Fall back to single curve
-        temps = np.array(cycle_result.value_array)
-        positions = None
-
-    # Get phase diagram for this steel grade
-    grade = sim.steel_grade
-    diagram = grade.phase_diagrams.first()
-
-    if not diagram:
         return Response('No phase diagram available for this steel grade', status=404)
 
     trans_temps = diagram.temps_dict
     curves = _get_cct_curves_for_grade(grade, diagram)
 
-    # Generate CCT overlay plot with multiple positions
     plot_data = visualization.create_cct_overlay_plot(
-        times=times,
+        times=sliced_times,
         temperatures=temps,
         transformation_temps=trans_temps,
         curves=curves if curves else None,
-        title=f'CCT Diagram (Multi-Position) - {sim.name}',
+        title=f'CCT Diagram (Transfer + Quench) - {sim.name}',
         positions=positions
     )
 
