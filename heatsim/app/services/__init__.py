@@ -29,6 +29,7 @@ from .snapshot_diff import SnapshotDiffService
 from .material_change_tracker import MaterialChangeTracker
 from .lineage_service import LineageService
 from .compliance_report import ComplianceReportGenerator
+from .cct_predictor import CCTCurvePredictor, predict_cct_curves
 from .rosenthal_solver import RosenthalSolver, RosenthalParams
 from .haz_predictor import HAZPredictor, HAZResult
 from .preheat_calculator import PreheatCalculator, PreheatResult
@@ -101,6 +102,9 @@ __all__ = [
     # Phase 13 services - Process optimization
     'OptimizationService',
     'OptimizationResult',
+    # CCT curve prediction
+    'CCTCurvePredictor',
+    'predict_cct_curves',
     # Phase 14 services - Welding simulation improvements
     'RosenthalSolver',
     'RosenthalParams',
