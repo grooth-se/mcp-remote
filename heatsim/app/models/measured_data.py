@@ -47,7 +47,7 @@ class MeasuredData(db.Model):
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationship
-    simulation = db.relationship('Simulation', backref=db.backref('measured_data', lazy='dynamic'))
+    simulation = db.relationship('Simulation', backref=db.backref('measured_data', lazy='dynamic', cascade='all, delete-orphan'))
 
     @property
     def channel_labels_dict(self) -> Dict[str, str]:

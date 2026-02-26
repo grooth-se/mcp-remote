@@ -51,7 +51,8 @@ class SimulationSnapshot(db.Model):
 
     # Relationships
     simulation = db.relationship('Simulation', backref=db.backref(
-        'snapshots', lazy='dynamic', order_by='SimulationSnapshot.version.desc()'
+        'snapshots', lazy='dynamic', order_by='SimulationSnapshot.version.desc()',
+        cascade='all, delete-orphan',
     ))
 
     __table_args__ = (
