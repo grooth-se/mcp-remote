@@ -1471,28 +1471,39 @@ def create_cct_overlay_plot(
                    label='Martensite region')
 
     # --- C-curves (z-order 3) ---
+    phases_with_fill = set()
     if curves:
         for phase, phase_curves in curves.items():
             if not isinstance(phase_curves, dict):
                 continue
             color = CCT_COLORS.get(phase, '#333333')
 
-            if 'start' in phase_curves and phase_curves['start']:
-                start_data = np.array(phase_curves['start'])
-                if len(start_data) > 1:
-                    ax.plot(start_data[:, 0], start_data[:, 1],
-                            color=color, linewidth=2, linestyle='-', zorder=3)
+            has_start = 'start' in phase_curves and phase_curves['start'] and len(phase_curves.get('start', [])) > 1
+            has_finish = 'finish' in phase_curves and phase_curves['finish'] and len(phase_curves.get('finish', [])) > 1
 
-            if 'finish' in phase_curves and phase_curves['finish']:
+            # Check if this phase got a shaded fill (only if both start & finish overlap)
+            if has_start and has_finish:
+                s = np.array(phase_curves['start'])
+                f = np.array(phase_curves['finish'])
+                if min(s[:, 1].max(), f[:, 1].max()) > max(s[:, 1].min(), f[:, 1].min()):
+                    phases_with_fill.add(phase)
+
+            if has_start:
+                start_data = np.array(phase_curves['start'])
+                # Add legend label on start curve if no shaded fill was drawn
+                label = f'{phase.title()}' if phase not in phases_with_fill else None
+                ax.plot(start_data[:, 0], start_data[:, 1],
+                        color=color, linewidth=2, linestyle='-', label=label, zorder=3)
+
+            if has_finish:
                 finish_data = np.array(phase_curves['finish'])
-                if len(finish_data) > 1:
-                    ax.plot(finish_data[:, 0], finish_data[:, 1],
-                            color=color, linewidth=2, linestyle='--', zorder=3)
+                ax.plot(finish_data[:, 0], finish_data[:, 1],
+                        color=color, linewidth=2, linestyle='--', zorder=3)
 
     # --- Transformation temperature lines (z-order 4) ---
     temp_lines = [
-        ('Ac3', transformation_temps.get('Ac3'), '#9467bd', 'Ac3'),
-        ('Ac1', transformation_temps.get('Ac1'), '#8c564b', 'Ac1'),
+        ('Ac3', transformation_temps.get('Ac3') or transformation_temps.get('Ae3'), '#9467bd', 'Ac3'),
+        ('Ac1', transformation_temps.get('Ac1') or transformation_temps.get('Ae1'), '#8c564b', 'Ac1'),
         ('Bs', transformation_temps.get('Bs'), '#ff7f0e', 'Bs'),
         ('Ms', transformation_temps.get('Ms'), '#d62728', 'Ms'),
         ('Mf', transformation_temps.get('Mf'), '#e377c2', 'Mf'),
@@ -1533,7 +1544,7 @@ def create_cct_overlay_plot(
 
     y_min = 0
     y_max = max(
-        transformation_temps.get('Ac3', 900) or 900,
+        transformation_temps.get('Ac3') or transformation_temps.get('Ae3') or 900,
         np.max(temperatures) if temperatures.size > 0 else 900
     )
     ax.set_ylim(y_min, y_max * 1.1)
