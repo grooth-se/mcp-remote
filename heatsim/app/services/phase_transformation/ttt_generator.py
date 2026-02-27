@@ -48,7 +48,7 @@ def generate_ttt_diagram(
 
     # Temperature ranges per phase
     phase_ranges = {
-        'ferrite': (bs + 20, ae3 - 5),
+        'ferrite': (bs + 20, ae1 - 5),
         'pearlite': (bs, ae1 - 5),
         'bainite': (ms + 10, bs - 5),
     }

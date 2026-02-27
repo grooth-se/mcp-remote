@@ -60,8 +60,8 @@ def generate_cct_from_ttt(
         critical_temps = {}
 
     if cooling_rates is None:
-        # Logarithmic distribution of cooling rates
-        cooling_rates = np.logspace(-1, 2.3, 30).tolist()  # 0.1 to ~200 K/s
+        # Logarithmic distribution of cooling rates — more points for smoother curves
+        cooling_rates = np.logspace(-1, 2.3, 50).tolist()  # 0.1 to ~200 K/s
 
     curves = {}
     phase_starts = {}   # phase -> list of (time, temp)
@@ -94,18 +94,22 @@ def generate_cct_from_ttt(
             if final_frac < 0.005:
                 continue
 
-            # Start point
-            start_threshold = start_fraction * final_frac
-            start_indices = np.where(frac >= start_threshold)[0]
+            # Use absolute thresholds (not relative to final_frac)
+            # This gives consistent detection across cooling rates
+            abs_start = start_fraction   # e.g. 0.01 = 1% absolute
+            abs_finish = min(finish_fraction * final_frac, final_frac * 0.99)
+
+            # Start point: first time fraction exceeds 1% absolute
+            start_indices = np.where(frac >= abs_start)[0]
             if len(start_indices) > 0:
                 idx = start_indices[0]
                 if phase not in phase_starts:
                     phase_starts[phase] = []
                 phase_starts[phase].append([float(times[idx]), float(temperatures[idx])])
 
-            # Finish point
-            finish_threshold = finish_fraction * final_frac
-            finish_indices = np.where(frac >= finish_threshold)[0]
+            # Finish point: first time fraction reaches 99% of what this
+            # cooling rate ultimately produces
+            finish_indices = np.where(frac >= abs_finish)[0]
             if len(finish_indices) > 0:
                 idx = finish_indices[0]
                 if phase not in phase_finishes:
@@ -116,11 +120,11 @@ def generate_cct_from_ttt(
     for phase in set(list(phase_starts.keys()) + list(phase_finishes.keys())):
         phase_dict = {}
         if phase in phase_starts and len(phase_starts[phase]) >= 2:
-            # Sort by temperature descending
-            start_pts = sorted(phase_starts[phase], key=lambda p: -p[1])
+            # Sort by time ascending (natural CCT ordering: fast cooling left, slow right)
+            start_pts = sorted(phase_starts[phase], key=lambda p: p[0])
             phase_dict['start'] = start_pts
         if phase in phase_finishes and len(phase_finishes[phase]) >= 2:
-            finish_pts = sorted(phase_finishes[phase], key=lambda p: -p[1])
+            finish_pts = sorted(phase_finishes[phase], key=lambda p: p[0])
             phase_dict['finish'] = finish_pts
 
         if phase_dict:

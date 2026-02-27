@@ -89,14 +89,14 @@ def calculate_cct_transformation(
     ms = ct.get('Ms', 350)
 
     # Phase ordering: transformations occur in sequence as temperature drops
-    # ferrite (below Ae3), pearlite (below Ae1), bainite (below Bs),
+    # ferrite (below Ae1), pearlite (below Ae1), bainite (below Bs),
     # martensite (below Ms, athermal)
     diffusional_phases = []
     phase_temp_limits = {}
 
     if 'ferrite' in jmak_models:
         diffusional_phases.append('ferrite')
-        phase_temp_limits['ferrite'] = (bs + 20, ae3)
+        phase_temp_limits['ferrite'] = (bs + 20, ae1)
     if 'pearlite' in jmak_models:
         diffusional_phases.append('pearlite')
         phase_temp_limits['pearlite'] = (bs, ae1)

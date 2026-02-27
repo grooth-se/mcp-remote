@@ -309,7 +309,7 @@ def _auto_generate_jmak(ttt, comp, temps):
             'nose_temp': nose_t,
             'nose_time': nose_time,
             'temp_min': bs + 20,
-            'temp_max': ae3,
+            'temp_max': ae1,
         })
 
     # Pearlite
