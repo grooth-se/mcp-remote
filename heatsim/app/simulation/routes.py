@@ -1026,18 +1026,15 @@ def vtk_download(id, result_id):
 
 
 def _get_cct_curves_for_grade(grade, diagram):
-    """Get CCT curves: digitized if available, else predicted from composition."""
-    curves = diagram.curves_dict if diagram else {}
-    if curves:
-        return curves
+    """Get CCT curves using three-tier fallback.
 
-    comp = grade.composition
-    if comp:
-        from app.services.cct_predictor import predict_cct_curves
-        trans_temps = diagram.temps_dict if diagram else {}
-        return predict_cct_curves(comp.to_dict(), trans_temps)
-
-    return None
+    Tier 1: Digitized PhaseDiagram curves
+    Tier 2: JMAK/Scheil CCT (if TTTParameters exist)
+    Tier 3: Empirical CCT predictor (from composition)
+    """
+    from app.services.phase_transformation import PhasePredictor
+    predictor = PhasePredictor(grade)
+    return predictor.get_cct_curves()
 
 
 @simulation_bp.route('/<int:id>/cct-overlay')

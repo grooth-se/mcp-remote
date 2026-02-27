@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Calibrate - {{ grade.designation }}{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('ttt_cct.index') }}">TTT/CCT</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('ttt_cct.view', grade_id=grade.id) }}">{{ grade.designation }}</a></li>
+            <li class="breadcrumb-item active">Calibrate</li>
+        </ol>
+    </nav>
+
+    <h3>Calibrate JMAK Parameters from Test Data</h3>
+
+    <div class="row">
+        <div class="col-md-8">
+            <form method="post" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            {{ form.csv_file.label(class="form-label") }}
+                            {{ form.csv_file(class="form-control") }}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.test_type.label(class="form-label") }}
+                                {{ form.test_type(class="form-select") }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.phase.label(class="form-label") }}
+                                {{ form.phase(class="form-select") }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('ttt_cct.view', grade_id=grade.id) }}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">CSV Format</div>
+                <div class="card-body">
+                    <h6>Isothermal:</h6>
+                    <pre class="bg-light p-2"><code>temperature,time,fraction
+650,10,0.01
+650,50,0.15
+650,200,0.85
+...</code></pre>
+                    <h6>CCT:</h6>
+                    <pre class="bg-light p-2"><code>cooling_rate,start_temperature,finish_temperature
+0.5,690,640
+2,680,610
+10,650,550
+...</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

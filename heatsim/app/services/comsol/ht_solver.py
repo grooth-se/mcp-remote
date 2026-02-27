@@ -2,6 +2,9 @@
 
 Runs multi-phase heat treatment simulation (heating, transfer, quenching,
 tempering) and generates 3D temperature field data as VTK files.
+
+The real COMSOL solver uses a single-study piecewise-BC approach:
+one continuous transient solve covering all phases.
 """
 import logging
 import os
@@ -25,6 +28,10 @@ logger = logging.getLogger(__name__)
 class HeatTreatmentSolver:
     """Run multi-phase heat treatment in COMSOL.
 
+    Uses the single-study piecewise-BC approach: build model once with
+    time-dependent h_conv(t) and T_amb(t) interpolation functions,
+    solve once, extract results at probe points.
+
     Parameters
     ----------
     client : COMSOLClient
@@ -43,6 +50,7 @@ class HeatTreatmentSolver:
         self.simulation = simulation
         self.snapshot = snapshot
         self.builder = HeatTreatmentModelBuilder(client, simulation)
+        self._model = None
 
         if vtk_folder is None:
             vtk_folder = os.path.join('instance', 'vtk', str(simulation.id))
@@ -59,94 +67,135 @@ class HeatTreatmentSolver:
             - phases: dict of phase_name -> phase result dict
             - vtk_files: list of VTK file paths
             - summary: dict with t_800_500, peak_temp, etc.
+            - temperature_profiles: multi-position temperature data
         """
-        # Create base model
-        model = self.builder.create_model()
+        # Build complete model with piecewise BCs
+        model = self.builder.build_complete_model()
+        self._model = model
 
-        ht_config = self.simulation.ht_config
-        results = {'phases': {}, 'vtk_files': [], 'summary': {}}
+        # Run single transient study
+        logger.info("Solving COMSOL model...")
+        self.client.run_study(model, 'std1')
+        logger.info("COMSOL solve completed")
 
-        phase_order = ['heating', 'transfer', 'quenching', 'tempering']
+        # Extract results at probe points
+        ht_config = self.simulation.ht_config or {}
+        timeline = self.builder._build_phase_timeline(ht_config)
 
-        for phase_name in phase_order:
-            phase_config = ht_config.get(phase_name, {})
-            if not phase_config.get('enabled', phase_name == 'quenching'):
-                continue
+        results = {
+            'phases': {},
+            'vtk_files': [],
+            'summary': {},
+            'temperature_profiles': {},
+        }
 
-            logger.info(f"Running COMSOL phase: {phase_name}")
+        # Extract multi-position temperature data
+        probe_data = self._extract_probe_data(model, timeline)
+        results['temperature_profiles'] = probe_data
 
-            # Configure model for this phase
-            self.builder.build_phase(model, phase_name, phase_config)
+        # Build per-phase results from continuous solution
+        for phase_info in timeline:
+            phase_name = phase_info['phase_name']
+            t_start = phase_info['start_time']
+            t_end = phase_info['end_time']
 
-            # Run COMSOL study
-            self.client.run_study(model, 'std1')
-
-            # Extract results
-            phase_result = self._extract_phase_results(model, phase_name, phase_config)
+            # Extract phase-specific data from continuous solution
+            phase_result = self._extract_phase_from_probes(
+                probe_data, phase_name, t_start, t_end
+            )
             results['phases'][phase_name] = phase_result
 
-            # Export VTK snapshots
-            vtk_paths = self._extract_vtk_snapshots(model, phase_name, phase_config)
-            results['vtk_files'].extend(vtk_paths)
+        # Export VTK snapshots at key times
+        results['vtk_files'] = self._export_vtk_snapshots(model, timeline)
 
         # Calculate summary metrics
         results['summary'] = self._calculate_summary(results)
 
-        logger.info(f"COMSOL HT simulation complete: {len(results['vtk_files'])} VTK files")
+        logger.info("COMSOL HT simulation complete: %d VTK files", len(results['vtk_files']))
         return results
 
-    def _extract_phase_results(self, model: Any, phase_name: str,
-                                phase_config: dict) -> dict:
-        """Extract thermal cycle and temperature data from COMSOL."""
-        duration = self.builder._get_phase_duration(phase_name, phase_config)
-        n_points = 100
-        times = np.linspace(0, duration, n_points)
+    def _extract_probe_data(self, model: Any, timeline: List[dict]) -> dict:
+        """Extract temperature vs time at 4 probe positions.
 
+        Returns dict with keys: times, center, one_third, two_thirds, surface
+        """
+        probe_names = ['center', 'one_third', 'two_thirds', 'surface']
+        result = {}
+
+        for name in probe_names:
+            ds_tag = f'probe_{name}'
+            try:
+                data = self.client.evaluate(model, 'T', dataset=ds_tag)
+                if isinstance(data, np.ndarray):
+                    # Convert from Kelvin if needed (COMSOL default is K)
+                    if data.mean() > 273:
+                        data = data - 273.15
+                    result[name] = data.tolist()
+            except Exception as e:
+                logger.warning("Probe %s extraction failed: %s", name, e)
+
+        # Get time array from solution
         try:
-            # Evaluate temperature at center and surface
-            t_center = self.client.evaluate(model, 'T', dataset='center')
-            t_surface = self.client.evaluate(model, 'T', dataset='surface')
+            # Evaluate time from solution
+            t_data = self.client.evaluate(model, 't')
+            if isinstance(t_data, np.ndarray):
+                result['times'] = t_data.tolist()
+        except Exception:
+            # Reconstruct from timeline
+            if timeline:
+                total = timeline[-1]['end_time']
+                result['times'] = np.linspace(0, total, 100).tolist()
 
-            if isinstance(t_center, np.ndarray) and len(t_center) > 0:
-                center_temps = t_center.tolist()
-            else:
-                center_temps = np.linspace(850, 25, n_points).tolist()
+        return result
 
-            if isinstance(t_surface, np.ndarray) and len(t_surface) > 0:
-                surface_temps = t_surface.tolist()
-            else:
-                surface_temps = np.linspace(850, 25, n_points).tolist()
+    def _extract_phase_from_probes(self, probe_data: dict, phase_name: str,
+                                     t_start: float, t_end: float) -> dict:
+        """Extract phase-specific data from continuous probe data."""
+        times = np.array(probe_data.get('times', []))
+        if len(times) == 0:
+            return {
+                'phase_name': phase_name,
+                'times': [],
+                'center_temps': [],
+                'surface_temps': [],
+                'duration': t_end - t_start,
+            }
 
-        except Exception as e:
-            logger.warning(f"Could not evaluate from COMSOL, using estimated data: {e}")
-            center_temps = np.linspace(850, 25, n_points).tolist()
-            surface_temps = np.linspace(850, 25, n_points).tolist()
+        mask = (times >= t_start) & (times <= t_end)
+        phase_times = (times[mask] - t_start).tolist()
+
+        center = np.array(probe_data.get('center', []))
+        surface = np.array(probe_data.get('surface', []))
 
         return {
             'phase_name': phase_name,
-            'times': times.tolist(),
-            'center_temps': center_temps,
-            'surface_temps': surface_temps,
-            'duration': duration,
+            'times': phase_times,
+            'center_temps': center[mask].tolist() if len(center) == len(times) else [],
+            'surface_temps': surface[mask].tolist() if len(surface) == len(times) else [],
+            'duration': t_end - t_start,
         }
 
-    def _extract_vtk_snapshots(self, model: Any, phase_name: str,
-                                phase_config: dict) -> List[str]:
-        """Export 3D temperature field as VTK at selected timesteps."""
-        duration = self.builder._get_phase_duration(phase_name, phase_config)
-
-        # Select ~10 snapshot times
-        n_snapshots = min(10, max(3, int(duration / 30)))
-        snapshot_times = np.linspace(0, duration, n_snapshots)
-
+    def _export_vtk_snapshots(self, model: Any, timeline: List[dict]) -> List[str]:
+        """Export VTK files at selected time points across all phases."""
         vtk_paths = []
-        for i, t in enumerate(snapshot_times):
-            vtk_path = self.vtk_folder / f"phase_{phase_name}_t{i:03d}.vtk"
-            try:
-                self.client.export_data(model, str(vtk_path), expression='T', format='vtk')
-                vtk_paths.append(str(vtk_path))
-            except Exception as e:
-                logger.warning(f"VTK export failed at t={t:.1f}s: {e}")
+
+        for phase_info in timeline:
+            phase_name = phase_info['phase_name']
+            t_start = phase_info['start_time']
+            t_end = phase_info['end_time']
+            dur = t_end - t_start
+
+            # Select ~5 snapshots per phase
+            n_snaps = min(5, max(2, int(dur / 30)))
+            snap_times = np.linspace(t_start, t_end, n_snaps)
+
+            for i, t in enumerate(snap_times):
+                vtk_path = self.vtk_folder / f"phase_{phase_name}_t{i:03d}.vtk"
+                try:
+                    self.client.export_vtk_at_time(model, str(vtk_path), float(t))
+                    vtk_paths.append(str(vtk_path))
+                except Exception as e:
+                    logger.warning("VTK export at t=%.1fs failed: %s", t, e)
 
         return vtk_paths
 
@@ -154,7 +203,6 @@ class HeatTreatmentSolver:
         """Calculate summary metrics from all phase results."""
         summary = {}
 
-        # Get quenching phase for t8/5 calculation
         quench = results['phases'].get('quenching', {})
         if quench:
             times = np.array(quench.get('times', []))
@@ -162,22 +210,27 @@ class HeatTreatmentSolver:
             surface_temps = np.array(quench.get('surface_temps', []))
 
             if len(center_temps) > 0:
-                # t8/5 at center
                 t_800_500 = self._calc_t8_5(times, center_temps)
                 if t_800_500:
                     summary['t_800_500'] = t_800_500
-
-                # Max cooling rate
                 if len(times) > 1:
                     dt = np.diff(times)
                     dT = np.diff(center_temps)
-                    cooling_rates = -dT / dt
-                    summary['max_cooling_rate'] = float(np.max(cooling_rates))
+                    valid = dt > 0
+                    if valid.any():
+                        cooling_rates = -dT[valid] / dt[valid]
+                        summary['max_cooling_rate'] = float(np.max(cooling_rates))
 
             if len(surface_temps) > 0:
                 summary['peak_surface_temp'] = float(np.max(surface_temps))
             if len(center_temps) > 0:
                 summary['peak_center_temp'] = float(np.max(center_temps))
+
+        # Multi-position temperature data
+        profiles = results.get('temperature_profiles', {})
+        if profiles:
+            summary['has_multi_position'] = True
+            summary['positions'] = ['center', 'one_third', 'two_thirds', 'surface']
 
         return summary
 
@@ -219,28 +272,17 @@ class MockHeatTreatmentSolver:
         self.vtk_folder.mkdir(parents=True, exist_ok=True)
 
     def solve(self) -> dict:
-        """Run mock multi-phase heat treatment simulation.
-
-        Generates synthetic thermal cycles and real VTK files.
-
-        Returns
-        -------
-        dict
-            Same structure as HeatTreatmentSolver.solve()
-        """
+        """Run mock multi-phase heat treatment simulation."""
         sim = self.simulation
         ht_config = sim.ht_config
         geo_config = sim.geometry_dict
         geo_type = sim.geometry_type
 
-        # Effective geometry for CAD types
         if geo_type == 'cad':
             geo_type = sim.cad_equivalent_type or 'cylinder'
             geo_config = sim.cad_equivalent_geometry_dict or geo_config
 
-        results = {'phases': {}, 'vtk_files': [], 'summary': {}}
-
-        # Track temperature state across phases
+        results = {'phases': {}, 'vtk_files': [], 'summary': {}, 'temperature_profiles': {}}
         current_temp = ht_config.get('heating', {}).get('initial_temperature', 25.0)
 
         phase_order = ['heating', 'transfer', 'quenching', 'tempering']
@@ -250,87 +292,63 @@ class MockHeatTreatmentSolver:
             if not phase_config.get('enabled', phase_name == 'quenching'):
                 continue
 
-            logger.info(f"Mock simulating phase: {phase_name}")
+            logger.info("Mock simulating phase: %s", phase_name)
 
-            # Generate synthetic thermal cycle for this phase
             phase_result = self._generate_phase_data(
                 phase_name, phase_config, current_temp, geo_type, geo_config
             )
             results['phases'][phase_name] = phase_result
 
-            # Generate VTK snapshots for this phase
             vtk_paths = self._generate_vtk_snapshots(
                 phase_name, phase_result, geo_type, geo_config
             )
             results['vtk_files'].extend(vtk_paths)
 
-            # Update current temperature for next phase
             center_temps = phase_result.get('center_temps', [])
             if center_temps:
                 current_temp = center_temps[-1]
 
-            # Small delay to simulate processing
             time.sleep(0.2)
 
-        # Calculate summary metrics
         results['summary'] = self._calculate_summary(results)
 
-        logger.info(f"Mock HT simulation complete: {len(results['vtk_files'])} VTK files")
+        logger.info("Mock HT simulation complete: %d VTK files", len(results['vtk_files']))
         return results
 
     def _generate_phase_data(self, phase_name: str, phase_config: dict,
                               initial_temp: float, geo_type: str,
                               geo_config: dict) -> dict:
-        """Generate synthetic thermal cycle data for a phase.
-
-        Returns dict with times, center_temps, surface_temps, quarter_temps,
-        temperature_profiles (for VTK generation).
-        """
+        """Generate synthetic thermal cycle data for a phase."""
         duration = self._get_phase_duration(phase_name, phase_config)
         n_points = 100
         times = np.linspace(0, duration, n_points)
-
-        # Number of radial positions for profiles
         n_radial = 50
 
         if phase_name == 'heating':
             target_temp = phase_config.get('target_temperature', 850.0)
-            # Heating: exponential approach to target
-            tau = duration / 4  # Time constant
+            tau = duration / 4
             center_temps = target_temp - (target_temp - initial_temp) * np.exp(-times / tau)
-            # Surface heats faster
             tau_surface = duration / 6
             surface_temps = target_temp - (target_temp - initial_temp) * np.exp(-times / tau_surface)
-
         elif phase_name == 'transfer':
             ambient = phase_config.get('ambient_temperature', 25.0)
-            # Mild cooling during transfer
             tau = 200.0
             center_temps = ambient + (initial_temp - ambient) * np.exp(-times / tau)
             tau_surface = 100.0
             surface_temps = ambient + (initial_temp - ambient) * np.exp(-times / tau_surface)
-
         elif phase_name == 'quenching':
             media_temp = phase_config.get('media_temperature', 25.0)
             media = phase_config.get('media', 'water')
             agitation = phase_config.get('agitation', 'moderate')
-
-            # Cooling speed depends on quench media
             tau_map = {'water': 15.0, 'oil': 40.0, 'polymer': 25.0, 'brine': 10.0, 'air': 200.0}
             base_tau = tau_map.get(media, 15.0)
             agit_factor = {'none': 1.5, 'mild': 1.2, 'moderate': 1.0, 'strong': 0.8, 'violent': 0.6}
             tau = base_tau * agit_factor.get(agitation, 1.0)
-
-            # Center cools slower than surface
             center_temps = media_temp + (initial_temp - media_temp) * np.exp(-times / (tau * 2))
             surface_temps = media_temp + (initial_temp - media_temp) * np.exp(-times / tau)
-
         elif phase_name == 'tempering':
             target_temp = phase_config.get('temperature', 550.0)
-            # Heat up to tempering temp, then hold
             ramp_time = duration * 0.2
-            hold_start = ramp_time
-
             center_temps = np.where(
                 times < ramp_time,
                 initial_temp + (target_temp - initial_temp) * times / ramp_time,
@@ -345,17 +363,13 @@ class MockHeatTreatmentSolver:
             center_temps = np.full(n_points, initial_temp)
             surface_temps = np.full(n_points, initial_temp)
 
-        # Quarter point: average of center and surface
         quarter_temps = 0.5 * (center_temps + surface_temps)
 
-        # Generate full radial temperature profiles at each timestep
-        # [n_times, n_radial] — from center (0) to surface (1)
         r_norm = np.linspace(0, 1, n_radial)
         temperature_profiles = np.zeros((n_points, n_radial))
         for i in range(n_points):
             t_center = center_temps[i]
             t_surface = surface_temps[i]
-            # Parabolic profile: T(r) = T_center + (T_surface - T_center) * r^2
             temperature_profiles[i] = t_center + (t_surface - t_center) * r_norm**2
 
         return {
@@ -371,10 +385,7 @@ class MockHeatTreatmentSolver:
 
     def _generate_vtk_snapshots(self, phase_name: str, phase_result: dict,
                                  geo_type: str, geo_config: dict) -> List[str]:
-        """Generate real VTK files with temperature data on 3D mesh.
-
-        Uses visualization_3d mesh functions for geometry creation.
-        """
+        """Generate real VTK files with temperature data on 3D mesh."""
         try:
             import pyvista as pv
         except ImportError:
@@ -394,28 +405,21 @@ class MockHeatTreatmentSolver:
         if temperature_profiles is None or len(times) == 0:
             return []
 
-        # Select ~8 snapshot times spread across the phase
         n_snapshots = min(8, len(times))
         indices = np.linspace(0, len(times) - 1, n_snapshots, dtype=int)
 
-        # Determine if we should use the actual CAD mesh
         use_cad_mesh = (
             self.simulation.geometry_type == 'cad'
             and self.simulation.cad_file_path
             and Path(self.simulation.cad_file_path).exists()
         )
 
-        # Create mesh for this geometry
         try:
             if use_cad_mesh:
                 mesh = create_cad_mesh(self.simulation.cad_file_path)
-                # Override geo_type for interpolation
                 geo_type = 'cad'
-                # Pass characteristic_length from analysis
                 analysis = self.simulation.cad_analysis_dict
-                geo_config = {
-                    'characteristic_length': analysis.get('characteristic_length', 0.01),
-                }
+                geo_config = {'characteristic_length': analysis.get('characteristic_length', 0.01)}
             elif geo_type == 'cylinder':
                 radius = geo_config.get('radius', 0.05)
                 length = geo_config.get('length', 0.1)
@@ -436,15 +440,13 @@ class MockHeatTreatmentSolver:
             else:
                 mesh = create_cylinder_mesh(0.05, 0.1, n_radial=30, n_axial=10)
         except Exception as e:
-            logger.error(f"Mesh creation failed: {e}")
+            logger.error("Mesh creation failed: %s", e)
             return []
 
         vtk_paths = []
         for i, idx in enumerate(indices):
             t = times[idx]
             temps = temperature_profiles[idx]
-
-            # Map temperatures onto mesh
             mesh_copy = mesh.copy()
             try:
                 mesh_copy = interpolate_temperature_to_mesh(
@@ -452,25 +454,21 @@ class MockHeatTreatmentSolver:
                     geo_type, geo_config
                 )
             except Exception as e:
-                logger.warning(f"Temperature interpolation failed at t={t:.1f}s: {e}")
-                # Fall back: assign uniform temp
+                logger.warning("Temperature interpolation failed at t=%.1fs: %s", t, e)
                 mesh_copy['Temperature'] = np.full(mesh_copy.n_points, float(np.mean(temps)))
 
-            # Save VTK
             vtk_path = self.vtk_folder / f"phase_{phase_name}_t{i:03d}.vtk"
             try:
                 mesh_copy.save(str(vtk_path))
                 vtk_paths.append(str(vtk_path))
-                logger.debug(f"Saved VTK: {vtk_path} (t={t:.1f}s)")
             except Exception as e:
-                logger.warning(f"VTK save failed: {e}")
+                logger.warning("VTK save failed: %s", e)
 
         return vtk_paths
 
     def _calculate_summary(self, results: dict) -> dict:
         """Calculate summary metrics from phase results."""
         summary = {}
-
         quench = results['phases'].get('quenching', {})
         if quench:
             times = np.array(quench.get('times', []))
@@ -478,20 +476,15 @@ class MockHeatTreatmentSolver:
             surface_temps = np.array(quench.get('surface_temps', []))
 
             if len(center_temps) > 0:
-                # t8/5
                 t_800_idx = np.argmax(center_temps < 800) if np.any(center_temps < 800) else -1
                 t_500_idx = np.argmax(center_temps < 500) if np.any(center_temps < 500) else -1
                 if t_800_idx > 0 and t_500_idx > 0 and t_500_idx > t_800_idx:
                     summary['t_800_500'] = float(times[t_500_idx] - times[t_800_idx])
-
-                # Cooling rate
                 if len(times) > 1:
                     dt_arr = np.diff(times)
                     dT_arr = np.diff(center_temps)
                     cooling_rates = -dT_arr / dt_arr
                     summary['max_cooling_rate'] = float(np.max(cooling_rates))
-
-                # Phase estimation from t8/5
                 t85 = summary.get('t_800_500')
                 if t85:
                     summary['estimated_phases'] = self._estimate_phases(t85)
@@ -504,10 +497,7 @@ class MockHeatTreatmentSolver:
         return summary
 
     def _estimate_phases(self, t_800_500: float) -> dict:
-        """Estimate phase fractions from t8/5 cooling time.
-
-        Same logic as MockSequentialSolver._estimate_phases.
-        """
+        """Estimate phase fractions from t8/5 cooling time."""
         if t_800_500 < 5:
             return {'martensite': 0.95, 'bainite': 0.05, 'ferrite': 0.0, 'pearlite': 0.0}
         elif t_800_500 < 20:

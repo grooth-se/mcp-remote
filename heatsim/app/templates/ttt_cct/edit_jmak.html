@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}JMAK Parameters - {{ phase|title }} - {{ grade.designation }}{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('ttt_cct.index') }}">TTT/CCT</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('ttt_cct.view', grade_id=grade.id) }}">{{ grade.designation }}</a></li>
+            <li class="breadcrumb-item active">{{ phase|title }} JMAK</li>
+        </ol>
+    </nav>
+
+    <h3>JMAK Parameters - {{ phase|title }}</h3>
+    <p class="text-muted">X(t) = 1 - exp(-b(T) &middot; t<sup>n</sup>)</p>
+
+    <form method="post">
+        {{ form.hidden_tag() }}
+        {{ form.phase(value=phase) }}
+
+        <div class="card mb-3">
+            <div class="card-header">Kinetics</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        {{ form.n_value.label(class="form-label") }}
+                        {{ form.n_value(class="form-control") }}
+                        <small class="text-muted">Typically 1-4</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ form.nose_temperature.label(class="form-label") }}
+                        {{ form.nose_temperature(class="form-control") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ form.nose_time.label(class="form-label") }}
+                        {{ form.nose_time(class="form-control") }}
+                        <small class="text-muted">At 1% start</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Rate Parameter b(T)</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    {{ form.b_model_type.label(class="form-label") }}
+                    {{ form.b_model_type(class="form-select", id="b_model_type") }}
+                </div>
+
+                <div id="gaussian_params">
+                    <h6>Gaussian: b = b_max &middot; exp(-0.5 &middot; ((T - T_nose) / &sigma;)&sup2;)</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.b_max.label(class="form-label") }}
+                            {{ form.b_max(class="form-control") }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.t_nose.label(class="form-label") }}
+                            {{ form.t_nose(class="form-control") }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.sigma.label(class="form-label") }}
+                            {{ form.sigma(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+
+                <div id="arrhenius_params" style="display:none">
+                    <h6>Arrhenius: b = b0 &middot; exp(-Q / (R &middot; T))</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.b0.label(class="form-label") }}
+                            {{ form.b0(class="form-control") }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.Q.label(class="form-label") }}
+                            {{ form.Q(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Valid Temperature Range</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ form.temp_range_min.label(class="form-label") }}
+                        {{ form.temp_range_min(class="form-control") }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ form.temp_range_max.label(class="form-label") }}
+                        {{ form.temp_range_max(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('ttt_cct.view', grade_id=grade.id) }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+
+<script>
+document.getElementById('b_model_type').addEventListener('change', function() {
+    document.getElementById('gaussian_params').style.display = this.value === 'gaussian' ? '' : 'none';
+    document.getElementById('arrhenius_params').style.display = this.value === 'arrhenius' ? '' : 'none';
+});
+// Trigger on load
+document.getElementById('b_model_type').dispatchEvent(new Event('change'));
+</script>
+{% endblock %}

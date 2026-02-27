@@ -38,6 +38,17 @@ from .weld_project import (
 )
 from .measured_data import MeasuredData
 from .snapshot import SimulationSnapshot
+from .ttt_parameters import (
+    TTTParameters,
+    JMAKParameters,
+    MartensiteParameters,
+    TTTCalibrationData,
+    TTTCurve,
+    TTT_SOURCE_LITERATURE, TTT_SOURCE_CALIBRATED, TTT_SOURCE_EMPIRICAL, TTT_SOURCES,
+    B_MODEL_GAUSSIAN, B_MODEL_ARRHENIUS, B_MODEL_POLYNOMIAL, B_MODEL_TYPES,
+    CURVE_TYPE_TTT, CURVE_TYPE_CCT, CURVE_TYPES,
+    CURVE_POS_START, CURVE_POS_FIFTY, CURVE_POS_FINISH, CURVE_POSITIONS,
+)
 from .material_changelog import MaterialChangeLog
 from .system_setting import SystemSetting
 from .application import Application
@@ -91,6 +102,16 @@ __all__ = [
     'MeasuredData',
     # Snapshot versioning
     'SimulationSnapshot',
+    # TTT/CCT parameters (PostgreSQL)
+    'TTTParameters',
+    'JMAKParameters',
+    'MartensiteParameters',
+    'TTTCalibrationData',
+    'TTTCurve',
+    'TTT_SOURCE_LITERATURE', 'TTT_SOURCE_CALIBRATED', 'TTT_SOURCE_EMPIRICAL', 'TTT_SOURCES',
+    'B_MODEL_GAUSSIAN', 'B_MODEL_ARRHENIUS', 'B_MODEL_POLYNOMIAL', 'B_MODEL_TYPES',
+    'CURVE_TYPE_TTT', 'CURVE_TYPE_CCT', 'CURVE_TYPES',
+    'CURVE_POS_START', 'CURVE_POS_FIFTY', 'CURVE_POS_FINISH', 'CURVE_POSITIONS',
     # Material change log
     'MaterialChangeLog',
     # System settings

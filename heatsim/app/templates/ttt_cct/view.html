@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}TTT/CCT - {{ grade.designation }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('ttt_cct.index') }}">TTT/CCT</a></li>
+            <li class="breadcrumb-item active">{{ grade.designation }}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>{{ grade.designation }} - TTT/CCT Diagrams</h2>
+        <div>
+            <a href="{{ url_for('ttt_cct.edit_parameters', grade_id=grade.id) }}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> Edit Parameters
+            </a>
+            {% if grade.composition %}
+            <form action="{{ url_for('ttt_cct.auto_generate', grade_id=grade.id) }}" method="post" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-success" onclick="return confirm('Auto-generate TTT parameters from composition?')">
+                    <i class="bi bi-magic"></i> Auto-Generate
+                </button>
+            </form>
+            {% endif %}
+            <a href="{{ url_for('ttt_cct.calibrate', grade_id=grade.id) }}" class="btn btn-outline-info">
+                <i class="bi bi-upload"></i> Calibrate
+            </a>
+        </div>
+    </div>
+
+    <!-- Prediction tier badge -->
+    <div class="mb-3">
+        {% if prediction_tier == 'digitized' %}
+        <span class="badge bg-primary fs-6">Tier 1: Digitized Diagram</span>
+        {% elif prediction_tier == 'jmak' %}
+        <span class="badge bg-info fs-6">Tier 2: JMAK/Scheil</span>
+        {% elif prediction_tier == 'empirical' %}
+        <span class="badge bg-warning text-dark fs-6">Tier 3: Empirical</span>
+        {% else %}
+        <span class="badge bg-danger fs-6">No prediction available</span>
+        {% endif %}
+    </div>
+
+    <div class="row">
+        <!-- Transformation Temperatures -->
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Transformation Temperatures</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        {% for name, val in trans_temps.items() %}
+                        {% if val is not none %}
+                        <tr>
+                            <td><strong>{{ name }}</strong></td>
+                            <td>{{ "%.0f"|format(val) }} &deg;C</td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- JMAK Parameters -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">JMAK Parameters</h5>
+                </div>
+                <div class="card-body">
+                    {% if jmak_phases %}
+                    {% for phase, params in jmak_phases.items() %}
+                    <div class="mb-2">
+                        <strong>{{ phase|title }}</strong>
+                        <a href="{{ url_for('ttt_cct.edit_jmak', grade_id=grade.id, phase=phase) }}" class="btn btn-sm btn-link p-0 ms-1">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                        <br>
+                        <small class="text-muted">
+                            n={{ "%.2f"|format(params.n) }}, model={{ params.model }}
+                            {% if params.nose_temp %}, T_nose={{ "%.0f"|format(params.nose_temp) }}&deg;C{% endif %}
+                            {% if params.nose_time %}, t_nose={{ "%.1f"|format(params.nose_time) }}s{% endif %}
+                        </small>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted">No JMAK data. Use Auto-Generate or add manually.</p>
+                    {% endif %}
+
+                    <!-- Add phase buttons -->
+                    <div class="mt-2">
+                        {% for p in ['ferrite', 'pearlite', 'bainite'] %}
+                        {% if p not in jmak_phases %}
+                        <a href="{{ url_for('ttt_cct.edit_jmak', grade_id=grade.id, phase=p) }}" class="btn btn-sm btn-outline-secondary me-1">
+                            + {{ p|title }}
+                        </a>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Martensite Parameters -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between">
+                    <h5 class="card-title mb-0">Martensite (K-M)</h5>
+                    <a href="{{ url_for('ttt_cct.edit_martensite', grade_id=grade.id) }}" class="btn btn-sm btn-link p-0">
+                        <i class="bi bi-pencil-square"></i>
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if martensite %}
+                    <small>
+                        Ms = {{ "%.0f"|format(martensite.ms) }}&deg;C,
+                        {% if martensite.mf %}Mf = {{ "%.0f"|format(martensite.mf) }}&deg;C,{% endif %}
+                        &alpha; = {{ "%.4f"|format(martensite.alpha_m) }} K<sup>-1</sup>
+                    </small>
+                    {% else %}
+                    <p class="text-muted mb-0">Not configured</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagrams -->
+        <div class="col-md-8">
+            <!-- TTT Diagram -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">TTT Diagram</h5>
+                </div>
+                <div class="card-body text-center">
+                    <img src="{{ url_for('ttt_cct.ttt_plot', grade_id=grade.id) }}"
+                         alt="TTT Diagram" class="img-fluid"
+                         onerror="this.parentElement.innerHTML='<p class=\'text-muted\'>TTT diagram not available. Add JMAK parameters or digitize a diagram.</p>'">
+                </div>
+            </div>
+
+            <!-- CCT Diagram -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">CCT Diagram</h5>
+                </div>
+                <div class="card-body text-center">
+                    <img src="{{ url_for('ttt_cct.cct_plot', grade_id=grade.id) }}"
+                         alt="CCT Diagram" class="img-fluid"
+                         onerror="this.parentElement.innerHTML='<p class=\'text-muted\'>CCT diagram not available.</p>'">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Martensite Parameters - {{ grade.designation }}{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('ttt_cct.index') }}">TTT/CCT</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('ttt_cct.view', grade_id=grade.id) }}">{{ grade.designation }}</a></li>
+            <li class="breadcrumb-item active">Martensite</li>
+        </ol>
+    </nav>
+
+    <h3>Koistinen-Marburger Parameters</h3>
+    <p class="text-muted">f<sub>m</sub> = 1 - exp(-&alpha; &middot; (M<sub>s</sub> - T))</p>
+
+    <form method="post">
+        {{ form.hidden_tag() }}
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        {{ form.ms.label(class="form-label") }}
+                        {{ form.ms(class="form-control") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ form.mf.label(class="form-label") }}
+                        {{ form.mf(class="form-control") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ form.alpha_m.label(class="form-label") }}
+                        {{ form.alpha_m(class="form-control", step="0.001") }}
+                        <small class="text-muted">Typical: 0.011 K<sup>-1</sup></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('ttt_cct.view', grade_id=grade.id) }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

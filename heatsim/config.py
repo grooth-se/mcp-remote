@@ -49,7 +49,7 @@ class Config:
     COMSOL_MODELS_FOLDER = basedir / 'data' / 'comsol_models'
 
     # COMSOL (Phase 4)
-    COMSOL_PATH = os.environ.get('COMSOL_PATH', '/usr/local/comsol')
+    COMSOL_PATH = os.environ.get('COMSOL_PATH', '/Applications/COMSOL64/Multiphysics')
     COMSOL_LICENSE_SERVER = os.environ.get('COMSOL_LICENSE', '')
     COMSOL_TIMEOUT = int(os.environ.get('COMSOL_TIMEOUT', 3600))  # 1 hour default
     COMSOL_CORES = int(os.environ.get('COMSOL_CORES', 4))  # CPU cores for COMSOL

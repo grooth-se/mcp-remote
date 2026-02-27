@@ -83,6 +83,7 @@ def create_app(config_name='default'):
     from .measured import measured_bp
     from .admin import admin_bp
     from .api import api_bp
+    from .ttt_cct import ttt_cct_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -93,6 +94,7 @@ def create_app(config_name='default'):
     app.register_blueprint(measured_bp, url_prefix='/measured')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(ttt_cct_bp, url_prefix='/ttt-cct')
 
     # Create database tables
     with app.app_context():

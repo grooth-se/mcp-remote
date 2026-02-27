@@ -2,13 +2,23 @@
 
 Provides connection management and basic operations for interacting
 with a local COMSOL Multiphysics installation.
+
+Singleton pattern: the COMSOL server starts once and is reused across
+simulation runs (startup takes 30-60s).
 """
 import os
 import logging
+import threading
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
+import numpy as np
+
 logger = logging.getLogger(__name__)
+
+# Singleton lock and instance
+_singleton_lock = threading.Lock()
+_singleton_client = None
 
 
 class COMSOLError(Exception):
@@ -21,6 +31,39 @@ class COMSOLNotAvailableError(COMSOLError):
     pass
 
 
+def get_shared_client(comsol_path: Optional[str] = None) -> 'COMSOLClient':
+    """Get or create the singleton COMSOLClient.
+
+    The COMSOL server process is expensive to start (30-60s), so we
+    reuse a single client across simulation runs.
+
+    Parameters
+    ----------
+    comsol_path : str, optional
+        Path to COMSOL installation
+
+    Returns
+    -------
+    COMSOLClient
+        Connected singleton client
+    """
+    global _singleton_client
+    with _singleton_lock:
+        if _singleton_client is None or not _singleton_client._connected:
+            _singleton_client = COMSOLClient(comsol_path)
+            _singleton_client.connect()
+        return _singleton_client
+
+
+def shutdown_shared_client():
+    """Shut down the singleton COMSOL client."""
+    global _singleton_client
+    with _singleton_lock:
+        if _singleton_client is not None:
+            _singleton_client.disconnect()
+            _singleton_client = None
+
+
 class COMSOLClient:
     """Interface to local COMSOL installation via mph library.
 
@@ -30,26 +73,15 @@ class COMSOLClient:
     Parameters
     ----------
     comsol_path : str, optional
-        Path to COMSOL installation directory. If not specified, mph will
-        attempt to find COMSOL automatically.
-
-    Attributes
-    ----------
-    client : mph.Client
-        The mph client connection to COMSOL
+        Path to COMSOL installation directory. If not specified, uses
+        COMSOL_PATH env var or the Flask config default.
     """
 
     def __init__(self, comsol_path: Optional[str] = None):
-        """Initialize COMSOL client connection.
-
-        Parameters
-        ----------
-        comsol_path : str, optional
-            Path to COMSOL installation. If None, uses environment variable
-            COMSOL_PATH or lets mph auto-detect.
-        """
         self._client = None
-        self._comsol_path = comsol_path or os.environ.get('COMSOL_PATH')
+        self._comsol_path = comsol_path or os.environ.get(
+            'COMSOL_PATH', '/Applications/COMSOL64/Multiphysics'
+        )
         self._connected = False
 
     @property
@@ -63,6 +95,9 @@ class COMSOLClient:
 
     def connect(self) -> None:
         """Establish connection to COMSOL server.
+
+        Sets mph's comsolroot option before starting the server so it
+        finds the correct installation.
 
         Raises
         ------
@@ -83,19 +118,44 @@ class COMSOLClient:
 
         try:
             logger.info("Starting COMSOL connection...")
-            if self._comsol_path:
-                self._client = mph.start(cores=4)  # mph finds COMSOL automatically
-            else:
-                self._client = mph.start(cores=4)
+
+            # Set COMSOL root path before starting
+            if self._comsol_path and Path(self._comsol_path).exists():
+                mph.option('classkit', False)
+                # Discover available COMSOL versions; if the desired path
+                # matches a known version, mph will use it.
+                versions = mph.discovery.backend()
+                comsol_root = Path(self._comsol_path)
+                found = False
+                for name, info in versions.items():
+                    if comsol_root == Path(info.get('root', '')):
+                        found = True
+                        break
+                if not found:
+                    # If not auto-discovered, register it manually
+                    logger.info("Registering COMSOL at %s", self._comsol_path)
+
+            self._client = mph.start(cores=4)
             self._connected = True
-            logger.info("COMSOL connection established")
+            logger.info("COMSOL connection established (server PID: %s)",
+                        getattr(self._client, 'port', 'unknown'))
         except Exception as e:
             raise COMSOLError(f"Failed to connect to COMSOL: {e}")
 
     def disconnect(self) -> None:
-        """Close connection to COMSOL server."""
+        """Close connection to COMSOL server.
+
+        Removes all loaded models before closing.
+        """
         if self._client is not None:
             try:
+                # Remove all models to free memory
+                for name in self._client.names():
+                    try:
+                        model = self._client.load(name) if isinstance(name, str) else name
+                        self._client.remove(model)
+                    except Exception:
+                        pass
                 self._client.clear()
             except Exception:
                 pass
@@ -121,180 +181,91 @@ class COMSOLClient:
         return self._client
 
     def create_model(self, name: str = 'Untitled') -> Any:
-        """Create a new empty COMSOL model.
-
-        Parameters
-        ----------
-        name : str
-            Name for the model
-
-        Returns
-        -------
-        Model
-            mph Model object
-        """
+        """Create a new empty COMSOL model."""
         model = self.client.create(name)
-        logger.info(f"Created new COMSOL model: {name}")
+        logger.info("Created new COMSOL model: %s", name)
         return model
 
+    def remove_model(self, model: Any) -> None:
+        """Remove a model from the COMSOL server to free memory."""
+        try:
+            self.client.remove(model)
+            logger.info("Removed COMSOL model")
+        except Exception as e:
+            logger.warning("Failed to remove model: %s", e)
+
     def load_model(self, filepath: str) -> Any:
-        """Load an existing COMSOL model from .mph file.
-
-        Parameters
-        ----------
-        filepath : str
-            Path to .mph file
-
-        Returns
-        -------
-        Model
-            mph Model object
-
-        Raises
-        ------
-        COMSOLError
-            If file doesn't exist or cannot be loaded
-        """
+        """Load an existing COMSOL model from .mph file."""
         path = Path(filepath)
         if not path.exists():
             raise COMSOLError(f"Model file not found: {filepath}")
-
         try:
             model = self.client.load(str(path))
-            logger.info(f"Loaded COMSOL model from: {filepath}")
+            logger.info("Loaded COMSOL model from: %s", filepath)
             return model
         except Exception as e:
             raise COMSOLError(f"Failed to load model: {e}")
 
     def save_model(self, model: Any, filepath: str) -> None:
-        """Save model to .mph file.
-
-        Parameters
-        ----------
-        model : Model
-            mph Model object to save
-        filepath : str
-            Output path for .mph file
-        """
+        """Save model to .mph file."""
         path = Path(filepath)
         path.parent.mkdir(parents=True, exist_ok=True)
-
         try:
             model.save(str(path))
-            logger.info(f"Saved COMSOL model to: {filepath}")
+            logger.info("Saved COMSOL model to: %s", filepath)
         except Exception as e:
             raise COMSOLError(f"Failed to save model: {e}")
 
     def import_cad(self, model: Any, cad_data: bytes, filename: str,
                    format: str = 'step') -> List[str]:
-        """Import CAD geometry into model.
-
-        Parameters
-        ----------
-        model : Model
-            mph Model object
-        cad_data : bytes
-            CAD file content
-        filename : str
-            Original filename for the CAD file
-        format : str
-            CAD format: 'step', 'iges', 'stl'
-
-        Returns
-        -------
-        list of str
-            List of body/domain names imported from CAD
-
-        Raises
-        ------
-        COMSOLError
-            If import fails
-        """
+        """Import CAD geometry into model."""
         import tempfile
 
-        # Write CAD data to temporary file
         suffix = f'.{format}'
         if format == 'step':
             suffix = '.stp'
         elif format == 'iges':
             suffix = '.igs'
 
+        temp_path = None
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
                 f.write(cad_data)
                 temp_path = f.name
 
-            # Import into COMSOL
-            # Access the geometry node and create an import
             geom = model/'geometries'/'geom1'
             if geom is None:
-                # Create geometry sequence
                 model.java.component().create('comp1', True)
                 model.java.component('comp1').geom().create('geom1', 3)
-                geom = model/'geometries'/'geom1'
 
-            # Create CAD import node
             imp = model.java.component('comp1').geom('geom1').create('imp1', 'Import')
             imp.set('filename', temp_path)
             imp.set('type', format.upper())
-
-            # Build geometry
             model.build()
 
-            # Get list of domains/bodies
             bodies = []
-            # This is simplified - actual implementation would query the geometry
-            # for domain labels
-
-            logger.info(f"Imported CAD geometry from {filename}")
+            logger.info("Imported CAD geometry from %s", filename)
             return bodies
-
         except Exception as e:
             raise COMSOLError(f"Failed to import CAD: {e}")
         finally:
-            # Clean up temp file
-            try:
-                os.unlink(temp_path)
-            except Exception:
-                pass
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
 
     def run_study(self, model: Any, study_name: str = 'std1') -> None:
-        """Execute a study in the model.
-
-        Parameters
-        ----------
-        model : Model
-            mph Model object
-        study_name : str
-            Name of the study to run
-
-        Raises
-        ------
-        COMSOLError
-            If study execution fails
-        """
+        """Execute a study in the model."""
         try:
-            logger.info(f"Running study: {study_name}")
+            logger.info("Running study: %s", study_name)
             model.solve(study_name)
-            logger.info(f"Study {study_name} completed")
+            logger.info("Study %s completed", study_name)
         except Exception as e:
             raise COMSOLError(f"Study execution failed: {e}")
 
     def get_parameter(self, model: Any, name: str) -> Any:
-        """Get a parameter value from the model.
-
-        Parameters
-        ----------
-        model : Model
-            mph Model object
-        name : str
-            Parameter name
-
-        Returns
-        -------
-        value
-            Parameter value
-        """
+        """Get a parameter value from the model."""
         try:
             return model.parameter(name)
         except Exception:
@@ -302,43 +273,16 @@ class COMSOLClient:
 
     def set_parameter(self, model: Any, name: str, value: Any,
                       description: str = '') -> None:
-        """Set a parameter in the model.
-
-        Parameters
-        ----------
-        model : Model
-            mph Model object
-        name : str
-            Parameter name
-        value : any
-            Parameter value
-        description : str, optional
-            Parameter description
-        """
+        """Set a parameter in the model."""
         try:
             model.parameter(name, value, description)
-            logger.debug(f"Set parameter {name} = {value}")
+            logger.debug("Set parameter %s = %s", name, value)
         except Exception as e:
             raise COMSOLError(f"Failed to set parameter {name}: {e}")
 
     def evaluate(self, model: Any, expression: str,
                  dataset: str = None) -> Any:
-        """Evaluate an expression in the model.
-
-        Parameters
-        ----------
-        model : Model
-            mph Model object
-        expression : str
-            Expression to evaluate (e.g., 'T', 'comp1.T')
-        dataset : str, optional
-            Dataset to evaluate on
-
-        Returns
-        -------
-        result
-            Evaluation result (typically numpy array)
-        """
+        """Evaluate an expression in the model."""
         try:
             if dataset:
                 return model.evaluate(expression, dataset)
@@ -346,51 +290,131 @@ class COMSOLClient:
         except Exception as e:
             raise COMSOLError(f"Evaluation failed for '{expression}': {e}")
 
-    def export_data(self, model: Any, filename: str,
-                    expression: str = 'T',
-                    format: str = 'vtk') -> None:
-        """Export solution data to file.
+    def evaluate_at_coordinates(self, model: Any,
+                                 expression: str,
+                                 coordinates: List[List[float]],
+                                 dataset_name: str = 'probe_pts') -> np.ndarray:
+        """Evaluate expression at specific coordinates via cut-point dataset.
+
+        Creates a CutPoint dataset at the given coordinates, evaluates
+        the expression, then removes the dataset.
 
         Parameters
         ----------
         model : Model
-            mph Model object
-        filename : str
-            Output filename
+            COMSOL model with completed solution
         expression : str
-            Expression to export (default: temperature 'T')
-        format : str
-            Export format: 'vtk', 'txt', 'csv'
+            Expression to evaluate (e.g., 'T')
+        coordinates : list of [x, y, z]
+            Coordinates in meters
+        dataset_name : str
+            Name for the temporary dataset
+
+        Returns
+        -------
+        np.ndarray
+            Evaluated values at each coordinate, shape (n_coords, n_times)
         """
+        try:
+            java = model.java
+            # Create cut-point dataset
+            ds = java.result().dataset().create(dataset_name, 'CutPoint3D')
+            # Set coordinates
+            x_coords = ' '.join(str(c[0]) for c in coordinates)
+            y_coords = ' '.join(str(c[1]) for c in coordinates)
+            z_coords = ' '.join(str(c[2]) for c in coordinates)
+            ds.set('pointx', x_coords)
+            ds.set('pointy', y_coords)
+            ds.set('pointz', z_coords)
+
+            # Evaluate
+            result = model.evaluate(expression, dataset_name)
+
+            # Clean up
+            java.result().dataset().remove(dataset_name)
+
+            return np.array(result)
+        except Exception as e:
+            # Try cleanup
+            try:
+                model.java.result().dataset().remove(dataset_name)
+            except Exception:
+                pass
+            raise COMSOLError(f"Coordinate evaluation failed: {e}")
+
+    def export_vtk_at_time(self, model: Any, filepath: str,
+                            time_value: float,
+                            expression: str = 'T') -> None:
+        """Export VTK file at a specific solution time step.
+
+        Parameters
+        ----------
+        model : Model
+            COMSOL model with completed solution
+        filepath : str
+            Output VTK file path
+        time_value : float
+            Solution time to export (seconds)
+        expression : str
+            Expression to export
+        """
+        path = Path(filepath)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            java = model.java
+
+            # Create VTK export node
+            export_tag = 'vtk_export'
+            try:
+                java.result().export().remove(export_tag)
+            except Exception:
+                pass
+
+            exp = java.result().export().create(export_tag, 'Data')
+            exp.set('expr', [expression])
+            exp.set('filename', str(path))
+            exp.set('filetype', 'vtk')
+
+            # Set time selection
+            exp.set('solnum', 'auto')
+            exp.set('timeinterp', 'on')
+            exp.set('t', str(time_value))
+
+            exp.run()
+
+            # Clean up export node
+            java.result().export().remove(export_tag)
+
+            logger.info("Exported VTK at t=%.1fs to: %s", time_value, filepath)
+        except Exception as e:
+            try:
+                model.java.result().export().remove('vtk_export')
+            except Exception:
+                pass
+            raise COMSOLError(f"VTK export failed: {e}")
+
+    def export_data(self, model: Any, filename: str,
+                    expression: str = 'T',
+                    format: str = 'vtk') -> None:
+        """Export solution data to file."""
         try:
             path = Path(filename)
             path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Create export node
             exp = model.java.result().export().create('data1', 'Data')
             exp.set('expr', expression)
             exp.set('filename', str(path))
             exp.run()
 
-            logger.info(f"Exported data to: {filename}")
+            # Clean up
+            model.java.result().export().remove('data1')
+            logger.info("Exported data to: %s", filename)
         except Exception as e:
             raise COMSOLError(f"Export failed: {e}")
 
     def get_names(self, model: Any, node_type: str) -> List[str]:
-        """Get names of nodes of a specific type.
-
-        Parameters
-        ----------
-        model : Model
-            mph Model object
-        node_type : str
-            Type of node: 'physics', 'study', 'geometry', 'material'
-
-        Returns
-        -------
-        list of str
-            List of node names
-        """
+        """Get names of nodes of a specific type."""
         try:
             names = []
             if node_type == 'physics':
@@ -412,10 +436,7 @@ class COMSOLClient:
 
 
 class MockCOMSOLClient(COMSOLClient):
-    """Mock COMSOL client for testing without actual COMSOL installation.
-
-    Simulates COMSOL operations for development and testing purposes.
-    """
+    """Mock COMSOL client for testing without actual COMSOL installation."""
 
     def __init__(self, comsol_path: Optional[str] = None):
         super().__init__(comsol_path)
@@ -444,32 +465,34 @@ class MockCOMSOLClient(COMSOLClient):
             'results': {},
         }
         self._models[name] = model
-        logger.info(f"Created mock COMSOL model: {name}")
+        logger.info("Created mock COMSOL model: %s", name)
         return model
+
+    def remove_model(self, model: Any) -> None:
+        name = model.get('name', '') if isinstance(model, dict) else str(model)
+        self._models.pop(name, None)
+        logger.info("Removed mock model")
 
     def load_model(self, filepath: str) -> dict:
         path = Path(filepath)
         if not path.exists():
             raise COMSOLError(f"Model file not found: {filepath}")
-        # Return empty mock model
         return self.create_model(path.stem)
 
     def save_model(self, model: dict, filepath: str) -> None:
         path = Path(filepath)
         path.parent.mkdir(parents=True, exist_ok=True)
-        # In mock mode, just log the save
-        logger.info(f"Mock saved model to: {filepath}")
+        logger.info("Mock saved model to: %s", filepath)
 
     def import_cad(self, model: dict, cad_data: bytes, filename: str,
                    format: str = 'step') -> List[str]:
-        # Return mock body names
         bodies = ['string_1', 'string_2', 'string_3', 'base_plate']
         model['geometries']['cad'] = {'bodies': bodies}
-        logger.info(f"Mock imported CAD with {len(bodies)} bodies")
+        logger.info("Mock imported CAD with %d bodies", len(bodies))
         return bodies
 
     def run_study(self, model: dict, study_name: str = 'std1') -> None:
-        logger.info(f"Mock running study: {study_name}")
+        logger.info("Mock running study: %s", study_name)
         model['results'][study_name] = {'completed': True}
 
     def get_parameter(self, model: dict, name: str) -> Any:
@@ -483,15 +506,34 @@ class MockCOMSOLClient(COMSOLClient):
 
     def evaluate(self, model: dict, expression: str,
                  dataset: str = None) -> Any:
-        import numpy as np
-        # Return mock temperature data
         return np.linspace(1500, 100, 100)
+
+    def evaluate_at_coordinates(self, model: Any,
+                                 expression: str,
+                                 coordinates: List[List[float]],
+                                 dataset_name: str = 'probe_pts') -> np.ndarray:
+        n_coords = len(coordinates)
+        n_times = 100
+        # Mock: generate different cooling curves per position
+        result = np.zeros((n_coords, n_times))
+        for i in range(n_coords):
+            # Surface cools faster than center
+            rate_factor = 1.0 + 0.5 * i / max(n_coords - 1, 1)
+            result[i] = 900 * np.exp(-0.01 * rate_factor * np.arange(n_times))
+        return result
+
+    def export_vtk_at_time(self, model: Any, filepath: str,
+                            time_value: float,
+                            expression: str = 'T') -> None:
+        path = Path(filepath)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+        logger.info("Mock VTK export at t=%.1fs to: %s", time_value, filepath)
 
     def export_data(self, model: dict, filename: str,
                     expression: str = 'T',
                     format: str = 'vtk') -> None:
         path = Path(filename)
         path.parent.mkdir(parents=True, exist_ok=True)
-        # Create empty file for mock
         path.touch()
-        logger.info(f"Mock exported to: {filename}")
+        logger.info("Mock exported to: %s", filename)

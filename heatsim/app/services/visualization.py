@@ -1393,16 +1393,18 @@ def create_cct_overlay_plot(
     curves: Optional[dict] = None,
     source_image: Optional[bytes] = None,
     title: str = "Cooling Curve on CCT Diagram",
-    positions: Optional[List[str]] = None
+    positions: Optional[List[str]] = None,
+    standalone: bool = False
 ) -> bytes:
     """Generate CCT diagram with cooling curve overlay.
 
     Parameters
     ----------
     times : np.ndarray
-        Time array in seconds
+        Time array in seconds (can be None if standalone=True)
     temperatures : np.ndarray
         Temperature field [time, position] or [time] for single curve
+        (can be None if standalone=True)
     transformation_temps : dict
         Dict with Ms, Mf, Bs, Bf, Ac1, Ac3 temperatures
     curves : dict, optional
@@ -1418,6 +1420,9 @@ def create_cct_overlay_plot(
         Plot title
     positions : list, optional
         Position labels for multi-position data
+    standalone : bool
+        If True, render CCT diagram without cooling curves
+        (times and temperatures can be None)
 
     Returns
     -------
@@ -1425,6 +1430,10 @@ def create_cct_overlay_plot(
         PNG image data
     """
     fig, ax = plt.subplots(figsize=(14, 8))
+
+    if standalone and (times is None or temperatures is None):
+        times = np.array([])
+        temperatures = np.array([])
 
     x_min = 0.1  # Start at 0.1 seconds for log scale
     x_max = max(times) if len(times) > 0 else 10000
@@ -1495,20 +1504,21 @@ def create_cct_overlay_plot(
                       alpha=0.7, label=f'{label} = {temp:.0f}°C', zorder=4)
 
     # --- Cooling curves (z-order 10, on top) ---
-    if temperatures.ndim == 1:
-        valid_mask = times > 0
-        ax.plot(times[valid_mask], temperatures[valid_mask],
-                'k-', linewidth=3, label='Cooling curve (center)', zorder=10)
-    else:
-        n_pos = temperatures.shape[1]
-        pos_colors = ['#000000', '#555555', '#888888', '#bbbbbb']
-        pos_labels = positions if positions else ['Center', '1/3 R', '2/3 R', 'Surface']
-
-        for i in range(min(n_pos, 4)):
+    if temperatures.size > 0:
+        if temperatures.ndim == 1:
             valid_mask = times > 0
-            ax.plot(times[valid_mask], temperatures[valid_mask, i],
-                    color=pos_colors[i], linewidth=2.5,
-                    label=f'{pos_labels[i]}', zorder=10)
+            ax.plot(times[valid_mask], temperatures[valid_mask],
+                    'k-', linewidth=3, label='Cooling curve (center)', zorder=10)
+        else:
+            n_pos = temperatures.shape[1]
+            pos_colors = ['#000000', '#555555', '#888888', '#bbbbbb']
+            pos_labels = positions if positions else ['Center', '1/3 R', '2/3 R', 'Surface']
+
+            for i in range(min(n_pos, 4)):
+                valid_mask = times > 0
+                ax.plot(times[valid_mask], temperatures[valid_mask, i],
+                        color=pos_colors[i], linewidth=2.5,
+                        label=f'{pos_labels[i]}', zorder=10)
 
     # Formatting
     ax.set_xscale('log')
@@ -1518,6 +1528,8 @@ def create_cct_overlay_plot(
 
     if len(times) > 0:
         ax.set_xlim(x_min, x_max * 1.5)
+    else:
+        ax.set_xlim(0.1, 100000)
 
     y_min = 0
     y_max = max(
@@ -1525,6 +1537,119 @@ def create_cct_overlay_plot(
         np.max(temperatures) if temperatures.size > 0 else 900
     )
     ax.set_ylim(y_min, y_max * 1.1)
+
+    ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1), fontsize=9, framealpha=0.9)
+    ax.grid(True, alpha=0.3, which='both')
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    return buf.getvalue()
+
+
+def create_ttt_plot(
+    curves: dict,
+    transformation_temps: Optional[dict] = None,
+    title: str = "TTT Diagram"
+) -> bytes:
+    """Generate standalone TTT diagram from curve data.
+
+    Parameters
+    ----------
+    curves : dict
+        TTT curves with structure:
+        {
+            "ferrite": {"start": [[t,T], ...], "finish": [[t,T], ...]},
+            "pearlite": {...},
+            "bainite": {...}
+        }
+    transformation_temps : dict, optional
+        Dict with Ae1, Ae3, Bs, Ms, Mf temperatures
+    title : str
+        Plot title
+
+    Returns
+    -------
+    bytes
+        PNG image data
+    """
+    fig, ax = plt.subplots(figsize=(14, 8))
+    if transformation_temps is None:
+        transformation_temps = {}
+
+    # Shaded phase regions
+    for phase, phase_curves in curves.items():
+        if not isinstance(phase_curves, dict):
+            continue
+        color = CCT_COLORS.get(phase, '#333333')
+
+        has_start = 'start' in phase_curves and phase_curves['start'] and len(phase_curves['start']) > 1
+        has_finish = 'finish' in phase_curves and phase_curves['finish'] and len(phase_curves['finish']) > 1
+
+        if has_start and has_finish:
+            start_data = np.array(phase_curves['start'])
+            finish_data = np.array(phase_curves['finish'])
+
+            t_lo = max(start_data[:, 1].min(), finish_data[:, 1].min())
+            t_hi = min(start_data[:, 1].max(), finish_data[:, 1].max())
+            if t_hi > t_lo:
+                common_temps = np.linspace(t_lo, t_hi, 200)
+                start_times = np.interp(common_temps, start_data[:, 1][::-1], start_data[:, 0][::-1])
+                finish_times = np.interp(common_temps, finish_data[:, 1][::-1], finish_data[:, 0][::-1])
+                ax.fill_betweenx(common_temps, start_times, finish_times,
+                                 alpha=PHASE_FILL_ALPHA, color=color,
+                                 label=f'{phase.title()} region', zorder=1)
+
+    # Martensite horizontal band
+    ms = transformation_temps.get('Ms')
+    mf = transformation_temps.get('Mf')
+    if ms is not None and mf is not None:
+        ax.axhspan(mf, ms, alpha=0.10, color='#d62728', zorder=1,
+                   label='Martensite region')
+
+    # C-curves
+    for phase, phase_curves in curves.items():
+        if not isinstance(phase_curves, dict):
+            continue
+        color = CCT_COLORS.get(phase, '#333333')
+
+        if 'start' in phase_curves and phase_curves['start']:
+            start_data = np.array(phase_curves['start'])
+            if len(start_data) > 1:
+                ax.plot(start_data[:, 0], start_data[:, 1],
+                        color=color, linewidth=2, linestyle='-', zorder=3,
+                        label=f'{phase.title()} start')
+
+        if 'finish' in phase_curves and phase_curves['finish']:
+            finish_data = np.array(phase_curves['finish'])
+            if len(finish_data) > 1:
+                ax.plot(finish_data[:, 0], finish_data[:, 1],
+                        color=color, linewidth=2, linestyle='--', zorder=3,
+                        label=f'{phase.title()} finish')
+
+    # Transformation temperature lines
+    temp_lines = [
+        ('Ae3', transformation_temps.get('Ae3'), '#9467bd'),
+        ('Ae1', transformation_temps.get('Ae1'), '#8c564b'),
+        ('Bs', transformation_temps.get('Bs'), '#ff7f0e'),
+        ('Ms', transformation_temps.get('Ms'), '#d62728'),
+        ('Mf', transformation_temps.get('Mf'), '#e377c2'),
+    ]
+    for name, temp, color in temp_lines:
+        if temp is not None:
+            ax.axhline(y=temp, color=color, linestyle=':', linewidth=1.5,
+                      alpha=0.7, label=f'{name} = {temp:.0f}°C', zorder=4)
+
+    ax.set_xscale('log')
+    ax.set_xlabel('Time (s)', fontsize=12)
+    ax.set_ylabel('Temperature (°C)', fontsize=12)
+    ax.set_title(title, fontsize=14)
+    ax.set_xlim(0.1, 100000)
+
+    y_max = max(transformation_temps.get('Ae3', 900) or 900, 900)
+    ax.set_ylim(0, y_max * 1.1)
 
     ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1), fontsize=9, framealpha=0.9)
     ax.grid(True, alpha=0.3, which='both')

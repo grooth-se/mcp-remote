@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Edit TTT Parameters - {{ grade.designation }}{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('ttt_cct.index') }}">TTT/CCT</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('ttt_cct.view', grade_id=grade.id) }}">{{ grade.designation }}</a></li>
+            <li class="breadcrumb-item active">Edit Parameters</li>
+        </ol>
+    </nav>
+
+    <h3>TTT Parameters - {{ grade.designation }}</h3>
+
+    <form method="post">
+        {{ form.hidden_tag() }}
+
+        <div class="card mb-3">
+            <div class="card-header">Transformation Temperatures</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        {{ form.ae1.label(class="form-label") }}
+                        {{ form.ae1(class="form-control", placeholder="e.g. 727") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ form.ae3.label(class="form-label") }}
+                        {{ form.ae3(class="form-control", placeholder="e.g. 850") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ form.bs.label(class="form-label") }}
+                        {{ form.bs(class="form-control", placeholder="e.g. 550") }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        {{ form.ms.label(class="form-label") }}
+                        {{ form.ms(class="form-control", placeholder="e.g. 350") }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        {{ form.mf.label(class="form-label") }}
+                        {{ form.mf(class="form-control", placeholder="e.g. 150") }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Austenitizing Conditions</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ form.austenitizing_temperature.label(class="form-label") }}
+                        {{ form.austenitizing_temperature(class="form-control") }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ form.grain_size_astm.label(class="form-label") }}
+                        {{ form.grain_size_astm(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Metadata</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    {{ form.data_source.label(class="form-label") }}
+                    {{ form.data_source(class="form-select") }}
+                </div>
+                <div class="mb-3">
+                    {{ form.notes.label(class="form-label") }}
+                    {{ form.notes(class="form-control", rows=3) }}
+                </div>
+            </div>
+        </div>
+
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('ttt_cct.view', grade_id=grade.id) }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}
