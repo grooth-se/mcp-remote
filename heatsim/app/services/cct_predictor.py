@@ -202,20 +202,32 @@ class CCTCurvePredictor:
         return curves
 
     def _predict_ferrite(self, hardenability_factor):
-        """Predict ferrite transformation C-curves."""
-        # Ferrite nose temperature: between Ae1 and Ae3
-        nose_temp = self.Ae1 + 0.6 * (self.Ae3 - self.Ae1)
+        """Predict ferrite transformation C-curves.
+
+        During continuous cooling, ferrite nucleation requires undercooling
+        below equilibrium Ae3.  Alloy additions (Cr, Mo, Mn) increase the
+        undercooling and suppress diffusional ferrite.  The C-curve nose
+        sits well below Ae1 for alloy steels and extends from near Ae3
+        (at very slow cooling rates) down toward the bainite start region.
+        """
+        # Undercooling below Ae1 — Cr and Mo strongly suppress ferrite
+        undercooling = 30 + 10 * self.Cr + 10 * self.Mo + 5 * self.Mn
+        nose_temp = self.Ae1 - undercooling
+
+        # Clamp: nose must stay above Bs + 30 (below that is bainite territory)
+        nose_temp = max(nose_temp, self.Bs + 30)
 
         # Base time at nose for plain carbon steel ~1-5 seconds
         # Alloy additions shift it right
         base_time = 1.5 * hardenability_factor
 
         # Temperature ranges
-        range_above = self.Ae3 - nose_temp  # Up to Ae3
-        range_below = nose_temp - self.Ae1 - 10  # Down to near Ae1
+        range_above = self.Ae3 - nose_temp  # Extends up toward Ae3
+        range_below_raw = nose_temp - self.Bs - 20  # Down toward bainite
+        range_below = min(max(range_below_raw, 50), 150)
 
         start_curve = self._generate_c_curve(
-            nose_temp, range_above, max(range_below, 10),
+            nose_temp, range_above, range_below,
             base_time, spread_factor=0.9
         )
 
@@ -225,7 +237,7 @@ class CCTCurvePredictor:
 
         # Finish temperature range is slightly narrower
         finish_curve = self._generate_c_curve(
-            nose_temp - 15, range_above - 10, max(range_below - 15, 10),
+            nose_temp - 15, max(range_above - 10, 10), max(range_below - 15, 10),
             finish_time, spread_factor=1.0
         )
 
