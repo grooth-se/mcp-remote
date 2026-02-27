@@ -205,10 +205,10 @@ class CCTCurvePredictor:
         """Predict ferrite transformation C-curves.
 
         During continuous cooling, ferrite nucleation requires undercooling
-        below equilibrium Ae3.  Alloy additions (Cr, Mo, Mn) increase the
+        below equilibrium Ae1.  Alloy additions (Cr, Mo, Mn) increase the
         undercooling and suppress diffusional ferrite.  The C-curve nose
-        sits well below Ae1 for alloy steels and extends from near Ae3
-        (at very slow cooling rates) down toward the bainite start region.
+        sits well below Ae1 for alloy steels and the region extends up
+        toward Ae1 at long times, staying below the eutectoid temperature.
         """
         # Undercooling below Ae1 — Cr and Mo strongly suppress ferrite
         undercooling = 30 + 10 * self.Cr + 10 * self.Mo + 5 * self.Mn
@@ -222,7 +222,7 @@ class CCTCurvePredictor:
         base_time = 1.5 * hardenability_factor
 
         # Temperature ranges
-        range_above = self.Ae3 - nose_temp  # Extends up toward Ae3
+        range_above = self.Ae1 - nose_temp  # Extends up toward Ae1
         range_below_raw = nose_temp - self.Bs - 20  # Down toward bainite
         range_below = min(max(range_below_raw, 50), 150)
 
