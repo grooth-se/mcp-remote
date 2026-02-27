@@ -22,6 +22,8 @@
                         <th class="text-end">Remaining</th>
                         <th class="text-end">Accrued</th>
                         <th class="text-end">Total Income</th>
+                        <th class="text-end">Actual Cost</th>
+                        <th class="text-end">Actual Profit</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -34,6 +36,8 @@
                         <td class="text-end">{{ "{:,.0f}".format(p.remaining_income or 0) }}</td>
                         <td class="text-end text-success">{{ "{:,.0f}".format(p.accrued_income_cur or 0) }}</td>
                         <td class="text-end"><strong>{{ "{:,.0f}".format(p.total_income_cur or 0) }}</strong></td>
+                        <td class="text-end text-danger">{{ "{:,.0f}".format(p.actual_cost_cur or 0) }}</td>
+                        <td class="text-end {% if (p.project_profit or 0) >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "{:,.0f}".format(p.project_profit or 0) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -45,6 +49,8 @@
                         <th class="text-end">{{ "{:,.0f}".format(projects|sum(attribute='remaining_income') or 0) }}</th>
                         <th class="text-end">{{ "{:,.0f}".format(projects|sum(attribute='accrued_income_cur') or 0) }}</th>
                         <th class="text-end">{{ "{:,.0f}".format(projects|sum(attribute='total_income_cur') or 0) }}</th>
+                        <th class="text-end">{{ "{:,.0f}".format(projects|sum(attribute='actual_cost_cur') or 0) }}</th>
+                        <th class="text-end">{{ "{:,.0f}".format(projects|sum(attribute='project_profit') or 0) }}</th>
                     </tr>
                 </tfoot>
             </table>
