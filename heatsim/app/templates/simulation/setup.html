@@ -335,6 +335,10 @@
                     const isComsol = document.getElementById('solver-comsol').checked;
                     document.getElementById('builtin-solver-options').style.display = isComsol ? 'none' : 'block';
                     document.getElementById('comsol-solver-options').style.display = isComsol ? 'block' : 'none';
+                    // Disable hidden inputs so browser skips their validation
+                    document.querySelectorAll('#builtin-solver-options input').forEach(function(el) {
+                        el.disabled = isComsol;
+                    });
                 }
                 toggleSolverOptions();
                 </script>
