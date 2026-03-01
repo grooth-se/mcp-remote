@@ -117,34 +117,44 @@ class HeatTreatmentSolver:
     def _extract_probe_data(self, model: Any, timeline: List[dict]) -> dict:
         """Extract temperature vs time at 4 probe positions.
 
+        Uses the Java API to evaluate at CutPoint3D datasets, which returns
+        a 1D array (one value per time step) for single-point probes.
+
+        If mph's evaluate returns 2D data (all mesh nodes), falls back to
+        averaging or extracting a single column.
+
         Returns dict with keys: times, center, one_third, two_thirds, surface
         """
         probe_names = ['center', 'one_third', 'two_thirds', 'surface']
         result = {}
+
+        # Get time array first (evaluate on default dataset)
+        try:
+            t_data = self.client.evaluate(model, 't')
+            if isinstance(t_data, np.ndarray):
+                if t_data.ndim > 1:
+                    t_data = t_data[:, 0]  # Take first column
+                result['times'] = t_data.tolist()
+        except Exception:
+            if timeline:
+                total = timeline[-1]['end_time']
+                result['times'] = np.linspace(0, total, 100).tolist()
 
         for name in probe_names:
             ds_tag = f'probe_{name}'
             try:
                 data = self.client.evaluate(model, 'T', dataset=ds_tag)
                 if isinstance(data, np.ndarray):
+                    # CutPoint3D with single point should give 1D (one T per time)
+                    # If 2D (n_times × n_nodes), the probe may span all nodes — take col 0
+                    if data.ndim > 1:
+                        data = data[:, 0]
                     # Convert from Kelvin if needed (COMSOL default is K)
-                    if data.mean() > 273:
+                    if data.size > 0 and data.mean() > 273:
                         data = data - 273.15
                     result[name] = data.tolist()
             except Exception as e:
                 logger.warning("Probe %s extraction failed: %s", name, e)
-
-        # Get time array from solution
-        try:
-            # Evaluate time from solution
-            t_data = self.client.evaluate(model, 't')
-            if isinstance(t_data, np.ndarray):
-                result['times'] = t_data.tolist()
-        except Exception:
-            # Reconstruct from timeline
-            if timeline:
-                total = timeline[-1]['end_time']
-                result['times'] = np.linspace(0, total, 100).tolist()
 
         return result
 
@@ -210,12 +220,20 @@ class HeatTreatmentSolver:
             surface_temps = np.array(quench.get('surface_temps', []))
 
             if len(center_temps) > 0:
+                # Ensure arrays are same length (COMSOL probes may differ)
+                n = min(len(times), len(center_temps))
+                times = times[:n]
+                center_temps = center_temps[:n]
+
                 t_800_500 = self._calc_t8_5(times, center_temps)
                 if t_800_500:
                     summary['t_800_500'] = t_800_500
-                if len(times) > 1:
+                if n > 1:
                     dt = np.diff(times)
                     dT = np.diff(center_temps)
+                    # Defensive: ensure diff arrays match
+                    nd = min(len(dt), len(dT))
+                    dt, dT = dt[:nd], dT[:nd]
                     valid = dt > 0
                     if valid.any():
                         cooling_rates = -dT[valid] / dt[valid]

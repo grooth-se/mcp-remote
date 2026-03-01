@@ -249,10 +249,19 @@ class COMSOLClient:
                     pass
 
     def run_study(self, model: Any, study_name: str = 'std1') -> None:
-        """Execute a study in the model."""
+        """Execute a study in the model.
+
+        Uses the Java API directly because mph's model.solve() may not
+        find studies created via the Java API.
+        """
         try:
             logger.info("Running study: %s", study_name)
-            model.solve(study_name)
+            # Try Java API directly first (works for studies created via Java)
+            try:
+                model.java.study(study_name).run()
+            except Exception:
+                # Fall back to mph's solve()
+                model.solve(study_name)
             logger.info("Study %s completed", study_name)
         except Exception as e:
             raise COMSOLError(f"Study execution failed: {e}")
@@ -364,13 +373,16 @@ class COMSOLClient:
             except Exception:
                 pass
 
+            # Use VTK export type directly (COMSOL 6.x)
             exp = java.result().export().create(export_tag, 'Data')
             exp.set('expr', [expression])
-            exp.set('filename', str(path))
-            exp.set('filetype', 'vtk')
+            # Set filename with .vtu extension (COMSOL 6.x exports VTK as VTU)
+            vtk_path = str(path)
+            if vtk_path.endswith('.vtk'):
+                vtk_path = vtk_path[:-4] + '.vtu'
+            exp.set('filename', vtk_path)
 
             # Set time selection
-            exp.set('solnum', 'auto')
             exp.set('timeinterp', 'on')
             exp.set('t', str(time_value))
 

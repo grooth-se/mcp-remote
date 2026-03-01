@@ -11,6 +11,15 @@ import numpy as np
 
 from .client import COMSOLClient, COMSOLError
 
+
+def _jint_array(values):
+    """Convert Python list to Java int[] for COMSOL selections via JPype."""
+    try:
+        import jpype
+        return jpype.JArray(jpype.JInt)(values)
+    except ImportError:
+        return values
+
 if TYPE_CHECKING:
     from app.models.simulation import Simulation
 
@@ -238,17 +247,9 @@ class HeatTreatmentModelBuilder:
             # Free tetrahedral meshing
             ftet = mesh.create('ftet1', 'FreeTet')
 
-            # Size settings - finer near surfaces
+            # Size settings — pass integers as strings to avoid Java overload ambiguity
             size = mesh.create('size1', 'Size')
-            size.set('hauto', 4)  # Moderate mesh density (1=coarsest, 9=finest)
-
-            # Boundary layer refinement near surfaces
-            bl = mesh.create('bl1', 'BndLayer')
-            bl_prop = bl.create('blp1', 'BndLayerProp')
-            bl_prop.set('blnlayers', 3)  # 3 boundary layers
-            bl_prop.set('blstretch', 1.2)  # Growth ratio
-            # Apply to all external boundaries
-            bl.selection().allGeom()
+            size.set('hauto', '4')  # Moderate mesh density (1=coarsest, 9=finest)
 
             mesh.run()
             logger.info("Mesh created successfully")
@@ -262,8 +263,8 @@ class HeatTreatmentModelBuilder:
         try:
             mat = model.java.component('comp1').material().create('mat1', 'Common')
             mat.label(f'Steel - {steel.designation}')
-            # Select all domains
-            mat.selection().allGeom()
+            # Select all domains (use set('all') for material selection)
+            mat.selection().set(_jint_array([1]))
             self._add_thermal_properties(model, mat, steel)
             logger.info("Configured material: %s", steel.designation)
         except Exception as e:
@@ -271,48 +272,62 @@ class HeatTreatmentModelBuilder:
             self._setup_default_material(model)
 
     def _add_thermal_properties(self, model: Any, mat: Any, steel: Any) -> None:
-        """Add T-dependent thermal properties to material."""
+        """Add T-dependent thermal properties to material.
+
+        Property data_dict uses 'value' for both constant and curve data.
+        """
+        props = mat.propertyGroup('def')
+
         k_prop = steel.get_property('thermal_conductivity')
+        k_set = False
         if k_prop:
             data = k_prop.data_dict
             if k_prop.property_type == 'constant':
-                mat.propertyGroup('def').set('thermalconductivity', str(data.get('value', 45)))
+                props.set('thermalconductivity', f'{data.get("value", 45)}[W/(m*K)]')
+                k_set = True
             elif k_prop.property_type == 'curve':
                 temps = data.get('temperature', [])
-                values = data.get('values', [])
-                if temps and values:
+                values = data.get('values') or data.get('value', [])
+                if temps and values and len(temps) == len(values):
                     self._create_interpolation(model, 'k_int', temps, values)
-                    mat.propertyGroup('def').set('thermalconductivity', 'k_int(T)')
-        else:
-            mat.propertyGroup('def').set('thermalconductivity', '45')
+                    props.set('thermalconductivity', 'k_int(T)')
+                    k_set = True
+        if not k_set:
+            props.set('thermalconductivity', '45[W/(m*K)]')
 
         rho_prop = steel.get_property('density')
+        rho_set = False
         if rho_prop:
             data = rho_prop.data_dict
             if rho_prop.property_type == 'constant':
-                mat.propertyGroup('def').set('density', str(data.get('value', 7850)))
+                props.set('density', f'{data.get("value", 7850)}[kg/m^3]')
+                rho_set = True
             elif rho_prop.property_type == 'curve':
                 temps = data.get('temperature', [])
-                values = data.get('values', [])
-                if temps and values:
+                values = data.get('values') or data.get('value', [])
+                if temps and values and len(temps) == len(values):
                     self._create_interpolation(model, 'rho_int', temps, values)
-                    mat.propertyGroup('def').set('density', 'rho_int(T)')
-        else:
-            mat.propertyGroup('def').set('density', '7850')
+                    props.set('density', 'rho_int(T)')
+                    rho_set = True
+        if not rho_set:
+            props.set('density', '7850[kg/m^3]')
 
         cp_prop = steel.get_property('specific_heat')
+        cp_set = False
         if cp_prop:
             data = cp_prop.data_dict
             if cp_prop.property_type == 'constant':
-                mat.propertyGroup('def').set('heatcapacity', str(data.get('value', 500)))
+                props.set('heatcapacity', f'{data.get("value", 500)}[J/(kg*K)]')
+                cp_set = True
             elif cp_prop.property_type == 'curve':
                 temps = data.get('temperature', [])
-                values = data.get('values', [])
-                if temps and values:
+                values = data.get('values') or data.get('value', [])
+                if temps and values and len(temps) == len(values):
                     self._create_interpolation(model, 'cp_int', temps, values)
-                    mat.propertyGroup('def').set('heatcapacity', 'cp_int(T)')
-        else:
-            mat.propertyGroup('def').set('heatcapacity', '500')
+                    props.set('heatcapacity', 'cp_int(T)')
+                    cp_set = True
+        if not cp_set:
+            props.set('heatcapacity', '500[J/(kg*K)]')
 
     def _create_interpolation(self, model: Any, name: str,
                               x_data: List[float], y_data: List[float]) -> None:
@@ -320,8 +335,9 @@ class HeatTreatmentModelBuilder:
         try:
             func = model.java.func().create(name, 'Interpolation')
             func.set('source', 'table')
-            table_data = [[str(x), str(y)] for x, y in zip(x_data, y_data)]
-            func.setIndex('table', table_data, 0)
+            for i, (x, y) in enumerate(zip(x_data, y_data)):
+                func.setIndex('table', str(x), i, 0)
+                func.setIndex('table', str(y), i, 1)
             func.set('interp', 'piecewisecubic')
             func.set('extrap', 'linear')
         except Exception as e:
@@ -330,12 +346,17 @@ class HeatTreatmentModelBuilder:
     def _setup_default_material(self, model: Any) -> None:
         """Setup default steel material properties."""
         try:
-            mat = model.java.component('comp1').material().create('mat1', 'Common')
+            java = model.java
+            # Check if mat1 already exists (from failed _setup_material)
+            try:
+                mat = java.component('comp1').material('mat1')
+            except Exception:
+                mat = java.component('comp1').material().create('mat1', 'Common')
             mat.label('Steel (Default)')
-            mat.selection().allGeom()
-            mat.propertyGroup('def').set('thermalconductivity', '45')
-            mat.propertyGroup('def').set('density', '7850')
-            mat.propertyGroup('def').set('heatcapacity', '500')
+            mat.selection().set(_jint_array([1]))
+            mat.propertyGroup('def').set('thermalconductivity', '45[W/(m*K)]')
+            mat.propertyGroup('def').set('density', '7850[kg/m^3]')
+            mat.propertyGroup('def').set('heatcapacity', '500[J/(kg*K)]')
         except Exception as e:
             logger.warning("Default material setup failed: %s", e)
 
@@ -388,12 +409,13 @@ class HeatTreatmentModelBuilder:
             t_data.append([t_end, phase['ambient_temp']])
 
         try:
-            # h_conv(t)
+            # h_conv(t) — row-by-row to avoid Java overload issues
             h_func = model.java.func().create('h_conv_pw', 'Interpolation')
             h_func.set('source', 'table')
-            h_table = [[str(row[0]), str(row[1])] for row in h_data]
-            h_func.setIndex('table', h_table, 0)
-            h_func.set('interp', 'piecewiselinear')
+            for i, row in enumerate(h_data):
+                h_func.setIndex('table', str(row[0]), i, 0)
+                h_func.setIndex('table', str(row[1]), i, 1)
+            h_func.set('interp', 'linear')
             h_func.set('extrap', 'const')
             h_func.set('argunit', 's')
             h_func.set('fununit', 'W/(m^2*K)')
@@ -401,9 +423,10 @@ class HeatTreatmentModelBuilder:
             # T_amb(t)
             t_func = model.java.func().create('T_amb_pw', 'Interpolation')
             t_func.set('source', 'table')
-            t_table = [[str(row[0]), str(row[1])] for row in t_data]
-            t_func.setIndex('table', t_table, 0)
-            t_func.set('interp', 'piecewiselinear')
+            for i, row in enumerate(t_data):
+                t_func.setIndex('table', str(row[0]), i, 0)
+                t_func.setIndex('table', str(row[1]), i, 1)
+            t_func.set('interp', 'linear')
             t_func.set('extrap', 'const')
             t_func.set('argunit', 's')
             t_func.set('fununit', 'K')
@@ -418,24 +441,27 @@ class HeatTreatmentModelBuilder:
         """Configure Heat Transfer physics with piecewise BCs."""
         try:
             java = model.java
+
+            # Create Heat Transfer physics (auto-creates init1, solid1)
             ht = java.component('comp1').physics().create('ht', 'HeatTransfer', 'geom1')
             ht.label('Heat Transfer')
 
-            # Initial temperature
+            # Initial temperature — modify existing init1 (auto-created by HeatTransfer)
             heating_config = ht_config.get('heating', {})
             if heating_config.get('enabled', False):
                 init_temp = heating_config.get('initial_temperature', 25.0)
             else:
                 init_temp = heating_config.get('target_temperature', 850.0)
 
-            init = ht.create('init1', 'init', 3)
+            init = ht.feature('init1')
             init.set('Tinit', f'{init_temp}[degC]')
 
-            # Convective cooling on ALL external boundaries
-            conv = ht.create('conv1', 'ConvectiveCooling', 2)
-            conv.selection().all()  # All external boundaries
-            conv.set('h', 'h_conv_pw(t)')
-            conv.set('Text', 'T_amb_pw(t)')
+            # Heat flux boundary with convective term on ALL external boundaries
+            hf = ht.create('hf1', 'HeatFluxBoundary', 2)
+            hf.selection().all()
+            hf.set('HeatFluxType', 'ConvectiveHeatFlux')
+            hf.set('h', 'h_conv_pw(t)')
+            hf.set('Text', 'T_amb_pw(t)')
 
             logger.info("Configured piecewise heat transfer physics")
         except Exception as e:
