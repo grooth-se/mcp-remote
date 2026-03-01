@@ -34,7 +34,7 @@ from .rosenthal_solver import RosenthalSolver, RosenthalParams
 from .haz_predictor import HAZPredictor, HAZResult
 from .preheat_calculator import PreheatCalculator, PreheatResult
 from . import visualization
-from . import visualization_3d
+# Note: visualization_3d imported lazily where needed (requires PYVISTA_OFF_SCREEN)
 from . import comsol
 
 __all__ = [

@@ -22,6 +22,15 @@ def _check_pyvista():
         return False
 
 
+def _can_render():
+    """Check if VTK rendering is safe (macOS Cocoa requires main thread)."""
+    import sys
+    import threading
+    if sys.platform == 'darwin' and threading.current_thread() is not threading.main_thread():
+        return False
+    return _check_pyvista()
+
+
 def create_cad_mesh(step_path: str, tolerance: float = 0.1):
     """Load STEP file via CadQuery and tessellate to PyVista PolyData.
 
@@ -306,6 +315,8 @@ def create_temperature_snapshot(
 ) -> Optional[bytes]:
     """Create a 3D temperature snapshot as PNG.
 
+    Returns None on macOS if called from a non-main thread (VTK Cocoa limitation).
+
     Parameters
     ----------
     geometry_type : str
@@ -336,6 +347,13 @@ def create_temperature_snapshot(
     """
     if not _check_pyvista():
         logger.warning("PyVista not available, using matplotlib fallback")
+        return _create_fallback_snapshot(
+            geometry_type, geometry_params, temperatures,
+            radial_positions, colormap, clim, title
+        )
+
+    if not _can_render():
+        logger.info("Skipping 3D snapshot (VTK Cocoa not available on worker thread)")
         return _create_fallback_snapshot(
             geometry_type, geometry_params, temperatures,
             radial_positions, colormap, clim, title
@@ -489,8 +507,8 @@ def create_temperature_animation(
     bytes or None
         GIF image data
     """
-    if not _check_pyvista():
-        logger.warning("PyVista not available for 3D animation")
+    if not _can_render():
+        logger.info("PyVista/VTK rendering not available (missing or worker thread)")
         return _create_fallback_animation(times, temperature_history, fps)
 
     import pyvista as pv

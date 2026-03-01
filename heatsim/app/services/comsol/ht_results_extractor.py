@@ -439,6 +439,13 @@ class HeatTreatmentResultsExtractor:
         combined_times = np.array(all_times)
 
         try:
+            import sys
+            import threading
+            # VTK Cocoa renderer crashes on macOS when called from non-main thread
+            if sys.platform == 'darwin' and threading.current_thread() is not threading.main_thread():
+                logger.info("Skipping animation on macOS worker thread (VTK Cocoa limitation)")
+                return None
+
             from ..visualization_3d import create_temperature_animation
 
             clim = (float(combined_profiles.min()), float(combined_profiles.max()))

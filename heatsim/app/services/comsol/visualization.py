@@ -326,6 +326,11 @@ class WeldVisualization:
         if not self._has_pyvista:
             return None
 
+        # VTK Cocoa renderer crashes on macOS in non-main thread
+        import sys, threading
+        if sys.platform == 'darwin' and threading.current_thread() is not threading.main_thread():
+            return None
+
         import pyvista as pv
         import tempfile
 
@@ -394,6 +399,12 @@ class WeldVisualization:
         """
         if not self._has_pyvista:
             logger.warning("PyVista not available for animation generation")
+            return self._create_fallback_animation(times, fps)
+
+        # VTK Cocoa renderer crashes on macOS in non-main thread
+        import sys, threading
+        if sys.platform == 'darwin' and threading.current_thread() is not threading.main_thread():
+            logger.info("Skipping animation on macOS worker thread")
             return self._create_fallback_animation(times, fps)
 
         import pyvista as pv

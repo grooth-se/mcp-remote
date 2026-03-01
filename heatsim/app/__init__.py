@@ -1,5 +1,15 @@
 """Flask application factory."""
 import os
+
+# Force offscreen rendering for VTK/PyVista before any imports
+os.environ['PYVISTA_OFF_SCREEN'] = 'true'
+os.environ.setdefault('MPLBACKEND', 'Agg')
+try:
+    import pyvista
+    pyvista.OFF_SCREEN = True
+except ImportError:
+    pass
+
 from flask import Flask, render_template, request as flask_request
 from flask_login import current_user
 from config import config

@@ -28,7 +28,7 @@
 <h2>Configure Simulation: {{ sim.name }}</h2>
 <p class="text-muted">{{ sim.steel_grade.designation }} | {{ sim.geometry_label }}</p>
 
-<form method="post">
+<form method="post" novalidate>
     {{ geometry_form.hidden_tag() }}
 
     <div class="row">
