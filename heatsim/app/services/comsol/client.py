@@ -122,18 +122,17 @@ class COMSOLClient:
             # Set COMSOL root path before starting
             if self._comsol_path and Path(self._comsol_path).exists():
                 mph.option('classkit', False)
-                # Discover available COMSOL versions; if the desired path
-                # matches a known version, mph will use it.
-                versions = mph.discovery.backend()
-                comsol_root = Path(self._comsol_path)
-                found = False
-                for name, info in versions.items():
-                    if comsol_root == Path(info.get('root', '')):
-                        found = True
-                        break
-                if not found:
-                    # If not auto-discovered, register it manually
-                    logger.info("Registering COMSOL at %s", self._comsol_path)
+                # Verify the COMSOL installation is discoverable
+                try:
+                    backend = mph.discovery.backend()
+                    discovered_root = backend.get('root')
+                    if discovered_root:
+                        logger.info("Discovered COMSOL %s at %s",
+                                    backend.get('name', '?'), discovered_root)
+                    else:
+                        logger.info("No COMSOL auto-discovered, using %s", self._comsol_path)
+                except Exception as e:
+                    logger.warning("COMSOL discovery failed: %s", e)
 
             self._client = mph.start(cores=4)
             self._connected = True
@@ -149,13 +148,7 @@ class COMSOLClient:
         """
         if self._client is not None:
             try:
-                # Remove all models to free memory
-                for name in self._client.names():
-                    try:
-                        model = self._client.load(name) if isinstance(name, str) else name
-                        self._client.remove(model)
-                    except Exception:
-                        pass
+                # Remove all loaded models to free memory
                 self._client.clear()
             except Exception:
                 pass
