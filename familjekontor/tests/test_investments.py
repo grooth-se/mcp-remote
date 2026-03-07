@@ -12,7 +12,7 @@ from app.models.investment import (
 from app.services.investment_service import (
     create_portfolio, get_portfolios, get_portfolio,
     get_holding, get_holding_transactions, update_holding_price,
-    update_holding_metadata,
+    update_holding_metadata, adjust_holding, delete_holding,
     create_transaction, get_portfolio_summary,
     get_dividend_income_summary, get_interest_income_summary,
     parse_nordnet_csv, parse_csv, import_nordnet_transactions,
@@ -1009,3 +1009,199 @@ class TestHoldingMetadata:
         assert holding.org_number == '556999-0001'
         assert float(holding.interest_rate) == 6.5
         assert holding.maturity_date == date(2026, 6, 30)
+
+
+# ---------------------------------------------------------------------------
+# Holding Adjustment & Deletion
+# ---------------------------------------------------------------------------
+
+class TestHoldingAdjustment:
+    def test_adjust_holding(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'kop',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Adjust Test',
+            'instrument_type': 'aktie',
+            'quantity': 100,
+            'price_per_unit': 200,
+            'amount': 20000,
+            'fiscal_year_id': fy.id,
+        })
+
+        holding = adjust_holding(
+            tx.holding_id,
+            new_quantity=200,
+            new_average_cost=150,
+            note='Split 2:1',
+            created_by=1,
+        )
+        assert float(holding.quantity) == 200
+        assert float(holding.average_cost) == 150
+        assert float(holding.total_cost) == 30000
+        assert holding.active is True
+
+        # Check justering transaction was created
+        txs = get_holding_transactions(holding.id)
+        justering_txs = [t for t in txs if t.transaction_type == 'justering']
+        assert len(justering_txs) == 1
+        assert justering_txs[0].note == 'Split 2:1'
+
+    def test_adjust_holding_to_zero(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'kop',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Zero Test',
+            'instrument_type': 'aktie',
+            'quantity': 50,
+            'price_per_unit': 100,
+            'amount': 5000,
+            'fiscal_year_id': fy.id,
+        })
+
+        holding = adjust_holding(
+            tx.holding_id,
+            new_quantity=0,
+            new_average_cost=0,
+            note='Inlösen utan likvid',
+        )
+        assert float(holding.quantity) == 0
+        assert holding.active is False
+
+    def test_delete_holding(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        # Create holding without verification (no fiscal_year_id)
+        tx = create_transaction(p.id, {
+            'transaction_type': 'kop',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Delete Test',
+            'instrument_type': 'aktie',
+            'quantity': 10,
+            'price_per_unit': 100,
+            'amount': 1000,
+        })
+        holding_id = tx.holding_id
+        assert get_holding(holding_id) is not None
+
+        delete_holding(holding_id)
+        assert get_holding(holding_id) is None
+        # Transactions should also be deleted
+        assert InvestmentTransaction.query.filter_by(holding_id=holding_id).count() == 0
+
+    def test_delete_holding_with_verification_raises(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'kop',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Verified Delete',
+            'instrument_type': 'aktie',
+            'quantity': 10,
+            'price_per_unit': 100,
+            'amount': 1000,
+            'fiscal_year_id': fy.id,
+        })
+        assert tx.verification_id is not None
+
+        import pytest
+        with pytest.raises(ValueError, match='verifikationer'):
+            delete_holding(tx.holding_id)
+
+    def test_adjust_holding_route(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'kop',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Route Adjust',
+            'instrument_type': 'aktie',
+            'quantity': 100,
+            'price_per_unit': 50,
+            'amount': 5000,
+            'fiscal_year_id': fy.id,
+        })
+
+        # GET form
+        resp = logged_in_client.get(f'/investments/holdings/{tx.holding_id}/adjust')
+        assert resp.status_code == 200
+        assert 'Justera' in resp.data.decode()
+
+        # POST adjust
+        resp = logged_in_client.post(f'/investments/holdings/{tx.holding_id}/adjust', data={
+            'quantity': '200',
+            'average_cost': '25',
+            'note': 'Split 2:1',
+        }, follow_redirects=True)
+        assert resp.status_code == 200
+        assert 'Innehav justerat' in resp.data.decode()
+
+        holding = get_holding(tx.holding_id)
+        assert float(holding.quantity) == 200
+        assert float(holding.average_cost) == 25
+
+    def test_delete_holding_route(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'kop',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Route Delete',
+            'instrument_type': 'aktie',
+            'quantity': 10,
+            'price_per_unit': 100,
+            'amount': 1000,
+        })
+        holding_id = tx.holding_id
+
+        resp = logged_in_client.post(
+            f'/investments/holdings/{holding_id}/delete',
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert 'borttaget' in resp.data.decode()
+        assert get_holding(holding_id) is None
+
+    def test_adjust_form_prefills(self, logged_in_client):
+        co = _setup_company(logged_in_client)
+        fy = _setup_fy(co)
+        _add_accounts(co)
+        p = _create_test_portfolio(co)
+
+        tx = create_transaction(p.id, {
+            'transaction_type': 'kop',
+            'transaction_date': date(2024, 1, 1),
+            'name': 'Prefill Test',
+            'instrument_type': 'aktie',
+            'quantity': 75,
+            'price_per_unit': 120,
+            'amount': 9000,
+            'fiscal_year_id': fy.id,
+        })
+
+        resp = logged_in_client.get(f'/investments/holdings/{tx.holding_id}/adjust')
+        html = resp.data.decode()
+        assert '75' in html  # quantity prefilled
+        assert 'Nuvarande antal' in html
+        assert 'Nuvarande GAV' in html

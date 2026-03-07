@@ -66,6 +66,13 @@ class HoldingEditForm(FlaskForm):
     submit = SubmitField('Spara')
 
 
+class HoldingAdjustForm(FlaskForm):
+    quantity = DecimalField('Antal', places=4, validators=[DataRequired()])
+    average_cost = DecimalField('GAV (snitt per enhet)', places=4, validators=[DataRequired()])
+    note = TextAreaField('Anledning', validators=[DataRequired(), Length(max=500)])
+    submit = SubmitField('Justera')
+
+
 class ImportForm(FlaskForm):
     csv_file = FileField('Nordnet CSV-fil', validators=[
         DataRequired(),

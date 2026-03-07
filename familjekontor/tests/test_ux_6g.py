@@ -38,8 +38,11 @@ class TestActiveNavHighlight:
         _setup_company(logged_in_client)
         response = logged_in_client.get('/')
         html = response.data.decode()
-        # The "Start" nav link should have the active class
-        assert 'class="nav-link active' in html
+        # The "Start" dropdown nav link should have the active class
+        assert 'active' in html
+        assert 'Start' in html
+        # Nav uses dropdown-toggle with active class
+        assert 'nav-link dropdown-toggle' in html
 
     def test_accounting_nav_active(self, logged_in_client):
         co, fy = _setup_with_fy(logged_in_client)

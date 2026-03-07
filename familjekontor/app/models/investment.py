@@ -30,6 +30,7 @@ TRANSACTION_TYPE_LABELS = {
     'utlan': 'Utlåning',
     'amortering': 'Amortering',
     'kupong': 'Kupongbetalning',
+    'justering': 'Justering',
 }
 
 

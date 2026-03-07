@@ -7,12 +7,13 @@ from app.models.investment import (
     INSTRUMENT_TYPE_LABELS, TRANSACTION_TYPE_LABELS,
 )
 from app.forms.investment import (
-    PortfolioForm, TransactionForm, ImportForm, PriceUpdateForm, HoldingEditForm,
+    PortfolioForm, TransactionForm, ImportForm, PriceUpdateForm,
+    HoldingEditForm, HoldingAdjustForm,
 )
 from app.services.investment_service import (
     create_portfolio, get_portfolios, get_portfolio,
     get_holding, get_holding_transactions, update_holding_price,
-    update_holding_metadata,
+    update_holding_metadata, adjust_holding, delete_holding,
     create_transaction, get_portfolio_summary,
     get_dividend_income_summary, get_interest_income_summary,
     parse_csv, import_nordnet_transactions,
@@ -307,6 +308,67 @@ def price_update(holding_id):
             flash(str(e), 'danger')
 
     return render_template('investments/price_update.html', form=form, holding=holding)
+
+
+@investments_bp.route('/holdings/<int:holding_id>/adjust', methods=['GET', 'POST'])
+@login_required
+def holding_adjust(holding_id):
+    company_id, company, active_fy = _get_active_context()
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('investments.index'))
+
+    holding = get_holding(holding_id)
+    if not holding or holding.company_id != company_id:
+        flash('Innehav hittades inte.', 'danger')
+        return redirect(url_for('investments.index'))
+
+    form = HoldingAdjustForm(obj=holding)
+    if form.validate_on_submit():
+        try:
+            adjust_holding(
+                holding.id,
+                new_quantity=form.quantity.data,
+                new_average_cost=form.average_cost.data,
+                note=form.note.data,
+                created_by=current_user.id,
+            )
+            flash(f'Innehav justerat för {holding.name}.', 'success')
+            return redirect(url_for('investments.holding_view', holding_id=holding.id))
+        except ValueError as e:
+            flash(str(e), 'danger')
+
+    return render_template('investments/holding_adjust.html', form=form, holding=holding)
+
+
+@investments_bp.route('/holdings/<int:holding_id>/delete', methods=['POST'])
+@login_required
+def holding_delete(holding_id):
+    company_id, company, active_fy = _get_active_context()
+    if not company_id:
+        flash('Välj ett företag först.', 'warning')
+        return redirect(url_for('companies.index'))
+    if current_user.is_readonly:
+        flash('Du har inte behörighet.', 'danger')
+        return redirect(url_for('investments.index'))
+
+    holding = get_holding(holding_id)
+    if not holding or holding.company_id != company_id:
+        flash('Innehav hittades inte.', 'danger')
+        return redirect(url_for('investments.index'))
+
+    portfolio_id = holding.portfolio_id
+    name = holding.name
+    try:
+        delete_holding(holding.id)
+        flash(f'Innehav "{name}" borttaget.', 'success')
+    except ValueError as e:
+        flash(str(e), 'danger')
+
+    return redirect(url_for('investments.portfolio_view', portfolio_id=portfolio_id))
 
 
 # ---------------------------------------------------------------------------

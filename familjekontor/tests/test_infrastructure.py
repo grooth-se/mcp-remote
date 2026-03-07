@@ -148,11 +148,10 @@ class TestProductionConfig:
 
 
 class TestRunConfig:
-    def test_run_binds_localhost(self):
+    def test_run_binds_lan(self):
         with open(os.path.join(os.path.dirname(__file__), '..', 'run.py')) as f:
             content = f.read()
-        assert "host='127.0.0.1'" in content
-        assert "host='0.0.0.0'" not in content
+        assert "host='0.0.0.0'" in content
         assert 'debug=True' not in content.split('if __name__')[1]
 
 

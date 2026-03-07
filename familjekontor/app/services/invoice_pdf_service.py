@@ -160,8 +160,8 @@ def generate_invoice_pdf(invoice_id):
 
     try:
         from weasyprint import HTML
-    except ImportError:
-        # weasyprint not installed - return HTML as fallback
+    except (ImportError, OSError):
+        # weasyprint not installed or system libraries missing - return HTML as fallback
         return html
 
     import os

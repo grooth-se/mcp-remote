@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "macros/breadcrumbs.html" import render_breadcrumbs %}
+{% block title %}Justera innehav - {{ holding.name }}{% endblock %}
+{% block breadcrumbs %}
+{{ render_breadcrumbs([
+    {'title': 'Start', 'url': url_for('dashboard.index')},
+    {'title': 'Investeringar', 'url': url_for('investments.index')},
+    {'title': holding.name, 'url': url_for('investments.holding_view', holding_id=holding.id)},
+    {'title': 'Justera'}
+]) }}
+{% endblock %}
+{% block content %}
+<h2><i class="bi bi-pencil-square"></i> Justera innehav — {{ holding.name }}</h2>
+
+<div class="row mb-4 mt-3">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Nuvarande antal</h6>
+                <h4>{{ "%.2f"|format(holding.quantity) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Nuvarande GAV</h6>
+                <h4>{{ holding.average_cost|sek(2) }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="text-muted">Nuvarande kostnad</h6>
+                <h4>{{ holding.total_cost|sek(0) }}</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST" data-unsaved-warning>
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.quantity.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.quantity(class="form-control", id="adj-quantity") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">{{ form.average_cost.label.text }} <span class="text-danger">*</span></label>
+                    {{ form.average_cost(class="form-control", id="adj-avg-cost") }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Ny total kostnad</label>
+                    <input type="text" class="form-control" id="adj-total-cost" readonly>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">{{ form.note.label.text }} <span class="text-danger">*</span></label>
+                {{ form.note(class="form-control", rows="3", placeholder="T.ex. Split 2:1, Emission 500 st, Konvertering") }}
+            </div>
+            <div class="d-flex gap-2">
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('investments.holding_view', holding_id=holding.id) }}" class="btn btn-outline-secondary">Avbryt</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function calcTotal() {
+    const qty = parseFloat(document.getElementById('adj-quantity').value) || 0;
+    const avg = parseFloat(document.getElementById('adj-avg-cost').value) || 0;
+    const total = qty * avg;
+    document.getElementById('adj-total-cost').value = total.toLocaleString('sv-SE', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' kr';
+}
+document.getElementById('adj-quantity').addEventListener('input', calcTotal);
+document.getElementById('adj-avg-cost').addEventListener('input', calcTotal);
+document.addEventListener('DOMContentLoaded', calcTotal);
+</script>
+{% endblock %}

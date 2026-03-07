@@ -110,6 +110,9 @@
                         </td>
                         <td class="text-end">
                             <a href="{{ url_for('investments.price_update', holding_id=h.id) }}" class="btn btn-outline-secondary btn-sm" title="Uppdatera pris"><i class="bi bi-currency-exchange"></i></a>
+                            {% if not current_user.is_readonly %}
+                            <a href="{{ url_for('investments.holding_adjust', holding_id=h.id) }}" class="btn btn-outline-warning btn-sm" title="Justera innehav"><i class="bi bi-pencil-square"></i></a>
+                            {% endif %}
                         </td>
                         {% endif %}
                     </tr>

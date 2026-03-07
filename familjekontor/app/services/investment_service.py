@@ -481,6 +481,86 @@ def get_interest_income_summary(company_id, fiscal_year_id):
     return sorted(by_holding.values(), key=lambda x: x['total'], reverse=True)
 
 
+def adjust_holding(holding_id, new_quantity, new_average_cost, note, created_by=None):
+    """Manually adjust holding quantity and average cost.
+
+    Creates a 'justering' transaction for audit trail. No accounting
+    verification is created (these adjustments reflect VP-only movements
+    like splits, emissions, conversions that have no cash effect).
+    """
+    holding = db.session.get(InvestmentHolding, holding_id)
+    if not holding:
+        raise ValueError('Innehav hittades inte')
+
+    new_quantity = Decimal(str(new_quantity))
+    new_average_cost = Decimal(str(new_average_cost))
+
+    holding.quantity = new_quantity
+    holding.average_cost = new_average_cost
+    holding.total_cost = new_quantity * new_average_cost
+    holding.active = new_quantity > 0
+
+    # Recalculate market value if we have a current price
+    if holding.current_price and new_quantity > 0:
+        holding.current_value = holding.current_price * new_quantity
+        holding.unrealized_gain = holding.current_value - holding.total_cost
+    elif new_quantity <= 0:
+        holding.current_value = Decimal('0')
+        holding.unrealized_gain = Decimal('0')
+
+    # Create audit trail transaction
+    tx = InvestmentTransaction(
+        portfolio_id=holding.portfolio_id,
+        holding_id=holding.id,
+        company_id=holding.company_id,
+        transaction_date=date.today(),
+        transaction_type='justering',
+        quantity=new_quantity,
+        price_per_unit=new_average_cost,
+        amount=Decimal('0'),
+        amount_sek=Decimal('0'),
+        commission=Decimal('0'),
+        note=note,
+    )
+    db.session.add(tx)
+
+    audit = AuditLog(
+        company_id=holding.company_id, user_id=created_by,
+        action='update', entity_type='investment_holding', entity_id=holding.id,
+        new_values={'action': 'justering', 'quantity': str(new_quantity),
+                    'average_cost': str(new_average_cost), 'note': note},
+    )
+    db.session.add(audit)
+    db.session.commit()
+    return holding
+
+
+def delete_holding(holding_id):
+    """Delete a holding and all its linked transactions.
+
+    Raises ValueError if any transaction has a linked verification.
+    """
+    holding = db.session.get(InvestmentHolding, holding_id)
+    if not holding:
+        raise ValueError('Innehav hittades inte')
+
+    # Check for linked verifications
+    linked = InvestmentTransaction.query.filter(
+        InvestmentTransaction.holding_id == holding_id,
+        InvestmentTransaction.verification_id.isnot(None),
+    ).first()
+    if linked:
+        raise ValueError(
+            'Innehavet har transaktioner kopplade till verifikationer. '
+            'Ta bort verifikationerna först.'
+        )
+
+    # Delete transactions linked to this holding
+    InvestmentTransaction.query.filter_by(holding_id=holding_id).delete()
+    db.session.delete(holding)
+    db.session.commit()
+
+
 def update_holding_metadata(holding_id, data):
     """Update extended metadata on a holding (org_number, ownership, rates, etc.)."""
     holding = db.session.get(InvestmentHolding, holding_id)

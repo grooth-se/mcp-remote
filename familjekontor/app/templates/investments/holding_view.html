@@ -28,6 +28,13 @@
         {% if holding.active and not current_user.is_readonly and not holding.is_loan_type %}
         <a href="{{ url_for('investments.price_update', holding_id=holding.id) }}" class="btn btn-outline-primary"><i class="bi bi-currency-exchange"></i> Uppdatera pris</a>
         {% endif %}
+        {% if not current_user.is_readonly %}
+        <a href="{{ url_for('investments.holding_adjust', holding_id=holding.id) }}" class="btn btn-outline-warning"><i class="bi bi-pencil-square"></i> Justera</a>
+        <form method="POST" action="{{ url_for('investments.holding_delete', holding_id=holding.id) }}" class="d-inline" data-confirm="Är du säker på att du vill ta bort detta innehav och alla dess transaktioner?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i> Ta bort</button>
+        </form>
+        {% endif %}
     </div>
 </div>
 
