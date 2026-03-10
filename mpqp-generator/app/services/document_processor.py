@@ -27,21 +27,37 @@ def extract_text(file_path):
 def _extract_pdf(file_path):
     """Extract text from PDF using PyMuPDF."""
     try:
+        import signal
         import fitz  # PyMuPDF
 
-        doc = fitz.open(file_path)
-        pages = []
-        for page in doc:
-            pages.append(page.get_text())
+        # Timeout guard: skip PDFs that take too long (e.g. corrupted files)
+        timed_out = False
 
-        text = '\n\n'.join(pages)
-        metadata = {
-            'title': doc.metadata.get('title', ''),
-            'author': doc.metadata.get('author', ''),
-            'subject': doc.metadata.get('subject', ''),
-        }
-        page_count = len(doc)
-        doc.close()
+        def _timeout_handler(signum, frame):
+            nonlocal timed_out
+            timed_out = True
+            raise TimeoutError('PDF extraction timed out')
+
+        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+        signal.alarm(30)  # 30 second timeout per PDF
+
+        try:
+            doc = fitz.open(file_path)
+            pages = []
+            for page in doc:
+                pages.append(page.get_text())
+
+            text = '\n\n'.join(pages)
+            metadata = {
+                'title': doc.metadata.get('title', ''),
+                'author': doc.metadata.get('author', ''),
+                'subject': doc.metadata.get('subject', ''),
+            }
+            page_count = len(doc)
+            doc.close()
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
 
         return {
             'text': text,
@@ -52,6 +68,9 @@ def _extract_pdf(file_path):
     except ImportError:
         logger.error('PyMuPDF (fitz) not installed')
         return {'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': 'PyMuPDF not installed'}
+    except TimeoutError:
+        logger.warning(f'PDF extraction timed out for {file_path}')
+        return {'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': 'extraction timed out'}
     except Exception as e:
         logger.error(f'PDF extraction failed for {file_path}: {e}')
         return {'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': str(e)}

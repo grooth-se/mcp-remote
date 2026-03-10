@@ -51,6 +51,12 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        'DATABASE_URL',
+        f'sqlite:///{os.path.join(project_dir, "data", "mpqp.db")}'
+    )
+    PORTAL_URL = os.environ.get('PORTAL_URL', 'http://localhost:5050')
+    PORTAL_EXTERNAL_URL = os.environ.get('PORTAL_EXTERNAL_URL', 'http://localhost:5050')
 
 
 class TestingConfig(Config):

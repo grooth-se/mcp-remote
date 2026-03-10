@@ -97,13 +97,15 @@ def init_portal_auth(app):
         if token:
             result = validate_token_with_portal(token, app_code, portal_url)
             if result:
-                user = _ensure_local_user(result)
+                session['portal_user'] = result.get('user', {}).get('username') or result.get('username')
+                session['portal_role'] = result.get('user', {}).get('role') or result.get('role')
+                session.permanent = True
+                user = _ensure_local_user(result.get('user', result))
                 if user:
                     login_user(user)
-                    session['portal_user'] = result.get('username')
-                    session['portal_role'] = result.get('role')
                 # Redirect to clean URL (without token param)
-                clean_url = request.path
+                # Include script_root so redirect goes back through nginx prefix
+                clean_url = request.script_root + request.path
                 return redirect(clean_url)
             else:
                 return redirect(external_url)

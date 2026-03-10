@@ -114,13 +114,14 @@ def _collect_project_folders(root_path):
     return folders
 
 
-def scan_directory(root_path, extract_text_flag=True, dry_run=False):
+def scan_directory(root_path, extract_text_flag=True, dry_run=False, progress_callback=None):
     """Scan a root directory for project folders and their documents.
 
     Args:
         root_path: Path to the historical projects root
         extract_text_flag: Whether to extract text from documents during scan
         dry_run: If True, report what would be done without writing to DB
+        progress_callback: Optional callable(msg, processed, total) for progress updates
 
     Returns:
         Dict with scan results.
@@ -144,8 +145,15 @@ def scan_directory(root_path, extract_text_flag=True, dry_run=False):
     # Container folders (e.g. "Delivered") that hold project subfolders
     # are detected and recursed into automatically.
     project_folders = _collect_project_folders(root_path)
+    total = len(project_folders)
 
-    for folder_path, folder_name in project_folders:
+    if progress_callback:
+        progress_callback(f'Found {total} project folders', 0, total)
+
+    for idx, (folder_path, folder_name) in enumerate(project_folders):
+        if progress_callback:
+            progress_callback(f'Scanning: {folder_name}', idx, total)
+
         try:
             project_result = _process_project_folder(
                 folder_path, folder_name, extract_text_flag, dry_run
@@ -164,6 +172,9 @@ def scan_directory(root_path, extract_text_flag=True, dry_run=False):
         except Exception as e:
             logger.error(f'Error processing folder {folder_name}: {e}')
             results['errors'].append(f'{folder_name}: {str(e)}')
+
+    if progress_callback:
+        progress_callback('Complete', total, total)
 
     logger.info(
         f'Scan complete: {results["projects_found"]} projects, '

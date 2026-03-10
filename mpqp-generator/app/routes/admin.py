@@ -1,4 +1,5 @@
 import os
+import threading
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
 from flask_login import login_required
 from werkzeug.utils import secure_filename
@@ -11,6 +12,15 @@ from app.services.llm_client import check_ollama_status
 from app.services import vector_store
 
 admin_bp = Blueprint('admin', __name__)
+
+# Background scan state (single-user system, simple dict is fine)
+_scan_state = {
+    'running': False,
+    'progress': '',
+    'projects_processed': 0,
+    'projects_total': 0,
+    'result': None,
+}
 
 
 @admin_bp.route('/')
@@ -183,7 +193,7 @@ def scan():
 @admin_bp.route('/scan', methods=['POST'])
 @login_required
 def scan_run():
-    """Execute a project folder scan."""
+    """Start a project folder scan in the background."""
     scan_path = request.form.get('scan_path', '').strip()
     extract_text_flag = request.form.get('extract_text', 'on') == 'on'
     dry_run = request.form.get('dry_run', '') == 'on'
@@ -196,22 +206,76 @@ def scan_run():
         flash(f'Directory not found: {scan_path}', 'danger')
         return redirect(url_for('admin.scan'))
 
-    from app.services.project_scanner import scan_directory
-    result = scan_directory(scan_path, extract_text_flag=extract_text_flag, dry_run=dry_run)
+    if _scan_state['running']:
+        flash('A scan is already running. Please wait for it to finish.', 'warning')
+        return redirect(url_for('admin.scan_progress'))
 
-    if result.get('error'):
-        flash(f'Scan failed: {result["error"]}', 'danger')
-    else:
-        msg = (f'Scan complete: {result["projects_found"]} projects found, '
-               f'{result["projects_created"]} created, '
-               f'{result["documents_created"]} documents added.')
-        if dry_run:
-            msg += ' (Dry run — no changes saved)'
-        flash(msg, 'success')
+    # Reset state and start background scan
+    _scan_state.update({
+        'running': True,
+        'progress': 'Starting scan...',
+        'projects_processed': 0,
+        'projects_total': 0,
+        'result': None,
+    })
 
-    return render_template('admin/scan.html',
-                           historical_path=scan_path,
-                           scan_result=result)
+    app = current_app._get_current_object()
+
+    def _run_scan():
+        with app.app_context():
+            from app.services.project_scanner import scan_directory
+            try:
+                result = scan_directory(
+                    scan_path,
+                    extract_text_flag=extract_text_flag,
+                    dry_run=dry_run,
+                    progress_callback=_update_scan_progress,
+                )
+                _scan_state['result'] = result
+            except Exception as e:
+                _scan_state['result'] = {'error': str(e)}
+            finally:
+                _scan_state['running'] = False
+                _scan_state['progress'] = 'Complete'
+
+    thread = threading.Thread(target=_run_scan, daemon=True)
+    thread.start()
+
+    return redirect(url_for('admin.scan_progress'))
+
+
+def _update_scan_progress(msg, processed, total):
+    """Callback for project_scanner to report progress."""
+    _scan_state['progress'] = msg
+    _scan_state['projects_processed'] = processed
+    _scan_state['projects_total'] = total
+
+
+@admin_bp.route('/scan/progress')
+@login_required
+def scan_progress():
+    """Page that shows live scan progress."""
+    # If scan is done and we have results, show the results page
+    if not _scan_state['running'] and _scan_state['result']:
+        result = _scan_state['result']
+        scan_path = result.get('root_path', '')
+        return render_template('admin/scan.html',
+                               historical_path=scan_path,
+                               scan_result=result)
+    return render_template('admin/scan_progress.html')
+
+
+@admin_bp.route('/scan/status')
+@login_required
+def scan_status():
+    """JSON endpoint for scan progress polling."""
+    return jsonify({
+        'running': _scan_state['running'],
+        'progress': _scan_state['progress'],
+        'projects_processed': _scan_state['projects_processed'],
+        'projects_total': _scan_state['projects_total'],
+        'done': not _scan_state['running'] and _scan_state['result'] is not None,
+    })
 
 
 @admin_bp.route('/metadata/<int:project_id>', methods=['POST'])

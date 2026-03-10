@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Scanning... - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <div class="page-header">
+        <h2><i class="bi bi-folder-symlink me-2"></i>Scanning Historical Projects</h2>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary mb-3" role="status" id="spinner">
+                <span class="visually-hidden">Scanning...</span>
+            </div>
+            <h4 id="progress-msg">Starting scan...</h4>
+            <div class="progress mt-3 mx-auto" style="max-width: 500px; height: 24px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                     id="progress-bar" role="progressbar" style="width: 0%">
+                    0 / 0
+                </div>
+            </div>
+            <p class="text-muted mt-3" id="progress-detail">
+                This may take several minutes for large project folders.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const msgEl = document.getElementById('progress-msg');
+    const barEl = document.getElementById('progress-bar');
+    const detailEl = document.getElementById('progress-detail');
+    const spinnerEl = document.getElementById('spinner');
+
+    function poll() {
+        fetch('{{ url_for("admin.scan_status") }}')
+            .then(r => r.json())
+            .then(data => {
+                msgEl.textContent = data.progress || 'Working...';
+                if (data.projects_total > 0) {
+                    const pct = Math.round((data.projects_processed / data.projects_total) * 100);
+                    barEl.style.width = pct + '%';
+                    barEl.textContent = data.projects_processed + ' / ' + data.projects_total;
+                    detailEl.textContent = 'Processing project ' + data.projects_processed + ' of ' + data.projects_total;
+                }
+                if (data.done) {
+                    // Scan finished — redirect to results page
+                    window.location.href = '{{ url_for("admin.scan_progress") }}';
+                } else if (data.running) {
+                    setTimeout(poll, 2000);
+                } else {
+                    // Not running and not done — something went wrong
+                    spinnerEl.classList.add('d-none');
+                    msgEl.textContent = 'Scan stopped unexpectedly.';
+                }
+            })
+            .catch(() => {
+                setTimeout(poll, 5000);
+            });
+    }
+
+    setTimeout(poll, 1000);
+})();
+</script>
+{% endblock %}
