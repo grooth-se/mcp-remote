@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Vector Search - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="bi bi-search me-2"></i>Vector Search</h2>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('admin.search') }}">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label">Search Query</label>
+                        <input type="text" class="form-control" name="q" value="{{ query }}"
+                               placeholder="e.g. welding procedure for Inconel 625 riser">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Document Type</label>
+                        <select class="form-select" name="document_type">
+                            <option value="">All types</option>
+                            <option value="MPQP" {{ 'selected' if doc_type == 'MPQP' }}>MPQP</option>
+                            <option value="MPS" {{ 'selected' if doc_type == 'MPS' }}>MPS</option>
+                            <option value="ITP" {{ 'selected' if doc_type == 'ITP' }}>ITP</option>
+                            <option value="SPEC" {{ 'selected' if doc_type == 'SPEC' }}>Specification</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">Results</label>
+                        <input type="number" class="form-control" name="n" value="10" min="1" max="50">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-accent w-100">
+                            <i class="bi bi-search me-1"></i>Search
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if query %}
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-list-stars me-1"></i>Results for "{{ query }}"
+            <span class="badge bg-secondary ms-2">{{ results|length }} matches</span>
+        </div>
+        <div class="card-body">
+            {% if results %}
+            {% for result in results %}
+            <div class="border rounded p-3 mb-3 {{ 'border-start border-4 border-accent' if result.similarity > 0.7 }}">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <strong>
+                            <i class="bi bi-file-earmark me-1"></i>
+                            {{ result.metadata.file_name or 'Unknown' }}
+                        </strong>
+                        {% if result.metadata.section %}
+                        <span class="text-muted ms-2">{{ result.metadata.section[:60] }}</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span class="badge {{ 'bg-success' if result.similarity > 0.7 else 'bg-warning text-dark' if result.similarity > 0.5 else 'bg-secondary' }}">
+                            {{ "%.1f"|format(result.similarity * 100) }}% match
+                        </span>
+                        {% if result.metadata.document_type %}
+                        <span class="badge bg-info ms-1">{{ result.metadata.document_type }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="text-muted small" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">{{ result.text[:500] }}{% if result.text|length > 500 %}...{% endif %}</div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-emoji-neutral" style="font-size: 2rem;"></i>
+                <p class="mt-2">No matching chunks found. Make sure documents are indexed and Ollama is running.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

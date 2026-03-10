@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Scan Projects - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1000px;">
+    <div class="page-header">
+        <h2><i class="bi bi-folder-symlink me-2"></i>Scan Historical Projects</h2>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-search me-1"></i>Scan Configuration
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin.scan_run') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-3">
+                    <label class="form-label">Project Folder Path</label>
+                    <input type="text" class="form-control" name="scan_path"
+                           value="{{ historical_path }}"
+                           placeholder="/path/to/historical/projects">
+                    <div class="form-text">
+                        Each subdirectory will be treated as a project folder.
+                        Documents (PDF, DOCX, XLSX) are discovered recursively.
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="extract_text"
+                                   name="extract_text" checked>
+                            <label class="form-check-label" for="extract_text">
+                                Extract text from documents during scan
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="dry_run" name="dry_run">
+                            <label class="form-check-label" for="dry_run">
+                                Dry run (preview only, no changes)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-accent">
+                        <i class="bi bi-play me-1"></i>Run Scan
+                    </button>
+                    <a href="{{ url_for('admin.index') }}" class="btn btn-outline-secondary">Back</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if scan_result %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-clipboard-data me-1"></i>Scan Results
+            {% if scan_result.get('dry_run') or (scan_result.details and scan_result.details[0].get('dry_run')) %}
+            <span class="badge bg-warning text-dark ms-2">Dry Run</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="row g-3 mb-4">
+                <div class="col-md-3 col-6">
+                    <div class="stat-card card p-3">
+                        <div class="stat-value">{{ scan_result.projects_found }}</div>
+                        <div class="stat-label">Projects Found</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="stat-card card p-3">
+                        <div class="stat-value">{{ scan_result.projects_created }}</div>
+                        <div class="stat-label">Projects Created</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="stat-card card p-3">
+                        <div class="stat-value">{{ scan_result.documents_found }}</div>
+                        <div class="stat-label">Documents Found</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="stat-card card p-3">
+                        <div class="stat-value">{{ scan_result.documents_created }}</div>
+                        <div class="stat-label">Documents Added</div>
+                    </div>
+                </div>
+            </div>
+
+            {% if scan_result.errors %}
+            <div class="alert alert-danger">
+                <strong>Errors ({{ scan_result.errors|length }}):</strong>
+                <ul class="mb-0 mt-1">
+                    {% for err in scan_result.errors %}
+                    <li>{{ err }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if scan_result.details %}
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>Folder</th>
+                        <th>Project #</th>
+                        <th>Docs Found</th>
+                        <th>Docs Added</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detail in scan_result.details %}
+                    <tr>
+                        <td><small>{{ detail.folder }}</small></td>
+                        <td>{{ detail.get('project_number', '-') }}</td>
+                        <td>{{ detail.documents_found }}</td>
+                        <td>{{ detail.documents_created }}</td>
+                        <td>
+                            {% if detail.get('created') %}
+                            <span class="badge bg-success">Created</span>
+                            {% elif detail.get('skipped') %}
+                            <span class="badge bg-secondary">Exists</span>
+                            {% elif detail.get('dry_run') %}
+                            <span class="badge bg-warning text-dark">Preview</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.indexing') }}" class="btn btn-accent">
+            <i class="bi bi-database-add me-1"></i>Go to Indexing
+        </a>
+        <a href="{{ url_for('main.projects') }}" class="btn btn-outline-accent">
+            <i class="bi bi-folder me-1"></i>View Projects
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

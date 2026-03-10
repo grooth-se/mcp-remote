@@ -1,0 +1,28 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environment
+venv/
+.env
+
+# Data directories
+data/new_projects/
+data/generated/
+data/vectordb/
+data/historical_projects/
+
+# Database
+*.db
+migrations/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

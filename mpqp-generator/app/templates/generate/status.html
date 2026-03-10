@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Job #{{ job.id }} - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <h2><i class="bi bi-list-task me-2"></i>Generation Job #{{ job.id }}</h2>
+        <span class="badge badge-{{ job.status }} fs-6">{{ job.status_label }}</span>
+    </div>
+
+    <!-- Workflow actions -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-signpost-split me-1"></i>Workflow
+        </div>
+        <div class="card-body">
+            <div class="d-flex gap-2 flex-wrap">
+                {% if not job.extracted_requirements or job.extracted_requirements.get('error') %}
+                <form method="POST" action="{{ url_for('generate.extract_requirements', job_id=job.id) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-accent">
+                        <i class="bi bi-cpu me-1"></i>1. Extract Requirements
+                    </button>
+                </form>
+                {% else %}
+                <span class="btn btn-outline-success disabled">
+                    <i class="bi bi-check-circle me-1"></i>1. Requirements Extracted
+                </span>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('generate.find_similar', job_id=job.id) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-accent">
+                        <i class="bi bi-diagram-3 me-1"></i>2. Find Similar Projects
+                    </button>
+                </form>
+
+                {% if job.similar_projects %}
+                <a href="{{ url_for('generate.review', job_id=job.id) }}" class="btn btn-outline-accent">
+                    <i class="bi bi-eye me-1"></i>3. Review &amp; Select
+                </a>
+                {% else %}
+                <span class="btn btn-outline-secondary disabled">
+                    <i class="bi bi-eye me-1"></i>3. Review &amp; Select
+                </span>
+                {% endif %}
+
+                {% if job.status in ('review', 'pending') and job.selected_references %}
+                <form method="POST" action="{{ url_for('generate.generate_doc', job_id=job.id) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-accent">
+                        <i class="bi bi-file-earmark-text me-1"></i>4. Generate Document
+                    </button>
+                </form>
+                {% elif job.status == 'completed' %}
+                <span class="btn btn-outline-success disabled">
+                    <i class="bi bi-check-circle me-1"></i>4. Generated
+                </span>
+                {% else %}
+                <span class="btn btn-outline-secondary disabled">
+                    <i class="bi bi-file-earmark-text me-1"></i>4. Generate Document
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-info-circle me-1"></i>Job Details
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl>
+                        <dt>Project Name</dt>
+                        <dd>{{ job.new_project_name or '-' }}</dd>
+                        <dt>Customer</dt>
+                        <dd>{{ job.customer.name if job.customer else '-' }}</dd>
+                        <dt>Product Type</dt>
+                        <dd>{{ job.product_type or '-' }}</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl>
+                        <dt>Template</dt>
+                        <dd>{{ job.template.name if job.template else 'Auto-select' }}</dd>
+                        <dt>Created</dt>
+                        <dd>{{ job.created_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+                        <dt>Selected References</dt>
+                        <dd>{{ (job.selected_references or [])|length }} project(s)</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Uploaded documents -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-file-earmark-arrow-up me-1"></i>Uploaded Documents ({{ (job.uploaded_documents or [])|length }})
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Format</th>
+                        <th>Pages</th>
+                        <th>Text Extracted</th>
+                        <th>Size</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in (job.uploaded_documents or []) %}
+                    <tr>
+                        <td><i class="bi bi-file-earmark me-1"></i>{{ doc.filename }}</td>
+                        <td>{{ doc.format }}</td>
+                        <td>{{ doc.page_count or '-' }}</td>
+                        <td>
+                            {% if doc.error %}
+                            <span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>{{ doc.error }}</span>
+                            {% elif doc.text_length %}
+                            <span class="text-success"><i class="bi bi-check-circle me-1"></i>{{ doc.text_length }} chars</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ doc.size }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Extracted requirements -->
+    {% if job.extracted_requirements and not job.extracted_requirements.get('error') %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-search me-1"></i>Extracted Requirements
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% if job.extracted_requirements.get('materials') %}
+                <div class="col-md-6 mb-3">
+                    <dt>Materials</dt>
+                    <dd>
+                        {% for m in job.extracted_requirements.materials %}
+                        <span class="badge bg-secondary">{{ m }}</span>
+                        {% endfor %}
+                    </dd>
+                </div>
+                {% endif %}
+                {% if job.extracted_requirements.get('standards') %}
+                <div class="col-md-6 mb-3">
+                    <dt>Standards</dt>
+                    <dd>
+                        {% for s in job.extracted_requirements.standards %}
+                        <span class="badge bg-secondary">{{ s }}</span>
+                        {% endfor %}
+                    </dd>
+                </div>
+                {% endif %}
+                {% if job.extracted_requirements.get('testing_requirements') %}
+                <div class="col-md-6 mb-3">
+                    <dt>Testing</dt>
+                    <dd>
+                        {% for t in job.extracted_requirements.testing_requirements %}
+                        <span class="badge bg-info">{{ t }}</span>
+                        {% endfor %}
+                    </dd>
+                </div>
+                {% endif %}
+                {% if job.extracted_requirements.get('welding_processes') %}
+                <div class="col-md-6 mb-3">
+                    <dt>Welding</dt>
+                    <dd>
+                        {% for w in job.extracted_requirements.welding_processes %}
+                        <span class="badge bg-info">{{ w }}</span>
+                        {% endfor %}
+                    </dd>
+                </div>
+                {% endif %}
+            </div>
+            <details class="mt-2">
+                <summary class="text-muted small">Raw JSON</summary>
+                <pre class="mt-2 small" style="max-height: 200px; overflow-y: auto;">{{ job.extracted_requirements | tojson(indent=2) }}</pre>
+            </details>
+        </div>
+    </div>
+    {% elif job.extracted_requirements and job.extracted_requirements.get('error') %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        Requirement extraction: {{ job.extracted_requirements.error }}
+    </div>
+    {% endif %}
+
+    <!-- Similar projects summary -->
+    {% if job.similar_projects %}
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-diagram-3 me-1"></i>Similar Projects ({{ job.similar_projects|length }})</span>
+            <a href="{{ url_for('generate.review', job_id=job.id) }}" class="btn btn-sm btn-outline-accent">
+                Review &amp; Select
+            </a>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Project</th>
+                        <th>Customer</th>
+                        <th>Type</th>
+                        <th>Score</th>
+                        <th>Selected</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in (job.similar_projects or [])[:5] %}
+                    <tr>
+                        <td><strong>{{ item.project_number }}</strong></td>
+                        <td>{{ item.customer or '-' }}</td>
+                        <td>{{ item.product_type or '-' }}</td>
+                        <td>{{ "%.0f"|format(item.score * 100) }}%</td>
+                        <td>
+                            {% if item.project_id in (job.selected_references or []) %}
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Generation log -->
+    {% if job.generation_log %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-terminal me-1"></i>Generation Log
+        </div>
+        <div class="card-body">
+            <pre class="mb-0 small" style="max-height: 300px; overflow-y: auto;">{{ job.generation_log }}</pre>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="d-flex justify-content-between">
+        <a href="{{ url_for('generate.job_list') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Back to Jobs
+        </a>
+        {% if job.generated_document_path %}
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('generate.chat', job_id=job.id) }}" class="btn btn-accent">
+                <i class="bi bi-chat-dots me-1"></i>Refine with Chat
+            </a>
+            <a href="{{ url_for('generate.download', job_id=job.id) }}" class="btn btn-outline-accent">
+                <i class="bi bi-download me-1"></i>Download Markdown
+            </a>
+            <form method="POST" action="{{ url_for('generate.export_word', job_id=job.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-accent">
+                    <i class="bi bi-file-earmark-word me-1"></i>Export Word
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

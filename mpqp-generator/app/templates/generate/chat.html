@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}Refine - Job #{{ job.id }} - MPQP Generator{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        height: calc(100vh - 250px);
+        min-height: 400px;
+        display: flex;
+        flex-direction: column;
+    }
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+    }
+    .chat-msg {
+        margin-bottom: 1rem;
+        max-width: 85%;
+    }
+    .chat-msg.user {
+        margin-left: auto;
+    }
+    .chat-msg .bubble {
+        padding: 0.75rem 1rem;
+        border-radius: 0.75rem;
+        line-height: 1.5;
+    }
+    .chat-msg.user .bubble {
+        background: var(--accent, #00A2A4);
+        color: #fff;
+    }
+    .chat-msg.assistant .bubble {
+        background: #fff;
+        border: 1px solid #dee2e6;
+    }
+    .chat-msg .meta {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    .chat-msg.user .meta { text-align: right; }
+    .doc-preview {
+        height: calc(100vh - 250px);
+        min-height: 400px;
+        overflow-y: auto;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        font-size: 0.9rem;
+    }
+    .doc-preview h2 { font-size: 1.2rem; margin-top: 1.5rem; color: var(--dark-bg, #1a1a2e); }
+    .doc-preview h3 { font-size: 1.05rem; margin-top: 1rem; }
+    .doc-preview ul, .doc-preview ol { padding-left: 1.5rem; }
+    .version-badge { font-size: 0.8rem; }
+    #send-btn:disabled { opacity: 0.6; }
+    .typing-indicator { color: #6c757d; font-style: italic; display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="max-width: 1400px;">
+    <div class="page-header d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Refine Document</h2>
+            <small class="text-muted">Job #{{ job.id }} — {{ job.new_project_name }} — v{{ job.current_version }}</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('generate.status', job_id=job.id) }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Back to Status
+            </a>
+            <a href="{{ url_for('generate.download', job_id=job.id) }}" class="btn btn-outline-accent btn-sm">
+                <i class="bi bi-download me-1"></i>Download
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Chat panel -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-chat-dots me-1"></i>Chat</span>
+                    <button class="btn btn-outline-secondary btn-sm" id="clear-btn" title="Clear history">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chat-messages">
+                            {% if not history %}
+                            <div class="text-center text-muted py-4" id="empty-state">
+                                <i class="bi bi-chat-dots" style="font-size: 2rem;"></i>
+                                <p class="mt-2 mb-0">Ask me to refine any section of the document.</p>
+                                <p class="small">e.g. "Update the materials section to use Super Duplex instead of Inconel 625"</p>
+                            </div>
+                            {% endif %}
+                            {% for msg in history %}
+                            <div class="chat-msg {{ msg.role }}">
+                                <div class="bubble">{{ msg.content }}</div>
+                                <div class="meta">{{ msg.timestamp[:16] if msg.timestamp else '' }}</div>
+                            </div>
+                            {% endfor %}
+                            <div class="typing-indicator px-3 pb-2" id="typing">
+                                <i class="bi bi-three-dots"></i> Thinking...
+                            </div>
+                        </div>
+                        <div class="p-2 border-top">
+                            <form id="chat-form" class="d-flex gap-2">
+                                <input type="text" id="chat-input" class="form-control"
+                                       placeholder="Ask to refine the document..." autocomplete="off">
+                                <button type="submit" id="send-btn" class="btn btn-accent">
+                                    <i class="bi bi-send"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Version history -->
+            {% if versions %}
+            <div class="card mt-3">
+                <div class="card-header">
+                    <i class="bi bi-clock-history me-1"></i>Version History
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            {% for v in versions %}
+                            <tr>
+                                <td><span class="badge bg-secondary version-badge">v{{ v.version_number }}</span></td>
+                                <td>{{ v.changes_description or 'No description' }}</td>
+                                <td class="text-muted small">{{ v.created_at.strftime('%m-%d %H:%M') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Document preview -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-file-earmark-text me-1"></i>Document Preview (v{{ job.current_version }})</span>
+                    <button class="btn btn-outline-accent btn-sm" id="apply-btn" disabled title="Apply last LLM response as revision">
+                        <i class="bi bi-check2-circle me-1"></i>Apply Revision
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="doc-preview" id="doc-preview">{{ doc_content }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const jobId = {{ job.id }};
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const chatForm = document.getElementById('chat-form');
+const sendBtn = document.getElementById('send-btn');
+const applyBtn = document.getElementById('apply-btn');
+const clearBtn = document.getElementById('clear-btn');
+const typingIndicator = document.getElementById('typing');
+const docPreview = document.getElementById('doc-preview');
+let lastResponse = '';
+
+function scrollToBottom() {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addMessage(role, content) {
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.remove();
+
+    const div = document.createElement('div');
+    div.className = `chat-msg ${role}`;
+    const now = new Date().toISOString().slice(0, 16);
+    div.innerHTML = `<div class="bubble">${escapeHtml(content)}</div><div class="meta">${now}</div>`;
+    typingIndicator.before(div);
+    scrollToBottom();
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = chatInput.value.trim();
+    if (!msg) return;
+
+    addMessage('user', msg);
+    chatInput.value = '';
+    sendBtn.disabled = true;
+    typingIndicator.style.display = 'block';
+    scrollToBottom();
+
+    try {
+        const resp = await fetch(`/generate/chat/${jobId}/send`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: msg}),
+        });
+        const data = await resp.json();
+        typingIndicator.style.display = 'none';
+
+        if (data.error) {
+            addMessage('assistant', `Error: ${data.error}`);
+        } else {
+            addMessage('assistant', data.response);
+            lastResponse = data.response;
+            applyBtn.disabled = false;
+        }
+    } catch (err) {
+        typingIndicator.style.display = 'none';
+        addMessage('assistant', `Error: ${err.message}`);
+    }
+    sendBtn.disabled = false;
+    chatInput.focus();
+});
+
+applyBtn.addEventListener('click', async () => {
+    if (!lastResponse) return;
+    applyBtn.disabled = true;
+    applyBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Applying...';
+
+    try {
+        const resp = await fetch(`/generate/chat/${jobId}/apply`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({content: lastResponse, description: 'Chat refinement'}),
+        });
+        const data = await resp.json();
+
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            docPreview.textContent = lastResponse;
+            const header = document.querySelector('.card-header span');
+            if (header && header.textContent.includes('Preview')) {
+                header.innerHTML = `<i class="bi bi-file-earmark-text me-1"></i>Document Preview (v${data.version})`;
+            }
+            addMessage('assistant', `✓ Applied as version ${data.version}`);
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+    applyBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Apply Revision';
+    applyBtn.disabled = true;
+});
+
+clearBtn.addEventListener('click', async () => {
+    if (!confirm('Clear chat history?')) return;
+    await fetch(`/generate/chat/${jobId}/clear`, {method: 'POST'});
+    chatMessages.innerHTML = `<div class="text-center text-muted py-4" id="empty-state">
+        <i class="bi bi-chat-dots" style="font-size: 2rem;"></i>
+        <p class="mt-2 mb-0">Ask me to refine any section of the document.</p>
+    </div><div class="typing-indicator px-3 pb-2" id="typing" style="display:none;">
+        <i class="bi bi-three-dots"></i> Thinking...</div>`;
+});
+
+// Auto-scroll on load if there's history
+scrollToBottom();
+chatInput.focus();
+</script>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Admin - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="bi bi-gear me-2"></i>Administration</h2>
+    </div>
+
+    <div class="row g-4">
+        <!-- System Status -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-cpu me-1"></i>System Status
+                </div>
+                <div class="card-body">
+                    <dl class="mb-0">
+                        <dt>Ollama (Local LLM)</dt>
+                        <dd>
+                            {% if ollama_status.online %}
+                            <span class="badge bg-success">Online</span>
+                            {% if ollama_status.models %}
+                            <br><small class="text-muted mt-1 d-block">
+                                Models: {{ ollama_status.models | join(', ') }}
+                            </small>
+                            {% endif %}
+                            {% else %}
+                            <span class="badge bg-danger">Offline</span>
+                            <br><small class="text-muted">Ollama is not running or not reachable.</small>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="mt-3">Vector Database (ChromaDB)</dt>
+                        <dd>
+                            {% if vector_stats.status == 'online' %}
+                            <span class="badge bg-success">Online</span>
+                            <span class="ms-2">{{ vector_stats.total_chunks }} chunks stored</span>
+                            {% else %}
+                            <span class="badge bg-danger">Error</span>
+                            <br><small class="text-muted">{{ vector_stats.error or 'Not available' }}</small>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="mt-3">Indexing Status</dt>
+                        <dd>
+                            {{ indexed_projects }}/{{ total_projects }} projects indexed<br>
+                            {{ indexed_docs }}/{{ total_docs }} documents indexed
+                        </dd>
+
+                        <dt class="mt-3">Templates</dt>
+                        <dd>
+                            {{ templates|length }} active template(s)
+                            <a href="{{ url_for('admin.templates') }}" class="ms-2">Manage</a>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-lightning me-1"></i>Quick Actions
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin.scan') }}" class="btn btn-outline-accent text-start">
+                            <i class="bi bi-folder-symlink me-2"></i>Scan Project Folders
+                        </a>
+                        <a href="{{ url_for('admin.indexing') }}" class="btn btn-outline-accent text-start">
+                            <i class="bi bi-database-add me-2"></i>Document Indexing
+                        </a>
+                        <a href="{{ url_for('admin.search') }}" class="btn btn-outline-accent text-start">
+                            <i class="bi bi-search me-2"></i>Vector Search
+                        </a>
+                        <a href="{{ url_for('admin.templates') }}" class="btn btn-outline-accent text-start">
+                            <i class="bi bi-file-earmark-plus me-2"></i>Manage Templates
+                        </a>
+                        <a href="{{ url_for('upload.index') }}" class="btn btn-outline-accent text-start">
+                            <i class="bi bi-cloud-upload me-2"></i>New Generation
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

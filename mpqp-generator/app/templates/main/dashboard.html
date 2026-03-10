@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <h2><i class="bi bi-speedometer2 me-2"></i>Dashboard</h2>
+        <a href="{{ url_for('upload.index') }}" class="btn btn-accent">
+            <i class="bi bi-plus-lg me-1"></i>New Generation
+        </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+            <div class="card stat-card">
+                <div class="stat-value">{{ stats.total_projects }}</div>
+                <div class="stat-label">Indexed Projects</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card stat-card">
+                <div class="stat-value">{{ stats.total_customers }}</div>
+                <div class="stat-label">Customers</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card stat-card">
+                <div class="stat-value">{{ stats.completed_jobs }}</div>
+                <div class="stat-label">Documents Generated</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card stat-card">
+                <div class="stat-value">{{ stats.pending_jobs }}</div>
+                <div class="stat-label">In Progress</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System status -->
+    <div class="card mb-4">
+        <div class="card-body py-2 d-flex align-items-center gap-3">
+            <span class="small text-muted">LLM:</span>
+            {% if ollama.online %}
+            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Ollama Online</span>
+            {% if ollama.models %}
+            <span class="small text-muted">Models: {{ ollama.models|join(', ') }}</span>
+            {% endif %}
+            {% else %}
+            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Ollama Offline</span>
+            <span class="small text-muted">Generation and extraction require Ollama</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent jobs -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-clock-history me-1"></i>Recent Generation Jobs</span>
+            <a href="{{ url_for('generate.job_list') }}" class="btn btn-sm btn-outline-accent">View All</a>
+        </div>
+        <div class="card-body p-0">
+            {% if recent_jobs %}
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Project</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Documents</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in recent_jobs %}
+                    <tr>
+                        <td>{{ job.id }}</td>
+                        <td>{{ job.new_project_name or '-' }}</td>
+                        <td>{{ job.product_type or '-' }}</td>
+                        <td>
+                            <span class="badge badge-{{ job.status }}">{{ job.status_label }}</span>
+                        </td>
+                        <td>{{ (job.uploaded_documents or [])|length }}</td>
+                        <td>{{ job.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('generate.status', job_id=job.id) }}" class="btn btn-outline-accent" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if job.generated_document_path %}
+                                <a href="{{ url_for('generate.chat', job_id=job.id) }}" class="btn btn-outline-accent" title="Refine">
+                                    <i class="bi bi-chat-dots"></i>
+                                </a>
+                                <a href="{{ url_for('generate.download', job_id=job.id) }}" class="btn btn-outline-accent" title="Download">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                <p class="mt-2">No generation jobs yet. Start by uploading project documents.</p>
+                <a href="{{ url_for('upload.index') }}" class="btn btn-accent mt-2">
+                    <i class="bi bi-cloud-upload me-1"></i>Upload Documents
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

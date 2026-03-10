@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Review Similar Projects - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1100px;">
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h2><i class="bi bi-diagram-3 me-2"></i>Similar Projects</h2>
+            <p class="text-muted mb-0">Job #{{ job.id }} &mdash; {{ job.new_project_name }}</p>
+        </div>
+        <span class="badge badge-{{ job.status }} fs-6">{{ job.status_label }}</span>
+    </div>
+
+    {% if job.extracted_requirements and job.extracted_requirements.get('materials') %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-search me-1"></i>Matching Criteria
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <dt>Customer</dt>
+                    <dd>{{ job.customer.name if job.customer else 'Not specified' }}</dd>
+                </div>
+                <div class="col-md-3">
+                    <dt>Product Type</dt>
+                    <dd>{{ job.product_type or 'Not specified' }}</dd>
+                </div>
+                <div class="col-md-3">
+                    <dt>Materials</dt>
+                    <dd>
+                        {% for m in (job.extracted_requirements.materials or [])[:5] %}
+                        <span class="badge bg-secondary">{{ m }}</span>
+                        {% endfor %}
+                    </dd>
+                </div>
+                <div class="col-md-3">
+                    <dt>Standards</dt>
+                    <dd>
+                        {% for s in (job.extracted_requirements.standards or [])[:5] %}
+                        <span class="badge bg-secondary">{{ s }}</span>
+                        {% endfor %}
+                    </dd>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('generate.select_references', job_id=job.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% if similar %}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-list-stars me-1"></i>Ranked Projects ({{ similar|length }})</span>
+                <small class="text-muted">Select projects to use as references for generation</small>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;"></th>
+                            <th>Project</th>
+                            <th>Customer</th>
+                            <th>Type</th>
+                            <th>Score</th>
+                            <th>Matching Factors</th>
+                            <th>Docs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in similar %}
+                        <tr class="{{ 'table-success' if item.score >= 0.5 else 'table-warning' if item.score >= 0.3 else '' }}">
+                            <td>
+                                <input type="checkbox" class="form-check-input"
+                                       name="reference_projects" value="{{ item.project_id }}"
+                                       {{ 'checked' if item.score >= 0.5 }}>
+                            </td>
+                            <td>
+                                <strong>{{ item.project_number }}</strong>
+                                {% if item.project_name %}
+                                <br><small class="text-muted">{{ item.project_name[:60] }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.customer or '-' }}</td>
+                            <td>{{ item.product_type or '-' }}</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1" style="height: 8px; width: 60px;">
+                                        <div class="progress-bar {{ 'bg-success' if item.score >= 0.5 else 'bg-warning' if item.score >= 0.3 else 'bg-secondary' }}"
+                                             style="width: {{ (item.score * 100)|int }}%"></div>
+                                    </div>
+                                    <span class="ms-2 small fw-bold">{{ "%.0f"|format(item.score * 100) }}%</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% set bd = item.get('breakdown', {}) %}
+                                {% if bd.get('customer', 0) > 0 %}
+                                <span class="badge bg-primary" title="Customer match">C</span>
+                                {% endif %}
+                                {% if bd.get('product', 0) > 0 %}
+                                <span class="badge bg-info" title="Product type match {{ 'exact' if bd.product >= 1 else 'category' }}">
+                                    P{{ '*' if bd.product < 1 else '' }}
+                                </span>
+                                {% endif %}
+                                {% if bd.get('materials', 0) > 0 %}
+                                <span class="badge bg-success" title="Material overlap {{ '%.0f'|format(bd.materials * 100) }}%">M</span>
+                                {% endif %}
+                                {% if bd.get('standards', 0) > 0 %}
+                                <span class="badge bg-warning text-dark" title="Standard overlap {{ '%.0f'|format(bd.standards * 100) }}%">S</span>
+                                {% endif %}
+                                {% if item.vector_score > 0.3 %}
+                                <span class="badge bg-dark" title="Vector similarity {{ '%.0f'|format(item.vector_score * 100) }}%">V</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.get('output_documents') %}
+                                {% for od in item.output_documents %}
+                                <span class="badge bg-secondary">{{ od.type }}</span>
+                                {% endfor %}
+                                {% else %}
+                                <small class="text-muted">{{ item.get('document_count', '?') }}</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if item.materials or item.standards %}
+                        <tr class="small">
+                            <td></td>
+                            <td colspan="6" class="py-1">
+                                {% for m in (item.materials or [])[:4] %}
+                                <span class="badge bg-light text-dark">{{ m }}</span>
+                                {% endfor %}
+                                {% for s in (item.standards or [])[:4] %}
+                                <span class="badge bg-light text-dark border">{{ s }}</span>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="card mb-4">
+            <div class="card-body text-center py-5 text-muted">
+                <i class="bi bi-search" style="font-size: 3rem;"></i>
+                <p class="mt-2">No similar projects found in the indexed data.</p>
+                <p>You can still proceed with generation using the uploaded documents only.</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Score legend -->
+        <div class="card mb-4">
+            <div class="card-body small">
+                <strong>Matching factors:</strong>
+                <span class="badge bg-primary">C</span> Customer (40%)
+                <span class="badge bg-info">P</span> Product type (30%)
+                <span class="badge bg-success">M</span> Materials (15%)
+                <span class="badge bg-warning text-dark">S</span> Standards (15%)
+                <span class="badge bg-dark">V</span> Vector similarity
+                &mdash;
+                <span class="badge bg-info">P*</span> = same category, different type
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('generate.status', job_id=job.id) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back to Job
+            </a>
+            <button type="submit" class="btn btn-accent btn-lg">
+                <i class="bi bi-check2-square me-1"></i>Confirm Selection
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

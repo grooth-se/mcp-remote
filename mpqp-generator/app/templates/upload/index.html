@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}New Generation - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <div class="page-header">
+        <h2><i class="bi bi-cloud-upload me-2"></i>New Document Generation</h2>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('upload.create') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-1"></i>Project Details
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="project_name" class="form-label">Project Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="project_name" name="project_name" required
+                           placeholder="e.g. TTR System - Customer X">
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="customer_name" class="form-label">Customer</label>
+                        <input type="text" class="form-control" id="customer_name" name="customer_name"
+                               list="customer_list" placeholder="Start typing...">
+                        <datalist id="customer_list">
+                            {% for c in customers %}
+                            <option value="{{ c.name }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="product_type" class="form-label">Product Type</label>
+                        <select class="form-select" id="product_type" name="product_type">
+                            <option value="">-- Select --</option>
+                            {% for code, label in product_types %}
+                            <option value="{{ code }}">{{ code }} - {{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="document_type" class="form-label">Document Type</label>
+                        <select class="form-select" id="document_type" name="document_type">
+                            <option value="MPQP">MPQP</option>
+                            <option value="MPS">MPS</option>
+                            <option value="ITP">ITP</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="template_id" class="form-label">Template</label>
+                        <select class="form-select" id="template_id" name="template_id">
+                            <option value="">-- Auto-select --</option>
+                            {% for t in templates %}
+                            <option value="{{ t.id }}">{{ t.name }} ({{ t.document_type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Documents
+            </div>
+            <div class="card-body">
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                    <i class="bi bi-cloud-arrow-up d-block mb-2"></i>
+                    <p class="mb-1"><strong>Click or drag files here</strong></p>
+                    <p class="text-muted small mb-0">Supported: PDF, Word (.docx), Excel (.xlsx)</p>
+                </div>
+                <input type="file" id="fileInput" name="documents" multiple accept=".pdf,.docx,.doc,.xlsx,.xls"
+                       class="d-none" onchange="updateFileList()">
+                <div id="fileList" class="mt-3"></div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-accent btn-lg">
+                <i class="bi bi-lightning me-1"></i>Start Generation
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const zone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+
+['dragenter', 'dragover'].forEach(e => {
+    zone.addEventListener(e, (ev) => { ev.preventDefault(); zone.classList.add('dragover'); });
+});
+['dragleave', 'drop'].forEach(e => {
+    zone.addEventListener(e, (ev) => { ev.preventDefault(); zone.classList.remove('dragover'); });
+});
+zone.addEventListener('drop', (ev) => {
+    fileInput.files = ev.dataTransfer.files;
+    updateFileList();
+});
+
+function updateFileList() {
+    const list = document.getElementById('fileList');
+    const files = fileInput.files;
+    if (!files.length) { list.innerHTML = ''; return; }
+    let html = '<ul class="list-group">';
+    for (const f of files) {
+        const size = (f.size / 1024).toFixed(0);
+        html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-file-earmark me-2"></i>${f.name}</span>
+            <span class="badge bg-secondary">${size} KB</span>
+        </li>`;
+    }
+    html += '</ul>';
+    list.innerHTML = html;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  mpqpgenerator:
+    build: .
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./data:/app/data
+      # Mount historical projects folder (adjust path when available)
+      # - /mnt/projects:/data/projects:ro
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - DATABASE_URL=postgresql://mpqp:${POSTGRES_PASSWORD:-mpqp}@db:5432/mpqp_generator
+      - OLLAMA_HOST=http://ollama:11434
+      - LLM_MODEL=llama3.1:8b
+      - EMBEDDING_MODEL=nomic-embed-text
+      - APP_CODE=mpqpgenerator
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_EXTERNAL_URL=/
+      - PORTAL_AUTH_ENABLED=true
+      - GUNICORN_WORKERS=2
+      - GUNICORN_TIMEOUT=300
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=mpqp_generator
+      - POSTGRES_USER=mpqp
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mpqp}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mpqp -d mpqp_generator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    # CPU-only — no GPU reservation needed
+    # After first start, pull models:
+    #   docker compose exec ollama ollama pull llama3.1:8b
+    #   docker compose exec ollama ollama pull nomic-embed-text
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  ollama_models:

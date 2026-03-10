@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Templates - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="bi bi-file-earmark-ruled me-2"></i>Document Templates</h2>
+    </div>
+
+    <div class="row g-4">
+        <!-- Upload new template -->
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-plus-circle me-1"></i>Upload Template
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin.upload_template') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" required
+                                   placeholder="e.g. Standard MPQP Template">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Document Type</label>
+                            <select class="form-select" name="document_type">
+                                <option value="MPQP">MPQP</option>
+                                <option value="MPS">MPS</option>
+                                <option value="ITP">ITP</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" name="description" rows="2"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Template File <span class="text-danger">*</span></label>
+                            <input type="file" class="form-control" name="template_file" required
+                                   accept=".docx,.doc,.xlsx,.xls">
+                        </div>
+                        <button type="submit" class="btn btn-accent w-100">
+                            <i class="bi bi-upload me-1"></i>Upload
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Existing templates -->
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-collection me-1"></i>Existing Templates
+                </div>
+                <div class="card-body p-0">
+                    {% if templates %}
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Format</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in templates %}
+                            <tr>
+                                <td>
+                                    <strong>{{ t.name }}</strong>
+                                    {% if t.description %}
+                                    <br><small class="text-muted">{{ t.description }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>{{ t.document_type }}</td>
+                                <td>{{ t.format }}</td>
+                                <td>
+                                    {% if t.active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p class="mb-0">No templates uploaded yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

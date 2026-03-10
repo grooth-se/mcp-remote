@@ -1,0 +1,160 @@
+/* MPQP Generator — matches App Portal color scheme */
+
+:root {
+    --accent: #00A2A4;
+    --accent-hover: #008688;
+    --dark-bg: #1a1a2e;
+    --dark-bg-light: #232340;
+}
+
+/* Navbar */
+.navbar {
+    background-color: var(--dark-bg);
+}
+
+.navbar-brand {
+    font-weight: 600;
+    color: var(--accent) !important;
+}
+
+.navbar .nav-link {
+    color: rgba(255, 255, 255, 0.8) !important;
+    transition: color 0.2s;
+}
+
+.navbar .nav-link:hover,
+.navbar .nav-link.active {
+    color: var(--accent) !important;
+}
+
+/* Accent buttons */
+.btn-accent {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.btn-accent:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: #fff;
+}
+
+.btn-outline-accent {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.btn-outline-accent:hover {
+    background-color: var(--accent);
+    color: #fff;
+}
+
+/* Cards */
+.card {
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid var(--accent);
+    font-weight: 600;
+}
+
+/* Stat cards */
+.stat-card {
+    text-align: center;
+    padding: 1.5rem;
+}
+
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.stat-card .stat-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Status badges */
+.badge-pending { background-color: #6c757d; }
+.badge-extracting,
+.badge-analyzing,
+.badge-matching,
+.badge-generating { background-color: var(--accent); }
+.badge-review { background-color: #ffc107; color: #000; }
+.badge-completed { background-color: #198754; }
+.badge-failed { background-color: #dc3545; }
+
+/* Border accent utility */
+.border-accent {
+    border-color: var(--accent) !important;
+}
+
+/* Upload area */
+.upload-zone {
+    border: 2px dashed var(--accent);
+    border-radius: 0.5rem;
+    padding: 3rem;
+    text-align: center;
+    background: #f8fffe;
+    transition: background 0.2s, border-color 0.2s;
+    cursor: pointer;
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+    background: #e8f8f8;
+    border-color: var(--accent-hover);
+}
+
+.upload-zone i {
+    font-size: 3rem;
+    color: var(--accent);
+}
+
+/* Footer */
+.footer {
+    border-top: 1px solid #dee2e6;
+}
+
+/* Tables */
+.table th {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #6c757d;
+    border-bottom-color: var(--accent);
+}
+
+/* Links */
+a {
+    color: var(--accent);
+}
+
+a:hover {
+    color: var(--accent-hover);
+}
+
+/* Page header */
+.page-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--accent);
+}
+
+.page-header h1,
+.page-header h2 {
+    color: var(--dark-bg);
+    font-weight: 600;
+}
