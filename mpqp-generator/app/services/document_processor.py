@@ -24,56 +24,65 @@ def extract_text(file_path):
         return {'text': '', 'page_count': 0, 'format': ext, 'metadata': {}, 'error': f'Unsupported format: {ext}'}
 
 
-def _extract_pdf(file_path):
-    """Extract text from PDF using PyMuPDF."""
+def _extract_pdf_worker(file_path):
+    """Worker function for PDF extraction — runs in a subprocess."""
+    import fitz  # PyMuPDF
+
+    doc = fitz.open(file_path)
+    pages = [page.get_text() for page in doc]
+    text = '\n\n'.join(pages)
+    metadata = {
+        'title': doc.metadata.get('title', ''),
+        'author': doc.metadata.get('author', ''),
+        'subject': doc.metadata.get('subject', ''),
+    }
+    page_count = len(doc)
+    doc.close()
+    return {
+        'text': text,
+        'page_count': page_count,
+        'format': 'PDF',
+        'metadata': metadata,
+    }
+
+
+def _pdf_subprocess_target(file_path, result_queue):
+    """Subprocess target for PDF extraction — must be module-level for pickling."""
     try:
-        import signal
-        import fitz  # PyMuPDF
-
-        # Timeout guard: skip PDFs that take too long (e.g. corrupted files)
-        timed_out = False
-
-        def _timeout_handler(signum, frame):
-            nonlocal timed_out
-            timed_out = True
-            raise TimeoutError('PDF extraction timed out')
-
-        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(30)  # 30 second timeout per PDF
-
-        try:
-            doc = fitz.open(file_path)
-            pages = []
-            for page in doc:
-                pages.append(page.get_text())
-
-            text = '\n\n'.join(pages)
-            metadata = {
-                'title': doc.metadata.get('title', ''),
-                'author': doc.metadata.get('author', ''),
-                'subject': doc.metadata.get('subject', ''),
-            }
-            page_count = len(doc)
-            doc.close()
-        finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
-
-        return {
-            'text': text,
-            'page_count': page_count,
-            'format': 'PDF',
-            'metadata': metadata,
-        }
-    except ImportError:
-        logger.error('PyMuPDF (fitz) not installed')
-        return {'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': 'PyMuPDF not installed'}
-    except TimeoutError:
-        logger.warning(f'PDF extraction timed out for {file_path}')
-        return {'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': 'extraction timed out'}
+        result = _extract_pdf_worker(file_path)
+        result_queue.put(result)
     except Exception as e:
-        logger.error(f'PDF extraction failed for {file_path}: {e}')
-        return {'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': str(e)}
+        result_queue.put({'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': str(e)})
+
+
+def _extract_pdf(file_path):
+    """Extract text from PDF using PyMuPDF.
+
+    Uses a subprocess with timeout to protect against corrupted PDFs that
+    can hang or segfault PyMuPDF (a C extension). signal.SIGALRM does not
+    work from background threads, so we use multiprocessing instead.
+    """
+    from multiprocessing import Process, Queue
+
+    result_queue = Queue()
+    proc = Process(target=_pdf_subprocess_target, args=(file_path, result_queue))
+    proc.start()
+    proc.join(timeout=30)
+
+    if proc.is_alive():
+        logger.warning(f'PDF extraction timed out for {file_path}, killing subprocess')
+        proc.kill()
+        proc.join()
+        return {'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': 'extraction timed out'}
+
+    if proc.exitcode != 0:
+        logger.error(f'PDF extraction crashed for {file_path} (exit code {proc.exitcode})')
+        return {'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': f'subprocess crashed (exit code {proc.exitcode})'}
+
+    try:
+        return result_queue.get_nowait()
+    except Exception:
+        return {'text': '', 'page_count': 0, 'format': 'PDF', 'metadata': {}, 'error': 'no result from subprocess'}
 
 
 def _extract_word(file_path):

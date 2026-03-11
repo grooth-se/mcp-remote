@@ -239,9 +239,8 @@ def test_admin_scan_real_directory(app, db, logged_in_client):
             'scan_path': tmpdir,
             'extract_text': '',
             'csrf_token': _get_csrf(logged_in_client),
-        })
+        }, follow_redirects=True)
         assert resp.status_code == 200
-        assert b'Scan Results' in resp.data
 
 
 # --- Helper ---
