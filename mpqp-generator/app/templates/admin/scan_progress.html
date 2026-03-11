@@ -33,7 +33,10 @@
     const detailEl = document.getElementById('progress-detail');
     const spinnerEl = document.getElementById('spinner');
 
+    let pollCount = 0;
+
     function poll() {
+        pollCount++;
         fetch('{{ url_for("admin.scan_status") }}')
             .then(r => r.json())
             .then(data => {
@@ -47,12 +50,16 @@
                 if (data.done) {
                     // Scan finished — redirect to results page
                     window.location.href = '{{ url_for("admin.scan_progress") }}';
-                } else if (data.running) {
+                } else if (data.running || pollCount <= 5) {
+                    // Keep polling if running, or if still in early polls
+                    // (thread may not have started yet)
                     setTimeout(poll, 2000);
                 } else {
-                    // Not running and not done — something went wrong
+                    // Not running and not done after several polls — something went wrong
                     spinnerEl.classList.add('d-none');
                     msgEl.textContent = 'Scan stopped unexpectedly.';
+                    msgEl.insertAdjacentHTML('afterend',
+                        '<a href="{{ url_for("admin.scan") }}" class="btn btn-outline-primary mt-3">Back to Scan</a>');
                 }
             })
             .catch(() => {
@@ -60,7 +67,7 @@
             });
     }
 
-    setTimeout(poll, 1000);
+    setTimeout(poll, 500);
 })();
 </script>
 {% endblock %}
