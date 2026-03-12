@@ -35,6 +35,12 @@ from app.services.document_processor import extract_text, SUPPORTED_EXTENSIONS
 MAX_FILE_SIZE_FOR_EXTRACTION = 50 * 1024 * 1024  # 50 MB
 MAX_DOCUMENTS_PER_PROJECT = 500
 
+# Subfolders to skip during scan (case-insensitive).
+# These contain bulk certificates/data books, not useful for MPQP/MPS generation.
+SKIP_SUBFOLDER_NAMES = {
+    'data books and certificates',
+}
+
 logger = logging.getLogger(__name__)
 
 # Patterns to guess document type from filename/path
@@ -331,8 +337,12 @@ def _find_documents(folder_path):
     """Recursively find all supported document files in a folder."""
     documents = []
     for root, dirs, files in os.walk(folder_path):
-        # Skip hidden directories
-        dirs[:] = [d for d in dirs if not d.startswith('.')]
+        # Skip hidden directories and excluded subfolder names
+        dirs[:] = [
+            d for d in dirs
+            if not d.startswith('.')
+            and d.lower() not in SKIP_SUBFOLDER_NAMES
+        ]
         for f in sorted(files):
             if f.startswith('.') or f.startswith('~$'):
                 continue
