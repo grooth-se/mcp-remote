@@ -18,6 +18,7 @@ Expected folder structure (flexible):
 
 The scanner is tolerant of varied naming conventions.
 """
+import gc
 import os
 import re
 import logging
@@ -29,6 +30,10 @@ from app import db
 from app.models.project import Project, Customer
 from app.models.document import Document
 from app.services.document_processor import extract_text, SUPPORTED_EXTENSIONS
+
+# Limits to prevent OOM on huge project folders
+MAX_FILE_SIZE_FOR_EXTRACTION = 50 * 1024 * 1024  # 50 MB
+MAX_DOCUMENTS_PER_PROJECT = 500
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +181,9 @@ def scan_directory(root_path, extract_text_flag=True, dry_run=False, progress_ca
                 db.session.rollback()
             except Exception:
                 pass
+        finally:
+            # Free memory after each project to prevent OOM
+            gc.collect()
 
     if progress_callback:
         progress_callback('Complete', total, total)
@@ -259,7 +267,15 @@ def _process_project_folder(folder_path, folder_name, extract_text_flag, dry_run
 def _scan_documents_for_project(project, folder_path, extract_text_flag, dry_run, result):
     """Recursively find and register documents for a project."""
     doc_files = _find_documents(folder_path)
-    result['documents_found'] = len(doc_files)
+    total_found = len(doc_files)
+    result['documents_found'] = total_found
+
+    if total_found > MAX_DOCUMENTS_PER_PROJECT:
+        logger.warning(
+            f'Project {project.project_number}: {total_found} documents found, '
+            f'capping at {MAX_DOCUMENTS_PER_PROJECT}'
+        )
+        doc_files = doc_files[:MAX_DOCUMENTS_PER_PROJECT]
 
     for file_path in doc_files:
         file_name = os.path.basename(file_path)
@@ -280,7 +296,10 @@ def _scan_documents_for_project(project, folder_path, extract_text_flag, dry_run
         # Determine document type and format
         doc_type = _guess_document_type(file_path)
         file_format = Document.FORMAT_EXTENSIONS.get(ext, ext.upper().lstrip('.'))
-        file_size = os.path.getsize(file_path)
+        try:
+            file_size = os.path.getsize(file_path)
+        except OSError:
+            file_size = 0
 
         doc = Document(
             project_id=project.id,
@@ -291,8 +310,8 @@ def _scan_documents_for_project(project, folder_path, extract_text_flag, dry_run
             file_size=file_size,
         )
 
-        # Optionally extract text during scan
-        if extract_text_flag:
+        # Optionally extract text during scan (skip large files)
+        if extract_text_flag and file_size <= MAX_FILE_SIZE_FOR_EXTRACTION:
             try:
                 extraction = extract_text(file_path)
                 doc.extracted_text = extraction.get('text', '')
@@ -300,6 +319,8 @@ def _scan_documents_for_project(project, folder_path, extract_text_flag, dry_run
                 doc.metadata_ = extraction.get('metadata', {})
             except Exception as e:
                 logger.warning(f'Text extraction failed for {file_path}: {e}')
+        elif extract_text_flag and file_size > MAX_FILE_SIZE_FOR_EXTRACTION:
+            logger.info(f'Skipping text extraction for large file ({file_size/1024/1024:.0f} MB): {file_name}')
 
         db.session.add(doc)
         db.session.commit()
