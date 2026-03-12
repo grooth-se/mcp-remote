@@ -172,6 +172,10 @@ def scan_directory(root_path, extract_text_flag=True, dry_run=False, progress_ca
         except Exception as e:
             logger.error(f'Error processing folder {folder_name}: {e}')
             results['errors'].append(f'{folder_name}: {str(e)}')
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
 
     if progress_callback:
         progress_callback('Complete', total, total)
@@ -298,6 +302,7 @@ def _scan_documents_for_project(project, folder_path, extract_text_flag, dry_run
                 logger.warning(f'Text extraction failed for {file_path}: {e}')
 
         db.session.add(doc)
+        db.session.commit()
         result['documents_created'] += 1
 
 

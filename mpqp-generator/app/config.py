@@ -55,6 +55,10 @@ class DevelopmentConfig(Config):
         'DATABASE_URL',
         f'sqlite:///{os.path.join(project_dir, "data", "mpqp.db")}'
     )
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'connect_args': {'timeout': 30},
+        'pool_pre_ping': True,
+    }
     PORTAL_URL = os.environ.get('PORTAL_URL', 'http://localhost:5050')
     PORTAL_EXTERNAL_URL = os.environ.get('PORTAL_EXTERNAL_URL', 'http://localhost:5050')
 
@@ -68,6 +72,11 @@ class ProductionConfig(Config):
     DEBUG = False
     WTF_CSRF_TIME_LIMIT = None  # No expiry — tokens valid for session lifetime
     SESSION_COOKIE_SAMESITE = 'Lax'
+    # SQLite busy timeout (30s) — prevents "database is locked" during scans
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'connect_args': {'timeout': 30},
+        'pool_pre_ping': True,
+    }
 
 
 config = {

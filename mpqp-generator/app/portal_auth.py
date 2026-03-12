@@ -83,9 +83,9 @@ def init_portal_auth(app):
 
     @app.before_request
     def check_portal_auth():
-        # Skip auth for health, static, and api paths
+        # Skip auth for health, static, api, and login paths
         path = request.path
-        if path in ('/health',) or path.startswith('/static/') or path.startswith('/api/'):
+        if path in ('/health', '/login', '/logout') or path.startswith('/static/') or path.startswith('/api/'):
             return None
 
         portal_url = current_app.config.get('PORTAL_URL', 'http://portal:5000')
@@ -110,7 +110,7 @@ def init_portal_auth(app):
             else:
                 return redirect(external_url)
 
-        # Check existing session
+        # Check existing session (portal or local login)
         if session.get('portal_user'):
             if not current_user.is_authenticated:
                 from app.models.user import User
@@ -119,5 +119,9 @@ def init_portal_auth(app):
                     login_user(user)
             return None
 
-        # No auth — redirect to portal
+        # Allow locally authenticated users (direct login on port 5003)
+        if current_user.is_authenticated:
+            return None
+
+        # No auth — redirect to local login (works for both portal and direct access)
         return redirect(external_url)

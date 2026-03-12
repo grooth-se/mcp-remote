@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
+from sqlalchemy import event
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -63,20 +64,28 @@ def create_app(config_name=None):
         from app.portal_auth import init_portal_auth
         init_portal_auth(app)
 
+    # Enable WAL mode for SQLite (allows concurrent reads during writes)
+    if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
+        with app.app_context():
+            @event.listens_for(db.engine, 'connect')
+            def _set_sqlite_wal(dbapi_conn, connection_record):
+                cursor = dbapi_conn.cursor()
+                cursor.execute('PRAGMA journal_mode=WAL')
+                cursor.close()
+
     # Ensure upload directories exist and seed admin user
     with app.app_context():
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
         os.makedirs(app.config['GENERATED_FOLDER'], exist_ok=True)
 
-        # Create default admin if no users exist (standalone mode)
-        if not portal_auth_enabled:
-            try:
-                if User.query.count() == 0:
-                    admin = User(username='admin', display_name='Admin', is_admin=True)
-                    admin.set_password('admin')
-                    db.session.add(admin)
-                    db.session.commit()
-            except Exception:
-                pass
+        # Create default admin if no users exist
+        try:
+            if User.query.count() == 0:
+                admin = User(username='admin', display_name='Admin', is_admin=True)
+                admin.set_password('admin')
+                db.session.add(admin)
+                db.session.commit()
+        except Exception:
+            pass
 
     return app
