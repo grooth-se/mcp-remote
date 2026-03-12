@@ -29,7 +29,7 @@ from flask import current_app
 from app import db
 from app.models.project import Project, Customer
 from app.models.document import Document
-from app.services.document_processor import extract_text, SUPPORTED_EXTENSIONS
+from app.services.document_processor import SUPPORTED_EXTENSIONS
 
 # Limits to prevent OOM on huge project folders
 MAX_FILE_SIZE_FOR_EXTRACTION = 50 * 1024 * 1024  # 50 MB
@@ -169,7 +169,14 @@ def scan_directory(root_path, extract_text_flag=True, dry_run=False, progress_ca
             project_result = _process_project_folder(
                 folder_path, folder_name, extract_text_flag, dry_run
             )
-            results['details'].append(project_result)
+            # Keep only summary, not full detail per project (avoids memory bloat)
+            results['details'].append({
+                'folder': project_result.get('folder'),
+                'created': project_result.get('created', False),
+                'skipped': project_result.get('skipped', False),
+                'documents_found': project_result.get('documents_found', 0),
+                'documents_created': project_result.get('documents_created', 0),
+            })
 
             if project_result.get('created'):
                 results['projects_created'] += 1
@@ -316,17 +323,10 @@ def _scan_documents_for_project(project, folder_path, extract_text_flag, dry_run
             file_size=file_size,
         )
 
-        # Optionally extract text during scan (skip large files)
-        if extract_text_flag and file_size <= MAX_FILE_SIZE_FOR_EXTRACTION:
-            try:
-                extraction = extract_text(file_path)
-                doc.extracted_text = extraction.get('text', '')
-                doc.page_count = extraction.get('page_count', 0)
-                doc.metadata_ = extraction.get('metadata', {})
-            except Exception as e:
-                logger.warning(f'Text extraction failed for {file_path}: {e}')
-        elif extract_text_flag and file_size > MAX_FILE_SIZE_FOR_EXTRACTION:
-            logger.info(f'Skipping text extraction for large file ({file_size/1024/1024:.0f} MB): {file_name}')
+        # Text extraction is deferred to the indexing step to prevent
+        # OOM during large scans.  The extract_text_flag is kept for
+        # backwards compatibility but ignored for now.
+        # Use Admin > Indexing to extract text per-project after scanning.
 
         db.session.add(doc)
         db.session.commit()
