@@ -22,6 +22,62 @@
     </div>
     {% endif %}
 
+    {% if batch_result %}
+    <div class="alert alert-{{ 'success' if batch_result.failed == 0 else 'info' }} alert-dismissible fade show">
+        <strong>Batch indexing complete.</strong>
+        {{ batch_result.indexed }} of {{ batch_result.total }} documents indexed
+        ({{ batch_result.failed }} failed).
+        Document types: {{ batch_result.doc_types|join(', ') }}.
+        {% if batch_result.errors %}
+        <details class="mt-2"><summary>Errors ({{ batch_result.errors|length }})</summary>
+        <ul class="mb-0 mt-1 small">{% for e in batch_result.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        </details>
+        {% endif %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    <!-- Batch Index -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-lightning me-1"></i>Batch Index Key Documents
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin.batch_index') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row align-items-end">
+                    <div class="col-md-8">
+                        <label class="form-label">Document types to index:</label>
+                        <div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="doc_types" value="MPQP" id="dt-mpqp" checked>
+                                <label class="form-check-label" for="dt-mpqp">MPQP</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="doc_types" value="MPS" id="dt-mps" checked>
+                                <label class="form-check-label" for="dt-mps">MPS</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="doc_types" value="ITP" id="dt-itp" checked>
+                                <label class="form-check-label" for="dt-itp">ITP</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="doc_types" value="SPEC" id="dt-spec" checked>
+                                <label class="form-check-label" for="dt-spec">SPEC</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <button type="submit" class="btn btn-accent"
+                                {{ 'disabled' if not ollama_status.online }}>
+                            <i class="bi bi-play-fill me-1"></i>Start Batch Index
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Projects -->
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">

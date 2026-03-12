@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Indexing... - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <div class="page-header">
+        <h2><i class="bi bi-database-add me-2"></i>Batch Indexing</h2>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary mb-3" role="status" id="spinner">
+                <span class="visually-hidden">Indexing...</span>
+            </div>
+            <h4 id="progress-msg">Starting indexing...</h4>
+            <div class="progress mt-3 mx-auto" style="max-width: 500px; height: 24px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                     id="progress-bar" role="progressbar" style="width: 0%">
+                    0 / 0
+                </div>
+            </div>
+            <div class="mt-3">
+                <span class="badge bg-success me-2" id="indexed-badge">0 indexed</span>
+                <span class="badge bg-danger" id="failed-badge">0 failed</span>
+            </div>
+            <p class="text-muted mt-3" id="progress-detail">
+                Extracting text and generating embeddings for key document types...
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const msgEl = document.getElementById('progress-msg');
+    const barEl = document.getElementById('progress-bar');
+    const detailEl = document.getElementById('progress-detail');
+    const spinnerEl = document.getElementById('spinner');
+    const indexedEl = document.getElementById('indexed-badge');
+    const failedEl = document.getElementById('failed-badge');
+
+    let pollCount = 0;
+
+    function poll() {
+        pollCount++;
+        fetch('{{ url_for("admin.batch_index_status") }}')
+            .then(r => r.json())
+            .then(data => {
+                msgEl.textContent = data.progress || 'Working...';
+                indexedEl.textContent = data.docs_indexed + ' indexed';
+                failedEl.textContent = data.docs_failed + ' failed';
+
+                if (data.docs_total > 0) {
+                    const pct = Math.round((data.docs_processed / data.docs_total) * 100);
+                    barEl.style.width = pct + '%';
+                    barEl.textContent = data.docs_processed + ' / ' + data.docs_total;
+                    detailEl.textContent = 'Processing document ' + data.docs_processed + ' of ' + data.docs_total;
+                }
+                if (data.done) {
+                    window.location.href = '{{ url_for("admin.batch_index_progress") }}';
+                } else if (data.running || pollCount <= 5) {
+                    setTimeout(poll, 3000);
+                } else {
+                    spinnerEl.classList.add('d-none');
+                    msgEl.textContent = 'Indexing stopped unexpectedly.';
+                    msgEl.insertAdjacentHTML('afterend',
+                        '<a href="{{ url_for("admin.indexing") }}" class="btn btn-outline-primary mt-3">Back to Indexing</a>');
+                }
+            })
+            .catch(() => {
+                setTimeout(poll, 5000);
+            });
+    }
+
+    setTimeout(poll, 1000);
+})();
+</script>
+{% endblock %}

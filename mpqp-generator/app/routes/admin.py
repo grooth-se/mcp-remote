@@ -22,6 +22,18 @@ _scan_state = {
     'result': None,
 }
 
+# Background indexing state
+_index_state = {
+    'running': False,
+    'progress': '',
+    'docs_processed': 0,
+    'docs_total': 0,
+    'docs_indexed': 0,
+    'docs_failed': 0,
+    'errors': [],
+    'result': None,
+}
+
 
 @admin_bp.route('/')
 @login_required
@@ -275,6 +287,151 @@ def scan_status():
         'projects_processed': _scan_state['projects_processed'],
         'projects_total': _scan_state['projects_total'],
         'done': not _scan_state['running'] and _scan_state['result'] is not None,
+    })
+
+
+# --- Batch indexing ---
+
+KEY_DOC_TYPES = ['MPQP', 'MPS', 'ITP', 'SPEC']
+
+
+@admin_bp.route('/indexing/batch', methods=['POST'])
+@login_required
+def batch_index():
+    """Start batch indexing of key document types in background."""
+    if _index_state['running']:
+        flash('Batch indexing is already running.', 'warning')
+        return redirect(url_for('admin.batch_index_progress'))
+
+    doc_types = request.form.getlist('doc_types') or KEY_DOC_TYPES
+
+    # Reset state
+    _index_state.update({
+        'running': True,
+        'progress': 'Starting batch indexing...',
+        'docs_processed': 0,
+        'docs_total': 0,
+        'docs_indexed': 0,
+        'docs_failed': 0,
+        'errors': [],
+        'result': None,
+    })
+
+    app = current_app._get_current_object()
+
+    def _run_batch_index():
+        import gc
+        with app.app_context():
+            from app.services.embedder import index_document as do_index
+            from app.services.document_processor import extract_text
+
+            # Query documents of key types that haven't been indexed yet
+            docs = Document.query.filter(
+                Document.document_type.in_(doc_types),
+                Document.indexed_at.is_(None),
+            ).order_by(Document.id).all()
+
+            doc_ids = [d.id for d in docs]
+            _index_state['docs_total'] = len(doc_ids)
+            _index_state['progress'] = f'Found {len(doc_ids)} documents to index'
+
+            for i, doc_id in enumerate(doc_ids):
+                try:
+                    doc = db.session.get(Document, doc_id)
+                    if not doc:
+                        continue
+
+                    _index_state['progress'] = f'Indexing: {doc.file_name}'
+                    _index_state['docs_processed'] = i
+
+                    # Step 1: Extract text if needed
+                    if not doc.extracted_text:
+                        try:
+                            file_size = doc.file_size or 0
+                            if file_size > 50 * 1024 * 1024:
+                                _index_state['docs_failed'] += 1
+                                _index_state['errors'].append(f'{doc.file_name}: too large')
+                                continue
+                            extraction = extract_text(doc.file_path)
+                            if extraction.get('error'):
+                                _index_state['docs_failed'] += 1
+                                continue
+                            doc.extracted_text = extraction.get('text', '')
+                            doc.page_count = extraction.get('page_count', 0)
+                            db.session.commit()
+                        except Exception as e:
+                            _index_state['docs_failed'] += 1
+                            db.session.rollback()
+                            continue
+
+                    if not doc.extracted_text or not doc.extracted_text.strip():
+                        _index_state['docs_failed'] += 1
+                        continue
+
+                    # Step 2: Index (chunk + embed + store)
+                    result = do_index(doc_id)
+                    if 'error' in result:
+                        _index_state['docs_failed'] += 1
+                        if len(_index_state['errors']) < 50:
+                            _index_state['errors'].append(
+                                f'{doc.file_name}: {result["error"][:80]}')
+                    else:
+                        _index_state['docs_indexed'] += 1
+
+                except Exception as e:
+                    _index_state['docs_failed'] += 1
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
+
+                # Free memory periodically
+                if i % 20 == 0:
+                    gc.collect()
+
+            _index_state['docs_processed'] = len(doc_ids)
+            _index_state['result'] = {
+                'total': len(doc_ids),
+                'indexed': _index_state['docs_indexed'],
+                'failed': _index_state['docs_failed'],
+                'errors': _index_state['errors'],
+                'doc_types': doc_types,
+            }
+            _index_state['running'] = False
+            _index_state['progress'] = 'Complete'
+
+    thread = threading.Thread(target=_run_batch_index, daemon=True)
+    thread.start()
+
+    return redirect(url_for('admin.batch_index_progress'))
+
+
+@admin_bp.route('/indexing/batch/progress')
+@login_required
+def batch_index_progress():
+    """Batch indexing progress page."""
+    if not _index_state['running'] and _index_state['result']:
+        return render_template('admin/indexing.html',
+                               batch_result=_index_state['result'],
+                               projects=Project.query.order_by(Project.project_number).all(),
+                               documents=Document.query.order_by(Document.created_at.desc()).all(),
+                               vector_stats=vector_store.get_collection_stats(),
+                               ollama_status=check_ollama_status())
+    return render_template('admin/index_progress.html')
+
+
+@admin_bp.route('/indexing/batch/status')
+@login_required
+def batch_index_status():
+    """JSON endpoint for batch indexing progress."""
+    return jsonify({
+        'running': _index_state['running'],
+        'progress': _index_state['progress'],
+        'docs_processed': _index_state['docs_processed'],
+        'docs_total': _index_state['docs_total'],
+        'docs_indexed': _index_state['docs_indexed'],
+        'docs_failed': _index_state['docs_failed'],
+        'done': not _index_state['running'] and _index_state['result'] is not None,
     })
 
 
