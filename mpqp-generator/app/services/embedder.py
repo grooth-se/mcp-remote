@@ -19,6 +19,14 @@ from app.services import vector_store
 logger = logging.getLogger(__name__)
 
 
+# Cap text at 500k chars (~250 pages) to prevent chunking explosion
+MAX_TEXT_LENGTH = 500_000
+# Stop embedding a document after this many consecutive failures
+MAX_CONSECUTIVE_FAILURES = 5
+# Max chunks per document to prevent runaway embedding calls
+MAX_CHUNKS_PER_DOCUMENT = 200
+
+
 def index_document(document_id):
     """Index a single document: extract text, chunk, embed, store in vector DB.
 
@@ -40,22 +48,38 @@ def index_document(document_id):
     if not doc.extracted_text or not doc.extracted_text.strip():
         return {'error': 'No text content extracted from document'}
 
+    # Cap text length to prevent chunking explosion on huge files
+    text = doc.extracted_text
+    if len(text) > MAX_TEXT_LENGTH:
+        logger.warning(f'Document {document_id}: text truncated from {len(text)} to {MAX_TEXT_LENGTH} chars')
+        text = text[:MAX_TEXT_LENGTH]
+
     # Step 2: Chunk the text
-    chunks = chunk_document(doc.extracted_text)
+    chunks = chunk_document(text)
     if not chunks:
         return {'error': 'No chunks generated from document'}
+
+    if len(chunks) > MAX_CHUNKS_PER_DOCUMENT:
+        logger.warning(f'Document {document_id}: capping chunks from {len(chunks)} to {MAX_CHUNKS_PER_DOCUMENT}')
+        chunks = chunks[:MAX_CHUNKS_PER_DOCUMENT]
 
     # Step 3: Generate embeddings (one call per chunk)
     embeddings = []
     successful_chunks = []
+    consecutive_failures = 0
 
     for chunk in chunks:
         emb = get_embeddings(chunk['text'])
         if emb is not None:
             embeddings.append(emb)
             successful_chunks.append(chunk)
+            consecutive_failures = 0
         else:
+            consecutive_failures += 1
             logger.warning(f'Embedding failed for chunk {chunk["chunk_index"]} in document {document_id}')
+            if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                logger.error(f'Document {document_id}: {MAX_CONSECUTIVE_FAILURES} consecutive embedding failures, skipping rest')
+                break
 
     if not embeddings:
         return {'error': 'All embedding generations failed — is Ollama running with nomic-embed-text?'}
