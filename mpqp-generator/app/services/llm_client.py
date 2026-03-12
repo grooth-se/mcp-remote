@@ -110,7 +110,7 @@ def generate_json(prompt, model=None, system=None):
 
 
 def get_embeddings(text, model=None):
-    """Generate embeddings for text using Ollama."""
+    """Generate embeddings for a single text using Ollama."""
     model = model or current_app.config.get('EMBEDDING_MODEL', 'nomic-embed-text')
 
     payload = {
@@ -133,3 +133,39 @@ def get_embeddings(text, model=None):
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
         logger.error(f'Ollama embedding failed: {e}')
         return None
+
+
+def get_embeddings_batch(texts, model=None, batch_size=20):
+    """Generate embeddings for multiple texts using Ollama batch API.
+
+    Sends texts in batches to avoid overwhelming the server.
+    Returns list of embeddings (None for failed items).
+    """
+    model = model or current_app.config.get('EMBEDDING_MODEL', 'nomic-embed-text')
+    all_embeddings = []
+
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        payload = {
+            'model': model,
+            'input': batch,
+        }
+
+        try:
+            url = f'{_get_ollama_url()}/api/embed'
+            data = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(
+                url,
+                data=data,
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read().decode('utf-8'))
+                batch_embeddings = result.get('embeddings', [])
+                all_embeddings.extend(batch_embeddings)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+            logger.error(f'Ollama batch embedding failed for batch {i//batch_size}: {e}')
+            all_embeddings.extend([None] * len(batch))
+
+    return all_embeddings
