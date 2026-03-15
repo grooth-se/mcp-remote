@@ -108,10 +108,14 @@
                             </span>
                             {% else %}-{% endif %}
                         </td>
-                        <td class="text-end">
+                        <td class="text-end text-nowrap">
                             <a href="{{ url_for('investments.price_update', holding_id=h.id) }}" class="btn btn-outline-secondary btn-sm" title="Uppdatera pris"><i class="bi bi-currency-exchange"></i></a>
                             {% if not current_user.is_readonly %}
-                            <a href="{{ url_for('investments.holding_adjust', holding_id=h.id) }}" class="btn btn-outline-warning btn-sm" title="Justera innehav"><i class="bi bi-pencil-square"></i></a>
+                            <a href="{{ url_for('investments.holding_adjust', holding_id=h.id) }}" class="btn btn-outline-warning btn-sm" title="Justera antal"><i class="bi bi-pencil-square"></i></a>
+                            <form method="POST" action="{{ url_for('investments.holding_delete', holding_id=h.id) }}" class="d-inline" data-confirm="Ta bort {{ h.name }} och alla dess transaktioner?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Ta bort innehav"><i class="bi bi-trash"></i></button>
+                            </form>
                             {% endif %}
                         </td>
                         {% endif %}
@@ -138,6 +142,7 @@
                         <th>Värdepapper</th>
                         <th>Typ</th>
                         <th class="text-end">Slutlig kostnad</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -146,6 +151,15 @@
                         <td>{{ h.name }}</td>
                         <td>{{ h.instrument_type_label }}</td>
                         <td class="text-end">{{ h.total_cost|sek(0) }}</td>
+                        <td class="text-end text-nowrap">
+                            {% if not current_user.is_readonly %}
+                            <a href="{{ url_for('investments.holding_adjust', holding_id=h.id) }}" class="btn btn-outline-warning btn-sm" title="Justera antal"><i class="bi bi-pencil-square"></i></a>
+                            <form method="POST" action="{{ url_for('investments.holding_delete', holding_id=h.id) }}" class="d-inline" data-confirm="Ta bort {{ h.name }} och alla dess transaktioner?">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Ta bort innehav"><i class="bi bi-trash"></i></button>
+                            </form>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
