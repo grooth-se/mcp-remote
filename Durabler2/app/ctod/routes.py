@@ -17,7 +17,8 @@ from io import BytesIO
 from . import ctod_bp
 from .forms import UploadForm, SpecimenForm, ReportForm
 from app.extensions import db
-from app.models import TestRecord, AnalysisResult, AuditLog, Certificate, RawTestData, TestPhoto, ReportFile
+from app.models import (TestRecord, AnalysisResult, AuditLog, Certificate, RawTestData, TestPhoto, ReportFile,
+                        ReportApproval, STATUS_DRAFT, STATUS_REJECTED)
 
 # Import analysis utilities
 from utils.analysis.ctod_calculations import CTODAnalyzer, CTODResult
@@ -1137,12 +1138,16 @@ def report(test_id):
                 fig.savefig(chart_path, dpi=150, bbox_inches='tight')
                 plt.close(fig)
 
-            # Generate report
-            reports_folder = Path(current_app.root_path).parent / 'reports'
-            reports_folder.mkdir(exist_ok=True)
+            # Generate report into drafts folder (approval workflow compatible)
+            reports_folder = Path(current_app.config['REPORTS_FOLDER'])
+            drafts_folder = reports_folder / 'drafts'
+            drafts_folder.mkdir(parents=True, exist_ok=True)
 
-            report_filename = f"CTOD_Report_{test.specimen_id or test.test_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-            output_path = reports_folder / report_filename
+            safe_cert_num = (test.certificate.certificate_number_with_rev.replace(' ', '_').replace('/', '-')
+                             if test.certificate else test.specimen_id or test.test_id)
+            timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+            report_filename = f"{safe_cert_num}_{timestamp_str}.docx"
+            output_path = drafts_folder / report_filename
 
             generator = CTODReportGenerator(None)  # Use from-scratch generation
             generator.generate_report(
@@ -1155,6 +1160,17 @@ def report(test_id):
             # Clean up chart
             if chart_path and chart_path.exists():
                 os.remove(chart_path)
+
+            # Update approval record so certificate page can offer download
+            if test.certificate:
+                approval = test.certificate.approval
+                if not approval:
+                    approval = ReportApproval.get_or_create_for_certificate(
+                        test.certificate, current_user)
+                if approval.status in (STATUS_DRAFT, STATUS_REJECTED, None):
+                    approval.word_report_path = str(
+                        output_path.relative_to(reports_folder))
+                    approval.status = STATUS_DRAFT
 
             # Audit log
             audit = AuditLog(
@@ -1170,6 +1186,12 @@ def report(test_id):
 
             flash(f'Report generated: {report_filename}', 'success')
 
+            # Redirect to certificate page to continue review/approval workflow
+            if test.certificate:
+                return redirect(url_for('certificates.view',
+                                        cert_id=test.certificate.id))
+
+            # Fallback: download directly if no certificate linked
             return send_file(
                 output_path,
                 as_attachment=True,
