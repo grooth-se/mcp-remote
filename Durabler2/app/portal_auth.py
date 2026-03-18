@@ -67,9 +67,16 @@ def _ensure_local_user(portal_user):
             db.session.add(user)
             db.session.commit()
         else:
-            # Sync role for existing users on every login
+            # Sync role and display name from portal on every login
+            changed = False
             if getattr(user, "role", None) != portal_role:
                 user.role = portal_role
+                changed = True
+            portal_display = portal_user.get("display_name")
+            if portal_display and getattr(user, "full_name", None) != portal_display:
+                user.full_name = portal_display
+                changed = True
+            if changed:
                 db.session.commit()
 
         login_user(user)
