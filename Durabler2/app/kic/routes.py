@@ -1075,6 +1075,27 @@ def report(test_id):
             output_filename = f"{safe_cert_num}_{timestamp_str}.docx"
             output_path = drafts_folder / output_filename
 
+            # Get photos from DB or filesystem
+            import tempfile
+            photo_paths = []
+            temp_photo_files = []
+            db_photos = test.photos.all()
+            if db_photos:
+                for photo in db_photos:
+                    if photo.data:
+                        ext = (photo.original_filename or 'photo.jpg').rsplit('.', 1)[-1]
+                        tmp = tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False)
+                        tmp.write(photo.data)
+                        tmp.close()
+                        photo_paths.append(Path(tmp.name))
+                        temp_photo_files.append(Path(tmp.name))
+            else:
+                geometry_data = test.geometry or {}
+                for photo in geometry_data.get('photos', []):
+                    p = Path(current_app.root_path) / 'static' / 'uploads' / photo['filename']
+                    if p.exists():
+                        photo_paths.append(p)
+
             generator.generate_report(
                 output_path=output_path,
                 test_info=test_info,
@@ -1083,8 +1104,16 @@ def report(test_id):
                 results=result_proxy,
                 chart_path=chart_path if chart_path and chart_path.exists() else None,
                 logo_path=logo_path if logo_path.exists() else None,
-                precrack_measurements=crack_measurements if len(crack_measurements) == 5 else None
+                precrack_measurements=crack_measurements if len(crack_measurements) == 5 else None,
+                crack_photo_path=photo_paths[0] if photo_paths else None
             )
+
+            # Clean up temp photo files
+            for f in temp_photo_files:
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
 
             # Update approval record so certificate page can offer download
             if test.certificate:

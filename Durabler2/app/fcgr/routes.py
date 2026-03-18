@@ -1068,12 +1068,25 @@ def report(test_id):
                 fig2.savefig(plot2_path, dpi=150, bbox_inches='tight')
                 plt.close(fig2)
 
-            # Build photo paths from geometry
+            # Get photos from DB or filesystem
+            import tempfile
             photo_paths = []
-            for photo in geometry.get('photos', []):
-                photo_path = Path(current_app.root_path) / 'static' / 'uploads' / photo['filename']
-                if photo_path.exists():
-                    photo_paths.append(photo_path)
+            temp_photo_files = []
+            db_photos = test.photos.all()
+            if db_photos:
+                for photo in db_photos:
+                    if photo.data:
+                        ext = (photo.original_filename or 'photo.jpg').rsplit('.', 1)[-1]
+                        tmp = tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False)
+                        tmp.write(photo.data)
+                        tmp.close()
+                        photo_paths.append(Path(tmp.name))
+                        temp_photo_files.append(Path(tmp.name))
+            else:
+                for photo in geometry.get('photos', []):
+                    p = Path(current_app.root_path) / 'static' / 'uploads' / photo['filename']
+                    if p.exists():
+                        photo_paths.append(p)
 
             # Generate report into drafts folder (approval workflow compatible)
             reports_folder = Path(current_app.config['REPORTS_FOLDER'])
@@ -1096,7 +1109,12 @@ def report(test_id):
                 photo_paths=photo_paths if photo_paths else None
             )
 
-            # Clean up plot temp files
+            # Clean up temp files
+            for f in temp_photo_files:
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
             if plot1_path and plot1_path.exists():
                 os.remove(plot1_path)
             if plot2_path and plot2_path.exists():

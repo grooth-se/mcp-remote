@@ -1149,15 +1149,42 @@ def report(test_id):
             report_filename = f"{safe_cert_num}_{timestamp_str}.docx"
             output_path = drafts_folder / report_filename
 
+            # Get photos from DB or filesystem
+            import tempfile
+            photo_paths = []
+            temp_photo_files = []
+            db_photos = test.photos.all()
+            if db_photos:
+                for photo in db_photos:
+                    if photo.data:
+                        ext = (photo.original_filename or 'photo.jpg').rsplit('.', 1)[-1]
+                        tmp = tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False)
+                        tmp.write(photo.data)
+                        tmp.close()
+                        photo_paths.append(Path(tmp.name))
+                        temp_photo_files.append(Path(tmp.name))
+            else:
+                geometry = test.geometry or {}
+                for photo in geometry.get('photos', []):
+                    p = Path(current_app.root_path) / 'static' / 'uploads' / photo['filename']
+                    if p.exists():
+                        photo_paths.append(p)
+
             generator = CTODReportGenerator(None)  # Use from-scratch generation
             generator.generate_report(
                 output_path=output_path,
                 data=report_data,
                 chart_path=chart_path,
-                logo_path=logo_path if logo_path.exists() else None
+                logo_path=logo_path if logo_path.exists() else None,
+                photo_paths=photo_paths if photo_paths else None
             )
 
-            # Clean up chart
+            # Clean up temp files
+            for f in temp_photo_files:
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
             if chart_path and chart_path.exists():
                 os.remove(chart_path)
 

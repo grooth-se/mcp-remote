@@ -756,9 +756,25 @@ def report(test_id):
                 doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
             # Indent Photo (if requested and available)
-            if form.include_photo.data == 'yes' and test_params.get('photo_path'):
-                photo_path = Path(current_app.config['UPLOAD_FOLDER']) / test_params['photo_path']
-                if photo_path.exists():
+            import tempfile
+            temp_photo_files = []
+            if form.include_photo.data == 'yes':
+                photo_path = None
+                # Prefer DB photos
+                db_photo = test.photos.first()
+                if db_photo and db_photo.data:
+                    ext = (db_photo.original_filename or 'photo.jpg').rsplit('.', 1)[-1]
+                    tmp = tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False)
+                    tmp.write(db_photo.data)
+                    tmp.close()
+                    photo_path = Path(tmp.name)
+                    temp_photo_files.append(photo_path)
+                elif test_params.get('photo_path'):
+                    p = Path(current_app.config['UPLOAD_FOLDER']) / test_params['photo_path']
+                    if p.exists():
+                        photo_path = p
+
+                if photo_path and photo_path.exists():
                     heading = doc.add_heading('Indent Photo', level=1)
                     heading.paragraph_format.space_before = Pt(12)
                     heading.paragraph_format.space_after = Pt(6)
@@ -816,6 +832,13 @@ def report(test_id):
             output_filename = f"{safe_cert_num}_{timestamp_str}.docx"
             output_path = drafts_folder / output_filename
             doc.save(output_path)
+
+            # Clean up temp photo files
+            for f in temp_photo_files:
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
 
             # Update approval record so certificate page can offer download
             if test.certificate:
