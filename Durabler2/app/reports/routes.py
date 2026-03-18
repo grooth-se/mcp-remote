@@ -618,8 +618,13 @@ def approve(cert_id):
     can_sign = signing_deps['can_sign'] and has_certificate
 
     if request.method == 'GET':
+        # Get first test record for display
+        test_record = certificate.test_records.first()
         return render_template('reports/sign.html',
                                approval=certificate.approval,
+                               certificate=certificate,
+                               test_record=test_record,
+                               now=datetime.utcnow(),
                                signing_deps=signing_deps,
                                has_certificate=has_certificate,
                                can_sign=can_sign)
