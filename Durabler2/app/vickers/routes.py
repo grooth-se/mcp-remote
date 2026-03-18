@@ -781,28 +781,52 @@ def report(test_id):
                     doc.add_picture(str(photo_path), width=Inches(4))
                     doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-            # Approval Signatures (4 rows: header + tested + reviewed + approved)
+            # Approval Signatures
             heading = doc.add_heading('Approval', level=1)
             heading.paragraph_format.space_before = Pt(12)
             heading.paragraph_format.space_after = Pt(6)
 
-            sig_table = doc.add_table(rows=4, cols=4)
+            sig_table = doc.add_table(rows=4, cols=2)
             sig_table.style = 'Table Grid'
 
-            sig_headers = ['Role', 'Name', 'Signature', 'Date']
-            for i, header in enumerate(sig_headers):
-                sig_table.rows[0].cells[i].text = header
-                sig_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+            # Header row
+            sig_table.rows[0].cells[0].text = 'Role'
+            sig_table.rows[0].cells[0].paragraphs[0].runs[0].bold = True
+            sig_table.rows[0].cells[1].text = 'Name / Signature'
+            sig_table.rows[0].cells[1].paragraphs[0].runs[0].bold = True
 
-            sig_table.rows[1].cells[0].text = 'Tested by:'
-            sig_table.rows[2].cells[0].text = 'Reviewed by:'
-            sig_table.rows[3].cells[0].text = 'Approved by:'
+            # Row 1: Test Engineer — name only
+            sig_table.rows[1].cells[0].text = 'Test Engineer:'
+            sig_table.rows[1].cells[0].paragraphs[0].runs[0].bold = True
+            sig_table.rows[1].cells[1].text = test_info.get('operator', '')
 
-            # Compact signature table rows
+            # Row 2: Approved by — digital signature (filled by PDF signing)
+            sig_table.rows[2].cells[0].text = 'Approved by:'
+            sig_table.rows[2].cells[0].paragraphs[0].runs[0].bold = True
+            sig_table.rows[2].cells[1].text = ''
+
+            # Row 3: Third Party Approval
+            sig_table.rows[3].cells[0].text = 'Third Party Approval:'
+            sig_table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
+            sig_table.rows[3].cells[1].text = ''
+
+            # Set row heights for digital signature
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+            sig_row_height = Cm(1.5)
             for row in sig_table.rows:
                 for cell in row.cells:
                     cell.paragraphs[0].paragraph_format.space_before = Pt(1)
                     cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+            for row in [sig_table.rows[1], sig_table.rows[2], sig_table.rows[3]]:
+                tr = row._tr
+                trPr = tr.get_or_add_trPr()
+                trHeight = trPr.find(qn('w:trHeight'))
+                if trHeight is None:
+                    trHeight = OxmlElement('w:trHeight')
+                    trPr.append(trHeight)
+                trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))
+                trHeight.set(qn('w:hRule'), 'exact')
 
             # Add disclaimer to page footer (visible on all pages)
             disclaimer_text = (

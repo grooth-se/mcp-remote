@@ -962,6 +962,7 @@ def report(test_id):
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'temperature': str(test.temperature) if test.temperature else '23',
                 'requirement': cert.requirement if cert else '',  # CTOD requirement from certificate
+                'test_engineer': current_user.full_name or current_user.username,
             }
 
             # Prepare specimen data

@@ -897,6 +897,7 @@ def report(test_id):
                 'certificate_number': form.certificate_number.data or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'requirement': cert.requirement if cert else '',
+                'test_engineer': current_user.full_name or current_user.username,
             }
 
             # Prepare specimen data

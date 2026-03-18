@@ -1036,7 +1036,7 @@ def report(test_id):
                 'material': test.material or '',
                 'certificate_number': form.certificate_number.data or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
-                'test_engineer': current_user.username,
+                'test_engineer': current_user.full_name or current_user.username,
                 'temperature': str(test.temperature) if test.temperature else '23',
                 'strain_source': 'Displacement Only' if geometry.get('use_displacement_only') else 'Extensometer',
                 'comments': ''

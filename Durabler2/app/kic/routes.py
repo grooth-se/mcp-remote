@@ -986,6 +986,7 @@ def report(test_id):
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'temperature': test.temperature or '23',
                 'kic_req': kic_req,  # KIC requirement from certificate
+                'test_engineer': current_user.full_name or current_user.username,
             }
 
             dimensions = {

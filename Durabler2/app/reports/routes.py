@@ -157,7 +157,7 @@ def generate_report(cert_id):
                 'material': certificate.material or '',
                 'certificate_number': certificate.certificate_number_with_rev,
                 'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
-                'test_engineer': current_user.username,
+                'test_engineer': current_user.full_name or current_user.username,
                 'temperature': str(test_record.temperature) if test_record.temperature else '23',
                 'strain_source': 'Displacement Only' if geometry.get('use_displacement_only') else 'Extensometer',
                 'comments': ''
@@ -237,14 +237,75 @@ def generate_report(cert_id):
                 requirements=requirements
             )
 
+            # Generate stress-strain chart for the report
+            chart_path = None
+            if test_record.raw_data_filename:
+                try:
+                    import os
+                    import numpy as np
+                    import matplotlib
+                    matplotlib.use('Agg')
+                    import matplotlib.pyplot as plt
+                    from utils.data_acquisition.mts_csv_parser import parse_mts_csv
+                    from utils.analysis.tensile_calculations import TensileAnalyzer
+                    from app.tensile.routes import truncate_at_break
+
+                    csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], test_record.raw_data_filename)
+                    if os.path.exists(csv_path):
+                        data = parse_mts_csv(Path(csv_path))
+                        area = geometry.get('area', 100)
+                        L0 = geometry.get('L0', 50)
+                        Lp = geometry.get('Lp', 50)
+
+                        analyzer = TensileAnalyzer()
+                        stress, strain = analyzer.calculate_stress_strain(data.force, data.extension, area, L0)
+                        stress_disp, strain_disp = analyzer.calculate_stress_strain(data.force, data.displacement, area, Lp)
+
+                        strain_plot, stress_plot = truncate_at_break(strain, stress, break_threshold=0.5)
+                        strain_disp_plot, stress_disp_plot = truncate_at_break(strain_disp, stress_disp, break_threshold=0.5)
+
+                        fig, ax = plt.subplots(figsize=(8, 5))
+                        if geometry.get('use_displacement_only'):
+                            ax.plot(strain_disp_plot * 100, stress_disp_plot, 'black', linewidth=1.5, label='Displacement')
+                        else:
+                            ax.plot(strain_plot * 100, stress_plot, 'darkred', linewidth=1.5, label='Extensometer')
+
+                        # Add result markers
+                        rm_val = results.get('Rm')
+                        rp02_val = results.get('Rp0.2')
+                        if rm_val:
+                            ax.axhline(y=rm_val.value, color='gray', linestyle='--', linewidth=1,
+                                       label='Rm')
+                        if rp02_val:
+                            ax.axhline(y=rp02_val.value, color='gray', linestyle=':', linewidth=1,
+                                       label='Rp0.2')
+
+                        ax.set_xlabel('Strain (%)')
+                        ax.set_ylabel('Stress (MPa)')
+                        ax.set_title(f'Stress-Strain Curve - {test_record.specimen_id}')
+                        ax.legend(loc='lower right', fontsize=8)
+                        ax.grid(True, alpha=0.3)
+
+                        chart_path = Path(current_app.config['UPLOAD_FOLDER']) / f'chart_cert_{certificate.id}.png'
+                        fig.savefig(chart_path, dpi=150, bbox_inches='tight')
+                        plt.close(fig)
+                except Exception as e:
+                    current_app.logger.warning(f'Chart generation failed: {e}')
+                    chart_path = None
+
             logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
             generator = TensileReportGenerator(None)
             generator.generate_report(
                 output_path=output_path,
                 data=report_data,
-                chart_path=None,
+                chart_path=chart_path,
                 logo_path=logo_path if logo_path.exists() else None
             )
+
+            # Clean up chart temp file
+            if chart_path and chart_path.exists():
+                import os
+                os.remove(chart_path)
         elif test_record.test_method == 'CTOD':
             # Generate CTOD report
             _generate_ctod_report(certificate, test_record, output_path)
@@ -519,19 +580,23 @@ def review(cert_id):
                            status_colors=STATUS_COLORS)
 
 
-@reports_bp.route('/certificate/<int:cert_id>/approve', methods=['POST'])
+@reports_bp.route('/certificate/<int:cert_id>/approve', methods=['GET', 'POST'])
 @login_required
 @approver_required
 def approve(cert_id):
-    """Approve the certificate report with uploaded signed PDF.
+    """Approve the certificate report and generate signed PDF.
 
-    Simplified workflow for test phase:
-    1. Approver downloads Word doc, reviews externally
-    2. Approver saves as PDF and signs with external PDF software
-    3. Approver uploads signed PDF here to approve and publish
+    Two modes:
+    1. Automatic: Convert Word→PDF via LibreOffice, sign with X.509 cert
+    2. Manual fallback: Approver uploads externally signed PDF
+
+    GET: Show sign & publish confirmation page
+    POST: Execute signing and publish
     """
-    import hashlib
-    from werkzeug.utils import secure_filename
+    from utils.reporting.pdf_signer import (
+        check_dependencies, sign_report, create_placeholder_signed_pdf,
+        PDFSigningError
+    )
 
     certificate = Certificate.query.get_or_404(cert_id)
 
@@ -539,39 +604,103 @@ def approve(cert_id):
         flash('This report cannot be approved.', 'danger')
         return redirect(url_for('certificates.view', cert_id=cert_id))
 
-    # Check for uploaded signed PDF
-    if 'signed_pdf' not in request.files:
-        flash('Please upload the signed PDF file.', 'warning')
-        return redirect(url_for('reports.review', cert_id=cert_id))
+    if not certificate.approval.word_report_path:
+        flash('No Word report has been generated yet.', 'warning')
+        return redirect(url_for('certificates.view', cert_id=cert_id))
 
-    pdf_file = request.files['signed_pdf']
-    if pdf_file.filename == '':
-        flash('No PDF file selected.', 'warning')
-        return redirect(url_for('reports.review', cert_id=cert_id))
-
-    if not pdf_file.filename.lower().endswith('.pdf'):
-        flash('Please upload a PDF file.', 'warning')
-        return redirect(url_for('reports.review', cert_id=cert_id))
-
-    # Save the uploaded signed PDF
     reports_folder = Path(current_app.config['REPORTS_FOLDER'])
-    year = datetime.now().year
-    signed_folder = reports_folder / 'signed' / str(year)
-    signed_folder.mkdir(parents=True, exist_ok=True)
+    certs_folder = Path(current_app.config['CERTS_FOLDER'])
+    cert_file = certs_folder / current_app.config['COMPANY_CERT_FILE']
+    cert_password = current_app.config['COMPANY_CERT_PASSWORD']
 
-    safe_cert_num = certificate.certificate_number_with_rev.replace(' ', '_').replace('/', '-')
-    pdf_filename = f"{safe_cert_num}_signed.pdf"
-    output_pdf = signed_folder / pdf_filename
+    signing_deps = check_dependencies()
+    has_certificate = cert_file.exists()
+    can_sign = signing_deps['can_sign'] and has_certificate
 
-    pdf_file.save(output_pdf)
+    if request.method == 'GET':
+        return render_template('reports/sign.html',
+                               approval=certificate.approval,
+                               signing_deps=signing_deps,
+                               has_certificate=has_certificate,
+                               can_sign=can_sign)
 
-    # Calculate hash for integrity verification
-    with open(output_pdf, 'rb') as f:
-        pdf_hash = hashlib.sha256(f.read()).hexdigest()
-
-    pdf_path = str(output_pdf.relative_to(reports_folder))
-    timestamp = datetime.utcnow()
+    # POST: Execute approval and signing
     approver_name = current_user.full_name or current_user.username
+    word_path = reports_folder / certificate.approval.word_report_path
+
+    # Check if manual PDF upload was provided (fallback mode)
+    if 'signed_pdf' in request.files and request.files['signed_pdf'].filename:
+        import hashlib
+        pdf_file = request.files['signed_pdf']
+        if not pdf_file.filename.lower().endswith('.pdf'):
+            flash('Please upload a PDF file.', 'warning')
+            return redirect(url_for('reports.approve', cert_id=cert_id))
+
+        year = datetime.now().year
+        signed_folder = reports_folder / 'signed' / str(year)
+        signed_folder.mkdir(parents=True, exist_ok=True)
+
+        safe_cert_num = certificate.certificate_number_with_rev.replace(' ', '_').replace('/', '-')
+        output_pdf = signed_folder / f"{safe_cert_num}_signed.pdf"
+        pdf_file.save(output_pdf)
+
+        with open(output_pdf, 'rb') as f:
+            pdf_hash = hashlib.sha256(f.read()).hexdigest()
+
+        pdf_path = str(output_pdf.relative_to(reports_folder))
+        timestamp = datetime.utcnow()
+        signing_method = 'manual_upload'
+    else:
+        # Automatic signing
+        if not word_path.exists():
+            flash('Word report file not found on server. Please regenerate the report.', 'danger')
+            return redirect(url_for('certificates.view', cert_id=cert_id))
+
+        try:
+            # Logo for approval stamp
+            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'logo.png'
+            if not logo_path.exists():
+                logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
+
+            if can_sign and signing_deps['can_convert']:
+                # Full automatic: stamp approval + convert + sign
+                result = sign_report(
+                    word_report_path=word_path,
+                    output_folder=reports_folder,
+                    certificate_number=certificate.certificate_number_with_rev,
+                    cert_path=cert_file,
+                    cert_password=cert_password,
+                    signer_name=approver_name,
+                    signer_user_id=current_user.user_id or current_user.username,
+                    logo_path=logo_path if logo_path.exists() else None
+                )
+                signing_method = 'x509_signed'
+            elif signing_deps['can_convert']:
+                # Convert only (no certificate for signing)
+                result = create_placeholder_signed_pdf(
+                    word_report_path=word_path,
+                    output_folder=reports_folder,
+                    certificate_number=certificate.certificate_number_with_rev,
+                    signer_name=approver_name,
+                    signer_user_id=current_user.user_id or current_user.username,
+                    logo_path=logo_path if logo_path.exists() else None
+                )
+                signing_method = 'converted_unsigned'
+            else:
+                flash(
+                    'Cannot generate PDF automatically. LibreOffice is not installed. '
+                    'Please upload a signed PDF manually.',
+                    'warning'
+                )
+                return redirect(url_for('reports.approve', cert_id=cert_id))
+
+            pdf_path = result['pdf_path']
+            pdf_hash = result['pdf_hash']
+            timestamp = result['timestamp']
+
+        except PDFSigningError as e:
+            flash(f'PDF signing failed: {e}', 'danger')
+            return redirect(url_for('reports.approve', cert_id=cert_id))
 
     # Mark as approved and published
     certificate.approval.approve(current_user)
@@ -589,7 +718,7 @@ def approve(cert_id):
             'status': STATUS_PUBLISHED,
             'certificate_number': certificate.certificate_number_with_rev,
             'approved_by': approver_name,
-            'signed_pdf_uploaded': True,
+            'signing_method': signing_method,
             'pdf_hash': pdf_hash[:16] + '...',
             'timestamp': timestamp.isoformat()
         },
@@ -598,7 +727,17 @@ def approve(cert_id):
     db.session.add(audit)
     db.session.commit()
 
-    flash(f'Report approved and published: {certificate.certificate_number_with_rev}', 'success')
+    if signing_method == 'x509_signed':
+        flash(f'Report approved, signed and published: {certificate.certificate_number_with_rev}', 'success')
+    elif signing_method == 'converted_unsigned':
+        flash(
+            f'Report approved and published (PDF converted but not digitally signed — '
+            f'no certificate configured): {certificate.certificate_number_with_rev}',
+            'warning'
+        )
+    else:
+        flash(f'Report approved and published: {certificate.certificate_number_with_rev}', 'success')
+
     return redirect(url_for('certificates.view', cert_id=cert_id))
 
 
@@ -806,6 +945,50 @@ def _get_logo_path():
     return logo_path if logo_path.exists() else None
 
 
+def _get_photo_paths(test_record):
+    """Get photo paths for a test record.
+
+    Prefers DB-stored photos (TestPhoto BLOB), writes them to temp files.
+    Falls back to filesystem photos stored in geometry['photos'].
+    Returns list of Path objects and a cleanup list of temp files to remove.
+    """
+    import tempfile
+    photo_paths = []
+    temp_files = []
+
+    # Try database photos first
+    db_photos = test_record.photos.all()
+    if db_photos:
+        for photo in db_photos:
+            if photo.data:
+                ext = (photo.original_filename or 'photo.jpg').rsplit('.', 1)[-1]
+                tmp = tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False)
+                tmp.write(photo.data)
+                tmp.close()
+                photo_paths.append(Path(tmp.name))
+                temp_files.append(Path(tmp.name))
+    else:
+        # Fall back to filesystem photos
+        geometry = test_record.geometry or {}
+        for photo in geometry.get('photos', []):
+            photo_path = Path(current_app.root_path) / 'static' / 'uploads' / photo['filename']
+            if photo_path.exists():
+                photo_paths.append(photo_path)
+
+    return photo_paths, temp_files
+
+
+def _cleanup_temp_files(temp_files):
+    """Remove temporary files."""
+    import os
+    for f in temp_files:
+        try:
+            if f.exists():
+                os.remove(f)
+        except OSError:
+            pass
+
+
 def _generate_ctod_report(certificate, test_record, output_path):
     """Generate CTOD Word report for certificate approval workflow."""
     import matplotlib
@@ -830,6 +1013,7 @@ def _generate_ctod_report(certificate, test_record, output_path):
         'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
         'temperature': str(test_record.temperature) if test_record.temperature else '23',
         'requirement': certificate.requirement or '',
+        'test_engineer': current_user.full_name if current_user.full_name else current_user.username,
     }
 
     specimen_data = {
@@ -944,15 +1128,15 @@ def _generate_ctod_report(certificate, test_record, output_path):
             if Vp < 0:
                 Vp = 0
             ax.plot([Vp, V_max], [0, P_max_val], ':', color='grey', linewidth=1,
-                    label=f'Plastic Line (Vp={Vp:.4f} mm)')
-            ax.plot(Vp, 0, '^', color='grey', markersize=8, label=f'Vp = {Vp:.4f} mm')
+                    label='Plastic Line')
+            ax.plot(Vp, 0, '^', color='grey', markersize=8, label='Vp')
 
         for ctod_type, marker in [('delta_m', 'o'), ('delta_c', 'D'), ('delta_u', 's')]:
             pt = ctod_points.get(ctod_type)
             if pt:
                 ax.plot(pt['cmod'], pt['force'], marker, color='grey', markersize=10,
                         markerfacecolor='none', markeredgewidth=2,
-                        label=f'{ctod_type}: \u03b4={pt["ctod"]:.4f} mm')
+                        label=ctod_type)
 
         ax.set_xlabel('CMOD (mm)')
         ax.set_ylabel('Force (kN)')
@@ -969,14 +1153,18 @@ def _generate_ctod_report(certificate, test_record, output_path):
         plt.close(fig)
 
     logo_path = _get_logo_path()
+    photo_paths, temp_photos = _get_photo_paths(test_record)
+
     generator = CTODReportGenerator(None)
     generator.generate_report(
         output_path=output_path,
         data=report_data,
         chart_path=chart_path,
-        logo_path=logo_path
+        logo_path=logo_path,
+        photo_paths=photo_paths if photo_paths else None
     )
 
+    _cleanup_temp_files(temp_photos)
     if chart_path and chart_path.exists():
         import os
         os.remove(chart_path)
@@ -1003,6 +1191,7 @@ def _generate_sonic_report(certificate, test_record, output_path):
         'certificate_number': certificate.certificate_number_with_rev,
         'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
         'temperature': str(test_record.temperature) if test_record.temperature else '23',
+        'test_engineer': current_user.full_name if current_user.full_name else current_user.username,
     }
 
     specimen_data = {
@@ -1067,12 +1256,6 @@ def _generate_sonic_report(certificate, test_record, output_path):
                              color='darkred', edgecolor='black')
             bars_vs = ax.bar(x_vs, [vs1, vs2, vs3], width=0.15, label='Shear (Vs)',
                              color='black', edgecolor='black')
-            for bar, val in zip(bars_vl, [vl1, vl2, vl3]):
-                ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 50,
-                        f'{val:.0f}', ha='center', va='bottom', fontsize=8)
-            for bar, val in zip(bars_vs, [vs1, vs2, vs3]):
-                ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 50,
-                        f'{val:.0f}', ha='center', va='bottom', fontsize=8, color='white')
             vl_avg = (vl1 + vl2 + vl3) / 3
             vs_avg = (vs1 + vs2 + vs3) / 3
             ax.axhline(y=vl_avg, xmin=0.1, xmax=0.45, color='grey', linestyle='--', linewidth=1)
@@ -1125,6 +1308,7 @@ def _generate_fcgr_report(certificate, test_record, output_path):
         'certificate_number': certificate.certificate_number_with_rev,
         'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
         'requirement': certificate.requirement or '',
+        'test_engineer': current_user.full_name if current_user.full_name else current_user.username,
     }
 
     specimen_data = {
@@ -1212,6 +1396,7 @@ def _generate_fcgr_report(certificate, test_record, output_path):
         test_params=test_params,
         results=mock_results
     )
+    report_data['test_engineer'] = current_user.full_name if current_user.full_name else current_user.username
 
     # Generate plots
     plot1_path = None
@@ -1249,7 +1434,7 @@ def _generate_fcgr_report(certificate, test_record, output_path):
         dK_fit = np.logspace(np.log10(dK_min.value * 0.9), np.log10(dK_max.value * 1.1), 100)
         dadN_fit = paris_C.value * dK_fit ** paris_m.value
         ax2.loglog(dK_fit, dadN_fit, '-', color='black', linewidth=2,
-                   label=f'Paris: C={paris_C.value:.2e}, m={paris_m.value:.2f}')
+                   label='Paris Law Fit')
         ax2.set_xlabel('\u0394K (MPa\u221am)')
         ax2.set_ylabel('da/dN (mm/cycle)')
         ax2.set_title(f'Paris Law - {test_record.specimen_id}')
@@ -1259,14 +1444,9 @@ def _generate_fcgr_report(certificate, test_record, output_path):
         fig2.savefig(plot2_path, dpi=150, bbox_inches='tight')
         plt.close(fig2)
 
-    # Photo paths
-    photo_paths = []
-    for photo in geometry.get('photos', []):
-        photo_path = Path(current_app.root_path) / 'static' / 'uploads' / photo['filename']
-        if photo_path.exists():
-            photo_paths.append(photo_path)
-
     logo_path = _get_logo_path()
+    photo_paths, temp_photos = _get_photo_paths(test_record)
+
     generator = FCGRReportGenerator(None)
     generator.generate_report(
         output_path=output_path,
@@ -1277,6 +1457,7 @@ def _generate_fcgr_report(certificate, test_record, output_path):
         photo_paths=photo_paths if photo_paths else None
     )
 
+    _cleanup_temp_files(temp_photos)
     import os
     if plot1_path and plot1_path.exists():
         os.remove(plot1_path)
@@ -1333,7 +1514,7 @@ def _generate_kic_report(certificate, test_record, output_path):
             if P_Q:
                 idx = np.argmin(np.abs(force - P_Q))
                 ax.plot(displacement[idx], P_Q, 'D', color='grey', markersize=10,
-                        markerfacecolor='none', markeredgewidth=2, label=f'PQ = {P_Q:.2f} kN')
+                        markerfacecolor='none', markeredgewidth=2, label='PQ')
 
         P_max_data = results.get('P_max')
         if P_max_data and isinstance(P_max_data, dict):
@@ -1341,7 +1522,7 @@ def _generate_kic_report(certificate, test_record, output_path):
             if P_max:
                 idx = np.argmax(force)
                 ax.plot(displacement[idx], P_max, 's', color='grey', markersize=12,
-                        markerfacecolor='none', markeredgewidth=2, label=f'Pmax = {P_max:.2f} kN')
+                        markerfacecolor='none', markeredgewidth=2, label='Pmax')
 
         ax.set_xlabel('Displacement (mm)')
         ax.set_ylabel('Force (kN)')
@@ -1378,6 +1559,7 @@ def _generate_kic_report(certificate, test_record, output_path):
         'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
         'temperature': test_record.temperature or '23',
         'kic_req': kic_req,
+        'test_engineer': current_user.full_name if current_user.full_name else current_user.username,
     }
 
     dimensions = {
@@ -1449,6 +1631,8 @@ def _generate_kic_report(certificate, test_record, output_path):
     crack_measurements = geometry.get('crack_measurements', [])
 
     logo_path = _get_logo_path()
+    photo_paths, temp_photos = _get_photo_paths(test_record)
+
     generator = KICReportGenerator()
     generator.generate_report(
         output_path=output_path,
@@ -1458,9 +1642,11 @@ def _generate_kic_report(certificate, test_record, output_path):
         results=result_proxy,
         chart_path=chart_path if chart_path and chart_path.exists() else None,
         logo_path=logo_path,
-        precrack_measurements=crack_measurements if len(crack_measurements) == 5 else None
+        precrack_measurements=crack_measurements if len(crack_measurements) == 5 else None,
+        crack_photo_path=photo_paths[0] if photo_paths else None
     )
 
+    _cleanup_temp_files(temp_photos)
     if chart_path and chart_path.exists():
         import os
         os.remove(chart_path)
@@ -1502,11 +1688,8 @@ def _generate_vickers_report(certificate, test_record, output_path):
         x = list(range(1, len(values) + 1))
         ax.plot(x, values, color='darkred', linewidth=2, marker='o',
                 markersize=10, markerfacecolor='darkred', markeredgecolor='darkred')
-        for xi, val in zip(x, values):
-            ax.text(xi, val + max(values) * 0.02, f'{val:.1f}',
-                    ha='center', va='bottom', fontsize=9)
         ax.axhline(y=mean_val, color='grey', linestyle=':', linewidth=2,
-                   label=f'Mean: {mean_val:.1f}')
+                   label='Mean')
         ax.set_xlabel('Reading Number')
         ax.set_ylabel(f'Hardness ({test_params.get("load_level", "HV")})')
         ax.set_title('Hardness Profile')
@@ -1725,23 +1908,69 @@ def _generate_vickers_report(certificate, test_record, output_path):
         doc.add_picture(str(chart_path), width=Inches(5.5))
         doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+    # Test Photos (if available)
+    photo_paths, temp_photos = _get_photo_paths(test_record)
+    if photo_paths:
+        heading = doc.add_heading('Test Photos', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+        for photo_path in photo_paths:
+            if photo_path.exists():
+                doc.add_picture(str(photo_path), width=Inches(4.0))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        caption = doc.add_paragraph('Figure: Indent photograph(s)')
+        caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        caption.runs[0].font.size = Pt(10)
+        caption.runs[0].font.italic = True
+    _cleanup_temp_files(temp_photos)
+
     # Approval Signatures
     heading = doc.add_heading('Approval', level=1)
     heading.paragraph_format.space_before = Pt(12)
     heading.paragraph_format.space_after = Pt(6)
 
-    sig_table = doc.add_table(rows=4, cols=4)
+    sig_table = doc.add_table(rows=4, cols=2)
     sig_table.style = 'Table Grid'
-    for i, h in enumerate(['Role', 'Name', 'Signature', 'Date']):
-        sig_table.rows[0].cells[i].text = h
-        sig_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
-    sig_table.rows[1].cells[0].text = 'Tested by:'
-    sig_table.rows[2].cells[0].text = 'Reviewed by:'
-    sig_table.rows[3].cells[0].text = 'Approved by:'
+
+    # Header row
+    sig_table.rows[0].cells[0].text = 'Role'
+    sig_table.rows[0].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[0].cells[1].text = 'Name / Signature'
+    sig_table.rows[0].cells[1].paragraphs[0].runs[0].bold = True
+
+    # Row 1: Test Engineer — name only
+    sig_table.rows[1].cells[0].text = 'Test Engineer:'
+    sig_table.rows[1].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[1].cells[1].text = test_info.get('operator', '')
+
+    # Row 2: Approved by — digital signature (filled by PDF signing)
+    sig_table.rows[2].cells[0].text = 'Approved by:'
+    sig_table.rows[2].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[2].cells[1].text = ''  # Digital signature applied here
+
+    # Row 3: Third Party Approval (if applicable)
+    sig_table.rows[3].cells[0].text = 'Third Party Approval:'
+    sig_table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[3].cells[1].text = ''
+
+    # Set row heights — equal height for all signature rows, sized for digital signature
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    sig_row_height = Cm(1.5)
     for row in sig_table.rows:
         for cell in row.cells:
             cell.paragraphs[0].paragraph_format.space_before = Pt(1)
             cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+    # Set fixed row height on the three data rows (skip header)
+    for row in [sig_table.rows[1], sig_table.rows[2], sig_table.rows[3]]:
+        tr = row._tr
+        trPr = tr.get_or_add_trPr()
+        trHeight = trPr.find(qn('w:trHeight'))
+        if trHeight is None:
+            trHeight = OxmlElement('w:trHeight')
+            trPr.append(trHeight)
+        trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))  # EMU to twips
+        trHeight.set(qn('w:hRule'), 'exact')
 
     # Disclaimer footer
     disclaimer_text = (

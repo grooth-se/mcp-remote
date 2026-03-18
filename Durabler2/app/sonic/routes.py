@@ -348,6 +348,7 @@ def report(test_id):
                 'certificate_number': form.certificate_number.data or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'temperature': str(test.temperature) if test.temperature else '23',
+                'test_engineer': current_user.full_name or current_user.username,
             }
 
             # Prepare specimen data
