@@ -1149,10 +1149,10 @@ def report(test_id):
 
                     if rm_val:
                         ax.axhline(y=rm_val.value, color='gray', linestyle='--', linewidth=1,
-                                   label=f'Rm = {rm_val.value:.1f} MPa')
+                                   label='Rm')
                     if rp02_val:
                         ax.axhline(y=rp02_val.value, color='gray', linestyle=':', linewidth=1,
-                                   label=f'Rp0.2 = {rp02_val.value:.1f} MPa')
+                                   label='Rp0.2')
 
                     ax.set_xlabel('Strain (%)')
                     ax.set_ylabel('Stress (MPa)')

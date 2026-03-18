@@ -1106,10 +1106,10 @@ def report(test_id):
 
                     # Plastic line parallel to elastic through Pmax - dotted grey
                     ax.plot([Vp, V_max], [0, P_max_val], ':', color='grey', linewidth=1,
-                           label=f'Plastic Line (Vp={Vp:.4f} mm)')
+                           label='Plastic Line')
 
                     # Mark Vp on x-axis - grey triangle
-                    ax.plot(Vp, 0, '^', color='grey', markersize=8, label=f'Vp = {Vp:.4f} mm')
+                    ax.plot(Vp, 0, '^', color='grey', markersize=8, label='Vp')
 
                 # Mark CTOD points - grey with different markers
                 for ctod_type, marker in [('delta_m', 'o'), ('delta_c', 'D'), ('delta_u', 's')]:
@@ -1117,7 +1117,7 @@ def report(test_id):
                     if pt:
                         ax.plot(pt['cmod'], pt['force'], marker, color='grey', markersize=10,
                                markerfacecolor='none', markeredgewidth=2,
-                               label=f'{ctod_type}: δ={pt["ctod"]:.4f} mm')
+                               label=ctod_type)
 
                 ax.set_xlabel('CMOD (mm)')
                 ax.set_ylabel('Force (kN)')

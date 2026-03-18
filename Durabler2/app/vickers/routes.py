@@ -449,7 +449,7 @@ def report(test_id):
 
                 # Mean line (grey dotted)
                 ax.axhline(y=mean_val, color='grey', linestyle=':', linewidth=2,
-                           label=f'Mean: {mean_val:.1f}')
+                           label='Mean')
 
                 ax.set_xlabel('Reading Number')
                 ax.set_ylabel(f'Hardness ({test_params.get("load_level", "HV")})')

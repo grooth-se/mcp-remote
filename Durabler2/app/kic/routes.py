@@ -937,7 +937,7 @@ def report(test_id):
                     if P_Q:
                         idx = np.argmin(np.abs(force - P_Q))
                         ax.plot(displacement[idx], P_Q, 'D', color='grey', markersize=10,
-                               markerfacecolor='none', markeredgewidth=2, label=f'PQ = {P_Q:.2f} kN')
+                               markerfacecolor='none', markeredgewidth=2, label='PQ')
 
                 # Mark Pmax - grey square
                 P_max_data = results.get('P_max')
@@ -946,7 +946,7 @@ def report(test_id):
                     if P_max:
                         idx = np.argmax(force)
                         ax.plot(displacement[idx], P_max, 's', color='grey', markersize=12,
-                               markerfacecolor='none', markeredgewidth=2, label=f'Pmax = {P_max:.2f} kN')
+                               markerfacecolor='none', markeredgewidth=2, label='Pmax')
 
                 ax.set_xlabel('Displacement (mm)')
                 ax.set_ylabel('Force (kN)')

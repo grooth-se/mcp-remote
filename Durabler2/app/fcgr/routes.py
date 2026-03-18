@@ -1052,13 +1052,13 @@ def report(test_id):
                     dK_fit_init = np.logspace(np.log10(paris_init_dK_min * 0.9), np.log10(paris_init_dK_max * 1.1), 100)
                     dadN_fit_init = paris_init_C * dK_fit_init ** paris_init_m
                     ax2.loglog(dK_fit_init, dadN_fit_init, ':', color='grey', linewidth=1,
-                              label=f'Initial: C={paris_init_C:.2e}, m={paris_init_m:.2f}')
+                              label='Initial Fit')
 
                 # Final regression line (without outliers) - black solid
                 dK_fit = np.logspace(np.log10(dK_min.value * 0.9), np.log10(dK_max.value * 1.1), 100)
                 dadN_fit = paris_C.value * dK_fit ** paris_m.value
                 ax2.loglog(dK_fit, dadN_fit, '-', color='black', linewidth=2,
-                          label=f'Final: C={paris_C.value:.2e}, m={paris_m.value:.2f}')
+                          label='Paris Law Fit')
 
                 ax2.set_xlabel('ΔK (MPa√m)')
                 ax2.set_ylabel('da/dN (mm/cycle)')
