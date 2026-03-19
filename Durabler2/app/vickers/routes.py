@@ -257,8 +257,12 @@ def new():
                     material=form.material.data or ''
                 )
 
-                # Run analysis
-                analyzer = VickersAnalyzer()
+                # Run analysis with user-specified uncertainty
+                analyzer = VickersAnalyzer(
+                    machine_uncertainty=(form.machine_uncertainty.data or 0.5) / 100,
+                    diagonal_uncertainty=(form.diagonal_uncertainty.data or 1.0) / 100,
+                    force_uncertainty=(form.force_uncertainty.data or 1.0) / 100
+                )
                 result = analyzer.run_analysis(test_data)
 
                 # Get uncertainty budget

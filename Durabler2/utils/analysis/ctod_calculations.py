@@ -57,9 +57,24 @@ class CTODAnalyzer:
     from force-CMOD test data.
     """
 
-    def __init__(self):
-        """Initialize CTOD analyzer."""
-        pass
+    def __init__(self,
+                 force_uncertainty: float = 0.01,
+                 displacement_uncertainty: float = 0.01,
+                 dimension_uncertainty: float = 0.005):
+        """Initialize CTOD analyzer with uncertainty values.
+
+        Parameters
+        ----------
+        force_uncertainty : float
+            Relative uncertainty of force measurement (fraction, default 0.01 = 1%)
+        displacement_uncertainty : float
+            Relative uncertainty of CMOD measurement (fraction, default 0.01 = 1%)
+        dimension_uncertainty : float
+            Relative uncertainty of dimensions (fraction, default 0.005 = 0.5%)
+        """
+        self.force_uncertainty = force_uncertainty
+        self.displacement_uncertainty = displacement_uncertainty
+        self.dimension_uncertainty = dimension_uncertainty
 
     def calculate_stress_intensity_K(
         self,
@@ -101,8 +116,9 @@ class CTODAnalyzer:
         # Convert to MPa√m
         K_mpa_sqrtm = K / 1e6
 
-        # Uncertainty estimate (~3% for force, geometry)
-        u_K = K_mpa_sqrtm * 0.03
+        # Uncertainty from force and geometry (RSS)
+        import math
+        u_K = K_mpa_sqrtm * math.sqrt(self.force_uncertainty**2 + (2 * self.dimension_uncertainty)**2)
 
         return MeasuredValue(
             value=round(K_mpa_sqrtm, 2),
@@ -486,14 +502,14 @@ class CTODAnalyzer:
 
         results['P_max'] = MeasuredValue(
             value=round(max_force, 2),
-            uncertainty=round(max_force * 0.01 * 2, 2),  # ~1% uncertainty
+            uncertainty=round(max_force * self.force_uncertainty * 2, 2),
             unit="kN",
             coverage_factor=2.0
         )
 
         results['CMOD_max'] = MeasuredValue(
             value=round(cmod_at_max, 3),
-            uncertainty=round(cmod_at_max * 0.02 * 2, 3),  # ~2% uncertainty
+            uncertainty=round(cmod_at_max * self.displacement_uncertainty * 2, 3),
             unit="mm",
             coverage_factor=2.0
         )
@@ -509,8 +525,14 @@ class CTODAnalyzer:
             point_data = ctod_points[ctod_type]
             if point_data is not None:
                 idx, P, V, delta = point_data
-                # Estimate uncertainty (~5% for CTOD)
-                u_delta = delta * 0.05
+                # CTOD uncertainty from force, displacement, and geometry
+                import math
+                u_delta_rel = math.sqrt(
+                    self.force_uncertainty**2 +
+                    self.displacement_uncertainty**2 +
+                    (2 * self.dimension_uncertainty)**2
+                )
+                u_delta = delta * u_delta_rel
 
                 results[ctod_type] = CTODResult(
                     ctod_type=ctod_type.replace('_', ''),
@@ -522,13 +544,13 @@ class CTODAnalyzer:
                     ),
                     force=MeasuredValue(
                         value=round(P, 2),
-                        uncertainty=round(P * 0.01 * 2, 2),
+                        uncertainty=round(P * self.force_uncertainty * 2, 2),
                         unit="kN",
                         coverage_factor=2.0
                     ),
                     cmod=MeasuredValue(
                         value=round(V, 3),
-                        uncertainty=round(V * 0.02 * 2, 3),
+                        uncertainty=round(V * self.displacement_uncertainty * 2, 3),
                         unit="mm",
                         coverage_factor=2.0
                     ),
@@ -543,7 +565,11 @@ class CTODAnalyzer:
         delta_m_bs7448 = self.calculate_ctod_bs7448(
             max_force, cmod_at_max, specimen, material, compliance
         )
-        u_delta_bs = delta_m_bs7448 * 0.05
+        u_delta_bs = delta_m_bs7448 * math.sqrt(
+            self.force_uncertainty**2 +
+            self.displacement_uncertainty**2 +
+            (2 * self.dimension_uncertainty)**2
+        )
         results['delta_m_bs7448'] = MeasuredValue(
             value=round(delta_m_bs7448, 4),
             uncertainty=round(2 * u_delta_bs, 4),

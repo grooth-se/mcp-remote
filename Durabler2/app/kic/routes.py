@@ -465,8 +465,12 @@ def specimen():
                 poissons_ratio=poissons_ratio
             )
 
-            # Run analysis
-            analyzer = KICAnalyzer()
+            # Run analysis with user-specified uncertainty
+            analyzer = KICAnalyzer(
+                force_uncertainty=(form.force_uncertainty.data or 1.0) / 100,
+                disp_uncertainty=(form.displacement_uncertainty.data or 1.0) / 100,
+                dim_uncertainty=(form.dimension_uncertainty.data or 0.5) / 100
+            )
             result = analyzer.run_analysis(np.array(force), np.array(displacement), specimen_obj, material_obj)
 
             # Build geometry dict for storage

@@ -49,9 +49,24 @@ class SonicAnalyzer:
     Calculates elastic properties from longitudinal and shear wave velocities.
     """
 
-    def __init__(self):
-        """Initialize sonic analyzer."""
-        pass
+    def __init__(self,
+                 velocity_uncertainty: float = 0.01,
+                 dimension_uncertainty: float = 0.005,
+                 mass_uncertainty: float = 0.001):
+        """Initialize sonic analyzer with uncertainty values.
+
+        Parameters
+        ----------
+        velocity_uncertainty : float
+            Relative uncertainty of velocity measurement (fraction, default 0.01 = 1%)
+        dimension_uncertainty : float
+            Relative uncertainty of dimensions (fraction, default 0.005 = 0.5%)
+        mass_uncertainty : float
+            Relative uncertainty of mass measurement (fraction, default 0.001 = 0.1%)
+        """
+        self.velocity_uncertainty = velocity_uncertainty
+        self.dimension_uncertainty = dimension_uncertainty
+        self.mass_uncertainty = mass_uncertainty
 
     def calculate_poissons_ratio(
         self,
@@ -359,31 +374,34 @@ class SonicAnalyzer:
         G_gpa = G_pa / 1e9
         E_gpa = E_pa / 1e9
 
-        # Calculate uncertainties
-        # Density uncertainty (~0.075% standard, ±0.15% expanded k=2)
-        u_rho = rho * 0.00075
+        # Calculate uncertainties from user-specified values
+        # Density uncertainty from mass and dimension uncertainties
+        # ρ = m/V, so u_ρ/ρ = √((u_m/m)² + (3·u_dim/dim)²)
+        rho_rel_u = math.sqrt(self.mass_uncertainty**2 + (3 * self.dimension_uncertainty)**2)
+        u_rho = rho * rho_rel_u
 
-        # Velocity uncertainties (~0.075% standard, ±0.15% expanded k=2)
-        u_vl = vl * 0.00075
-        u_vs = vs * 0.00075
+        # Velocity uncertainties from user input
+        u_vl = vl * self.velocity_uncertainty
+        u_vs = vs * self.velocity_uncertainty
 
-        # Propagate uncertainties (simplified)
+        # Propagate uncertainties
         # For G = ρ × Vs², relative uncertainty: u_G/G = √((u_ρ/ρ)² + 4(u_Vs/Vs)²)
         if G_gpa > 0 and vs > 0:
-            rel_u_G = math.sqrt((u_rho/rho)**2 + 4*(u_vs/vs)**2)
+            rel_u_G = math.sqrt(rho_rel_u**2 + 4 * self.velocity_uncertainty**2)
             u_G = G_gpa * rel_u_G
         else:
             u_G = 0
 
-        # For E, similar propagation
+        # For E = 2G(1+ν), similar propagation
         if E_gpa > 0:
-            u_E = E_gpa * 0.03  # ~3% typical
+            rel_u_E = math.sqrt(rho_rel_u**2 + 4 * self.velocity_uncertainty**2)
+            u_E = E_gpa * rel_u_E
         else:
             u_E = 0
 
-        # For ν, uncertainty depends on velocity ratio
+        # For ν, uncertainty from velocity ratio
         if vl > 0 and vs > 0:
-            u_nu = 0.01  # Typical uncertainty ~0.01
+            u_nu = 2 * self.velocity_uncertainty  # Approximate for velocity ratio
         else:
             u_nu = 0
 

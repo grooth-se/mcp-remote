@@ -163,8 +163,12 @@ def new():
                 flash('Side length is required for square specimens.', 'danger')
                 return render_template('sonic/new.html', form=form, certificate=certificate)
 
-            # Run analysis
-            analyzer = SonicAnalyzer()
+            # Run analysis with user-specified uncertainty
+            analyzer = SonicAnalyzer(
+                velocity_uncertainty=(form.velocity_uncertainty.data or 1.0) / 100,
+                dimension_uncertainty=(form.dimension_uncertainty.data or 0.5) / 100,
+                mass_uncertainty=(form.mass_uncertainty.data or 0.1) / 100
+            )
             results = analyzer.run_analysis(specimen, measurements)
 
             # Build geometry dict

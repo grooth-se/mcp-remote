@@ -359,12 +359,18 @@ def specimen():
             L1 = form.L1.data  # Final extensometer length
             Lf = form.Lf.data  # Final parallel length
 
+            # Get uncertainty parameters from form
+            force_unc_pct = form.force_uncertainty.data or 1.0
+            disp_unc_pct = form.displacement_uncertainty.data or 1.0
+            dim_unc_pct = form.dimension_uncertainty.data or 0.5
+            dim_unc_mm = dim_unc_pct / 100  # Convert % to fraction for mm calc
+
             # Calculate area based on specimen type
             if specimen_type == 'round':
                 D0 = form.D0.data
                 D1 = form.D1.data
                 area = np.pi * (D0 / 2) ** 2
-                area_unc = np.pi * D0 * 0.01 / 2  # d_unc = 0.01mm
+                area_unc = np.pi * D0 * dim_unc_mm / 2
                 # Final area for Z%
                 if D1:
                     area_final = np.pi * (D1 / 2) ** 2
@@ -376,7 +382,7 @@ def specimen():
                 au = form.au.data  # Final width
                 bu = form.bu.data  # Final thickness
                 area = a0 * b0
-                area_unc = np.sqrt((b0 * 0.01)**2 + (a0 * 0.01)**2)  # 0.01mm uncertainty
+                area_unc = np.sqrt((b0 * dim_unc_mm)**2 + (a0 * dim_unc_mm)**2)
                 D0 = None
                 D1 = None
                 # Final area for Z%
@@ -385,8 +391,12 @@ def specimen():
                 else:
                     area_final = None
 
-            # Create analyzer
-            analyzer = TensileAnalyzer()
+            # Create analyzer with user-specified uncertainty parameters
+            config = TensileAnalysisConfig(
+                force_calibration_uncertainty=force_unc_pct / 100,
+                extensometer_uncertainty=disp_unc_pct / 100 * (L0 or 50) / 1000,
+            )
+            analyzer = TensileAnalyzer(config=config)
 
             # ===== STRESS-STRAIN CALCULATIONS =====
 

@@ -467,8 +467,12 @@ def specimen():
             current_app.logger.info(f'CTOD Analysis - Specimen: {specimen_id}, W={W}, B={B}, a_0={a_0}, S={S}')
             current_app.logger.info(f'CTOD Analysis - Material: yield={yield_strength} MPa, E={youngs_modulus} GPa')
 
-            # Run analysis
-            analyzer = CTODAnalyzer()
+            # Run analysis with user-specified uncertainty
+            analyzer = CTODAnalyzer(
+                force_uncertainty=(form.force_uncertainty.data or 1.0) / 100,
+                displacement_uncertainty=(form.displacement_uncertainty.data or 1.0) / 100,
+                dimension_uncertainty=(form.dimension_uncertainty.data or 0.5) / 100
+            )
             results = analyzer.run_analysis(force, cmod, specimen_obj, material_obj)
 
             # Build geometry dict for storage
