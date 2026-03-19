@@ -111,7 +111,7 @@ def query():
     if not test_method or not parameter:
         return jsonify({'error': 'Test method and parameter are required'}), 400
 
-    # Build query — use year/cert_id columns, not the property
+    # Build query — explicit join path: AnalysisResult → TestRecord → Certificate
     query = db.session.query(
         AnalysisResult.value,
         AnalysisResult.uncertainty,
@@ -122,7 +122,11 @@ def query():
         TestRecord.test_date,
         Certificate.year,
         Certificate.cert_id
-    ).join(TestRecord).outerjoin(Certificate)
+    ).select_from(AnalysisResult).join(
+        TestRecord, AnalysisResult.test_record_id == TestRecord.id
+    ).outerjoin(
+        Certificate, TestRecord.certificate_id == Certificate.id
+    )
 
     # Apply filters
     query = query.filter(
@@ -228,7 +232,7 @@ def export():
     if not test_method or not parameter:
         return jsonify({'error': 'Test method and parameter are required'}), 400
 
-    # Build query — use year/cert_id columns, not the property
+    # Build query — explicit join path: AnalysisResult → TestRecord → Certificate
     query = db.session.query(
         AnalysisResult.value,
         AnalysisResult.uncertainty,
@@ -240,7 +244,11 @@ def export():
         TestRecord.test_date,
         Certificate.year,
         Certificate.cert_id
-    ).join(TestRecord).outerjoin(Certificate)
+    ).select_from(AnalysisResult).join(
+        TestRecord, AnalysisResult.test_record_id == TestRecord.id
+    ).outerjoin(
+        Certificate, TestRecord.certificate_id == Certificate.id
+    )
 
     query = query.filter(
         TestRecord.test_method == test_method,
