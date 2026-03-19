@@ -68,27 +68,27 @@ def create_app(config_name='default'):
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(statistics_bp, url_prefix='/statistics')
 
-    # Handle reverse proxy prefix (X-Script-Name header from nginx)
-    # This makes url_for() generate correct URLs behind /app/durabler2/
-    class ReverseProxied:
-        def __init__(self, wsgi_app):
-            self.wsgi_app = wsgi_app
-
-        def __call__(self, environ, start_response):
-            script_name = environ.get('HTTP_X_SCRIPT_NAME', '')
-            if script_name:
-                environ['SCRIPT_NAME'] = script_name
-                path_info = environ.get('PATH_INFO', '')
-                if path_info.startswith(script_name):
-                    environ['PATH_INFO'] = path_info[len(script_name):]
-            return self.wsgi_app(environ, start_response)
-
-    app.wsgi_app = ReverseProxied(app.wsgi_app)
-
     # Portal authentication (when running behind app portal)
+    # portal_auth.init_portal_auth installs its own ScriptNameMiddleware
     if app.config.get('PORTAL_AUTH_ENABLED'):
         from .portal_auth import init_portal_auth
         init_portal_auth(app)
+    else:
+        # Standalone reverse proxy support (X-Script-Name header from nginx)
+        class ReverseProxied:
+            def __init__(self, wsgi_app):
+                self.wsgi_app = wsgi_app
+
+            def __call__(self, environ, start_response):
+                script_name = environ.get('HTTP_X_SCRIPT_NAME', '')
+                if script_name:
+                    environ['SCRIPT_NAME'] = script_name
+                    path_info = environ.get('PATH_INFO', '')
+                    if path_info.startswith(script_name):
+                        environ['PATH_INFO'] = path_info[len(script_name):]
+                return self.wsgi_app(environ, start_response)
+
+        app.wsgi_app = ReverseProxied(app.wsgi_app)
 
     # Create database tables in development
     # In production/Docker, the entrypoint script handles this
