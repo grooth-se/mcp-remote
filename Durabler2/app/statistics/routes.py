@@ -111,7 +111,7 @@ def query():
     if not test_method or not parameter:
         return jsonify({'error': 'Test method and parameter are required'}), 400
 
-    # Build query
+    # Build query — use year/cert_id columns, not the property
     query = db.session.query(
         AnalysisResult.value,
         AnalysisResult.uncertainty,
@@ -120,7 +120,8 @@ def query():
         TestRecord.material,
         TestRecord.temperature,
         TestRecord.test_date,
-        Certificate.certificate_number
+        Certificate.year,
+        Certificate.cert_id
     ).join(TestRecord).outerjoin(Certificate)
 
     # Apply filters
@@ -192,7 +193,7 @@ def query():
             'material': r.material,
             'temperature': r.temperature,
             'test_date': r.test_date.strftime('%Y-%m-%d') if r.test_date else None,
-            'certificate': r.certificate_number,
+            'certificate': f'DUR-{r.year}-{r.cert_id}' if r.year else None,
         })
 
     return jsonify({
@@ -227,7 +228,7 @@ def export():
     if not test_method or not parameter:
         return jsonify({'error': 'Test method and parameter are required'}), 400
 
-    # Build query
+    # Build query — use year/cert_id columns, not the property
     query = db.session.query(
         AnalysisResult.value,
         AnalysisResult.uncertainty,
@@ -237,7 +238,8 @@ def export():
         TestRecord.material,
         TestRecord.temperature,
         TestRecord.test_date,
-        Certificate.certificate_number
+        Certificate.year,
+        Certificate.cert_id
     ).join(TestRecord).outerjoin(Certificate)
 
     query = query.filter(
@@ -282,7 +284,7 @@ def export():
             r.material,
             r.temperature,
             r.test_date.strftime('%Y-%m-%d') if r.test_date else '',
-            r.certificate_number or '',
+            f'DUR-{r.year}-{r.cert_id}' if r.year else '',
             r.value,
             r.uncertainty or '',
             r.unit or ''
