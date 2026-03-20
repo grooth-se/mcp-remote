@@ -310,15 +310,23 @@ class CTODReportGenerator:
         # Get CTOD requirement from data
         ctod_req = data.get('ctod_req', data.get('delta_c_req', data.get('delta_u_req', data.get('delta_m_req', '-'))))
 
+        # Find the CTOD value — use first non-empty result (prefer δc > δu > δm)
+        def first_valid(*keys):
+            for k in keys:
+                v = data.get(k)
+                if v and v != '-':
+                    return v
+            return '-'
+
+        ctod_value = first_valid('delta_c_value', 'delta_u_value', 'delta_m_value')
+        ctod_unc = first_valid('delta_c_uncertainty', 'delta_u_uncertainty', 'delta_m_uncertainty')
+
         # Results data: (Parameter, Unit, Value, Requirement, Uncertainty)
         results_data = [
             ('Pmax', 'kN', data.get('P_max_value', '-'), data.get('P_max_req', '-'), data.get('P_max_uncertainty', '-')),
             ('CMOD at Pmax', 'mm', data.get('CMOD_max_value', '-'), data.get('CMOD_max_req', '-'), data.get('CMOD_max_uncertainty', '-')),
             ('Kmax', 'MPa√m', data.get('K_max_value', '-'), data.get('K_max_req', '-'), data.get('K_max_uncertainty', '-')),
-            (f"CTOD ({data.get('ctod_type', 'δ')})", 'mm',
-             data.get('delta_c_value', data.get('delta_u_value', data.get('delta_m_value', '-'))),
-             ctod_req,
-             data.get('delta_c_uncertainty', data.get('delta_u_uncertainty', data.get('delta_m_uncertainty', '-')))),
+            (f"CTOD ({data.get('ctod_type', 'δ')})", 'mm', ctod_value, ctod_req, ctod_unc),
             ('Compliance', 'mm/kN', data.get('compliance', '-'), '-', '-'),
             ('Crack Growth Δa', 'mm', data.get('delta_a', '-'), '-', '-'),
             ('Validity', '-', data.get('validity_status', '-'), '-', '-'),
