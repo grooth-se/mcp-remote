@@ -960,12 +960,15 @@ def report(test_id):
             test_info = {
                 'test_project': cert.test_project if cert else '',
                 'customer': cert.customer if cert else '',
+                'customer_order': cert.customer_order if cert else '',
+                'product_sn': cert.product_sn if cert else '',
                 'specimen_id': test.specimen_id or '',
+                'location_orientation': cert.location_orientation if cert else '',
                 'material': test.material or '',
                 'certificate_number': form.certificate_number.data or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'temperature': str(test.temperature) if test.temperature else '23',
-                'requirement': cert.requirement if cert else '',  # CTOD requirement from certificate
+                'requirement': cert.requirement if cert else '',
                 'test_engineer': current_user.full_name or current_user.username,
             }
 
@@ -976,6 +979,7 @@ def report(test_id):
                 'B': geometry.get('B', ''),
                 'B_n': geometry.get('B_n', ''),
                 'a_0': geometry.get('a_0', ''),
+                'a_f': geometry.get('a_f', '-'),
                 'S': geometry.get('S', ''),
                 'notch_type': geometry.get('notch_type', 'fatigue'),
             }

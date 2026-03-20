@@ -418,23 +418,50 @@ class CTODReportGenerator:
         heading.paragraph_format.space_before = Pt(12)
         heading.paragraph_format.space_after = Pt(6)
 
-        sig_table = doc.add_table(rows=4, cols=4)
+        sig_table = doc.add_table(rows=4, cols=2)
         sig_table.style = 'Table Grid'
 
-        sig_headers = ['Role', 'Name', 'Signature', 'Date']
-        for i, header in enumerate(sig_headers):
-            sig_table.rows[0].cells[i].text = header
-            sig_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+        # Header row
+        sig_table.rows[0].cells[0].text = 'Role'
+        sig_table.rows[0].cells[0].paragraphs[0].runs[0].bold = True
+        sig_table.rows[0].cells[1].text = 'Name / Signature'
+        sig_table.rows[0].cells[1].paragraphs[0].runs[0].bold = True
 
-        sig_table.rows[1].cells[0].text = 'Tested by:'
-        sig_table.rows[2].cells[0].text = 'Reviewed by:'
-        sig_table.rows[3].cells[0].text = 'Approved by:'
+        # Row 1: Test Engineer — name only
+        sig_table.rows[1].cells[0].text = 'Test Engineer:'
+        sig_table.rows[1].cells[0].paragraphs[0].runs[0].bold = True
+        engineer_name = data.get('test_engineer', data.get('operator', ''))
+        sig_table.rows[1].cells[1].text = engineer_name
 
-        # Compact signature table rows
+        # Row 2: Approved by — digital signature (filled by PDF signing)
+        sig_table.rows[2].cells[0].text = 'Approved by:'
+        sig_table.rows[2].cells[0].paragraphs[0].runs[0].bold = True
+        sig_table.rows[2].cells[1].text = ''  # Digital signature applied here
+
+        # Row 3: Third Party Approval (if applicable)
+        sig_table.rows[3].cells[0].text = 'Third Party Approval:'
+        sig_table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
+        sig_table.rows[3].cells[1].text = data.get('third_party_approval', '')
+
+        # Set row heights — equal height for all signature rows, sized for digital signature
+        from docx.oxml.ns import qn
+        from docx.shared import Cm as CmShared
+        from docx.oxml import OxmlElement
+        sig_row_height = CmShared(1.5)  # ~50pt, matches PDF signature box
         for row in sig_table.rows:
             for cell in row.cells:
                 cell.paragraphs[0].paragraph_format.space_before = Pt(1)
                 cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+        # Set fixed row height on the three data rows (skip header)
+        for row in [sig_table.rows[1], sig_table.rows[2], sig_table.rows[3]]:
+            tr = row._tr
+            trPr = tr.get_or_add_trPr()
+            trHeight = trPr.find(qn('w:trHeight'))
+            if trHeight is None:
+                trHeight = OxmlElement('w:trHeight')
+                trPr.append(trHeight)
+            trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))  # EMU to twips
+            trHeight.set(qn('w:hRule'), 'exact')
 
         # Add disclaimer to page footer (visible on all pages)
         disclaimer_text = (
@@ -585,26 +612,44 @@ class CTODReportGenerator:
         data['test_equipment'] = 'MTS Landmark 500kN'
         data['test_temperature'] = test_info.get('temperature', '23')
 
-        # Specimen geometry
+        # Specimen geometry — format dimensions to 2 decimals
+        def fmt2(val):
+            try:
+                return f"{float(val):.2f}"
+            except (ValueError, TypeError):
+                return str(val) if val else ''
+
         data['specimen_type'] = specimen_data.get('specimen_type', 'SE(B)')
-        data['W'] = specimen_data.get('W', '')
-        data['B'] = specimen_data.get('B', '')
-        data['B_n'] = specimen_data.get('B_n', specimen_data.get('B', ''))
+        data['W'] = fmt2(specimen_data.get('W', ''))
+        data['B'] = fmt2(specimen_data.get('B', ''))
+        data['B_n'] = fmt2(specimen_data.get('B_n', specimen_data.get('B', '')))
         data['a_0'] = specimen_data.get('a_0', '')
-        data['S'] = specimen_data.get('S', '')
+        data['S'] = fmt2(specimen_data.get('S', ''))
         data['a_f'] = specimen_data.get('a_f', '-')
         data['notch_type'] = specimen_data.get('notch_type', 'Fatigue pre-crack')
         data['side_grooves'] = 'Yes' if specimen_data.get('B_n') and specimen_data.get('B_n') < specimen_data.get('B', 0) else 'No'
 
-        # Calculate a_0/W ratio and delta_a
-        W = float(specimen_data.get('W', 1))
-        a_0 = float(specimen_data.get('a_0', 0))
-        data['a_W_ratio'] = f"{a_0 / W:.3f}" if W > 0 else '-'
+        # Format crack length to 2 decimals
+        try:
+            a_0_val = float(specimen_data.get('a_0', 0))
+            data['a_0'] = f"{a_0_val:.2f}"
+        except (ValueError, TypeError):
+            a_0_val = 0
+
+        # Calculate a_0/W ratio, ligament, and delta_a
+        try:
+            W = float(specimen_data.get('W', 1))
+        except (ValueError, TypeError):
+            W = 1
+        data['a_W_ratio'] = f"{a_0_val / W:.3f}" if W > 0 else '-'
+        data['ligament'] = f"{W - a_0_val:.2f} mm" if W > 0 and a_0_val > 0 else '-'
 
         a_f = specimen_data.get('a_f')
         if a_f and a_f != '-':
             try:
-                delta_a = float(a_f) - a_0
+                a_f_val = float(a_f)
+                data['a_f'] = f"{a_f_val:.2f}"
+                delta_a = a_f_val - a_0_val
                 data['delta_a'] = f"{delta_a:.3f}"
             except (ValueError, TypeError):
                 data['delta_a'] = '-'
@@ -721,12 +766,8 @@ class CTODReportGenerator:
         else:
             data['validity_statement'] = f'The test does not meet all validity requirements.\n{validity_summary}'
 
-        # Signatures (to be filled manually)
-        data['tested_by'] = ''
-        data['tested_date'] = ''
-        data['reviewed_by'] = ''
-        data['reviewed_date'] = ''
-        data['approved_by'] = ''
-        data['approved_date'] = ''
+        # Signatures / approval
+        data['test_engineer'] = test_info.get('test_engineer', test_info.get('operator', ''))
+        data['third_party_approval'] = test_info.get('third_party_approval', '')
 
         return data

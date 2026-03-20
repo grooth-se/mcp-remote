@@ -1027,6 +1027,7 @@ def _generate_ctod_report(certificate, test_record, output_path):
         'B': geometry.get('B', ''),
         'B_n': geometry.get('B_n', ''),
         'a_0': geometry.get('a_0', ''),
+        'a_f': geometry.get('a_f', '-'),
         'S': geometry.get('S', ''),
         'notch_type': geometry.get('notch_type', 'fatigue'),
     }
