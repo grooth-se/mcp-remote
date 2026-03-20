@@ -307,10 +307,7 @@ class CTODReportGenerator:
             table.rows[0].cells[i].text = header
             table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
 
-        # Get CTOD requirement from data
-        ctod_req = data.get('ctod_req', data.get('delta_c_req', data.get('delta_u_req', data.get('delta_m_req', '-'))))
-
-        # Find the CTOD value — use first non-empty result (prefer δc > δu > δm)
+        # Helper: find first non-empty value from data dict (skip '-')
         def first_valid(*keys):
             for k in keys:
                 v = data.get(k)
@@ -318,6 +315,8 @@ class CTODReportGenerator:
                     return v
             return '-'
 
+        # Get CTOD requirement and values (prefer δc > δu > δm)
+        ctod_req = first_valid('ctod_req', 'delta_c_req', 'delta_u_req', 'delta_m_req')
         ctod_value = first_valid('delta_c_value', 'delta_u_value', 'delta_m_value')
         ctod_unc = first_valid('delta_c_uncertainty', 'delta_u_uncertainty', 'delta_m_uncertainty')
 

@@ -892,7 +892,10 @@ def report(test_id):
             test_info = {
                 'test_project': cert.test_project if cert else '',
                 'customer': cert.customer if cert else '',
+                'customer_order': cert.customer_order if cert else '',
+                'product_sn': cert.product_sn if cert else '',
                 'specimen_id': test.specimen_id or '',
+                'location_orientation': cert.location_orientation if cert else '',
                 'material': test.material or '',
                 'certificate_number': form.certificate_number.data or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',

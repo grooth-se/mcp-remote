@@ -985,11 +985,14 @@ def report(test_id):
                 'certificate_number': form.certificate_number.data or test.test_id,
                 'test_project': test.certificate.test_project if test.certificate else '',
                 'customer': test.certificate.customer if test.certificate else '',
+                'customer_order': test.certificate.customer_order if test.certificate else '',
+                'product_sn': test.certificate.product_sn if test.certificate else '',
                 'specimen_id': test.specimen_id or '',
+                'location_orientation': test.certificate.location_orientation if test.certificate else '',
                 'material': test.material or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'temperature': test.temperature or '23',
-                'kic_req': kic_req,  # KIC requirement from certificate
+                'kic_req': kic_req,
                 'test_engineer': current_user.full_name or current_user.username,
             }
 

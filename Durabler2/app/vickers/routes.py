@@ -474,6 +474,7 @@ def report(test_id):
                 'test_project': test.certificate.test_project if test.certificate else '',
                 'customer': test.certificate.customer if test.certificate else '',
                 'customer_order': test.certificate.customer_order if test.certificate else '',
+                'product_sn': test.certificate.product_sn if test.certificate else '',
                 'specimen_id': test.specimen_id or '',
                 'customer_specimen_info': test.certificate.customer_specimen_info if test.certificate else '',
                 'material': test.material or '',
