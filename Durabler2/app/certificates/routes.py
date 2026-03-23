@@ -454,8 +454,8 @@ def download_reports(cert_id):
 @login_required
 def import_excel():
     """Import certificates from Excel file."""
-    if current_user.role != 'admin':
-        flash('Only administrators can import certificates.', 'danger')
+    if current_user.role not in ('admin', 'approver'):
+        flash('Only administrators and approvers can import certificates.', 'danger')
         return redirect(url_for('certificates.index'))
 
     form = CertificateImportForm()
