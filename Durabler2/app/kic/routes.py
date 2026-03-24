@@ -467,8 +467,8 @@ def specimen():
 
             # Run analysis with user-specified uncertainty
             analyzer = KICAnalyzer(
-                force_uncertainty=(form.force_uncertainty.data or 1.0) / 100,
-                disp_uncertainty=(form.displacement_uncertainty.data or 1.0) / 100,
+                force_uncertainty=(form.force_uncertainty.data or 0.31) / 100,
+                disp_uncertainty=(form.displacement_uncertainty.data or 0.16) / 100,
                 dim_uncertainty=(form.dimension_uncertainty.data or 0.5) / 100
             )
             result = analyzer.run_analysis(np.array(force), np.array(displacement), specimen_obj, material_obj)
@@ -568,14 +568,14 @@ def specimen():
 
             # Store uncertainty inputs
             geometry_data['uncertainty_inputs'] = {
-                'force_pct': form.force_uncertainty.data or 1.0,
-                'displacement_pct': form.displacement_uncertainty.data or 1.0,
+                'force_pct': form.force_uncertainty.data or 0.31,
+                'displacement_pct': form.displacement_uncertainty.data or 0.16,
                 'dimension_pct': form.dimension_uncertainty.data or 0.5
             }
 
             # Calculate uncertainty budget
-            force_u = (form.force_uncertainty.data or 1.0) / 100
-            disp_u = (form.displacement_uncertainty.data or 1.0) / 100
+            force_u = (form.force_uncertainty.data or 0.31) / 100
+            disp_u = (form.displacement_uncertainty.data or 0.16) / 100
             dim_u = (form.dimension_uncertainty.data or 0.5) / 100
             # Combined uncertainty (simplified RSS)
             combined = (force_u**2 + disp_u**2 + 4*dim_u**2)**0.5 * 100  # approx for K

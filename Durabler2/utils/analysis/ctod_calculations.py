@@ -58,8 +58,8 @@ class CTODAnalyzer:
     """
 
     def __init__(self,
-                 force_uncertainty: float = 0.01,
-                 displacement_uncertainty: float = 0.01,
+                 force_uncertainty: float = 0.0031,
+                 displacement_uncertainty: float = 0.0016,
                  dimension_uncertainty: float = 0.005):
         """Initialize CTOD analyzer with uncertainty values.
 

@@ -179,7 +179,7 @@ def new():
 
         # Store uncertainty inputs (ISO 17025)
         test_params['uncertainty_inputs'] = {
-            'force_pct': form.force_uncertainty.data or 1.0,
+            'force_pct': form.force_uncertainty.data or 0.31,
             'diagonal_pct': form.diagonal_uncertainty.data or 1.0,
             'machine_pct': form.machine_uncertainty.data or 0.5
         }
@@ -261,7 +261,7 @@ def new():
                 analyzer = VickersAnalyzer(
                     machine_uncertainty=(form.machine_uncertainty.data or 0.5) / 100,
                     diagonal_uncertainty=(form.diagonal_uncertainty.data or 1.0) / 100,
-                    force_uncertainty=(form.force_uncertainty.data or 1.0) / 100
+                    force_uncertainty=(form.force_uncertainty.data or 0.31) / 100
                 )
                 result = analyzer.run_analysis(test_data)
 

@@ -148,12 +148,12 @@ class SpecimenForm(FlaskForm):
     # Uncertainty parameters (ISO 17025)
     force_uncertainty = FloatField('Force Uncertainty (%)', validators=[
         Optional(),
-        NumberRange(min=0.1, max=10, message='Typically 0.5-2%')
-    ], default=1.0)
+        NumberRange(min=0.01, max=10)
+    ], default=0.31)
     displacement_uncertainty = FloatField('Displacement Uncertainty (%)', validators=[
         Optional(),
-        NumberRange(min=0.1, max=10)
-    ], default=1.0)
+        NumberRange(min=0.01, max=10)
+    ], default=0.16)
     dimension_uncertainty = FloatField('Dimension Uncertainty (%)', validators=[
         Optional(),
         NumberRange(min=0.1, max=5)

@@ -545,14 +545,14 @@ def specimen():
 
             # Store uncertainty inputs
             geometry['uncertainty_inputs'] = {
-                'force_pct': form.force_uncertainty.data or 1.0,
-                'displacement_pct': form.displacement_uncertainty.data or 1.0,
+                'force_pct': form.force_uncertainty.data or 0.31,
+                'displacement_pct': form.displacement_uncertainty.data or 0.16,
                 'dimension_pct': form.dimension_uncertainty.data or 0.5
             }
 
             # Calculate uncertainty budget
-            force_u = (form.force_uncertainty.data or 1.0) / 100
-            disp_u = (form.displacement_uncertainty.data or 1.0) / 100
+            force_u = (form.force_uncertainty.data or 0.31) / 100
+            disp_u = (form.displacement_uncertainty.data or 0.16) / 100
             dim_u = (form.dimension_uncertainty.data or 0.5) / 100
             # Combined uncertainty (simplified RSS for FCGR)
             combined = (force_u**2 + disp_u**2 + 4*dim_u**2)**0.5 * 100

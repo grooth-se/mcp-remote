@@ -36,8 +36,8 @@ class TensileAnalysisConfig:
     elastic_strain_range: Tuple[float, float] = (0.0005, 0.0025)
     preload_threshold: float = 0.1
     smoothing_window: int = 5
-    force_calibration_uncertainty: float = 0.005  # 0.5%
-    extensometer_uncertainty: float = 0.001  # 0.001 mm
+    force_calibration_uncertainty: float = 0.0031  # 0.31%
+    extensometer_uncertainty: float = 0.0016  # 0.16% (converted to absolute in route)
 
 
 class TensileAnalyzer:

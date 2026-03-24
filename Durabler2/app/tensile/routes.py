@@ -360,8 +360,8 @@ def specimen():
             Lf = form.Lf.data  # Final parallel length
 
             # Get uncertainty parameters from form
-            force_unc_pct = form.force_uncertainty.data or 1.0
-            disp_unc_pct = form.displacement_uncertainty.data or 1.0
+            force_unc_pct = form.force_uncertainty.data or 0.31
+            disp_unc_pct = form.displacement_uncertainty.data or 0.16
             dim_unc_pct = form.dimension_uncertainty.data or 0.5
             dim_unc_mm = dim_unc_pct / 100  # Convert % to fraction for mm calc
 
@@ -685,14 +685,14 @@ def specimen():
 
             # Store uncertainty inputs (ISO 17025)
             geometry['uncertainty_inputs'] = {
-                'force_pct': form.force_uncertainty.data or 1.0,
-                'displacement_pct': form.displacement_uncertainty.data or 1.0,
+                'force_pct': form.force_uncertainty.data or 0.31,
+                'displacement_pct': form.displacement_uncertainty.data or 0.16,
                 'dimension_pct': form.dimension_uncertainty.data or 0.5
             }
 
             # Calculate uncertainty budget (simplified RSS)
-            force_u = (form.force_uncertainty.data or 1.0) / 100
-            disp_u = (form.displacement_uncertainty.data or 1.0) / 100
+            force_u = (form.force_uncertainty.data or 0.31) / 100
+            disp_u = (form.displacement_uncertainty.data or 0.16) / 100
             dim_u = (form.dimension_uncertainty.data or 0.5) / 100
             combined_u = math.sqrt(force_u**2 + disp_u**2 + dim_u**2) * 100
             geometry['uncertainty_budget'] = {

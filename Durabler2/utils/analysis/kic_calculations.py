@@ -89,8 +89,8 @@ class KICAnalyzer:
     """
 
     def __init__(self,
-                 force_uncertainty: float = 0.01,
-                 disp_uncertainty: float = 0.01,
+                 force_uncertainty: float = 0.0031,
+                 disp_uncertainty: float = 0.0016,
                  dim_uncertainty: float = 0.005):
         """
         Initialize KIC analyzer with uncertainty values.

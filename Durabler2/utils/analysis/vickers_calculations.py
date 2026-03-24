@@ -86,7 +86,7 @@ class VickersAnalyzer:
     def __init__(self,
                  machine_uncertainty: float = 0.02,
                  diagonal_uncertainty: float = 0.01,
-                 force_uncertainty: float = 0.01):
+                 force_uncertainty: float = 0.0031):
         """
         Initialize Vickers analyzer with uncertainty values.
 
