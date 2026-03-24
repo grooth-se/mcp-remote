@@ -94,7 +94,8 @@ class TensileAnalyzer:
         stress = (force * 1000) / area
 
         # Strain: epsilon = delta_L / L0
-        strain = extension / gauge_length
+        # Zero the extension data (displacement may have non-zero initial position)
+        strain = (extension - extension[0]) / gauge_length
 
         return stress, strain
 
