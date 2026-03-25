@@ -237,9 +237,38 @@ def generate_report(cert_id):
                 requirements=requirements
             )
 
-            # Generate stress-strain chart using stored plot data (same as analysis page)
+            # Generate stress-strain chart for the report
             chart_path = None
             plot_data = geometry.get('plot_data')
+
+            # Fallback: generate plot_data from CSV if not stored (older tests)
+            if not plot_data and test_record.raw_data_filename:
+                try:
+                    import os
+                    from utils.data_acquisition.mts_csv_parser import parse_mts_csv
+                    from utils.analysis.tensile_calculations import TensileAnalyzer
+                    from app.tensile.routes import truncate_at_break
+
+                    csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], test_record.raw_data_filename)
+                    if os.path.exists(csv_path):
+                        csv_data = parse_mts_csv(Path(csv_path))
+                        area = geometry.get('area', 100)
+                        L0 = geometry.get('L0', 50)
+                        Lp = geometry.get('Lp', 50)
+                        analyzer = TensileAnalyzer()
+                        stress_ext, strain_ext = analyzer.calculate_stress_strain(csv_data.force, csv_data.extension, area, L0)
+                        stress_dsp, strain_dsp = analyzer.calculate_stress_strain(csv_data.force, csv_data.displacement, area, Lp)
+                        s_t, st_t = truncate_at_break(strain_ext, stress_ext, break_threshold=0.5)
+                        sd_t, std_t = truncate_at_break(strain_dsp, stress_dsp, break_threshold=0.5)
+                        plot_data = {
+                            'strain': (s_t * 100).tolist(),
+                            'stress': st_t.tolist(),
+                            'strain_disp': (sd_t * 100).tolist(),
+                            'stress_disp': std_t.tolist(),
+                        }
+                except Exception as e:
+                    current_app.logger.warning(f'Plot data fallback failed: {e}')
+
             if plot_data:
                 try:
                     import numpy as np
@@ -255,7 +284,6 @@ def generate_report(cert_id):
                         ax.plot(plot_data['strain'], plot_data['stress'],
                                 'darkred', linewidth=1.5, label='Extensometer')
 
-                    # Add result markers
                     rm_val = results.get('Rm')
                     rp02_val = results.get('Rp0.2')
                     if rm_val:

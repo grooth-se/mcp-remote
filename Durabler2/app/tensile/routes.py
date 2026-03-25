@@ -1170,9 +1170,33 @@ def report(test_id):
                 requirements=requirements
             )
 
-            # Generate stress-strain chart using stored plot data (same as analysis page)
+            # Generate stress-strain chart for the report
             chart_path = None
             plot_data = geometry.get('plot_data')
+
+            # Fallback: generate plot_data from CSV if not stored (older tests)
+            if not plot_data and test.raw_data_filename:
+                try:
+                    csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], test.raw_data_filename)
+                    if os.path.exists(csv_path):
+                        csv_data = parse_mts_csv(Path(csv_path))
+                        _area = geometry.get('area', 100)
+                        _L0 = geometry.get('L0', 50)
+                        _Lp = geometry.get('Lp', 50)
+                        _analyzer = TensileAnalyzer()
+                        _stress, _strain = _analyzer.calculate_stress_strain(csv_data.force, csv_data.extension, _area, _L0)
+                        _stress_d, _strain_d = _analyzer.calculate_stress_strain(csv_data.force, csv_data.displacement, _area, _Lp)
+                        _st, _stt = truncate_at_break(_strain, _stress, break_threshold=0.5)
+                        _sdt, _sdtt = truncate_at_break(_strain_d, _stress_d, break_threshold=0.5)
+                        plot_data = {
+                            'strain': (_st * 100).tolist(),
+                            'stress': _stt.tolist(),
+                            'strain_disp': (_sdt * 100).tolist(),
+                            'stress_disp': _sdtt.tolist(),
+                        }
+                except Exception as e:
+                    current_app.logger.warning(f'Plot data fallback failed: {e}')
+
             if plot_data:
                 try:
                     fig, ax = plt.subplots(figsize=(8, 5))
@@ -1183,10 +1207,8 @@ def report(test_id):
                         ax.plot(plot_data['strain'], plot_data['stress'],
                                 'darkred', linewidth=1.5, label='Extensometer')
 
-                    # Add result markers
                     rm_val = results.get('Rm')
                     rp02_val = results.get('Rp0.2')
-
                     if rm_val:
                         ax.axhline(y=rm_val.value, color='gray', linestyle='--', linewidth=1,
                                    label='Rm')
@@ -1204,7 +1226,7 @@ def report(test_id):
                     fig.savefig(chart_path, dpi=150, bbox_inches='tight')
                     plt.close(fig)
                 except Exception as e:
-                    current_app.logger.warning(f'Report chart from plot_data failed: {e}')
+                    current_app.logger.warning(f'Report chart failed: {e}')
 
             # Get logo path (use from-scratch report generation)
             logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
