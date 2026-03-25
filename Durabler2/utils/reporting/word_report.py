@@ -687,13 +687,9 @@ class TensileReportGenerator:
         data['Z_req'] = requirements.get('Z', '-')
 
         # Rate calculations - template uses {{stress_rate_yield}}, {{strain_rate_yield}}, etc.
-        # For yield point, use Rp0.2 rates for offset method, ReH rates for yield_point method
-        if yield_type == 'offset':
-            stress_rate_yield = get_result_raw('stress_rate_rp02')
-            strain_rate_yield = get_result_raw('strain_rate_rp02')
-        else:
-            stress_rate_yield = get_result_raw('stress_rate_reh')
-            strain_rate_yield = get_result_raw('strain_rate_reh')
+        # Rate at yield is stored as Stress_rate_Rp02 regardless of yield method
+        stress_rate_yield = get_result_raw('stress_rate_rp02')
+        strain_rate_yield = get_result_raw('strain_rate_rp02')
 
         # Format stress rate at yield
         if stress_rate_yield and hasattr(stress_rate_yield, 'value'):
