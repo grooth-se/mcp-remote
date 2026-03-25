@@ -55,13 +55,15 @@ def calculate_area_uncertainty(diameter, d_unc=0.01):
     return np.pi * diameter * d_unc / 2
 
 
-def detect_break_point(stress, threshold=0.5):
-    """Detect specimen break point based on significant stress drop.
+def detect_break_point(stress, strain=None, threshold=0.5):
+    """Detect specimen break point based on stress drop or strain drop.
 
     Parameters
     ----------
     stress : array
         Stress data array
+    strain : array, optional
+        Strain data array (for detecting strain reversal at break)
     threshold : float
         Fraction of max stress below which break is detected (default 0.5 = 50%)
 
@@ -75,17 +77,38 @@ def detect_break_point(stress, threshold=0.5):
 
     max_stress_idx = np.argmax(stress)
     max_stress = stress[max_stress_idx]
+    break_idx = None
 
-    # Look for first point after max where stress drops below threshold
+    # Method 1: Stress drops below threshold after max
     for i in range(max_stress_idx + 1, len(stress)):
         if stress[i] < max_stress * threshold:
-            return i
+            break_idx = i
+            break
 
-    return None
+    # Method 2: Significant strain drop (reversal) after max stress
+    # This catches elastic snapback at fracture where strain jumps backwards
+    if strain is not None and len(strain) == len(stress):
+        max_strain_up_to_break = strain[max_stress_idx]
+        for i in range(max_stress_idx + 1, len(strain)):
+            # Track the running maximum strain
+            if strain[i] > max_strain_up_to_break:
+                max_strain_up_to_break = strain[i]
+            # Detect if strain drops by more than 10% of max strain
+            elif (max_strain_up_to_break - strain[i]) > 0.10 * max_strain_up_to_break:
+                strain_break = i
+                # Use the earlier of stress break and strain break
+                if break_idx is None or strain_break < break_idx:
+                    break_idx = strain_break
+                break
+
+    return break_idx
 
 
 def truncate_at_break(strain, stress, break_threshold=0.5):
     """Truncate stress-strain data at break point to clean up plots.
+
+    Detects break by both stress drop (below threshold) and strain
+    reversal (>10% drop from running max), uses whichever comes first.
 
     Parameters
     ----------
@@ -101,7 +124,7 @@ def truncate_at_break(strain, stress, break_threshold=0.5):
     tuple
         (truncated_strain, truncated_stress)
     """
-    break_idx = detect_break_point(stress, break_threshold)
+    break_idx = detect_break_point(stress, strain, break_threshold)
     if break_idx is not None:
         return strain[:break_idx], stress[:break_idx]
     return strain, stress
