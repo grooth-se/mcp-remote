@@ -264,6 +264,11 @@ def generate_report(cert_id):
                         strain_plot, stress_plot = truncate_at_break(strain, stress, break_threshold=0.5)
                         strain_disp_plot, stress_disp_plot = truncate_at_break(strain_disp, stress_disp, break_threshold=0.5)
 
+                        current_app.logger.info(
+                            f'Report chart: ext {len(strain)}->{len(strain_plot)} pts, '
+                            f'disp {len(strain_disp)}->{len(strain_disp_plot)} pts, '
+                            f'last stress ext={stress_plot[-1]:.1f} disp={stress_disp_plot[-1]:.1f}')
+
                         fig, ax = plt.subplots(figsize=(8, 5))
                         if geometry.get('use_displacement_only'):
                             ax.plot(strain_disp_plot * 100, stress_disp_plot, 'black', linewidth=1.5, label='Displacement')
