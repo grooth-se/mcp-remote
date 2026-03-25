@@ -78,9 +78,9 @@ class SpecimenForm(FlaskForm):
     ])
 
     # === COMMON - BEFORE TEST ===
-    L0 = FloatField('L0 - Extensometer Length (mm)', validators=[
+    L0 = FloatField('L0 - Gage Length, extensometer (mm)', validators=[
         DataRequired(),
-        NumberRange(min=1, max=200, message='Extensometer length must be between 1 and 200 mm')
+        NumberRange(min=1, max=200, message='Gage length must be between 1 and 200 mm')
     ])
     Lp = FloatField('Lp - Parallel Length (mm)', validators=[
         DataRequired(),
@@ -104,7 +104,7 @@ class SpecimenForm(FlaskForm):
     ])
 
     # === COMMON - AFTER TEST ===
-    L1 = FloatField('L1 - Final Extensometer Length (mm)', validators=[
+    L1 = FloatField('L1 - Final Gage Length (mm)', validators=[
         Optional(),
         NumberRange(min=1, max=1000, message='Length must be between 1 and 1000 mm')
     ])

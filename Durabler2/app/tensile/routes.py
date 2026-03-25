@@ -354,9 +354,9 @@ def specimen():
             use_displacement_only = form.use_displacement_only.data
 
             # Get common dimensions
-            L0 = form.L0.data  # Extensometer length
+            L0 = form.L0.data  # Gage length (extensometer)
             Lp = form.Lp.data  # Parallel length
-            L1 = form.L1.data  # Final extensometer length
+            L1 = form.L1.data  # Final gage length
             Lf = form.Lf.data  # Final parallel length
 
             # Get uncertainty parameters from form
