@@ -716,6 +716,16 @@ def specimen():
             geometry['yield_method'] = yield_method
             geometry['use_displacement_only'] = use_displacement_only
 
+            # Store truncated plot data for report chart (same data as analysis page)
+            strain_trunc, stress_trunc = truncate_at_break(strain, stress, break_threshold=0.5)
+            strain_disp_trunc, stress_disp_trunc = truncate_at_break(strain_disp, stress_disp, break_threshold=0.5)
+            geometry['plot_data'] = {
+                'strain': (strain_trunc * 100).tolist(),      # %
+                'stress': stress_trunc.tolist(),               # MPa
+                'strain_disp': (strain_disp_trunc * 100).tolist(),
+                'stress_disp': stress_disp_trunc.tolist(),
+            }
+
             # Store uncertainty inputs (ISO 17025)
             geometry['uncertainty_inputs'] = {
                 'force_pct': form.force_uncertainty.data or 0.31,
@@ -1160,40 +1170,22 @@ def report(test_id):
                 requirements=requirements
             )
 
-            # Generate stress-strain chart image
+            # Generate stress-strain chart using stored plot data (same as analysis page)
             chart_path = None
-            if test.raw_data_filename:
-                csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], test.raw_data_filename)
-                if os.path.exists(csv_path):
-                    data = parse_mts_csv(Path(csv_path))
-                    area = geometry.get('area', 100)
-                    L0 = geometry.get('L0', 50)
-                    Lp = geometry.get('Lp', 50)
-
-                    analyzer = TensileAnalyzer()
-                    stress, strain = analyzer.calculate_stress_strain(data.force, data.extension, area, L0)
-                    stress_disp, strain_disp = analyzer.calculate_stress_strain(data.force, data.displacement, area, Lp)
-
-                    # Truncate data at break point to clean up report chart
-                    strain_plot, stress_plot = truncate_at_break(strain, stress, break_threshold=0.5)
-                    strain_disp_plot, stress_disp_plot = truncate_at_break(strain_disp, stress_disp, break_threshold=0.5)
-
-                    current_app.logger.info(
-                        f'Report chart: ext {len(strain)}->{len(strain_plot)} pts, '
-                        f'disp {len(strain_disp)}->{len(strain_disp_plot)} pts, '
-                        f'last stress ext={stress_plot[-1]:.1f} disp={stress_disp_plot[-1]:.1f}')
-
-                    # Create matplotlib figure for report — single curve based on evaluation source
+            plot_data = geometry.get('plot_data')
+            if plot_data:
+                try:
                     fig, ax = plt.subplots(figsize=(8, 5))
                     if geometry.get('use_displacement_only'):
-                        ax.plot(strain_disp_plot * 100, stress_disp_plot, 'black', linewidth=1.5, label='Displacement')
+                        ax.plot(plot_data['strain_disp'], plot_data['stress_disp'],
+                                'black', linewidth=1.5, label='Displacement')
                     else:
-                        ax.plot(strain_plot * 100, stress_plot, 'darkred', linewidth=1.5, label='Extensometer')
+                        ax.plot(plot_data['strain'], plot_data['stress'],
+                                'darkred', linewidth=1.5, label='Extensometer')
 
                     # Add result markers
                     rm_val = results.get('Rm')
                     rp02_val = results.get('Rp0.2')
-                    e_val = results.get('E')
 
                     if rm_val:
                         ax.axhline(y=rm_val.value, color='gray', linestyle='--', linewidth=1,
@@ -1208,10 +1200,11 @@ def report(test_id):
                     ax.legend(loc='lower right', fontsize=8)
                     ax.grid(True, alpha=0.3)
 
-                    # Save chart to temp file
                     chart_path = Path(current_app.config['UPLOAD_FOLDER']) / f'chart_{test_id}.png'
                     fig.savefig(chart_path, dpi=150, bbox_inches='tight')
                     plt.close(fig)
+                except Exception as e:
+                    current_app.logger.warning(f'Report chart from plot_data failed: {e}')
 
             # Get logo path (use from-scratch report generation)
             logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'

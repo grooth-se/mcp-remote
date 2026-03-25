@@ -237,63 +237,43 @@ def generate_report(cert_id):
                 requirements=requirements
             )
 
-            # Generate stress-strain chart for the report
+            # Generate stress-strain chart using stored plot data (same as analysis page)
             chart_path = None
-            if test_record.raw_data_filename:
+            plot_data = geometry.get('plot_data')
+            if plot_data:
                 try:
-                    import os
                     import numpy as np
                     import matplotlib
                     matplotlib.use('Agg')
                     import matplotlib.pyplot as plt
-                    from utils.data_acquisition.mts_csv_parser import parse_mts_csv
-                    from utils.analysis.tensile_calculations import TensileAnalyzer
-                    from app.tensile.routes import truncate_at_break
 
-                    csv_path = os.path.join(current_app.config['UPLOAD_FOLDER'], test_record.raw_data_filename)
-                    if os.path.exists(csv_path):
-                        data = parse_mts_csv(Path(csv_path))
-                        area = geometry.get('area', 100)
-                        L0 = geometry.get('L0', 50)
-                        Lp = geometry.get('Lp', 50)
+                    fig, ax = plt.subplots(figsize=(8, 5))
+                    if geometry.get('use_displacement_only'):
+                        ax.plot(plot_data['strain_disp'], plot_data['stress_disp'],
+                                'black', linewidth=1.5, label='Displacement')
+                    else:
+                        ax.plot(plot_data['strain'], plot_data['stress'],
+                                'darkred', linewidth=1.5, label='Extensometer')
 
-                        analyzer = TensileAnalyzer()
-                        stress, strain = analyzer.calculate_stress_strain(data.force, data.extension, area, L0)
-                        stress_disp, strain_disp = analyzer.calculate_stress_strain(data.force, data.displacement, area, Lp)
+                    # Add result markers
+                    rm_val = results.get('Rm')
+                    rp02_val = results.get('Rp0.2')
+                    if rm_val:
+                        ax.axhline(y=rm_val.value, color='gray', linestyle='--', linewidth=1,
+                                   label='Rm')
+                    if rp02_val:
+                        ax.axhline(y=rp02_val.value, color='gray', linestyle=':', linewidth=1,
+                                   label='Rp0.2')
 
-                        strain_plot, stress_plot = truncate_at_break(strain, stress, break_threshold=0.5)
-                        strain_disp_plot, stress_disp_plot = truncate_at_break(strain_disp, stress_disp, break_threshold=0.5)
+                    ax.set_xlabel('Strain (%)')
+                    ax.set_ylabel('Stress (MPa)')
+                    ax.set_title(f'Stress-Strain Curve - {test_record.specimen_id}')
+                    ax.legend(loc='lower right', fontsize=8)
+                    ax.grid(True, alpha=0.3)
 
-                        current_app.logger.info(
-                            f'Report chart: ext {len(strain)}->{len(strain_plot)} pts, '
-                            f'disp {len(strain_disp)}->{len(strain_disp_plot)} pts, '
-                            f'last stress ext={stress_plot[-1]:.1f} disp={stress_disp_plot[-1]:.1f}')
-
-                        fig, ax = plt.subplots(figsize=(8, 5))
-                        if geometry.get('use_displacement_only'):
-                            ax.plot(strain_disp_plot * 100, stress_disp_plot, 'black', linewidth=1.5, label='Displacement')
-                        else:
-                            ax.plot(strain_plot * 100, stress_plot, 'darkred', linewidth=1.5, label='Extensometer')
-
-                        # Add result markers
-                        rm_val = results.get('Rm')
-                        rp02_val = results.get('Rp0.2')
-                        if rm_val:
-                            ax.axhline(y=rm_val.value, color='gray', linestyle='--', linewidth=1,
-                                       label='Rm')
-                        if rp02_val:
-                            ax.axhline(y=rp02_val.value, color='gray', linestyle=':', linewidth=1,
-                                       label='Rp0.2')
-
-                        ax.set_xlabel('Strain (%)')
-                        ax.set_ylabel('Stress (MPa)')
-                        ax.set_title(f'Stress-Strain Curve - {test_record.specimen_id}')
-                        ax.legend(loc='lower right', fontsize=8)
-                        ax.grid(True, alpha=0.3)
-
-                        chart_path = Path(current_app.config['UPLOAD_FOLDER']) / f'chart_cert_{certificate.id}.png'
-                        fig.savefig(chart_path, dpi=150, bbox_inches='tight')
-                        plt.close(fig)
+                    chart_path = Path(current_app.config['UPLOAD_FOLDER']) / f'chart_cert_{certificate.id}.png'
+                    fig.savefig(chart_path, dpi=150, bbox_inches='tight')
+                    plt.close(fig)
                 except Exception as e:
                     current_app.logger.warning(f'Chart generation failed: {e}')
                     chart_path = None
