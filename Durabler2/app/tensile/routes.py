@@ -56,7 +56,12 @@ def calculate_area_uncertainty(diameter, d_unc=0.01):
 
 
 def detect_break_point(stress, strain=None, threshold=0.5):
-    """Detect specimen break point based on stress drop or strain drop.
+    """Detect specimen break point based on stress drop, strain drop, or sudden gradient.
+
+    Three detection methods (earliest wins):
+    1. Stress drops below threshold fraction of max (default 50%)
+    2. Strain reversal >10% of running max (extensometer/crosshead snapback)
+    3. Sudden stress drop >5% of max in a single step (fracture event)
 
     Parameters
     ----------
@@ -86,20 +91,25 @@ def detect_break_point(stress, strain=None, threshold=0.5):
             break
 
     # Method 2: Significant strain drop (reversal) after max stress
-    # This catches elastic snapback at fracture where strain jumps backwards
     if strain is not None and len(strain) == len(stress):
         max_strain_up_to_break = strain[max_stress_idx]
         for i in range(max_stress_idx + 1, len(strain)):
-            # Track the running maximum strain
             if strain[i] > max_strain_up_to_break:
                 max_strain_up_to_break = strain[i]
-            # Detect if strain drops by more than 10% of max strain
             elif (max_strain_up_to_break - strain[i]) > 0.10 * max_strain_up_to_break:
                 strain_break = i
-                # Use the earlier of stress break and strain break
                 if break_idx is None or strain_break < break_idx:
                     break_idx = strain_break
                 break
+
+    # Method 3: Sudden stress drop (>5% of max in one step) — fracture event
+    drop_threshold = max_stress * 0.05
+    for i in range(max_stress_idx + 1, len(stress) - 1):
+        if (stress[i] - stress[i + 1]) > drop_threshold:
+            sudden_break = i + 1
+            if break_idx is None or sudden_break < break_idx:
+                break_idx = sudden_break
+            break
 
     return break_idx
 
