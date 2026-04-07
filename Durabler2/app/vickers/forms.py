@@ -141,6 +141,18 @@ class SpecimenForm(FlaskForm):
     reading_20_location = StringField('Location 20', validators=[Optional()])
     reading_20_value = FloatField('HV 20', validators=[Optional(), NumberRange(min=1)])
 
+    # CSV import from test machine
+    csv_file = FileField('Import Readings from CSV', validators=[
+        Optional(),
+        FileAllowed(['csv', 'txt'], 'CSV files only')
+    ])
+
+    # PDF attachment for report
+    pdf_attachment = FileField('PDF Attachment (added to report)', validators=[
+        Optional(),
+        FileAllowed(['pdf'], 'PDF files only')
+    ])
+
     # Indent photo
     photo = FileField('Indent Photo', validators=[
         Optional(),

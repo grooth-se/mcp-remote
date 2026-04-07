@@ -82,6 +82,30 @@
                         </div>
                     </div>
 
+                    <!-- CSV Import -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-file-earmark-spreadsheet"></i> Import from Test Machine (Optional)</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-end">
+                                <div class="col-md-6 mb-1">
+                                    {{ form.csv_file.label(class="form-label") }}
+                                    {{ form.csv_file(class="form-control", id="csvFileInput") }}
+                                    <small class="text-muted">q-ness CSV file (semicolon-separated)</small>
+                                </div>
+                                <div class="col-md-3 mb-1">
+                                    <button type="button" class="btn btn-outline-primary" id="importCsvBtn" disabled>
+                                        <i class="bi bi-download"></i> Import Readings
+                                    </button>
+                                </div>
+                                <div class="col-md-3 mb-1">
+                                    <span id="csvStatus" class="text-muted small"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Hardness Readings -->
                     <div class="card mb-2">
                         <div class="card-header bg-light">
@@ -89,7 +113,7 @@
                         </div>
                         <div class="card-body">
                             <p class="text-muted small mb-1">
-                                Enter hardness readings. At least 3 readings recommended per ASTM E92.
+                                Enter readings manually or import from CSV above. At least 3 readings recommended per ASTM E92.
                             </p>
                             <div class="table-responsive">
                                 <table class="table table-sm" id="readings-table">
@@ -125,6 +149,22 @@
                                     {{ form.photo.label(class="form-label") }}
                                     {{ form.photo(class="form-control") }}
                                     <small class="text-muted">JPG or PNG image of indentation</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PDF Attachment -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-file-pdf"></i> PDF Attachment (Optional)</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.pdf_attachment.label(class="form-label") }}
+                                    {{ form.pdf_attachment(class="form-control") }}
+                                    <small class="text-muted">PDF document to attach to the final report (e.g., test machine printout)</small>
                                 </div>
                             </div>
                         </div>
@@ -231,6 +271,89 @@ function updateReadingsTable() {
         }
     });
 }
+
+// CSV import
+document.getElementById('csvFileInput').addEventListener('change', function() {
+    document.getElementById('importCsvBtn').disabled = !this.files.length;
+    document.getElementById('csvStatus').textContent = '';
+});
+
+document.getElementById('importCsvBtn').addEventListener('click', async function() {
+    const fileInput = document.getElementById('csvFileInput');
+    if (!fileInput.files.length) return;
+
+    const formData = new FormData();
+    formData.append('csv_file', fileInput.files[0]);
+
+    const statusEl = document.getElementById('csvStatus');
+    statusEl.textContent = 'Parsing...';
+    statusEl.className = 'text-muted small';
+
+    try {
+        const response = await fetch('{{ url_for("vickers.parse_csv") }}', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.error) {
+            statusEl.textContent = data.error;
+            statusEl.className = 'text-danger small';
+            return;
+        }
+
+        // Update num_readings dropdown
+        const numSelect = document.getElementById('num_readings');
+        const count = data.count;
+        // Add option if not present
+        let found = false;
+        for (const opt of numSelect.options) {
+            if (parseInt(opt.value) === count) { found = true; opt.selected = true; break; }
+        }
+        if (!found) {
+            const opt = document.createElement('option');
+            opt.value = count;
+            opt.textContent = count + ' indents (from CSV)';
+            opt.selected = true;
+            numSelect.appendChild(opt);
+        }
+
+        // Update load level if detected
+        if (data.load_level) {
+            const loadSelect = document.querySelector('[name="load_level"]');
+            for (const opt of loadSelect.options) {
+                if (opt.value === data.load_level) { opt.selected = true; break; }
+            }
+        }
+
+        // Populate reading fields
+        // First clear all
+        for (let i = 1; i <= 20; i++) {
+            const loc = document.querySelector('[name="reading_' + i + '_location"]');
+            const val = document.querySelector('[name="reading_' + i + '_value"]');
+            if (loc) loc.value = '';
+            if (val) val.value = '';
+        }
+
+        // Fill from CSV data
+        data.readings.forEach(function(r, idx) {
+            const i = idx + 1;
+            if (i > 20) return;
+            const loc = document.querySelector('[name="reading_' + i + '_location"]');
+            const val = document.querySelector('[name="reading_' + i + '_value"]');
+            if (loc) loc.value = r.location;
+            if (val) val.value = r.hardness_value;
+        });
+
+        updateReadingsTable();
+        statusEl.textContent = count + ' readings imported';
+        statusEl.className = 'text-success small';
+
+    } catch (error) {
+        statusEl.textContent = 'Import failed: ' + error.message;
+        statusEl.className = 'text-danger small';
+    }
+});
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {

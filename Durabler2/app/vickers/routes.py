@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import (
     render_template, redirect, url_for, flash, request,
-    current_app, send_file, Response
+    current_app, send_file, Response, jsonify
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -20,6 +20,67 @@ from app.models import (TestRecord, AnalysisResult, AuditLog, Certificate, RawTe
 # Import calculation utilities
 from utils.analysis.vickers_calculations import VickersAnalyzer, VickersResult
 from utils.models.vickers_specimen import VickersTestData, VickersReading, VickersLoadLevel
+
+
+def parse_vickers_csv(file_content):
+    """Parse Vickers hardness CSV from q-ness test machine.
+
+    Format: semicolon-separated, Swedish decimal comma.
+    Structure:
+        Name:;value
+        <specimen name>
+        Name:;value
+        LINE <n>
+        <number>;<HV>;<method>;<d1 mm>;<d2 mm>
+        ...
+
+    Returns list of dicts with keys: line, number, hardness_value, method, d1_mm, d2_mm, location
+    """
+    readings = []
+    current_line = None
+    lines = file_content.splitlines()
+
+    for raw in lines:
+        row = raw.strip()
+        if not row:
+            continue
+
+        if row.upper().startswith('LINE'):
+            # Extract line number
+            parts = row.split()
+            if len(parts) >= 2:
+                current_line = parts[1]
+            continue
+
+        if row.startswith('Name:') or row.startswith('name:'):
+            continue
+
+        # Try to parse as data row: number;HV;method;d1;d2
+        fields = row.split(';')
+        if len(fields) >= 5:
+            try:
+                number = int(fields[0].strip())
+                hv = float(fields[1].strip().replace(',', '.'))
+                method = fields[2].strip()
+                d1 = float(fields[3].strip().replace(',', '.'))
+                d2 = float(fields[4].strip().replace(',', '.'))
+
+                location = f'Line {current_line}, Pos {number}' if current_line else f'Pos {number}'
+                readings.append({
+                    'line': current_line,
+                    'number': number,
+                    'hardness_value': hv,
+                    'method': method,
+                    'd1_mm': d1,
+                    'd2_mm': d2,
+                    'location': location,
+                    'reading_number': len(readings) + 1,
+                })
+            except (ValueError, IndexError):
+                continue
+        # Also try: just specimen name line (single value, no semicolons with data)
+
+    return readings
 
 
 def generate_vickers_test_id():
@@ -199,21 +260,56 @@ def new():
             operator_id=current_user.id
         )
 
-        # Collect readings (up to 20)
+        # Collect readings: prefer CSV import, fall back to manual entry
         readings = []
-        num_readings = int(form.num_readings.data or 5)
-        for i in range(1, num_readings + 1):
-            location = getattr(form, f'reading_{i}_location').data
-            value = getattr(form, f'reading_{i}_value').data
-            if value is not None and value > 0:
-                readings.append({
-                    'reading_number': len(readings) + 1,
-                    'location': location or f'Point {len(readings) + 1}',
-                    'hardness_value': value,
-                })
+        csv_readings = []
+        if form.csv_file.data:
+            try:
+                csv_content = form.csv_file.data.read().decode('utf-8', errors='replace')
+                csv_readings = parse_vickers_csv(csv_content)
+                for r in csv_readings:
+                    readings.append({
+                        'reading_number': r['reading_number'],
+                        'location': r['location'],
+                        'hardness_value': r['hardness_value'],
+                        'd1_mm': r.get('d1_mm'),
+                        'd2_mm': r.get('d2_mm'),
+                        'method': r.get('method', ''),
+                        'line': r.get('line'),
+                    })
+                if readings:
+                    test_params['num_readings'] = str(len(readings))
+                    # Detect load level from CSV
+                    method = csv_readings[0].get('method', '')
+                    if method:
+                        test_params['load_level'] = method
+            except Exception as e:
+                flash(f'CSV import error: {e}', 'warning')
+
+        if not readings:
+            # Manual entry fallback
+            num_readings = int(form.num_readings.data or 5)
+            for i in range(1, num_readings + 1):
+                location = getattr(form, f'reading_{i}_location').data
+                value = getattr(form, f'reading_{i}_value').data
+                if value is not None and value > 0:
+                    readings.append({
+                        'reading_number': len(readings) + 1,
+                        'location': location or f'Point {len(readings) + 1}',
+                        'hardness_value': value,
+                    })
 
         # Store readings in geometry
         test_params['readings'] = readings
+
+        # Handle PDF attachment
+        if form.pdf_attachment.data:
+            pdf_file = form.pdf_attachment.data
+            pdf_filename = secure_filename(pdf_file.filename)
+            pdf_filename = f"vickers_{test_id}_{pdf_filename}"
+            pdf_path = os.path.join(current_app.config['UPLOAD_FOLDER'], pdf_filename)
+            pdf_file.save(pdf_path)
+            test_params['pdf_attachment'] = pdf_filename
 
         # Handle photo upload
         if form.photo.data:
@@ -316,6 +412,21 @@ def new():
             )
             db_photo.set_image(photo_data, photo_file.filename)
             db.session.add(db_photo)
+
+        # Store PDF attachment in database for data persistence
+        if form.pdf_attachment.data:
+            pdf_file = form.pdf_attachment.data
+            pdf_file.seek(0)
+            pdf_data = pdf_file.read()
+            db_report = ReportFile(
+                test_record_id=test.id,
+                report_type='pdf_attachment',
+                original_filename=secure_filename(pdf_file.filename),
+                mime_type='application/pdf',
+                generated_by_id=current_user.id
+            )
+            db_report.set_data(pdf_data)
+            db.session.add(db_report)
 
         # Audit log
         audit = AuditLog(
@@ -911,6 +1022,35 @@ def report(test_id):
             return redirect(url_for('vickers.view', test_id=test.id))
 
     return render_template('vickers/report.html', test=test, form=form)
+
+
+@vickers_bp.route('/parse-csv', methods=['POST'])
+@login_required
+def parse_csv():
+    """Parse uploaded CSV file and return readings as JSON."""
+    if 'csv_file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    csv_file = request.files['csv_file']
+    if not csv_file.filename:
+        return jsonify({'error': 'No file selected'}), 400
+
+    try:
+        content = csv_file.read().decode('utf-8', errors='replace')
+        readings = parse_vickers_csv(content)
+        if not readings:
+            return jsonify({'error': 'No readings found in CSV'}), 400
+
+        # Detect load level from first reading
+        load_level = readings[0].get('method', 'HV 10') if readings else 'HV 10'
+
+        return jsonify({
+            'readings': readings,
+            'count': len(readings),
+            'load_level': load_level,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 
 @vickers_bp.route('/<int:test_id>/delete', methods=['POST'])
