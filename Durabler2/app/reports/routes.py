@@ -720,6 +720,50 @@ def approve(cert_id):
             flash(f'PDF signing failed: {e}', 'danger')
             return redirect(url_for('reports.approve', cert_id=cert_id))
 
+    # Merge PDF attachment if one exists for this test record
+    test_record = certificate.test_records.first()
+    if test_record and pdf_path:
+        try:
+            from pypdf import PdfReader, PdfWriter
+            from app.models import ReportFile
+            import hashlib
+
+            attachment = ReportFile.query.filter_by(
+                test_record_id=test_record.id,
+                report_type='pdf_attachment'
+            ).first()
+
+            if attachment:
+                attachment_data = attachment.get_data()
+                if attachment_data:
+                    signed_pdf_full = reports_folder / pdf_path
+                    writer = PdfWriter()
+
+                    # Add report pages
+                    report_reader = PdfReader(str(signed_pdf_full))
+                    for page in report_reader.pages:
+                        writer.add_page(page)
+
+                    # Add attachment pages
+                    import io
+                    attach_reader = PdfReader(io.BytesIO(attachment_data))
+                    for page in attach_reader.pages:
+                        writer.add_page(page)
+
+                    # Write merged PDF back
+                    with open(signed_pdf_full, 'wb') as f:
+                        writer.write(f)
+
+                    # Recalculate hash
+                    with open(signed_pdf_full, 'rb') as f:
+                        pdf_hash = hashlib.sha256(f.read()).hexdigest()
+
+                    current_app.logger.info(
+                        f'Merged PDF attachment ({attachment.original_filename}) '
+                        f'into report {certificate.certificate_number_with_rev}')
+        except Exception as e:
+            current_app.logger.warning(f'PDF attachment merge failed: {e}')
+
     # Mark as approved and published
     certificate.approval.approve(current_user)
     certificate.approval.publish(pdf_path=pdf_path, pdf_hash=pdf_hash)
