@@ -282,6 +282,11 @@ def new():
                     # Detect load level from CSV
                     method = csv_readings[0].get('method', '')
                     if method:
+                        # Normalise "HV10" → "HV 10" to match form choices
+                        import re
+                        m = re.match(r'^(HV)\s*(\d+)$', method, re.IGNORECASE)
+                        if m:
+                            method = f'HV {m.group(2)}'
                         test_params['load_level'] = method
             except Exception as e:
                 flash(f'CSV import error: {e}', 'warning')
@@ -341,9 +346,12 @@ def new():
                     for r in readings
                 ]
 
-                # Create load level
-                load_value = float(form.load_level.data.replace('HV ', ''))
-                load_level = VickersLoadLevel(form.load_level.data, load_value)
+                # Create load level — use CSV-detected level if available
+                load_label = test_params.get('load_level', form.load_level.data)
+                import re as _re
+                _lm = _re.search(r'(\d+)', load_label)
+                load_value = float(_lm.group(1)) if _lm else 10.0
+                load_level = VickersLoadLevel(load_label, load_value)
 
                 # Create test data
                 test_data = VickersTestData(
@@ -1041,8 +1049,12 @@ def parse_csv():
         if not readings:
             return jsonify({'error': 'No readings found in CSV'}), 400
 
-        # Detect load level from first reading
+        # Detect load level from first reading, normalise "HV10" → "HV 10"
         load_level = readings[0].get('method', 'HV 10') if readings else 'HV 10'
+        import re
+        m = re.match(r'^(HV)\s*(\d+)$', load_level, re.IGNORECASE)
+        if m:
+            load_level = f'HV {m.group(2)}'
 
         return jsonify({
             'readings': readings,

@@ -66,6 +66,7 @@ class SpecimenForm(FlaskForm):
     )
 
     # Number of indents to report
+    # validate_choice=False: CSV import can inject any count (e.g. 74) via JS
     num_readings = SelectField(
         'Number of Indents',
         choices=[
@@ -77,6 +78,7 @@ class SpecimenForm(FlaskForm):
             ('20', '20 indents'),
         ],
         default='5',
+        validate_choice=False,
         validators=[DataRequired()]
     )
 
