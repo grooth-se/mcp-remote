@@ -216,6 +216,11 @@ def new():
             else:
                 form.temperature.data = 23.0
 
+    if request.method == 'POST' and not form.validate():
+        for field_name, errors in form.errors.items():
+            for error in errors:
+                flash(f'{field_name}: {error}', 'danger')
+
     if form.validate_on_submit():
         # Link to certificate if selected
         certificate_id = None

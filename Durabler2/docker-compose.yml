@@ -20,7 +20,7 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "5002:5000"
+      - "5002:5005"
     environment:
       FLASK_CONFIG: production
       DATABASE_URL: postgresql://durabler:${POSTGRES_PASSWORD:-durabler_secret}@db:5432/durabler
