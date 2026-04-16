@@ -1,0 +1,1140 @@
+"""Routes for Brinell Hardness test module - ASTM E10 / ISO 6506."""
+import os
+import json
+from datetime import datetime
+from pathlib import Path
+
+from flask import (
+    render_template, redirect, url_for, flash, request,
+    current_app, send_file, Response, jsonify
+)
+from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
+
+from . import brinell_bp
+from .forms import SpecimenForm, ReportForm
+from app.extensions import db
+from app.models import (TestRecord, AnalysisResult, AuditLog, Certificate, RawTestData, TestPhoto, ReportFile,
+                        ReportApproval, STATUS_DRAFT, STATUS_REJECTED)
+
+# Import calculation utilities
+from utils.analysis.brinell_calculations import BrinellAnalyzer, BrinellResult
+from utils.models.brinell_specimen import BrinellTestData, BrinellReading, BrinellLoadLevel
+
+
+def parse_brinell_csv(file_content):
+    """Parse Brinell hardness CSV from q-ness test machine.
+
+    Format: semicolon-separated, Swedish decimal comma.
+    Structure:
+        Name:;value
+        <specimen name>
+        Name:;value
+        LINE <n>
+        <number>;<HBW>;<method>;<d_mm>
+        or
+        <number>;<HBW>;<method>;<d1 mm>;<d2 mm>
+        ...
+
+    Returns list of dicts with keys: line, number, hardness_value, method,
+    d_mm (or d1_mm/d2_mm), location, reading_number
+    """
+    readings = []
+    current_line = None
+    lines = file_content.splitlines()
+
+    for raw in lines:
+        row = raw.strip()
+        if not row:
+            continue
+
+        if row.upper().startswith('LINE'):
+            # Extract line number
+            parts = row.split()
+            if len(parts) >= 2:
+                current_line = parts[1]
+            continue
+
+        if row.startswith('Name:') or row.startswith('name:'):
+            continue
+
+        # Try to parse as data row — try 5-field first, fall back to 4-field
+        fields = row.split(';')
+
+        # 5-field format: number;HBW;method;d1_mm;d2_mm
+        if len(fields) >= 5:
+            try:
+                number = int(fields[0].strip())
+                hbw = float(fields[1].strip().replace(',', '.'))
+                method = fields[2].strip()
+                d1 = float(fields[3].strip().replace(',', '.'))
+                d2 = float(fields[4].strip().replace(',', '.'))
+
+                location = f'Line {current_line}, Pos {number}' if current_line else f'Pos {number}'
+                readings.append({
+                    'line': current_line,
+                    'number': number,
+                    'hardness_value': hbw,
+                    'method': method,
+                    'd1_mm': d1,
+                    'd2_mm': d2,
+                    'location': location,
+                    'reading_number': len(readings) + 1,
+                })
+                continue
+            except (ValueError, IndexError):
+                pass
+
+        # 4-field format: number;HBW;method;d_mm
+        if len(fields) >= 4:
+            try:
+                number = int(fields[0].strip())
+                hbw = float(fields[1].strip().replace(',', '.'))
+                method = fields[2].strip()
+                d_mm = float(fields[3].strip().replace(',', '.'))
+
+                location = f'Line {current_line}, Pos {number}' if current_line else f'Pos {number}'
+                readings.append({
+                    'line': current_line,
+                    'number': number,
+                    'hardness_value': hbw,
+                    'method': method,
+                    'd_mm': d_mm,
+                    'location': location,
+                    'reading_number': len(readings) + 1,
+                })
+                continue
+            except (ValueError, IndexError):
+                continue
+
+    return readings
+
+
+def generate_brinell_test_id():
+    """Generate unique test ID for Brinell test."""
+    today = datetime.now()
+    prefix = f"BH-{today.strftime('%y%m%d')}"
+    count = TestRecord.query.filter(
+        TestRecord.test_id.like(f'{prefix}%')
+    ).count()
+    return f"{prefix}-{count + 1:03d}"
+
+
+def create_hardness_profile_plot(readings, load_level='HBW'):
+    """Create interactive Hardness Profile plot using Plotly.
+
+    Parameters
+    ----------
+    readings : list
+        List of BrinellReading objects or dicts
+    load_level : str
+        Load level designation (e.g., "HBW 10/3000")
+
+    Returns
+    -------
+    str
+        HTML string with Plotly figure
+    """
+    import plotly.graph_objects as go
+    import numpy as np
+
+    # Extract data
+    locations = []
+    values = []
+    for i, r in enumerate(readings, 1):
+        if isinstance(r, dict):
+            locations.append(r.get('location', f'Point {i}'))
+            values.append(r.get('hardness_value', 0))
+        else:
+            locations.append(r.location or f'Point {i}')
+            values.append(r.hardness_value)
+
+    # Calculate statistics
+    mean_val = np.mean(values)
+    std_val = np.std(values, ddof=1) if len(values) > 1 else 0
+
+    fig = go.Figure()
+
+    # Line plot with markers (darkred)
+    fig.add_trace(go.Scatter(
+        x=list(range(1, len(values) + 1)),
+        y=values,
+        mode='lines+markers+text',
+        text=[f'{v:.1f}' for v in values],
+        textposition='top center',
+        textfont=dict(size=10),
+        name='Readings',
+        line=dict(color='darkred', width=2),
+        marker=dict(color='darkred', size=10, symbol='circle'),
+        hovertemplate='%{customdata}<br>%{y:.1f} ' + load_level + '<extra></extra>',
+        customdata=locations
+    ))
+
+    # Mean line (grey dotted)
+    fig.add_hline(
+        y=mean_val,
+        line_dash='dot',
+        line_color='grey',
+        line_width=2,
+        annotation_text=f'Mean: {mean_val:.1f}',
+        annotation_position='right',
+        annotation_font=dict(color='grey')
+    )
+
+    fig.update_layout(
+        title=f'Hardness Profile ({load_level})',
+        xaxis_title='Reading Number',
+        yaxis_title=f'Hardness ({load_level})',
+        template='plotly_white',
+        showlegend=False,
+        height=400,
+        xaxis=dict(tickmode='linear', tick0=1, dtick=1),
+        yaxis=dict(range=[0, max(values) * 1.15])
+    )
+
+    return fig.to_html(full_html=False, include_plotlyjs='cdn')
+
+
+@brinell_bp.route('/')
+@login_required
+def index():
+    """List all Brinell tests."""
+    tests = TestRecord.query.filter_by(test_method='BRINELL').order_by(
+        TestRecord.created_at.desc()
+    ).all()
+    return render_template('brinell/index.html', tests=tests)
+
+
+@brinell_bp.route('/new', methods=['GET', 'POST'])
+@login_required
+def new():
+    """Create a new Brinell test."""
+    form = SpecimenForm()
+
+    # Populate certificate dropdown
+    certificates = Certificate.query.order_by(
+        Certificate.year.desc(),
+        Certificate.cert_id.desc()
+    ).all()
+    form.certificate_id.choices = [(0, '-- Select Certificate --')] + [
+        (c.id, f"{c.certificate_number_with_rev} - {c.customer or 'No customer'}")
+        for c in certificates
+    ]
+
+    # Check if coming from certificate page
+    cert_id = request.args.get('certificate', type=int)
+    if cert_id and request.method == 'GET':
+        form.certificate_id.data = cert_id
+        cert = Certificate.query.get(cert_id)
+        if cert:
+            # Pre-fill form from certificate data (certificate register is the master)
+            form.material.data = cert.material
+            form.specimen_id.data = cert.test_article_sn  # Specimen SN
+            form.customer_specimen_info.data = cert.customer_specimen_info
+            form.requirement.data = cert.requirement
+            form.location_orientation.data = cert.location_orientation
+            # Parse temperature - handle string format
+            if cert.temperature:
+                try:
+                    temp_str = cert.temperature.replace('\u00b0C', '').replace('C', '').strip()
+                    form.temperature.data = float(temp_str)
+                except (ValueError, AttributeError):
+                    form.temperature.data = 23.0
+            else:
+                form.temperature.data = 23.0
+
+    if request.method == 'POST' and not form.validate():
+        for field_name, errors in form.errors.items():
+            for error in errors:
+                flash(f'{field_name}: {error}', 'danger')
+
+    if form.validate_on_submit():
+        # Link to certificate if selected
+        certificate_id = None
+        cert_number = None
+        if form.certificate_id.data and form.certificate_id.data != 0:
+            cert = Certificate.query.get(form.certificate_id.data)
+            if cert:
+                certificate_id = cert.id
+                cert_number = cert.certificate_number_with_rev
+
+        # Generate test ID automatically
+        test_id = generate_brinell_test_id()
+
+        # Build test parameters/geometry
+        test_params = {
+            'load_level': form.load_level.data,
+            'dwell_time': form.dwell_time.data,
+            'num_readings': form.num_readings.data,
+            'location_orientation': form.location_orientation.data,
+            'notes': form.notes.data,
+        }
+
+        # Store uncertainty inputs (ISO 17025)
+        test_params['uncertainty_inputs'] = {
+            'force_pct': form.force_uncertainty.data or 0.31,
+            'diameter_pct': form.diameter_uncertainty.data or 1.0,
+            'machine_pct': form.machine_uncertainty.data or 0.5
+        }
+
+        # Create test record
+        test = TestRecord(
+            test_id=test_id,
+            test_method='BRINELL',
+            specimen_id=form.specimen_id.data,
+            material=form.material.data,
+            test_date=form.test_date.data or datetime.now(),
+            temperature=form.temperature.data if form.temperature.data else 23.0,
+            geometry=test_params,
+            status='DRAFT',
+            certificate_id=certificate_id,
+            certificate_number=cert_number,
+            operator_id=current_user.id
+        )
+
+        # Collect readings: prefer CSV import, fall back to manual entry
+        readings = []
+        csv_readings = []
+        if form.csv_file.data:
+            try:
+                csv_content = form.csv_file.data.read().decode('utf-8', errors='replace')
+                csv_readings = parse_brinell_csv(csv_content)
+                for r in csv_readings:
+                    reading_dict = {
+                        'reading_number': r['reading_number'],
+                        'location': r['location'],
+                        'hardness_value': r['hardness_value'],
+                        'method': r.get('method', ''),
+                        'line': r.get('line'),
+                    }
+                    # Preserve diameter measurements from CSV
+                    if 'd_mm' in r:
+                        reading_dict['d_mm'] = r['d_mm']
+                    if 'd1_mm' in r:
+                        reading_dict['d1_mm'] = r['d1_mm']
+                    if 'd2_mm' in r:
+                        reading_dict['d2_mm'] = r['d2_mm']
+                    readings.append(reading_dict)
+                if readings:
+                    test_params['num_readings'] = str(len(readings))
+                    # Detect load level from CSV
+                    method = csv_readings[0].get('method', '')
+                    if method:
+                        # Normalise "HBW10/3000" -> "HBW 10/3000" to match form choices
+                        import re
+                        m = re.match(r'HBW\s*(\d+\.?\d*)\s*/\s*(\d+\.?\d*)', method, re.IGNORECASE)
+                        if m:
+                            method = f'HBW {m.group(1)}/{m.group(2)}'
+                        test_params['load_level'] = method
+            except Exception as e:
+                flash(f'CSV import error: {e}', 'warning')
+
+        if not readings:
+            # Manual entry fallback
+            num_readings = int(form.num_readings.data or 5)
+            for i in range(1, num_readings + 1):
+                location = getattr(form, f'reading_{i}_location').data
+                value = getattr(form, f'reading_{i}_value').data
+                if value is not None and value > 0:
+                    readings.append({
+                        'reading_number': len(readings) + 1,
+                        'location': location or f'Point {len(readings) + 1}',
+                        'hardness_value': value,
+                    })
+
+        # Store readings in geometry
+        test_params['readings'] = readings
+
+        # Handle PDF attachment
+        if form.pdf_attachment.data:
+            pdf_file = form.pdf_attachment.data
+            pdf_filename = secure_filename(pdf_file.filename)
+            pdf_filename = f"brinell_{test_id}_{pdf_filename}"
+            pdf_path = os.path.join(current_app.config['UPLOAD_FOLDER'], pdf_filename)
+            pdf_file.save(pdf_path)
+            test_params['pdf_attachment'] = pdf_filename
+
+        # Handle photo upload
+        if form.photo.data:
+            photo = form.photo.data
+            filename = secure_filename(photo.filename)
+            # Add test_id prefix to avoid collisions
+            filename = f"brinell_{test_id}_{filename}"
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            photo.save(filepath)
+            test_params['photo_path'] = filename
+
+        # Update geometry with all data
+        test.geometry = test_params
+
+        # Add test to session and flush to get ID before creating analysis records
+        db.session.add(test)
+        db.session.flush()
+
+        # Run analysis if we have readings
+        if readings:
+            try:
+                # Create BrinellReading objects
+                reading_objects = [
+                    BrinellReading(
+                        reading_number=r['reading_number'],
+                        location=r['location'],
+                        hardness_value=r['hardness_value']
+                    )
+                    for r in readings
+                ]
+
+                # Create load level — use CSV-detected level if available
+                load_label = test_params.get('load_level', form.load_level.data)
+                load_level = BrinellLoadLevel.from_designation(load_label)
+
+                # Store ball_diameter from load_level in test_params
+                test_params['ball_diameter'] = load_level.ball_diameter
+
+                # Create test data
+                test_data = BrinellTestData(
+                    readings=reading_objects,
+                    load_level=load_level,
+                    specimen_id=form.specimen_id.data or '',
+                    material=form.material.data or ''
+                )
+
+                # Run analysis with user-specified uncertainty
+                analyzer = BrinellAnalyzer(
+                    machine_uncertainty=(form.machine_uncertainty.data or 0.5) / 100,
+                    diameter_uncertainty=(form.diameter_uncertainty.data or 1.0) / 100,
+                    force_uncertainty=(form.force_uncertainty.data or 0.31) / 100
+                )
+                result = analyzer.run_analysis(test_data)
+
+                # Get uncertainty budget
+                import numpy as np
+                values = np.array([r['hardness_value'] for r in readings])
+                uncertainty_budget = analyzer.get_uncertainty_budget(values, result.mean_hardness.value)
+
+                # Store results as individual AnalysisResult records
+                load_lvl = result.load_level
+                results_to_store = [
+                    ('mean_hardness', result.mean_hardness.value, result.mean_hardness.uncertainty, load_lvl),
+                    ('std_dev', result.std_dev, None, load_lvl),
+                    ('range', result.range_value, None, load_lvl),
+                    ('min_value', result.min_value, None, load_lvl),
+                    ('max_value', result.max_value, None, load_lvl),
+                    ('n_readings', result.n_readings, None, '-'),
+                ]
+
+                for param_name, value, uncertainty, unit in results_to_store:
+                    analysis = AnalysisResult(
+                        test_record_id=test.id,
+                        parameter_name=param_name,
+                        value=value,
+                        uncertainty=uncertainty,
+                        unit=unit,
+                        calculated_by_id=current_user.id
+                    )
+                    db.session.add(analysis)
+
+                # Store uncertainty budget in geometry for report generation
+                test_params['uncertainty_budget'] = uncertainty_budget
+                test.geometry = test_params
+                test.status = 'ANALYZED'
+                flash(f'Analysis completed: Mean = {result.mean_hardness.value:.1f} +/- {result.mean_hardness.uncertainty:.1f} {result.load_level}', 'success')
+            except Exception as e:
+                flash(f'Analysis error: {e}', 'warning')
+                test.status = 'DRAFT'
+        else:
+            flash('No hardness readings entered.', 'warning')
+
+        # Store photo in database for data persistence
+        if form.photo.data:
+            photo_file = form.photo.data
+            photo_file.seek(0)
+            photo_data = photo_file.read()
+            db_photo = TestPhoto(
+                test_record_id=test.id,
+                photo_number=1,
+                description='Brinell test photo',
+                uploaded_by_id=current_user.id
+            )
+            db_photo.set_image(photo_data, photo_file.filename)
+            db.session.add(db_photo)
+
+        # Store PDF attachment in database for data persistence
+        if form.pdf_attachment.data:
+            pdf_file = form.pdf_attachment.data
+            pdf_file.seek(0)
+            pdf_data = pdf_file.read()
+            db_report = ReportFile(
+                test_record_id=test.id,
+                report_type='pdf_attachment',
+                original_filename=secure_filename(pdf_file.filename),
+                mime_type='application/pdf',
+                generated_by_id=current_user.id
+            )
+            db_report.set_data(pdf_data)
+            db.session.add(db_report)
+
+        # Audit log
+        audit = AuditLog(
+            user_id=current_user.id,
+            action='CREATE',
+            table_name='test_record',
+            record_id=test.id,
+            new_values=json.dumps({'test_id': test.test_id, 'test_method': 'BRINELL'})
+        )
+        db.session.add(audit)
+        db.session.commit()
+
+        flash(f'Brinell test {test.test_id} created.', 'success')
+        return redirect(url_for('brinell.view', test_id=test.id))
+
+    return render_template('brinell/new.html', form=form)
+
+
+@brinell_bp.route('/<int:test_id>')
+@login_required
+def view(test_id):
+    """View Brinell test details and results."""
+    test = TestRecord.query.get_or_404(test_id)
+
+    if test.test_method != 'BRINELL':
+        flash('Invalid test type.', 'error')
+        return redirect(url_for('brinell.index'))
+
+    # Parse stored data (geometry is JSON dict, not string)
+    test_params = test.geometry if test.geometry else {}
+    readings = test_params.get('readings', [])
+
+    # Get analysis results (individual records per parameter)
+    results = {}
+    analysis_records = AnalysisResult.query.filter_by(test_record_id=test.id).all()
+    for ar in analysis_records:
+        if ar.parameter_name == 'mean_hardness':
+            results['mean_hardness'] = {'value': ar.value, 'uncertainty': ar.uncertainty}
+        else:
+            results[ar.parameter_name] = ar.value
+    # Get load level and uncertainty budget from geometry
+    results['load_level'] = test_params.get('load_level', 'HBW')
+    results['uncertainty_budget'] = test_params.get('uncertainty_budget', {})
+
+    # Create plot if we have readings
+    hardness_plot = None
+    if readings:
+        load_level = test_params.get('load_level', 'HBW')
+        hardness_plot = create_hardness_profile_plot(readings, load_level)
+
+    # Get photo - prefer database, fall back to file system
+    photo_url = None
+    db_photo = test.photos.first()
+    if db_photo:
+        photo_url = url_for('brinell.photo', test_id=test_id, photo_id=db_photo.id)
+    elif test_params.get('photo_path'):
+        photo_url = url_for('static', filename=f'uploads/{test_params["photo_path"]}')
+
+    return render_template('brinell/view.html',
+                           test=test,
+                           test_params=test_params,
+                           readings=readings,
+                           results=results,
+                           hardness_plot=hardness_plot,
+                           photo_url=photo_url)
+
+
+@brinell_bp.route('/<int:test_id>/photo/<int:photo_id>')
+@login_required
+def photo(test_id, photo_id):
+    """Serve photo from database."""
+    photo = TestPhoto.query.filter_by(id=photo_id, test_record_id=test_id).first_or_404()
+    return Response(
+        photo.data,
+        mimetype=photo.mime_type or 'image/jpeg',
+        headers={'Content-Disposition': f'inline; filename="{photo.original_filename}"'}
+    )
+
+
+@brinell_bp.route('/<int:test_id>/report', methods=['GET', 'POST'])
+@login_required
+def report(test_id):
+    """Generate Brinell test report."""
+    test = TestRecord.query.get_or_404(test_id)
+
+    if test.test_method != 'BRINELL':
+        flash('Invalid test type.', 'error')
+        return redirect(url_for('brinell.index'))
+
+    form = ReportForm()
+
+    # Pre-fill certificate number
+    if request.method == 'GET':
+        form.certificate_number.data = test.certificate_number or test.test_id
+
+    if form.validate_on_submit():
+        try:
+            # Parse stored data (geometry is JSON dict, not string)
+            test_params = test.geometry if test.geometry else {}
+            readings = test_params.get('readings', [])
+
+            # Get analysis results (individual records per parameter)
+            results = {}
+            analysis_records = AnalysisResult.query.filter_by(test_record_id=test.id).all()
+            for ar in analysis_records:
+                if ar.parameter_name == 'mean_hardness':
+                    results['mean_hardness'] = {'value': ar.value, 'uncertainty': ar.uncertainty}
+                else:
+                    results[ar.parameter_name] = ar.value
+            results['load_level'] = test_params.get('load_level', 'HBW')
+            results['uncertainty_budget'] = test_params.get('uncertainty_budget', {})
+
+            # Generate chart image for report
+            chart_path = None
+            if readings:
+                import matplotlib
+                matplotlib.use('Agg')
+                import matplotlib.pyplot as plt
+                import numpy as np
+
+                values = [r['hardness_value'] for r in readings]
+                mean_val = np.mean(values)
+
+                fig, ax = plt.subplots(figsize=(8, 5))
+
+                # Line plot with markers (darkred)
+                x = list(range(1, len(values) + 1))
+                ax.plot(x, values, color='darkred', linewidth=2, marker='o',
+                        markersize=10, markerfacecolor='darkred', markeredgecolor='darkred')
+
+                # Add value labels above points
+                for xi, val in zip(x, values):
+                    ax.text(xi, val + max(values) * 0.02, f'{val:.1f}',
+                            ha='center', va='bottom', fontsize=9)
+
+                # Mean line (grey dotted)
+                ax.axhline(y=mean_val, color='grey', linestyle=':', linewidth=2,
+                           label='Mean')
+
+                ax.set_xlabel('Reading Number')
+                ax.set_ylabel(f'Hardness ({test_params.get("load_level", "HBW")})')
+                ax.set_title('Hardness Profile')
+                ax.legend(loc='upper right')
+                ax.set_xlim(0.5, len(values) + 0.5)
+                ax.set_ylim(0, max(values) * 1.15)
+                ax.set_xticks(x)
+                ax.grid(True, alpha=0.3, axis='y')
+
+                chart_path = Path(current_app.config['REPORTS_FOLDER']) / f'brinell_chart_{test.id}.png'
+                fig.savefig(chart_path, dpi=150, bbox_inches='tight')
+                plt.close(fig)
+
+            # Prepare report data - include all test information fields
+            test_info = {
+                'certificate_number': form.certificate_number.data or test.test_id,
+                'test_project': test.certificate.test_project if test.certificate else '',
+                'customer': test.certificate.customer if test.certificate else '',
+                'customer_order': test.certificate.customer_order if test.certificate else '',
+                'product_sn': test.certificate.product_sn if test.certificate else '',
+                'specimen_id': test.specimen_id or '',
+                'customer_specimen_info': test.certificate.customer_specimen_info if test.certificate else '',
+                'material': test.material or '',
+                'requirement': test.certificate.requirement if test.certificate else '',
+                'location_orientation': test_params.get('location_orientation', ''),
+                'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
+                'temperature': test.temperature or 23,
+                'load_level': test_params.get('load_level', 'HBW 10/3000'),
+                'dwell_time': test_params.get('dwell_time', '10'),
+                'ball_diameter': test_params.get('ball_diameter', 10),
+                'notes': test_params.get('notes', ''),
+                'operator': current_user.full_name if current_user.full_name else current_user.username,
+            }
+
+            # Create BrinellResult proxy for report
+            class ResultProxy:
+                def __init__(self, data, readings_list):
+                    self._data = data
+                    self._readings = readings_list
+
+                @property
+                def mean_hardness(self):
+                    d = self._data.get('mean_hardness', {})
+                    return type('MV', (), {
+                        'value': d.get('value', 0),
+                        'uncertainty': d.get('uncertainty', 0)
+                    })()
+
+                @property
+                def std_dev(self):
+                    return self._data.get('std_dev', 0)
+
+                @property
+                def range_value(self):
+                    return self._data.get('range_value', 0)
+
+                @property
+                def min_value(self):
+                    return self._data.get('min_value', 0)
+
+                @property
+                def max_value(self):
+                    return self._data.get('max_value', 0)
+
+                @property
+                def n_readings(self):
+                    return self._data.get('n_readings', 0)
+
+                @property
+                def load_level(self):
+                    return self._data.get('load_level', 'HBW')
+
+                @property
+                def readings(self):
+                    return [
+                        type('R', (), {
+                            'reading_number': r.get('reading_number', i),
+                            'location': r.get('location', f'Point {i}'),
+                            'hardness_value': r.get('hardness_value', 0)
+                        })()
+                        for i, r in enumerate(self._readings, 1)
+                    ]
+
+            result_proxy = ResultProxy(results, readings)
+            uncertainty_budget = results.get('uncertainty_budget', {})
+
+            # Create report from scratch (no template dependency)
+            from docx import Document
+            from docx.shared import Inches, Pt, Cm
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+            from docx.enum.table import WD_TABLE_ALIGNMENT
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+
+            doc = Document()
+
+            # Set compact paragraph spacing for entire document
+            style = doc.styles['Normal']
+            style.paragraph_format.space_before = Pt(0)
+            style.paragraph_format.space_after = Pt(3)
+            style.paragraph_format.line_spacing = 1.0
+            style.font.size = Pt(10)
+
+            # Set compact heading styles with dark green color
+            from docx.shared import RGBColor
+            dark_green = RGBColor(0x00, 0x64, 0x00)  # Dark green color
+
+            for i in range(1, 4):
+                heading_style = doc.styles[f'Heading {i}']
+                heading_style.paragraph_format.space_before = Pt(8)
+                heading_style.paragraph_format.space_after = Pt(4)
+                heading_style.font.color.rgb = dark_green
+
+            # Add header with logo on left, certificate info on right
+            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'logo.png'
+
+            for section in doc.sections:
+                # Set narrower margins for compact layout
+                section.top_margin = Cm(1.5)
+                section.bottom_margin = Cm(1.5)
+                section.left_margin = Cm(2.0)
+                section.right_margin = Cm(2.0)
+                header = section.header
+                header.is_linked_to_previous = False
+
+                # Simple 5-line header layout
+                # Row 1: Logo - left aligned
+                logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+                logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                logo_para.paragraph_format.space_after = Pt(0)
+                if logo_path.exists():
+                    logo_run = logo_para.add_run()
+                    logo_run.add_picture(str(logo_path), width=Cm(5.0))  # 50mm width
+
+                # Row 2: Title - centered, font size 12
+                title_para = header.add_paragraph()
+                title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                title_para.paragraph_format.space_before = Pt(0)
+                title_para.paragraph_format.space_after = Pt(0)
+                title_run = title_para.add_run('Brinell Hardness Test Report')
+                title_run.bold = True
+                title_run.font.size = Pt(12)
+
+                # Row 3: Standard - centered, font size 8
+                std_para = header.add_paragraph()
+                std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                std_para.paragraph_format.space_before = Pt(0)
+                std_para.paragraph_format.space_after = Pt(0)
+                std_run = std_para.add_run('ASTM E10 / ISO 6506')
+                std_run.font.size = Pt(8)
+
+                # Row 4: Certificate - right aligned, font size 8
+                cert_para = header.add_paragraph()
+                cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                cert_para.paragraph_format.space_before = Pt(0)
+                cert_para.paragraph_format.space_after = Pt(0)
+                cert_run = cert_para.add_run(f"Certificate: {test_info.get('certificate_number', '')}")
+                cert_run.font.size = Pt(8)
+
+                # Row 5: Date - right aligned, font size 8
+                date_para = header.add_paragraph()
+                date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                date_para.paragraph_format.space_before = Pt(0)
+                date_para.paragraph_format.space_after = Pt(0)
+                date_run = date_para.add_run(f"Date: {test_info.get('test_date', '')}")
+                date_run.font.size = Pt(8)
+
+            # Test Information - 4-column layout like Tensile report
+            heading = doc.add_heading('Test Information', level=1)
+            heading.paragraph_format.space_before = Pt(0)
+            heading.paragraph_format.space_after = Pt(6)
+
+            # Two-column layout: Label | Value | Label | Value (like Tensile report)
+            info_data = [
+                ('Test Project:', test_info.get('test_project', ''), 'Temperature:', f"{test_info.get('temperature', '23')} \u00b0C"),
+                ('Customer:', test_info.get('customer', ''), 'Test Standard:', 'ASTM E10 / ISO 6506'),
+                ('Customer Order:', test_info.get('customer_order', ''), 'Test Equipment:', 'q-ness ATM test machine'),
+                ('Product S/N:', test_info.get('specimen_id', ''), 'Load Level:', test_info.get('load_level', '')),
+                ('Material:', test_info.get('material', ''), 'Dwell Time:', f"{test_info.get('dwell_time', '10')} s"),
+                ('Customer Specimen Info:', test_info.get('customer_specimen_info', ''), 'Ball Diameter:', f"{test_info.get('ball_diameter', '10')} mm"),
+                ('Requirement:', test_info.get('requirement', ''), 'Location/Orientation:', test_info.get('location_orientation', '')),
+                ('', '', 'Operator:', test_info.get('operator', '')),
+            ]
+
+            table = doc.add_table(rows=len(info_data), cols=4)
+            table.style = 'Table Grid'
+
+            for i, (label1, value1, label2, value2) in enumerate(info_data):
+                table.rows[i].cells[0].text = label1
+                table.rows[i].cells[1].text = str(value1) if value1 else ''
+                table.rows[i].cells[2].text = label2
+                table.rows[i].cells[3].text = str(value2) if value2 else ''
+                # Bold the labels
+                if table.rows[i].cells[0].paragraphs[0].runs:
+                    table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+                if table.rows[i].cells[2].paragraphs[0].runs:
+                    table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
+                # Compact row height
+                for cell in table.rows[i].cells:
+                    cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                    cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+            # Results Summary
+            heading = doc.add_heading('Results Summary', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+
+            table = doc.add_table(rows=8, cols=3)
+            table.style = 'Table Grid'
+
+            headers = ['Parameter', 'Value', 'Unit']
+            for i, h in enumerate(headers):
+                table.rows[0].cells[i].text = h
+                table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+            # Get requirement from test info
+            requirement_value = test_info.get('requirement', '') or '-'
+
+            results_data = [
+                ('Mean Hardness', f'{result_proxy.mean_hardness.value:.1f} \u00b1 {result_proxy.mean_hardness.uncertainty:.1f}', result_proxy.load_level),
+                ('Standard Deviation', f'{result_proxy.std_dev:.1f}', result_proxy.load_level),
+                ('Range', f'{result_proxy.range_value:.1f}', result_proxy.load_level),
+                ('Minimum', f'{result_proxy.min_value:.1f}', result_proxy.load_level),
+                ('Maximum', f'{result_proxy.max_value:.1f}', result_proxy.load_level),
+                ('Number of Readings', str(result_proxy.n_readings), '-'),
+                ('Requirement', requirement_value, '-'),
+            ]
+
+            for i, (param, value, unit) in enumerate(results_data):
+                table.rows[i+1].cells[0].text = param
+                table.rows[i+1].cells[1].text = value
+                table.rows[i+1].cells[2].text = unit
+
+            # Compact table rows
+            for row in table.rows:
+                for cell in row.cells:
+                    cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                    cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+            # Individual Readings
+            heading = doc.add_heading('Individual Readings', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+
+            table = doc.add_table(rows=len(readings) + 1, cols=3)
+            table.style = 'Table Grid'
+
+            headers = ['#', 'Location', 'Hardness']
+            for i, h in enumerate(headers):
+                table.rows[0].cells[i].text = h
+                table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+            for i, r in enumerate(readings):
+                table.rows[i+1].cells[0].text = str(r.get('reading_number', i+1))
+                table.rows[i+1].cells[1].text = r.get('location', f'Point {i+1}')
+                table.rows[i+1].cells[2].text = f"{r.get('hardness_value', 0):.1f}"
+
+            # Compact table rows
+            for row in table.rows:
+                for cell in row.cells:
+                    cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                    cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+            # Notes (if any)
+            if test_info.get('notes'):
+                heading = doc.add_heading('Notes', level=1)
+                heading.paragraph_format.space_before = Pt(12)
+                heading.paragraph_format.space_after = Pt(6)
+                notes_para = doc.add_paragraph(test_info['notes'])
+                notes_para.paragraph_format.space_after = Pt(6)
+
+            # Uncertainty Budget (if requested)
+            if form.include_uncertainty_budget.data == 'yes' and uncertainty_budget:
+                heading = doc.add_heading('Uncertainty Budget (k=2)', level=1)
+                heading.paragraph_format.space_before = Pt(12)
+                heading.paragraph_format.space_after = Pt(6)
+
+                table = doc.add_table(rows=6, cols=2)
+                table.style = 'Table Grid'
+
+                unc_data = [
+                    ('Type A (Repeatability)', f"{uncertainty_budget.get('u_A', 0):.2f}"),
+                    ('Machine Calibration', f"{uncertainty_budget.get('u_machine', 0):.2f}"),
+                    ('Diameter Measurement', f"{uncertainty_budget.get('u_diameter', 0):.2f}"),
+                    ('Force Application', f"{uncertainty_budget.get('u_force', 0):.2f}"),
+                    ('Combined Standard (u_c)', f"{uncertainty_budget.get('u_combined', 0):.2f}"),
+                    ('Expanded (U, k=2)', f"{uncertainty_budget.get('U_expanded', 0):.2f}"),
+                ]
+
+                for i, (comp, val) in enumerate(unc_data):
+                    table.rows[i].cells[0].text = comp
+                    table.rows[i].cells[1].text = val
+
+                # Compact table rows
+                for row in table.rows:
+                    for cell in row.cells:
+                        cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                        cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+            # Chart
+            if chart_path and chart_path.exists():
+                heading = doc.add_heading('Hardness Profile', level=1)
+                heading.paragraph_format.space_before = Pt(12)
+                heading.paragraph_format.space_after = Pt(6)
+                doc.add_picture(str(chart_path), width=Inches(5.5))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            # Indent Photo (if requested and available)
+            import tempfile
+            temp_photo_files = []
+            if form.include_photo.data == 'yes':
+                photo_path = None
+                # Prefer DB photos
+                db_photo = test.photos.first()
+                if db_photo and db_photo.data:
+                    ext = (db_photo.original_filename or 'photo.jpg').rsplit('.', 1)[-1]
+                    tmp = tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False)
+                    tmp.write(db_photo.data)
+                    tmp.close()
+                    photo_path = Path(tmp.name)
+                    temp_photo_files.append(photo_path)
+                elif test_params.get('photo_path'):
+                    p = Path(current_app.config['UPLOAD_FOLDER']) / test_params['photo_path']
+                    if p.exists():
+                        photo_path = p
+
+                if photo_path and photo_path.exists():
+                    heading = doc.add_heading('Indent Photo', level=1)
+                    heading.paragraph_format.space_before = Pt(12)
+                    heading.paragraph_format.space_after = Pt(6)
+                    doc.add_picture(str(photo_path), width=Inches(4))
+                    doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            # Approval Signatures
+            heading = doc.add_heading('Approval', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+
+            sig_table = doc.add_table(rows=4, cols=2)
+            sig_table.style = 'Table Grid'
+
+            # Header row
+            sig_table.rows[0].cells[0].text = 'Role'
+            sig_table.rows[0].cells[0].paragraphs[0].runs[0].bold = True
+            sig_table.rows[0].cells[1].text = 'Name / Signature'
+            sig_table.rows[0].cells[1].paragraphs[0].runs[0].bold = True
+
+            # Row 1: Test Engineer -- name only
+            sig_table.rows[1].cells[0].text = 'Test Engineer:'
+            sig_table.rows[1].cells[0].paragraphs[0].runs[0].bold = True
+            sig_table.rows[1].cells[1].text = test_info.get('operator', '')
+
+            # Row 2: Approved by -- digital signature (filled by PDF signing)
+            sig_table.rows[2].cells[0].text = 'Approved by:'
+            sig_table.rows[2].cells[0].paragraphs[0].runs[0].bold = True
+            sig_table.rows[2].cells[1].text = ''
+
+            # Row 3: Third Party Approval
+            sig_table.rows[3].cells[0].text = 'Third Party Approval:'
+            sig_table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
+            sig_table.rows[3].cells[1].text = ''
+
+            # Set row heights for digital signature
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+            sig_row_height = Cm(1.5)
+            for row in sig_table.rows:
+                for cell in row.cells:
+                    cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                    cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+            for row in [sig_table.rows[1], sig_table.rows[2], sig_table.rows[3]]:
+                tr = row._tr
+                trPr = tr.get_or_add_trPr()
+                trHeight = trPr.find(qn('w:trHeight'))
+                if trHeight is None:
+                    trHeight = OxmlElement('w:trHeight')
+                    trPr.append(trHeight)
+                trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))
+                trHeight.set(qn('w:hRule'), 'exact')
+
+            # Add disclaimer to page footer (visible on all pages)
+            disclaimer_text = (
+                "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
+                "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
+                "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
+                "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
+                "Address: Durabler C/O Subseatec, Dalav\u00e4gen 23, 68130 Kristinehamn, SWEDEN"
+            )
+            for section in doc.sections:
+                footer = section.footer
+                footer.is_linked_to_previous = False
+                footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+                footer_para.clear()
+                footer_run = footer_para.add_run(disclaimer_text)
+                footer_run.font.size = Pt(7)
+                footer_run.italic = True
+
+            # Save document into drafts folder (approval workflow compatible)
+            reports_folder = Path(current_app.config['REPORTS_FOLDER'])
+            drafts_folder = reports_folder / 'drafts'
+            drafts_folder.mkdir(parents=True, exist_ok=True)
+
+            safe_cert_num = (test.certificate.certificate_number_with_rev.replace(' ', '_').replace('/', '-')
+                             if test.certificate else test.test_id.replace(' ', '_'))
+            timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_filename = f"{safe_cert_num}_{timestamp_str}.docx"
+            output_path = drafts_folder / output_filename
+            doc.save(output_path)
+
+            # Clean up temp photo files
+            for f in temp_photo_files:
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
+
+            # Update approval record so certificate page can offer download
+            if test.certificate:
+                approval = test.certificate.approval
+                if not approval:
+                    approval = ReportApproval.get_or_create_for_certificate(
+                        test.certificate, current_user)
+                if approval.status in (STATUS_DRAFT, STATUS_REJECTED, None):
+                    approval.word_report_path = str(
+                        output_path.relative_to(reports_folder))
+                    approval.status = STATUS_DRAFT
+
+            # Audit log
+            audit = AuditLog(
+                user_id=current_user.id,
+                action='REPORT',
+                table_name='test_record',
+                record_id=test.id,
+                new_values=json.dumps({'report': output_filename})
+            )
+            db.session.add(audit)
+            db.session.commit()
+
+            flash(f'Report generated: {output_filename}', 'success')
+
+            # Redirect to certificate page to continue review/approval workflow
+            if test.certificate:
+                return redirect(url_for('certificates.view',
+                                        cert_id=test.certificate.id))
+
+            # Fallback: download directly if no certificate linked
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name=output_filename,
+                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+
+        except Exception as e:
+            flash(f'Error generating report: {e}', 'error')
+            return redirect(url_for('brinell.view', test_id=test.id))
+
+    return render_template('brinell/report.html', test=test, form=form)
+
+
+@brinell_bp.route('/parse-csv', methods=['POST'])
+@login_required
+def parse_csv():
+    """Parse uploaded CSV file and return readings as JSON."""
+    if 'csv_file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    csv_file = request.files['csv_file']
+    if not csv_file.filename:
+        return jsonify({'error': 'No file selected'}), 400
+
+    try:
+        content = csv_file.read().decode('utf-8', errors='replace')
+        readings = parse_brinell_csv(content)
+        if not readings:
+            return jsonify({'error': 'No readings found in CSV'}), 400
+
+        # Detect load level from first reading, normalise "HBW10/3000" -> "HBW 10/3000"
+        load_level = readings[0].get('method', 'HBW 10/3000') if readings else 'HBW 10/3000'
+        import re
+        m = re.match(r'HBW\s*(\d+\.?\d*)\s*/\s*(\d+\.?\d*)', load_level, re.IGNORECASE)
+        if m:
+            load_level = f'HBW {m.group(1)}/{m.group(2)}'
+
+        return jsonify({
+            'readings': readings,
+            'count': len(readings),
+            'load_level': load_level,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@brinell_bp.route('/<int:test_id>/delete', methods=['POST'])
+@login_required
+def delete(test_id):
+    """Delete a Brinell test (admin only)."""
+    if current_user.role != 'admin':
+        flash('Admin access required.', 'error')
+        return redirect(url_for('brinell.index'))
+
+    test = TestRecord.query.get_or_404(test_id)
+
+    if test.test_method != 'BRINELL':
+        flash('Invalid test type.', 'error')
+        return redirect(url_for('brinell.index'))
+
+    test_id_str = test.test_id
+
+    # Audit log before deletion
+    audit = AuditLog(
+        user_id=current_user.id,
+        action='DELETE',
+        table_name='test_record',
+        record_id=test.id,
+        old_values=json.dumps({'test_id': test_id_str, 'test_method': 'BRINELL'})
+    )
+    db.session.add(audit)
+
+    # Delete analysis results first
+    AnalysisResult.query.filter_by(test_record_id=test.id).delete()
+    db.session.delete(test)
+    db.session.commit()
+
+    flash(f'Brinell test {test_id_str} deleted.', 'success')
+    return redirect(url_for('brinell.index'))

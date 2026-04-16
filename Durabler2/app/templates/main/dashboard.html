@@ -84,6 +84,18 @@
         </div>
     </div>
 
+    <!-- Brinell -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 test-card">
+            <div class="card-body text-center">
+                <i class="bi bi-circle display-4 mb-1" style="color: #d63384;"></i>
+                <h5 class="card-title">Brinell Hardness</h5>
+                <p class="card-text text-muted small">ISO 6506, ASTM E10</p>
+                <a href="{{ url_for('brinell.index') }}" class="btn stretched-link" style="background-color: #d63384; color: white;">Open</a>
+            </div>
+        </div>
+    </div>
+
     <!-- Certificate Register -->
     <div class="col-md-4 col-lg-3">
         <div class="card h-100 test-card">
@@ -186,6 +198,8 @@
                                     <a href="{{ url_for('kic.view', test_id=test.id) }}" class="btn btn-sm btn-outline-danger">View</a>
                                     {% elif test.test_method == 'VICKERS' %}
                                     <a href="{{ url_for('vickers.view', test_id=test.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                                    {% elif test.test_method == 'BRINELL' %}
+                                    <a href="{{ url_for('brinell.view', test_id=test.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
                                     {% else %}
                                     <a href="#" class="btn btn-sm btn-outline-secondary disabled">View</a>
                                     {% endif %}

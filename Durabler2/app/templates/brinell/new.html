@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}New Brinell Test{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('brinell.index') }}">Brinell Tests</a></li>
+        <li class="breadcrumb-item active">New Test</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-lg-10">
+        <div class="card shadow">
+            <div class="card-header text-white" style="background-color: #d63384 !important;">
+                <h4 class="mb-0"><i class="bi bi-circle"></i> New Brinell Hardness Test (ASTM E10 / ISO 6506)</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <!-- Test Identification -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-tag"></i> Test Identification</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-1">
+                                    {{ form.certificate_id.label(class="form-label") }}
+                                    {{ form.certificate_id(class="form-select") }}
+                                    <small class="text-muted">Certificate number is a main trace number</small>
+                                </div>
+                                <div class="col-md-6 mb-1">
+                                    {{ form.specimen_id.label(class="form-label") }}
+                                    {{ form.specimen_id(class="form-control") }}
+                                    <small class="text-muted">Specimen SN is a main trace number</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-1">
+                                    {{ form.material.label(class="form-label") }}
+                                    {{ form.material(class="form-control", placeholder="e.g., S355J2") }}
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.test_date.label(class="form-label") }}
+                                    {{ form.test_date(class="form-control", type="date") }}
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.location_orientation.label(class="form-label") }}
+                                    {{ form.location_orientation(class="form-control") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Test Parameters -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-gear"></i> Test Parameters</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 mb-1">
+                                    {{ form.load_level.label(class="form-label") }}
+                                    {{ form.load_level(class="form-select") }}
+                                </div>
+                                <div class="col-md-3 mb-1">
+                                    {{ form.dwell_time.label(class="form-label") }}
+                                    {{ form.dwell_time(class="form-select") }}
+                                </div>
+                                <div class="col-md-3 mb-1">
+                                    {{ form.temperature.label(class="form-label") }}
+                                    {{ form.temperature(class="form-control") }}
+                                </div>
+                                <div class="col-md-3 mb-1">
+                                    {{ form.num_readings.label(class="form-label") }}
+                                    {{ form.num_readings(class="form-select", id="num_readings", onchange="updateReadingsTable()") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CSV Import -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-file-earmark-spreadsheet"></i> Import from Test Machine (Optional)</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-end">
+                                <div class="col-md-6 mb-1">
+                                    {{ form.csv_file.label(class="form-label") }}
+                                    {{ form.csv_file(class="form-control", id="csvFileInput") }}
+                                    <small class="text-muted">Brinell test machine CSV file (semicolon-separated)</small>
+                                </div>
+                                <div class="col-md-3 mb-1">
+                                    <button type="button" class="btn btn-outline-primary" id="importCsvBtn" disabled>
+                                        <i class="bi bi-download"></i> Import Readings
+                                    </button>
+                                </div>
+                                <div class="col-md-3 mb-1">
+                                    <span id="csvStatus" class="text-muted small"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hardness Readings -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-list-ol"></i> Hardness Readings</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-1">
+                                Enter readings manually or import from CSV above. At least 3 readings recommended per ASTM E10.
+                            </p>
+                            <div class="table-responsive">
+                                <table class="table table-sm" id="readings-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th width="10%">#</th>
+                                            <th width="45%">Location</th>
+                                            <th width="45%">Hardness (HBW)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for i in range(1, 21) %}
+                                        <tr class="reading-row" data-row="{{ i }}">
+                                            <td class="align-middle text-center"><strong>{{ i }}</strong></td>
+                                            <td>{{ form['reading_' ~ i ~ '_location'](class="form-control form-control-sm", placeholder="e.g., Center, Edge, HAZ...") }}</td>
+                                            <td>{{ form['reading_' ~ i ~ '_value'](class="form-control form-control-sm", placeholder="e.g., 245") }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Photo Upload -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-camera"></i> Indent Photo (Optional)</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.photo.label(class="form-label") }}
+                                    {{ form.photo(class="form-control") }}
+                                    <small class="text-muted">JPG or PNG image of indentation</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PDF Attachment -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-file-pdf"></i> PDF Attachment (Optional)</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.pdf_attachment.label(class="form-label") }}
+                                    {{ form.pdf_attachment(class="form-control") }}
+                                    <small class="text-muted">PDF document to attach to the final report (e.g., test machine printout)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Uncertainty Parameters (ISO 17025) -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-percent"></i> Uncertainty Parameters (ISO 17025)</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small">Enter measurement uncertainties for ISO 17025 compliance reporting</p>
+                            <div class="row">
+                                <div class="col-md-4 mb-1">
+                                    {{ form.force_uncertainty.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.force_uncertainty(class="form-control") }}
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Test force application</small>
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.diameter_uncertainty.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.diameter_uncertainty(class="form-control") }}
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Optical measurement</small>
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.machine_uncertainty.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.machine_uncertainty(class="form-control") }}
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <small class="text-muted">Calibration certificate</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-2">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control", rows=3, placeholder="Additional notes...") }}
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('brinell.index') }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
+                        </a>
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Sidebar -->
+    <div class="col-lg-2">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Help</h6>
+            </div>
+            <div class="card-body small">
+                <p><strong>ASTM E10 / ISO 6506</strong></p>
+                <p>Brinell Hardness Test for Metallic Materials</p>
+                <hr>
+                <p><strong>Load Levels:</strong></p>
+                <ul class="ps-3">
+                    <li>HBW 10/3000 (F/D²=30)</li>
+                    <li>HBW 10/1500 (F/D²=15)</li>
+                    <li>HBW 5/750 (F/D²=30)</li>
+                </ul>
+                <hr>
+                <p><strong>Tips:</strong></p>
+                <ul class="ps-3">
+                    <li>Min 3 readings</li>
+                    <li>10s dwell ferrous</li>
+                    <li>15s dwell non-ferrous</li>
+                    <li>Report location</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateReadingsTable() {
+    const numReadings = parseInt(document.getElementById('num_readings').value) || 5;
+    const rows = document.querySelectorAll('.reading-row');
+
+    rows.forEach(function(row) {
+        const rowNum = parseInt(row.getAttribute('data-row'));
+        if (rowNum <= numReadings) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+            // Clear hidden fields
+            const inputs = row.querySelectorAll('input');
+            inputs.forEach(function(input) {
+                input.value = '';
+            });
+        }
+    });
+}
+
+// CSV import
+document.getElementById('csvFileInput').addEventListener('change', function() {
+    document.getElementById('importCsvBtn').disabled = !this.files.length;
+    document.getElementById('csvStatus').textContent = '';
+});
+
+document.getElementById('importCsvBtn').addEventListener('click', async function() {
+    const fileInput = document.getElementById('csvFileInput');
+    if (!fileInput.files.length) return;
+
+    const formData = new FormData();
+    formData.append('csv_file', fileInput.files[0]);
+
+    const statusEl = document.getElementById('csvStatus');
+    statusEl.textContent = 'Parsing...';
+    statusEl.className = 'text-muted small';
+
+    try {
+        const response = await fetch('{{ url_for("brinell.parse_csv") }}', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.error) {
+            statusEl.textContent = data.error;
+            statusEl.className = 'text-danger small';
+            return;
+        }
+
+        // Update num_readings dropdown
+        const numSelect = document.getElementById('num_readings');
+        const count = data.count;
+        // Add option if not present
+        let found = false;
+        for (const opt of numSelect.options) {
+            if (parseInt(opt.value) === count) { found = true; opt.selected = true; break; }
+        }
+        if (!found) {
+            const opt = document.createElement('option');
+            opt.value = count;
+            opt.textContent = count + ' indents (from CSV)';
+            opt.selected = true;
+            numSelect.appendChild(opt);
+        }
+
+        // Update load level if detected
+        if (data.load_level) {
+            const loadSelect = document.querySelector('[name="load_level"]');
+            // Try exact match first
+            let found = false;
+            for (const opt of loadSelect.options) {
+                if (opt.value === data.load_level) { opt.selected = true; found = true; break; }
+            }
+            // If not found, add it
+            if (!found && data.load_level.startsWith('HBW')) {
+                const opt = document.createElement('option');
+                opt.value = data.load_level;
+                opt.textContent = data.load_level;
+                opt.selected = true;
+                loadSelect.appendChild(opt);
+            }
+        }
+
+        // Populate reading fields
+        // First clear all
+        for (let i = 1; i <= 20; i++) {
+            const loc = document.querySelector('[name="reading_' + i + '_location"]');
+            const val = document.querySelector('[name="reading_' + i + '_value"]');
+            if (loc) loc.value = '';
+            if (val) val.value = '';
+        }
+
+        // Fill from CSV data
+        data.readings.forEach(function(r, idx) {
+            const i = idx + 1;
+            if (i > 20) return;
+            const loc = document.querySelector('[name="reading_' + i + '_location"]');
+            const val = document.querySelector('[name="reading_' + i + '_value"]');
+            if (loc) loc.value = r.location;
+            if (val) val.value = r.hardness_value;
+        });
+
+        updateReadingsTable();
+        statusEl.textContent = count + ' readings imported';
+        statusEl.className = 'text-success small';
+
+    } catch (error) {
+        statusEl.textContent = 'Import failed: ' + error.message;
+        statusEl.className = 'text-danger small';
+    }
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateReadingsTable();
+});
+</script>
+{% endblock %}

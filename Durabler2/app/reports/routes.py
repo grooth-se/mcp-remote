@@ -339,6 +339,10 @@ def generate_report(cert_id):
             # Generate Vickers report
             _generate_vickers_report(certificate, test_record, output_path)
 
+        elif test_record.test_method == 'BRINELL':
+            # Generate Brinell report
+            _generate_brinell_report(certificate, test_record, output_path)
+
         else:
             flash(f'Report generation for {test_record.test_method} not yet implemented.', 'warning')
             return redirect(url_for('certificates.view', cert_id=cert_id))
@@ -2040,6 +2044,347 @@ def _generate_vickers_report(certificate, test_record, output_path):
             trHeight = OxmlElement('w:trHeight')
             trPr.append(trHeight)
         trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))  # EMU to twips
+        trHeight.set(qn('w:hRule'), 'exact')
+
+    # Disclaimer footer
+    disclaimer_text = (
+        "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
+        "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
+        "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
+        "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
+        "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
+    )
+    for section in doc.sections:
+        footer = section.footer
+        footer.is_linked_to_previous = False
+        footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        footer_para.clear()
+        footer_run = footer_para.add_run(disclaimer_text)
+        footer_run.font.size = Pt(7)
+        footer_run.italic = True
+
+    doc.save(output_path)
+
+    if chart_path and chart_path.exists():
+        import os
+        os.remove(chart_path)
+
+
+def _generate_brinell_report(certificate, test_record, output_path):
+    """Generate Brinell Word report for certificate approval workflow."""
+    import numpy as np
+    from docx import Document
+    from docx.shared import Inches, Pt, Cm, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from app.models import AnalysisResult
+
+    test_params = test_record.geometry if test_record.geometry else {}
+    readings = test_params.get('readings', [])
+
+    # Get analysis results
+    results = {}
+    analysis_records = AnalysisResult.query.filter_by(test_record_id=test_record.id).all()
+    for ar in analysis_records:
+        if ar.parameter_name == 'mean_hardness':
+            results['mean_hardness'] = {'value': ar.value, 'uncertainty': ar.uncertainty}
+        else:
+            results[ar.parameter_name] = ar.value
+    results['load_level'] = test_params.get('load_level', 'HBW')
+    results['uncertainty_budget'] = test_params.get('uncertainty_budget', {})
+
+    # Generate chart
+    chart_path = None
+    if readings:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
+        values = [r['hardness_value'] for r in readings]
+        mean_val = np.mean(values)
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        x = list(range(1, len(values) + 1))
+        ax.plot(x, values, color='darkred', linewidth=2, marker='o',
+                markersize=10, markerfacecolor='darkred', markeredgecolor='darkred')
+        ax.axhline(y=mean_val, color='grey', linestyle=':', linewidth=2,
+                   label='Mean')
+        ax.set_xlabel('Reading Number')
+        ax.set_ylabel(f'Hardness ({test_params.get("load_level", "HBW")})')
+        ax.set_title('Hardness Profile')
+        ax.legend(loc='upper right')
+        ax.set_xlim(0.5, len(values) + 0.5)
+        ax.set_ylim(0, max(values) * 1.15)
+        ax.set_xticks(x)
+        ax.grid(True, alpha=0.3, axis='y')
+
+        chart_path = Path(current_app.config['REPORTS_FOLDER']) / f'brinell_chart_{test_record.id}.png'
+        fig.savefig(chart_path, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+
+    test_info = {
+        'certificate_number': certificate.certificate_number_with_rev,
+        'test_project': certificate.test_order or '',
+        'customer': certificate.customer or '',
+        'customer_order': certificate.customer_order or '',
+        'product_sn': certificate.product_sn or '',
+        'specimen_id': test_record.specimen_id or '',
+        'customer_specimen_info': certificate.customer_specimen_info or '',
+        'material': certificate.material or '',
+        'requirement': certificate.requirement or '',
+        'location_orientation': test_params.get('location_orientation', certificate.location_orientation or ''),
+        'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
+        'temperature': test_record.temperature or 23,
+        'load_level': test_params.get('load_level', 'HBW 10/3000'),
+        'ball_diameter': test_params.get('ball_diameter', '10'),
+        'dwell_time': test_params.get('dwell_time', '10'),
+        'notes': test_params.get('notes', ''),
+        'operator': current_user.full_name if current_user.full_name else current_user.username,
+    }
+
+    # Build result proxy
+    class ResultProxy:
+        def __init__(self, data, readings_list):
+            self._data = data
+            self._readings = readings_list
+
+        @property
+        def mean_hardness(self):
+            d = self._data.get('mean_hardness', {})
+            return type('MV', (), {'value': d.get('value', 0), 'uncertainty': d.get('uncertainty', 0)})()
+
+        @property
+        def std_dev(self):
+            return self._data.get('std_dev', 0)
+
+        @property
+        def range_value(self):
+            return self._data.get('range_value', 0)
+
+        @property
+        def min_value(self):
+            return self._data.get('min_value', 0)
+
+        @property
+        def max_value(self):
+            return self._data.get('max_value', 0)
+
+        @property
+        def n_readings(self):
+            return self._data.get('n_readings', 0)
+
+        @property
+        def load_level(self):
+            return self._data.get('load_level', 'HBW')
+
+    result_proxy = ResultProxy(results, readings)
+    uncertainty_budget = results.get('uncertainty_budget', {})
+    requirement_value = test_info.get('requirement', '') or '-'
+
+    # Build report from scratch
+    doc = Document()
+
+    style = doc.styles['Normal']
+    style.paragraph_format.space_before = Pt(0)
+    style.paragraph_format.space_after = Pt(3)
+    style.paragraph_format.line_spacing = 1.0
+    style.font.size = Pt(10)
+
+    dark_green = RGBColor(0x00, 0x64, 0x00)
+    for i in range(1, 4):
+        heading_style = doc.styles[f'Heading {i}']
+        heading_style.paragraph_format.space_before = Pt(8)
+        heading_style.paragraph_format.space_after = Pt(4)
+        heading_style.font.color.rgb = dark_green
+
+    logo_path = _get_logo_path()
+
+    for section in doc.sections:
+        section.top_margin = Cm(1.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(2.0)
+        section.right_margin = Cm(2.0)
+        header = section.header
+        header.is_linked_to_previous = False
+
+        logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+        logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        logo_para.paragraph_format.space_after = Pt(0)
+        if logo_path:
+            logo_run = logo_para.add_run()
+            logo_run.add_picture(str(logo_path), width=Cm(5.0))
+
+        title_para = header.add_paragraph()
+        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        title_para.paragraph_format.space_before = Pt(0)
+        title_para.paragraph_format.space_after = Pt(0)
+        title_run = title_para.add_run('Brinell Hardness Test Report')
+        title_run.bold = True
+        title_run.font.size = Pt(12)
+
+        std_para = header.add_paragraph()
+        std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        std_para.paragraph_format.space_before = Pt(0)
+        std_para.paragraph_format.space_after = Pt(0)
+        std_run = std_para.add_run('ASTM E10 / ISO 6506')
+        std_run.font.size = Pt(8)
+
+        cert_para = header.add_paragraph()
+        cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        cert_para.paragraph_format.space_before = Pt(0)
+        cert_para.paragraph_format.space_after = Pt(0)
+        cert_run = cert_para.add_run(f"Certificate: {test_info.get('certificate_number', '')}")
+        cert_run.font.size = Pt(8)
+
+        date_para = header.add_paragraph()
+        date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        date_para.paragraph_format.space_before = Pt(0)
+        date_para.paragraph_format.space_after = Pt(0)
+        date_run = date_para.add_run(f"Date: {test_info.get('test_date', '')}")
+        date_run.font.size = Pt(8)
+
+    # Test Information
+    heading = doc.add_heading('Test Information', level=1)
+    heading.paragraph_format.space_before = Pt(0)
+    heading.paragraph_format.space_after = Pt(6)
+
+    info_data = [
+        ('Test Project:', test_info.get('test_project', ''), 'Temperature:', f"{test_info.get('temperature', '23')} \u00b0C"),
+        ('Customer:', test_info.get('customer', ''), 'Test Standard:', 'ASTM E10 / ISO 6506'),
+        ('Customer Order:', test_info.get('customer_order', ''), 'Test Equipment:', 'q-ness ATM test machine'),
+        ('Product S/N:', test_info.get('specimen_id', ''), 'Load Level:', test_info.get('load_level', '')),
+        ('Material:', test_info.get('material', ''), 'Ball Diameter:', f"{test_info.get('ball_diameter', '10')} mm"),
+        ('Customer Specimen Info:', test_info.get('customer_specimen_info', ''), 'Dwell Time:', f"{test_info.get('dwell_time', '10')} s"),
+        ('Requirement:', test_info.get('requirement', ''), 'Operator:', test_info.get('operator', '')),
+        ('Location/Orientation:', test_info.get('location_orientation', ''), '', ''),
+    ]
+
+    table = doc.add_table(rows=len(info_data), cols=4)
+    table.style = 'Table Grid'
+    for i, (label1, value1, label2, value2) in enumerate(info_data):
+        table.rows[i].cells[0].text = label1
+        table.rows[i].cells[1].text = str(value1) if value1 else ''
+        table.rows[i].cells[2].text = label2
+        table.rows[i].cells[3].text = str(value2) if value2 else ''
+        if table.rows[i].cells[0].paragraphs[0].runs:
+            table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+        if table.rows[i].cells[2].paragraphs[0].runs:
+            table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
+        for cell in table.rows[i].cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+    # Results Summary
+    heading = doc.add_heading('Results Summary', level=1)
+    heading.paragraph_format.space_before = Pt(12)
+    heading.paragraph_format.space_after = Pt(6)
+
+    table = doc.add_table(rows=8, cols=3)
+    table.style = 'Table Grid'
+    for i, h in enumerate(['Parameter', 'Value', 'Unit']):
+        table.rows[0].cells[i].text = h
+        table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+
+    results_data = [
+        ('Mean Hardness', f'{result_proxy.mean_hardness.value:.1f} \u00b1 {result_proxy.mean_hardness.uncertainty:.1f}', result_proxy.load_level),
+        ('Standard Deviation', f'{result_proxy.std_dev:.1f}', result_proxy.load_level),
+        ('Range', f'{result_proxy.range_value:.1f}', result_proxy.load_level),
+        ('Minimum', f'{result_proxy.min_value:.1f}', result_proxy.load_level),
+        ('Maximum', f'{result_proxy.max_value:.1f}', result_proxy.load_level),
+        ('Number of Readings', str(result_proxy.n_readings), '-'),
+        ('Requirement', requirement_value, '-'),
+    ]
+    for i, (param, value, unit) in enumerate(results_data):
+        table.rows[i+1].cells[0].text = param
+        table.rows[i+1].cells[1].text = value
+        table.rows[i+1].cells[2].text = unit
+    for row in table.rows:
+        for cell in row.cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+    # Individual Readings
+    heading = doc.add_heading('Individual Readings', level=1)
+    heading.paragraph_format.space_before = Pt(12)
+    heading.paragraph_format.space_after = Pt(6)
+
+    table = doc.add_table(rows=len(readings) + 1, cols=3)
+    table.style = 'Table Grid'
+    for i, h in enumerate(['#', 'Location', 'Hardness']):
+        table.rows[0].cells[i].text = h
+        table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+    for i, r in enumerate(readings):
+        table.rows[i+1].cells[0].text = str(r.get('reading_number', i+1))
+        table.rows[i+1].cells[1].text = r.get('location', f'Point {i+1}')
+        table.rows[i+1].cells[2].text = f"{r.get('hardness_value', 0):.1f}"
+    for row in table.rows:
+        for cell in row.cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+    # Chart
+    if chart_path and chart_path.exists():
+        heading = doc.add_heading('Hardness Profile', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+        doc.add_picture(str(chart_path), width=Inches(5.5))
+        doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # Test Photos (if available)
+    photo_paths, temp_photos = _get_photo_paths(test_record)
+    if photo_paths:
+        heading = doc.add_heading('Test Photos', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+        for photo_path in photo_paths:
+            if photo_path.exists():
+                doc.add_picture(str(photo_path), width=Inches(4.0))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        caption = doc.add_paragraph('Figure: Indent photograph(s)')
+        caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        caption.runs[0].font.size = Pt(10)
+        caption.runs[0].font.italic = True
+    _cleanup_temp_files(temp_photos)
+
+    # Approval Signatures
+    heading = doc.add_heading('Approval', level=1)
+    heading.paragraph_format.space_before = Pt(12)
+    heading.paragraph_format.space_after = Pt(6)
+
+    sig_table = doc.add_table(rows=4, cols=2)
+    sig_table.style = 'Table Grid'
+
+    sig_table.rows[0].cells[0].text = 'Role'
+    sig_table.rows[0].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[0].cells[1].text = 'Name / Signature'
+    sig_table.rows[0].cells[1].paragraphs[0].runs[0].bold = True
+
+    sig_table.rows[1].cells[0].text = 'Test Engineer:'
+    sig_table.rows[1].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[1].cells[1].text = test_info.get('operator', '')
+
+    sig_table.rows[2].cells[0].text = 'Approved by:'
+    sig_table.rows[2].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[2].cells[1].text = ''
+
+    sig_table.rows[3].cells[0].text = 'Third Party Approval:'
+    sig_table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[3].cells[1].text = ''
+
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    sig_row_height = Cm(1.5)
+    for row in sig_table.rows:
+        for cell in row.cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+    for row in [sig_table.rows[1], sig_table.rows[2], sig_table.rows[3]]:
+        tr = row._tr
+        trPr = tr.get_or_add_trPr()
+        trHeight = trPr.find(qn('w:trHeight'))
+        if trHeight is None:
+            trHeight = OxmlElement('w:trHeight')
+            trPr.append(trHeight)
+        trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))
         trHeight.set(qn('w:hRule'), 'exact')
 
     # Disclaimer footer
