@@ -273,8 +273,8 @@ def new():
         # Store uncertainty inputs (ISO 17025)
         test_params['uncertainty_inputs'] = {
             'force_pct': form.force_uncertainty.data or 0.31,
-            'diameter_pct': form.diameter_uncertainty.data or 1.0,
-            'machine_pct': form.machine_uncertainty.data or 0.5
+            'diameter_pct': form.diameter_uncertainty.data or 0.5,
+            'machine_pct': form.machine_uncertainty.data or 0.2
         }
 
         # Create test record
@@ -401,8 +401,8 @@ def new():
 
                 # Run analysis with user-specified uncertainty
                 analyzer = BrinellAnalyzer(
-                    machine_uncertainty=(form.machine_uncertainty.data or 0.5) / 100,
-                    diameter_uncertainty=(form.diameter_uncertainty.data or 1.0) / 100,
+                    machine_uncertainty=(form.machine_uncertainty.data or 0.2) / 100,
+                    diameter_uncertainty=(form.diameter_uncertainty.data or 0.5) / 100,
                     force_uncertainty=(form.force_uncertainty.data or 0.31) / 100
                 )
                 result = analyzer.run_analysis(test_data)

@@ -169,11 +169,11 @@ class SpecimenForm(FlaskForm):
     diagonal_uncertainty = FloatField('Diagonal Measurement Uncertainty (%)', validators=[
         Optional(),
         NumberRange(min=0.1, max=10)
-    ], default=1.0)
+    ], default=0.5)
     machine_uncertainty = FloatField('Machine Calibration Uncertainty (%)', validators=[
         Optional(),
         NumberRange(min=0.1, max=5)
-    ], default=0.5)
+    ], default=0.2)
 
     # Notes
     notes = TextAreaField('Notes', validators=[Optional()])

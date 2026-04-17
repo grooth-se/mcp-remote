@@ -76,16 +76,16 @@ class VickersAnalyzer:
     Attributes
     ----------
     machine_uncertainty : float
-        Relative uncertainty of hardness testing machine (default 0.02 = 2%)
+        Relative uncertainty of hardness testing machine (default 0.002 = 0.2%)
     diagonal_uncertainty : float
-        Relative uncertainty in diagonal measurement (default 0.01 = 1%)
+        Relative uncertainty in diagonal measurement (default 0.005 = 0.5%)
     force_uncertainty : float
         Relative uncertainty in applied force (default 0.01 = 1%)
     """
 
     def __init__(self,
-                 machine_uncertainty: float = 0.02,
-                 diagonal_uncertainty: float = 0.01,
+                 machine_uncertainty: float = 0.002,
+                 diagonal_uncertainty: float = 0.005,
                  force_uncertainty: float = 0.0031):
         """
         Initialize Vickers analyzer with uncertainty values.

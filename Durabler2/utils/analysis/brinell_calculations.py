@@ -78,16 +78,16 @@ class BrinellAnalyzer:
     Attributes
     ----------
     machine_uncertainty : float
-        Relative uncertainty of hardness testing machine (default 0.02 = 2%)
+        Relative uncertainty of hardness testing machine (default 0.002 = 0.2%)
     diameter_uncertainty : float
-        Relative uncertainty in indent diameter measurement (default 0.01 = 1%)
+        Relative uncertainty in indent diameter measurement (default 0.005 = 0.5%)
     force_uncertainty : float
         Relative uncertainty in applied force (default 0.0031 = 0.31%)
     """
 
     def __init__(self,
-                 machine_uncertainty: float = 0.02,
-                 diameter_uncertainty: float = 0.01,
+                 machine_uncertainty: float = 0.002,
+                 diameter_uncertainty: float = 0.005,
                  force_uncertainty: float = 0.0031):
         self.machine_uncertainty = machine_uncertainty
         self.diameter_uncertainty = diameter_uncertainty
