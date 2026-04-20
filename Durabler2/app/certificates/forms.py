@@ -38,6 +38,8 @@ class CertificateForm(FlaskForm):
         ('ASTM E399', 'ASTM E399 - KIC'),
         ('ISO 6507-1', 'ISO 6507-1 - Vickers'),
         ('ASTM E92', 'ASTM E92 - Vickers'),
+        ('ASTM E10', 'ASTM E10 - Brinell'),
+        ('ISO 6506-1', 'ISO 6506-1 - Brinell'),
         ('Other', 'Other')
     ], validators=[Optional()])
 
