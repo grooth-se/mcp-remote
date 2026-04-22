@@ -38,6 +38,7 @@ class Config:
 
     # Session
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
+    SESSION_COOKIE_NAME = 'session_durabler2'
 
     # Portal authentication
     PORTAL_AUTH_ENABLED = os.environ.get('PORTAL_AUTH_ENABLED', '').lower() in ('true', '1', 'yes')

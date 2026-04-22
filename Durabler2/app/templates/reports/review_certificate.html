@@ -166,29 +166,51 @@
                         <i class="bi bi-info-circle"></i>
                         <strong>Approval workflow:</strong>
                         <ol class="mb-0 mt-1 ps-3">
-                            <li>Download the Word report below</li>
-                            <li>Review and verify the content</li>
-                            <li>Save as PDF and sign with your PDF software</li>
-                            <li>Upload the signed PDF to approve</li>
+                            <li>Download and review the Word report</li>
+                            <li>Click "Approve & Sign" to auto-generate signed PDF</li>
                         </ol>
                     </div>
 
-                    <!-- Approve with Signed PDF Upload -->
-                    <form action="{{ url_for('reports.approve', cert_id=certificate.id) }}"
-                          method="POST" enctype="multipart/form-data" class="mb-1">
-                        <div class="mb-2">
-                            <label for="signed_pdf" class="form-label fw-bold">
-                                <i class="bi bi-file-pdf text-danger"></i> Upload Signed PDF
-                            </label>
-                            <input type="file" name="signed_pdf" id="signed_pdf"
-                                   class="form-control" accept=".pdf" required>
-                            <div class="form-text">Upload the PDF that you have signed externally</div>
+                    <!-- Primary: Automatic Approve & Sign -->
+                    <a href="{{ url_for('reports.approve', cert_id=certificate.id) }}"
+                       class="btn btn-success btn-lg w-100 mb-2">
+                        <i class="bi bi-pen"></i> Approve & Sign
+                    </a>
+                    <p class="text-muted small mb-1">
+                        Converts Word report to PDF and signs with company certificate automatically.
+                    </p>
+
+                    <!-- Fallback: Manual PDF Upload -->
+                    <div class="accordion mb-1" id="manualUploadAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed py-2" type="button"
+                                        data-bs-toggle="collapse" data-bs-target="#manualUpload">
+                                    <small><i class="bi bi-upload"></i> Manual PDF upload (fallback)</small>
+                                </button>
+                            </h2>
+                            <div id="manualUpload" class="accordion-collapse collapse"
+                                 data-bs-parent="#manualUploadAccordion">
+                                <div class="accordion-body">
+                                    <form action="{{ url_for('reports.approve', cert_id=certificate.id) }}"
+                                          method="POST" enctype="multipart/form-data">
+                                        <div class="mb-2">
+                                            <label for="signed_pdf" class="form-label fw-bold">
+                                                <i class="bi bi-file-pdf text-danger"></i> Upload Signed PDF
+                                            </label>
+                                            <input type="file" name="signed_pdf" id="signed_pdf"
+                                                   class="form-control" accept=".pdf" required>
+                                            <div class="form-text">Upload a PDF signed with external software</div>
+                                        </div>
+                                        <button type="submit" class="btn btn-outline-success w-100"
+                                                onclick="return confirm('Approve this report with the uploaded PDF?')">
+                                            <i class="bi bi-check-circle"></i> Upload & Publish
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-success btn-lg w-100"
-                                onclick="return confirm('Approve this report and publish the uploaded PDF?')">
-                            <i class="bi bi-check-circle"></i> Approve & Publish
-                        </button>
-                    </form>
+                    </div>
 
                     <hr>
 

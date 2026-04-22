@@ -18,6 +18,7 @@ Requirements:
 """
 
 import hashlib
+import shutil
 import subprocess
 import tempfile
 from datetime import datetime
@@ -291,22 +292,23 @@ def sign_pdf(
         pdf_data = f.read()
 
     try:
-        # Create signature dictionary
+        # Create signature dictionary — invisible cryptographic signature
+        # The visible approval (logo + name + date) is stamped into the Word doc
+        # before conversion; this adds the cryptographic layer only.
         dct = {
             'aligned': 0,
             'sigflags': 3,
             'sigflagsft': 132,
             'sigpage': 0,
-            'sigbutton': True,
+            'sigbutton': False,
             'sigfield': 'Signature1',
             'auto_sigfield': True,
-            'signaturebox': (50, 50, 250, 100),  # Position of visible signature
-            'signature': signer_name or 'Durabler AB',
             'signform': False,
             'contact': contact_info,
             'location': signer_location,
             'signingdate': timestamp.strftime("D:%Y%m%d%H%M%S+00'00'"),
             'reason': reason,
+            'signature': signer_name or 'Durabler',
         }
 
         # Sign the PDF
@@ -334,6 +336,88 @@ def sign_pdf(
         raise PDFSigningError(f"PDF signing failed: {e}")
 
 
+def stamp_approval_in_word(
+    word_path: Path,
+    output_path: Path,
+    signer_name: str,
+    timestamp: datetime,
+    logo_path: Optional[Path] = None
+) -> Path:
+    """Stamp the approval into the Word document's 'Approved by' cell.
+
+    Finds the approval table (last table with 'Approved by:' cell),
+    and fills the corresponding value cell with:
+    - Durabler logo (scaled to fit row height)
+    - Approver name
+    - Signing date
+
+    Parameters
+    ----------
+    word_path : Path
+        Original Word report
+    output_path : Path
+        Where to save the stamped copy
+    signer_name : str
+        Name of the approver
+    timestamp : datetime
+        Signing timestamp
+    logo_path : Path, optional
+        Path to Durabler logo image
+
+    Returns
+    -------
+    Path
+        Path to the stamped Word document
+    """
+    from docx import Document
+    from docx.shared import Cm, Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    doc = Document(str(word_path))
+
+    # Find the approval table — search from last table backwards
+    approval_cell = None
+    for table in reversed(doc.tables):
+        for row in table.rows:
+            if row.cells[0].text.strip() == 'Approved by:':
+                approval_cell = row.cells[1]  # The value cell
+                break
+        if approval_cell:
+            break
+
+    if approval_cell:
+        # Clear existing content
+        for p in approval_cell.paragraphs:
+            p.clear()
+
+        # Use the first paragraph for logo
+        para = approval_cell.paragraphs[0]
+        para.paragraph_format.space_before = Pt(1)
+        para.paragraph_format.space_after = Pt(0)
+
+        if logo_path and logo_path.exists():
+            run = para.add_run()
+            run.add_picture(str(logo_path), height=Cm(0.6))
+
+        # Add approver name on new line
+        name_para = approval_cell.add_paragraph()
+        name_para.paragraph_format.space_before = Pt(1)
+        name_para.paragraph_format.space_after = Pt(0)
+        name_run = name_para.add_run(signer_name)
+        name_run.font.size = Pt(8)
+        name_run.bold = True
+
+        # Add date on new line
+        date_para = approval_cell.add_paragraph()
+        date_para.paragraph_format.space_before = Pt(0)
+        date_para.paragraph_format.space_after = Pt(1)
+        date_run = date_para.add_run(timestamp.strftime('%Y-%m-%d %H:%M UTC'))
+        date_run.font.size = Pt(7)
+
+    doc.save(str(output_path))
+    return output_path
+
+
 def sign_report(
     word_report_path: Path,
     output_folder: Path,
@@ -341,14 +425,15 @@ def sign_report(
     cert_path: Path,
     cert_password: str = '',
     signer_name: str = '',
-    signer_user_id: str = ''
+    signer_user_id: str = '',
+    logo_path: Optional[Path] = None
 ) -> dict:
-    """Complete workflow to convert and sign a test report.
+    """Complete workflow to stamp approval, convert, and sign a test report.
 
-    This is the main entry point for the signing workflow:
-    1. Convert Word document to PDF
-    2. Sign the PDF with X.509 certificate
-    3. Return signing details for audit trail
+    1. Stamp approval (logo + name + date) into Word doc's 'Approved by' cell
+    2. Convert stamped Word document to PDF via LibreOffice
+    3. Apply invisible X.509 cryptographic signature to PDF
+    4. Return signing details for audit trail
 
     Parameters
     ----------
@@ -366,6 +451,8 @@ def sign_report(
         Full name of the person signing
     signer_user_id : str
         User ID of the signer (e.g., 'DUR-APP-001')
+    logo_path : Path, optional
+        Path to Durabler logo for the approval stamp
 
     Returns
     -------
@@ -376,7 +463,6 @@ def sign_report(
             'timestamp': Signing timestamp (datetime),
             'signer_name': Name of signer,
             'signer_user_id': User ID of signer,
-            'certificate_info': Certificate subject info
         }
 
     Raises
@@ -410,11 +496,24 @@ def sign_report(
     unsigned_pdf = signed_folder / pdf_filename
     signed_pdf = signed_folder / signed_filename
 
-    # Step 1: Convert Word to PDF
-    convert_word_to_pdf(word_report_path, unsigned_pdf)
+    timestamp = datetime.utcnow()
 
-    # Step 2: Sign the PDF
-    signed_path, pdf_hash, timestamp = sign_pdf(
+    # Step 1: Stamp approval into Word doc (work on a temp copy)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        stamped_word = Path(tmpdir) / word_report_path.name
+        stamp_approval_in_word(
+            word_path=word_report_path,
+            output_path=stamped_word,
+            signer_name=signer_name,
+            timestamp=timestamp,
+            logo_path=logo_path
+        )
+
+        # Step 2: Convert stamped Word to PDF
+        convert_word_to_pdf(stamped_word, unsigned_pdf)
+
+    # Step 3: Sign the PDF (invisible cryptographic signature)
+    signed_path, pdf_hash, sign_timestamp = sign_pdf(
         pdf_path=unsigned_pdf,
         output_path=signed_pdf,
         cert_path=cert_path,
@@ -443,35 +542,13 @@ def create_placeholder_signed_pdf(
     output_folder: Path,
     certificate_number: str,
     signer_name: str = '',
-    signer_user_id: str = ''
+    signer_user_id: str = '',
+    logo_path: Optional[Path] = None
 ) -> dict:
     """Create a placeholder 'signed' PDF when actual signing is not available.
 
-    This is used when:
-    - LibreOffice is not installed
-    - Certificate is not configured
-    - Development/testing environment
-
-    The PDF is converted but not cryptographically signed.
-    A watermark or note indicates it's not officially signed.
-
-    Parameters
-    ----------
-    word_report_path : Path
-        Path to the Word report (.docx)
-    output_folder : Path
-        Folder for output PDFs
-    certificate_number : str
-        Certificate number
-    signer_name : str
-        Name of signer (for metadata)
-    signer_user_id : str
-        User ID of signer
-
-    Returns
-    -------
-    dict
-        Same structure as sign_report()
+    Stamps the approval into the Word doc, converts to PDF, but does NOT
+    apply a cryptographic signature.
     """
     year = datetime.now().year
     signed_folder = output_folder / 'signed' / str(year)
@@ -483,18 +560,25 @@ def create_placeholder_signed_pdf(
 
     timestamp = datetime.utcnow()
 
-    # Try to convert Word to PDF
     deps = check_dependencies()
     if deps['can_convert'] and word_report_path.exists():
         try:
-            convert_word_to_pdf(word_report_path, signed_pdf)
+            # Stamp approval into Word doc, then convert
+            with tempfile.TemporaryDirectory() as tmpdir:
+                stamped_word = Path(tmpdir) / word_report_path.name
+                stamp_approval_in_word(
+                    word_path=word_report_path,
+                    output_path=stamped_word,
+                    signer_name=signer_name,
+                    timestamp=timestamp,
+                    logo_path=logo_path
+                )
+                convert_word_to_pdf(stamped_word, signed_pdf)
             pdf_hash = calculate_pdf_hash(signed_pdf)
         except PDFSigningError:
-            # Fallback: create empty placeholder
             signed_pdf.write_bytes(b'%PDF-1.4\n% Placeholder - signing not available\n')
             pdf_hash = calculate_pdf_hash(signed_pdf)
     else:
-        # Create minimal placeholder PDF
         signed_pdf.write_bytes(b'%PDF-1.4\n% Placeholder - conversion not available\n')
         pdf_hash = calculate_pdf_hash(signed_pdf)
 

@@ -101,7 +101,7 @@ with app.app_context():
 
 echo "=== Starting Gunicorn ==="
 exec gunicorn \
-    --bind 0.0.0.0:5000 \
+    --bind 0.0.0.0:5005 \
     --workers 4 \
     --timeout 120 \
     --access-logfile - \

@@ -484,23 +484,50 @@ class FCGRReportGenerator:
         heading.paragraph_format.space_before = Pt(12)
         heading.paragraph_format.space_after = Pt(6)
 
-        sig_table = doc.add_table(rows=4, cols=4)
+        sig_table = doc.add_table(rows=4, cols=2)
         sig_table.style = 'Table Grid'
 
-        sig_headers = ['Role', 'Name', 'Signature', 'Date']
-        for i, header in enumerate(sig_headers):
-            sig_table.rows[0].cells[i].text = header
-            sig_table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+        # Header row
+        sig_table.rows[0].cells[0].text = 'Role'
+        sig_table.rows[0].cells[0].paragraphs[0].runs[0].bold = True
+        sig_table.rows[0].cells[1].text = 'Name / Signature'
+        sig_table.rows[0].cells[1].paragraphs[0].runs[0].bold = True
 
-        sig_table.rows[1].cells[0].text = 'Tested by:'
-        sig_table.rows[2].cells[0].text = 'Reviewed by:'
-        sig_table.rows[3].cells[0].text = 'Approved by:'
+        # Row 1: Test Engineer — name only
+        sig_table.rows[1].cells[0].text = 'Test Engineer:'
+        sig_table.rows[1].cells[0].paragraphs[0].runs[0].bold = True
+        engineer_name = data.get('test_engineer', data.get('operator', ''))
+        sig_table.rows[1].cells[1].text = engineer_name
 
-        # Compact signature table rows
+        # Row 2: Approved by — digital signature (filled by PDF signing)
+        sig_table.rows[2].cells[0].text = 'Approved by:'
+        sig_table.rows[2].cells[0].paragraphs[0].runs[0].bold = True
+        sig_table.rows[2].cells[1].text = ''  # Digital signature applied here
+
+        # Row 3: Third Party Approval (if applicable)
+        sig_table.rows[3].cells[0].text = 'Third Party Approval:'
+        sig_table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
+        sig_table.rows[3].cells[1].text = data.get('third_party_approval', '')
+
+        # Set row heights — equal height for all signature rows, sized for digital signature
+        from docx.oxml.ns import qn
+        from docx.shared import Cm as CmShared
+        from docx.oxml import OxmlElement
+        sig_row_height = CmShared(1.5)  # ~50pt, matches PDF signature box
         for row in sig_table.rows:
             for cell in row.cells:
                 cell.paragraphs[0].paragraph_format.space_before = Pt(1)
                 cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+        # Set fixed row height on the three data rows (skip header)
+        for row in [sig_table.rows[1], sig_table.rows[2], sig_table.rows[3]]:
+            tr = row._tr
+            trPr = tr.get_or_add_trPr()
+            trHeight = trPr.find(qn('w:trHeight'))
+            if trHeight is None:
+                trHeight = OxmlElement('w:trHeight')
+                trPr.append(trHeight)
+            trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))  # EMU to twips
+            trHeight.set(qn('w:hRule'), 'exact')
 
         # Add disclaimer to page footer (visible on all pages)
         disclaimer_text = (

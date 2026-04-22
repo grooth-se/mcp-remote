@@ -37,6 +37,7 @@ python-docx>=1.0.0           # Word report generation
 reportlab>=4.0.0
 pypdf>=4.0.0                 # PDF manipulation
 endesive>=2.15.0             # PDF digital signatures (X.509)
+attrs>=23.0.0                # Required by endesive for PDF annotations
 cryptography>=41.0.0         # Certificate handling
 Jinja2>=3.1.0                # Template engine (also used by Flask)
 
