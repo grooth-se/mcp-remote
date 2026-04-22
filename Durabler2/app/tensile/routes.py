@@ -172,13 +172,25 @@ def create_stress_strain_plot(strain, stress, strain_disp=None, stress_disp=None
             line=dict(color='#000000', width=1.5)  # Black solid
         ))
 
+    # Compute extensometer strain offset so slope lines align with data
+    # (accounts for extensometer settling at test start)
+    strain_zero = 0.0
+    if E_modulus and len(stress) > 10:
+        elastic_mask = (stress > 50) & (strain > 0) & (strain < 0.005)
+        if np.sum(elastic_mask) > 5:
+            from scipy.stats import theilslopes
+            ts_slope, ts_intercept, _, _ = theilslopes(
+                stress[elastic_mask], strain[elastic_mask])
+            if ts_slope > 0:
+                strain_zero = -ts_intercept / ts_slope
+
     # Elastic slope line - GREY DOTTED
     if E_modulus:
         E_mpa = E_modulus * 1000
-        max_elastic_strain = 0.01  # Up to 1%
-        elastic_strain = np.linspace(0, max_elastic_strain, 50)
-        elastic_stress = E_mpa * elastic_strain
-        valid = elastic_stress <= np.max(stress) * 1.1
+        max_elastic_strain = 0.01
+        elastic_strain = np.linspace(strain_zero, strain_zero + max_elastic_strain, 50)
+        elastic_stress = E_mpa * (elastic_strain - strain_zero)
+        valid = (elastic_stress >= 0) & (elastic_stress <= np.max(stress) * 1.1)
         fig.add_trace(go.Scatter(
             x=elastic_strain[valid] * 100,
             y=elastic_stress[valid],
@@ -200,8 +212,9 @@ def create_stress_strain_plot(strain, stress, strain_disp=None, stress_disp=None
         # Draw 0.2% offset line - GREY DOTTED
         if E_modulus:
             E_mpa = E_modulus * 1000
-            offset_strain = np.linspace(0.002, rp02_strain * 1.3, 50)
-            offset_stress = E_mpa * (offset_strain - 0.002)
+            offset_start = strain_zero + 0.002
+            offset_strain = np.linspace(offset_start, rp02_strain * 1.3, 50)
+            offset_stress = E_mpa * (offset_strain - offset_start)
             valid = (offset_stress > 0) & (offset_stress <= rp02_stress * 1.1)
             fig.add_trace(go.Scatter(
                 x=offset_strain[valid] * 100,
