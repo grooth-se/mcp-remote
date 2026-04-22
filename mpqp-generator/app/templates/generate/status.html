@@ -45,11 +45,15 @@
                 </span>
                 {% endif %}
 
-                {% if job.status in ('review', 'pending') and job.selected_references %}
+                {% if job.status == 'generating' %}
+                <a href="{{ url_for('generate.generate_progress', job_id=job.id) }}" class="btn btn-warning">
+                    <i class="bi bi-hourglass-split me-1"></i>4. Generating...
+                </a>
+                {% elif job.status in ('review', 'pending', 'failed') and job.selected_references %}
                 <form method="POST" action="{{ url_for('generate.generate_doc', job_id=job.id) }}" class="d-inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-accent">
-                        <i class="bi bi-file-earmark-text me-1"></i>4. Generate Document
+                        <i class="bi bi-file-earmark-text me-1"></i>4. {{ 'Re-generate' if job.status == 'failed' else 'Generate Document' }}
                     </button>
                 </form>
                 {% elif job.status == 'completed' %}

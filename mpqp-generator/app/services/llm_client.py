@@ -35,7 +35,11 @@ def check_ollama_status():
 
 
 def generate(prompt, model=None, temperature=None, max_tokens=None, system=None):
-    """Generate text using Ollama.
+    """Generate text using Ollama with streaming.
+
+    Uses streaming to avoid HTTP timeout on slow CPU inference.
+    Each token keeps the connection alive, so generation can take
+    as long as needed without timing out.
 
     Returns the generated text or None if unavailable.
     """
@@ -46,7 +50,7 @@ def generate(prompt, model=None, temperature=None, max_tokens=None, system=None)
     payload = {
         'model': model,
         'prompt': prompt,
-        'stream': False,
+        'stream': True,
         'options': {
             'temperature': temperature,
             'num_predict': max_tokens,
@@ -64,11 +68,28 @@ def generate(prompt, model=None, temperature=None, max_tokens=None, system=None)
             headers={'Content-Type': 'application/json'},
             method='POST'
         )
-        # CPU inference can be slow — use long timeout
-        timeout = 300  # 5 minutes
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            result = json.loads(resp.read().decode('utf-8'))
-            return result.get('response')
+        # Long initial timeout — on CPU, prompt evaluation can take
+        # several minutes before the first token is emitted.
+        # Once streaming starts, each token arrives within seconds.
+        with urllib.request.urlopen(req, timeout=900) as resp:
+            chunks = []
+            for line in resp:
+                line = line.decode('utf-8').strip()
+                if not line:
+                    continue
+                try:
+                    token_data = json.loads(line)
+                    token = token_data.get('response', '')
+                    if token:
+                        chunks.append(token)
+                    if token_data.get('done'):
+                        break
+                except json.JSONDecodeError:
+                    continue
+            result = ''.join(chunks)
+            if result:
+                logger.info(f'Ollama generated {len(result)} chars')
+            return result if result else None
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
         logger.error(f'Ollama generate failed: {e}')
         return None

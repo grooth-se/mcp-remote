@@ -1,4 +1,5 @@
 import os
+import threading
 from flask import Blueprint, render_template, redirect, url_for, flash, request, send_file, current_app, jsonify
 from flask_login import login_required
 
@@ -7,6 +8,16 @@ from app.models.generation import GenerationJob
 from app.models.project import Project
 
 generate_bp = Blueprint('generate', __name__)
+
+# Background generation state (single-user system)
+_gen_state = {
+    'running': False,
+    'job_id': None,
+    'progress': '',
+    'step': '',
+    'done': False,
+    'error': None,
+}
 
 
 @generate_bp.route('/status/<int:job_id>')
@@ -127,21 +138,87 @@ def extract_requirements(job_id):
 @generate_bp.route('/generate-document/<int:job_id>', methods=['POST'])
 @login_required
 def generate_doc(job_id):
-    """Trigger LLM document generation for a job."""
+    """Trigger LLM document generation in the background."""
     job = db.session.get(GenerationJob, job_id)
     if not job:
         flash('Job not found.', 'danger')
         return redirect(url_for('main.index'))
 
-    from app.services.document_generator import generate_document as run_generation
-    result = run_generation(job_id)
+    if _gen_state['running']:
+        flash('A generation is already running. Please wait for it to finish.', 'warning')
+        return redirect(url_for('generate.generate_progress', job_id=_gen_state['job_id']))
 
-    if result.get('error'):
-        flash(f'Generation failed: {result["error"]}', 'danger')
-    else:
-        flash(f'Document generated successfully ({result["content_length"]} chars, v{result["version"]}).', 'success')
+    # Reset state
+    _gen_state.update({
+        'running': True,
+        'job_id': job_id,
+        'progress': 'Starting document generation...',
+        'step': 'starting',
+        'done': False,
+        'error': None,
+    })
 
-    return redirect(url_for('generate.status', job_id=job.id))
+    app = current_app._get_current_object()
+
+    def _run_generation():
+        with app.app_context():
+            try:
+                from app.services.document_generator import generate_document as run_generation
+                _gen_state['progress'] = 'Gathering reference documents and requirements...'
+                _gen_state['step'] = 'gathering'
+
+                result = run_generation(job_id, progress_callback=_update_gen_progress)
+
+                if result.get('error'):
+                    _gen_state['error'] = result['error']
+                    _gen_state['progress'] = f'Failed: {result["error"]}'
+                else:
+                    _gen_state['progress'] = f'Complete — {result["content_length"]} chars generated'
+            except Exception as e:
+                _gen_state['error'] = str(e)
+                _gen_state['progress'] = f'Error: {e}'
+            finally:
+                _gen_state['running'] = False
+                _gen_state['done'] = True
+
+    thread = threading.Thread(target=_run_generation, daemon=True)
+    thread.start()
+
+    return redirect(url_for('generate.generate_progress', job_id=job_id))
+
+
+def _update_gen_progress(step, message):
+    """Callback for document_generator to report progress."""
+    _gen_state['step'] = step
+    _gen_state['progress'] = message
+
+
+@generate_bp.route('/generate-progress/<int:job_id>')
+@login_required
+def generate_progress(job_id):
+    """Generation progress page with polling."""
+    if not _gen_state['running'] and _gen_state['done']:
+        # Generation finished — redirect to status page
+        job = db.session.get(GenerationJob, job_id)
+        if _gen_state['error']:
+            flash(f'Generation failed: {_gen_state["error"]}', 'danger')
+        else:
+            flash('Document generated successfully.', 'success')
+        _gen_state['done'] = False  # Reset so page doesn't loop
+        return redirect(url_for('generate.status', job_id=job_id))
+    return render_template('generate/generate_progress.html', job_id=job_id)
+
+
+@generate_bp.route('/generate-status/<int:job_id>')
+def generate_status_api(job_id):
+    """JSON endpoint for generation progress polling."""
+    return jsonify({
+        'running': _gen_state['running'],
+        'progress': _gen_state['progress'],
+        'step': _gen_state['step'],
+        'done': _gen_state['done'],
+        'error': _gen_state['error'],
+    })
 
 
 @generate_bp.route('/download/<int:job_id>')

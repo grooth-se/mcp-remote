@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Generating... - MPQP Generator{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <div class="page-header">
+        <h2><i class="bi bi-file-earmark-text me-2"></i>Generating Document</h2>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body text-center py-5">
+            <div class="spinner-border text-primary mb-3" role="status" id="spinner">
+                <span class="visually-hidden">Generating...</span>
+            </div>
+            <h4 id="progress-msg">Starting generation...</h4>
+            <p class="text-muted mt-3" id="progress-detail">
+                LLM document generation on CPU can take several minutes. Please wait...
+            </p>
+            <div class="mt-3" id="step-badges">
+                <span class="badge bg-secondary me-1" id="badge-gathering">Gathering References</span>
+                <span class="badge bg-secondary me-1" id="badge-llm">LLM Generation</span>
+                <span class="badge bg-secondary me-1" id="badge-saving">Saving</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <a href="{{ url_for('generate.status', job_id=job_id) }}" class="btn btn-outline-secondary" id="back-btn" style="display:none;">
+            <i class="bi bi-arrow-left me-1"></i>Back to Job Status
+        </a>
+    </div>
+</div>
+
+<script>
+(function() {
+    const msgEl = document.getElementById('progress-msg');
+    const detailEl = document.getElementById('progress-detail');
+    const spinnerEl = document.getElementById('spinner');
+    const backBtn = document.getElementById('back-btn');
+    const steps = ['gathering', 'llm', 'saving'];
+
+    function updateBadges(currentStep) {
+        const stepOrder = {'gathering': 0, 'llm': 1, 'saving': 2};
+        const current = stepOrder[currentStep] || 0;
+        steps.forEach(function(step, i) {
+            const badge = document.getElementById('badge-' + step);
+            if (!badge) return;
+            if (i < current) {
+                badge.className = 'badge bg-success me-1';
+            } else if (i === current) {
+                badge.className = 'badge bg-primary me-1';
+            } else {
+                badge.className = 'badge bg-secondary me-1';
+            }
+        });
+    }
+
+    let pollCount = 0;
+
+    function poll() {
+        pollCount++;
+        fetch('{{ url_for("generate.generate_status_api", job_id=job_id) }}')
+            .then(r => r.json())
+            .then(data => {
+                msgEl.textContent = data.progress || 'Working...';
+                updateBadges(data.step);
+
+                if (data.done) {
+                    window.location.href = '{{ url_for("generate.generate_progress", job_id=job_id) }}';
+                } else if (data.running || pollCount <= 3) {
+                    setTimeout(poll, 3000);
+                } else {
+                    spinnerEl.classList.add('d-none');
+                    msgEl.textContent = 'Generation may have stopped unexpectedly.';
+                    backBtn.style.display = '';
+                }
+            })
+            .catch(() => {
+                setTimeout(poll, 5000);
+            });
+    }
+
+    setTimeout(poll, 1000);
+})();
+</script>
+{% endblock %}

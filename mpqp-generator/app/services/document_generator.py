@@ -84,11 +84,19 @@ content section by section, using markdown headers (## Section Title) to
 separate sections."""
 
 
-def generate_document(job_id):
+def generate_document(job_id, progress_callback=None):
     """Run the full document generation pipeline for a job.
+
+    Args:
+        job_id: GenerationJob ID
+        progress_callback: Optional callable(step, message) for progress updates
 
     Returns dict with generation result or error.
     """
+    def _progress(step, msg):
+        if progress_callback:
+            progress_callback(step, msg)
+
     job = db.session.get(GenerationJob, job_id)
     if not job:
         return {'error': f'Job {job_id} not found'}
@@ -99,6 +107,7 @@ def generate_document(job_id):
 
     try:
         # Step 1: Gather inputs
+        _progress('gathering', 'Gathering requirements and reference documents...')
         requirements = _format_requirements(job)
         reference_text = _gather_reference_text(job)
         template_structure = _get_template_structure(job)
@@ -108,6 +117,11 @@ def generate_document(job_id):
                    f'{len(reference_text)} chars reference text')
 
         # Step 2: Generate document content via LLM
+        _progress('llm', 'Generating document with LLM (this may take several minutes on CPU)...')
+
+        # Clean and trim reference text to reduce token count for CPU inference
+        clean_ref = _clean_reference_text(reference_text, max_chars=3000)
+
         prompt = FULL_DOC_PROMPT.format(
             doc_type=doc_type,
             project_name=job.new_project_name or 'New Project',
@@ -115,24 +129,25 @@ def generate_document(job_id):
             product_type=job.product_type or 'Unknown',
             requirements=requirements,
             ref_project=_get_ref_project_name(job),
-            reference_text=reference_text[:6000],  # Fit within context window
+            reference_text=clean_ref,
             template_structure=template_structure,
         )
 
-        _log(job, 'Calling LLM for document generation...')
+        _log(job, f'Calling LLM ({len(prompt)} char prompt)...')
         db.session.commit()
 
-        content = generate(prompt, system=GENERATION_SYSTEM, max_tokens=4096)
+        content = generate(prompt, system=GENERATION_SYSTEM, max_tokens=2048)
 
         if not content:
             _log(job, 'ERROR: LLM generation returned empty result')
             job.status = 'failed'
             db.session.commit()
-            return {'error': 'LLM generation failed — is Ollama running?'}
+            return {'error': 'LLM generation failed — is Ollama running? Check that llama3.1:8b model is loaded.'}
 
         _log(job, f'LLM generated {len(content)} characters')
 
         # Step 3: Save generated content
+        _progress('saving', 'Saving generated document...')
         result = _save_generated_content(job, content, doc_type)
 
         job.status = 'completed'
@@ -321,6 +336,44 @@ def _save_generated_content(job, content, doc_type):
         'content_length': len(content),
         'version': job.current_version,
     }
+
+
+def _clean_reference_text(text, max_chars=3000):
+    """Clean extracted PDF text to reduce noise and token count.
+
+    Removes short lines (table fragments, form labels), excessive whitespace,
+    and other PDF extraction artifacts.
+    """
+    if not text:
+        return 'No reference documents available.'
+
+    lines = text.split('\n')
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        # Skip very short lines (table cell fragments, form labels)
+        if len(stripped) < 10:
+            continue
+        # Skip lines that look like form fields or page headers
+        if stripped.startswith('---') and 'Reference:' in stripped:
+            cleaned.append(stripped)
+            continue
+        # Skip lines that are mostly special characters
+        alpha_count = sum(1 for c in stripped if c.isalpha())
+        if alpha_count < len(stripped) * 0.3 and len(stripped) > 5:
+            continue
+        cleaned.append(stripped)
+
+    result = '\n'.join(cleaned)
+    if len(result) > max_chars:
+        # Cut at a sentence boundary near the limit
+        cut_point = result.rfind('.', 0, max_chars)
+        if cut_point > max_chars * 0.5:
+            result = result[:cut_point + 1]
+        else:
+            result = result[:max_chars]
+
+    return result if result.strip() else 'No usable reference text found.'
 
 
 def _log(job, message):

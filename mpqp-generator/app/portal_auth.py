@@ -85,7 +85,7 @@ def init_portal_auth(app):
     def check_portal_auth():
         # Skip auth for health, static, api, and login paths
         path = request.path
-        if path in ('/health', '/login', '/logout') or path.startswith('/static/') or path.startswith('/api/'):
+        if path in ('/health', '/login', '/logout') or path.startswith('/static/') or path.startswith('/api/') or '/generate-status/' in path:
             return None
 
         portal_url = current_app.config.get('PORTAL_URL', 'http://portal:5000')
