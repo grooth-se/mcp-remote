@@ -99,6 +99,57 @@ class TensileAnalyzer:
 
         return stress, strain
 
+    def _find_elastic_modulus_robust(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+    ) -> tuple:
+        """
+        Find the elastic modulus using Theil-Sen robust regression.
+
+        Theil-Sen uses the median of all pairwise slopes, making it
+        highly resistant to outliers and noise in the extensometer data
+        (e.g. settling at test start, micro-yielding at top of range).
+
+        The elastic region is selected by the configured strain range.
+        If few points fall in that range a wider window is attempted.
+
+        Returns (elastic_stress, elastic_strain, slope, intercept, r², std_err).
+        """
+        from scipy.stats import theilslopes
+
+        min_strain, max_strain = self.config.elastic_strain_range
+
+        # Select elastic region
+        mask = (strain >= min_strain) & (strain <= max_strain) & (stress > 0)
+
+        if np.sum(mask) < 10:
+            # Widen the window
+            mask = (strain >= min_strain * 0.5) & (strain <= max_strain * 1.5) & (stress > 0)
+
+        if np.sum(mask) < 5:
+            raise ValueError("Insufficient data points in elastic region")
+
+        elastic_strain = strain[mask]
+        elastic_stress = stress[mask]
+
+        # Theil-Sen robust regression (median of pairwise slopes)
+        slope, intercept, lo_slope, hi_slope = theilslopes(
+            elastic_stress, elastic_strain
+        )
+
+        # Compute R² and std_err for uncertainty reporting
+        predicted = slope * elastic_strain + intercept
+        ss_res = np.sum((elastic_stress - predicted) ** 2)
+        ss_tot = np.sum((elastic_stress - np.mean(elastic_stress)) ** 2)
+        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
+        n = len(elastic_stress)
+        std_err = np.sqrt(ss_res / max(n - 2, 1)) / np.sqrt(
+            np.sum((elastic_strain - np.mean(elastic_strain)) ** 2)
+        ) if n > 2 else 0
+
+        return (elastic_stress, elastic_strain, slope, intercept, r2, std_err)
+
     def calculate_youngs_modulus(
         self,
         stress: np.ndarray,
@@ -109,8 +160,10 @@ class TensileAnalyzer:
         """
         Calculate Young's modulus E from linear portion of stress-strain curve.
 
-        Uses linear regression on the elastic region defined by
-        config.elastic_strain_range.
+        Uses Theil-Sen robust regression on the elastic region.  Theil-Sen
+        computes the median of all pairwise slopes, making it highly
+        resistant to outliers from extensometer settling or micro-yielding
+        at the edges of the elastic window.
 
         Parameters
         ----------
@@ -128,34 +181,29 @@ class TensileAnalyzer:
         MeasuredValue
             Young's modulus with uncertainty in GPa
         """
-        min_strain, max_strain = self.config.elastic_strain_range
+        try:
+            (elastic_stress, elastic_strain,
+             slope, intercept, r2, std_err) = self._find_elastic_modulus_robust(
+                stress, strain)
+        except (ValueError, ImportError):
+            # Fallback to standard linregress on fixed window
+            min_strain, max_strain = self.config.elastic_strain_range
+            mask = (strain >= min_strain) & (strain <= max_strain) & (stress > 0)
+            if np.sum(mask) < 10:
+                mask = (strain >= 0) & (strain <= max_strain * 2) & (stress > 0)
+            if np.sum(mask) < 5:
+                raise ValueError("Insufficient data points in elastic region")
+            elastic_strain = strain[mask]
+            elastic_stress = stress[mask]
+            slope, intercept, r_value, p_value, std_err = stats.linregress(
+                elastic_strain, elastic_stress)
 
-        # Select elastic region
-        mask = (strain >= min_strain) & (strain <= max_strain) & (stress > 0)
-
-        if np.sum(mask) < 10:
-            # Try wider range
-            mask = (strain >= 0) & (strain <= max_strain * 2) & (stress > 0)
-
-        if np.sum(mask) < 5:
-            raise ValueError("Insufficient data points in elastic region")
-
-        elastic_strain = strain[mask]
-        elastic_stress = stress[mask]
-
-        # Linear regression
-        slope, intercept, r_value, p_value, std_err = stats.linregress(
-            elastic_strain, elastic_stress
-        )
-
-        # E in GPa (slope is MPa/strain = MPa, divide by 1000 for GPa)
+        # E in GPa
         E = slope / 1000
 
-        # Uncertainty components:
-        # 1. Regression uncertainty (from fit)
+        # Uncertainty components
         u_regression = std_err / 1000
 
-        # 2. Area contribution
         area_mean = np.mean(elastic_stress)
         if area_mean > 0:
             relative_area_unc = area_uncertainty / (area_mean * gauge_length / 1000)
@@ -163,13 +211,9 @@ class TensileAnalyzer:
         else:
             u_area = 0
 
-        # 3. Extensometer uncertainty
         u_extensometer = E * self.config.extensometer_uncertainty / gauge_length
 
-        # Combined standard uncertainty
         u_combined = np.sqrt(u_regression**2 + u_area**2 + u_extensometer**2)
-
-        # Expanded uncertainty (k=2)
         U = 2 * u_combined
 
         return MeasuredValue(
