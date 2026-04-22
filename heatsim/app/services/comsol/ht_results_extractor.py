@@ -67,6 +67,9 @@ class HeatTreatmentResultsExtractor:
         for phase_name, phase_data in solver_results.get('phases', {}).items():
             results.extend(self._create_cooling_curves(phase_name, phase_data))
             results.extend(self._create_temperature_profiles(phase_name, phase_data))
+            # dT/dt plots for heating, quenching, tempering phases
+            if phase_name in ('heating', 'quenching', 'tempering'):
+                results.extend(self._create_dTdt_results(phase_name, phase_data))
 
         # --- Phase fraction results ---
         summary = solver_results.get('summary', {})
@@ -143,6 +146,60 @@ class HeatTreatmentResultsExtractor:
         s = np.array(all_surface) if all_surface else None
         return t, c, s
 
+    def _build_furnace_temps(self, solver_results: dict) -> list:
+        """Build furnace temperature list for the full_cycle plot overlay."""
+        ht_config = self.simulation.ht_config or {}
+        furnace_temps = []
+        time_offset = 0.0
+
+        for phase_name, phase_data in solver_results.get('phases', {}).items():
+            times = phase_data.get('times', [])
+            if not times:
+                continue
+
+            start_time = time_offset
+            duration = times[-1]
+            end_time = start_time + duration
+
+            temp = None
+            cold_furnace = False
+            furnace_start_temp = None
+            ramp_rate = 0
+
+            if phase_name == 'heating':
+                cfg = ht_config.get('heating', {})
+                temp = cfg.get('target_temperature')
+                cold_furnace = cfg.get('cold_furnace', False)
+                furnace_start_temp = cfg.get('furnace_start_temperature', 25.0)
+                ramp_rate = cfg.get('furnace_ramp_rate', 0)
+            elif phase_name == 'transfer':
+                temp = ht_config.get('transfer', {}).get('ambient_temperature')
+            elif phase_name == 'quenching':
+                temp = ht_config.get('quenching', {}).get('media_temperature')
+            elif phase_name == 'tempering':
+                cfg = ht_config.get('tempering', {})
+                temp = cfg.get('temperature')
+                cold_furnace = cfg.get('cold_furnace', False)
+                furnace_start_temp = cfg.get('furnace_start_temperature', 25.0)
+                ramp_rate = cfg.get('furnace_ramp_rate', 0)
+            elif phase_name == 'cooling':
+                temp = ht_config.get('transfer', {}).get('ambient_temperature', 25.0)
+
+            if temp is not None:
+                furnace_temps.append({
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'temperature': temp,
+                    'phase_name': phase_name,
+                    'cold_furnace': cold_furnace,
+                    'furnace_start_temperature': furnace_start_temp if furnace_start_temp else temp,
+                    'furnace_ramp_rate': ramp_rate,
+                })
+
+            time_offset = end_time
+
+        return furnace_temps
+
     def _create_full_cycle_result(self, solver_results, combined_times, combined_center, combined_surface):
         """Create full_cycle result with plot, matching builtin path output."""
         from app.models.simulation import SimulationResult
@@ -197,7 +254,7 @@ class HeatTreatmentResultsExtractor:
                 if idx_500 > idx_800 > 0:
                     result.t_800_500 = float(combined_times[idx_500] - combined_times[idx_800])
 
-        # Generate plot
+        # Generate plot with furnace temperature overlay
         try:
             from app.services import visualization
 
@@ -207,12 +264,16 @@ class HeatTreatmentResultsExtractor:
             else:
                 temp_2d = combined_center
 
+            # Build furnace/ambient temperature list for overlay
+            furnace_temps = self._build_furnace_temps(solver_results)
+
             result.plot_image = visualization.create_heat_treatment_cycle_plot(
                 combined_times,
                 temp_2d,
                 phase_results=None,
                 title=f'Heat Treatment Cycle - {sim.name}',
                 transformation_temps=trans_temps,
+                furnace_temps=furnace_temps,
             )
         except Exception as e:
             logger.warning("Failed to generate full cycle plot: %s", e)
@@ -371,6 +432,94 @@ class HeatTreatmentResultsExtractor:
         except Exception as e:
             logger.warning("Failed to generate cooling rate plot: %s", e)
             return None
+
+    def _build_phase_temp_2d(self, phase_data: dict) -> Optional[np.ndarray]:
+        """Build 2D temperature array [time, position] from phase probe data.
+
+        Returns array with columns for center, one_third, two_thirds, surface
+        (matching the format expected by visualization plot functions).
+        """
+        center = phase_data.get('center_temps', [])
+        surface = phase_data.get('surface_temps', [])
+        one_third = phase_data.get('one_third_temps', [])
+        two_thirds = phase_data.get('two_thirds_temps', [])
+
+        if not center:
+            return None
+
+        n = len(center)
+        cols = [np.array(center)]
+
+        if one_third and len(one_third) == n:
+            cols.append(np.array(one_third))
+        else:
+            cols.append(np.array(center))
+
+        if two_thirds and len(two_thirds) == n:
+            cols.append(np.array(two_thirds))
+        elif surface and len(surface) == n:
+            # Interpolate between center and surface
+            cols.append(0.5 * (np.array(center) + np.array(surface)))
+        else:
+            cols.append(np.array(center))
+
+        if surface and len(surface) == n:
+            cols.append(np.array(surface))
+        else:
+            cols.append(np.array(center))
+
+        return np.column_stack(cols)
+
+    def _create_dTdt_results(self, phase_name: str, phase_data: dict) -> List['SimulationResult']:
+        """Create dT/dt vs time and dT/dt vs temperature plots for a phase."""
+        from app.models.simulation import SimulationResult
+
+        results = []
+        times = phase_data.get('times', [])
+        if not times or len(times) < 3:
+            return results
+
+        temp_2d = self._build_phase_temp_2d(phase_data)
+        if temp_2d is None:
+            return results
+
+        times_arr = np.array(times)
+        sim = self.simulation
+        phase_label = phase_name.title()
+
+        try:
+            from app.services import visualization
+
+            # dT/dt vs Time
+            dtdt_time = SimulationResult(
+                result_type='dTdt_vs_time',
+                phase=phase_name,
+                location='all',
+            )
+            dtdt_time.plot_image = visualization.create_dTdt_vs_time_plot(
+                times_arr, temp_2d,
+                title=f'dT/dt vs Time ({phase_label}) - {sim.name}',
+                phase_name=phase_name,
+            )
+            results.append(dtdt_time)
+
+            # dT/dt vs Temperature
+            dtdt_temp = SimulationResult(
+                result_type='dTdt_vs_temp',
+                phase=phase_name,
+                location='all',
+            )
+            dtdt_temp.plot_image = visualization.create_dTdt_vs_temperature_plot(
+                times_arr, temp_2d,
+                title=f'dT/dt vs Temperature ({phase_label}) - {sim.name}',
+                phase_name=phase_name,
+            )
+            results.append(dtdt_temp)
+
+        except Exception as e:
+            logger.warning("Failed to generate dT/dt plots for %s: %s", phase_name, e)
+
+        return results
 
     def _create_vtk_results(self, vtk_files: List[str]) -> List['SimulationResult']:
         """Create vtk_snapshot results linking to VTK files on disk."""

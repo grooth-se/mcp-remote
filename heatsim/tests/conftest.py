@@ -4,6 +4,40 @@ import pytest
 
 from app import create_app
 from app.extensions import db as _db
+
+
+# ---------------------------------------------------------------------------
+# Auto-skip @pytest.mark.comsol when real COMSOL is not available
+# ---------------------------------------------------------------------------
+
+def pytest_collection_modifyitems(config, items):
+    """Skip tests marked @pytest.mark.comsol when COMSOL is not installed."""
+    try:
+        import mph  # noqa: F401
+        _comsol_available = True
+    except ImportError:
+        _comsol_available = False
+
+    if _comsol_available:
+        return
+
+    skip_comsol = pytest.mark.skip(reason='COMSOL (mph) not available')
+    for item in items:
+        if 'comsol' in item.keywords:
+            item.add_marker(skip_comsol)
+
+
+@pytest.fixture(scope='session')
+def comsol_client():
+    """Session-scoped real COMSOL client. Only usable in @pytest.mark.comsol tests."""
+    try:
+        from app.services.comsol.client import get_shared_client
+        client = get_shared_client()
+        if not client.is_available:
+            pytest.skip('COMSOL server not reachable')
+        yield client
+    except Exception as e:
+        pytest.skip(f'COMSOL not available: {e}')
 from app.models import (
     User, SteelGrade, Simulation, WeldProject, HeatTreatmentTemplate,
     ROLE_ENGINEER, ROLE_ADMIN,

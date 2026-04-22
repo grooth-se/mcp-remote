@@ -42,7 +42,7 @@ Xvfb :99 -screen 0 1024x768x24 &
 
 echo "=== Starting Gunicorn ==="
 exec gunicorn \
-    --bind 0.0.0.0:5000 \
+    --bind 0.0.0.0:5002 \
     --timeout 300 \
     --workers 1 \
     --threads 4 \

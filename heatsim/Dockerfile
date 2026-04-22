@@ -34,7 +34,7 @@ ENV PYVISTA_OFF_SCREEN=true
 ENV DISPLAY=:99
 
 # Expose port
-EXPOSE 5000
+EXPOSE 5002
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

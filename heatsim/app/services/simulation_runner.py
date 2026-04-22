@@ -52,8 +52,16 @@ def run_heat_treatment(simulation_id: int) -> None:
         solver_type = sim.solver_dict.get('solver_type', 'builtin')
 
         if solver_type == 'comsol':
-            _run_comsol(sim, snapshot)
-            return
+            try:
+                _run_comsol(sim, snapshot)
+                return
+            except Exception as e:
+                logger.warning(
+                    "COMSOL path failed (%s), falling back to builtin solver", e
+                )
+                # Remove partial results from the failed COMSOL attempt
+                SimulationResult.query.filter_by(snapshot_id=snapshot.id).delete()
+                db.session.flush()
 
         # ---------- Built-in 1D FDM path ----------
         _run_builtin(sim, snapshot)
@@ -65,6 +73,95 @@ def run_heat_treatment(simulation_id: int) -> None:
             SnapshotService.finalize_snapshot(snapshot, 'failed', str(e))
         db.session.commit()
         logger.exception("Simulation %d failed: %s", simulation_id, e)
+
+
+def _predict_phases(sim, snapshot, grade, diagram, times, center_temp, t85):
+    """Run phase prediction and store result.
+
+    Returns (tracker, phases) — tracker is set when using PhaseTracker fallback.
+    """
+    from app.services.phase_transformation import PhasePredictor
+
+    tracker = None
+    phases = None
+
+    if not (diagram or (grade and grade.composition)):
+        return tracker, phases
+
+    predictor = PhasePredictor(grade)
+    if predictor.is_available:
+        phases = predictor.predict_phases_scheil(times, center_temp, t85)
+        logger.info("Phase prediction via JMAK/Scheil for %s", grade.designation)
+    elif diagram:
+        tracker = PhaseTracker(diagram)
+        phases = tracker.predict_phases(times, center_temp, t85)
+
+    if phases:
+        phase_result_obj = SimulationResult(
+            simulation_id=sim.id,
+            snapshot_id=snapshot.id,
+            result_type='phase_fraction',
+            phase='full',
+            location='center',
+        )
+        phase_result_obj.set_phase_fractions(phases.to_dict())
+        phase_result_obj.plot_image = visualization.create_phase_fraction_plot(
+            phases.to_dict(),
+            title=f'Predicted Phase Fractions - {sim.name}'
+        )
+        db.session.add(phase_result_obj)
+
+    return tracker, phases
+
+
+def _predict_hardness(sim, snapshot, grade, ht_config, temperatures_2d, times, tracker):
+    """Run hardness prediction and store result."""
+    diagram = grade.phase_diagrams.first() if grade else None
+    if not (diagram and grade and grade.composition):
+        return
+
+    try:
+        hardness_result = predict_hardness_profile(
+            composition=grade.composition,
+            temperatures=temperatures_2d,
+            times=times,
+            phase_tracker=tracker,
+        )
+
+        hardness_sim_result = SimulationResult(
+            simulation_id=sim.id,
+            snapshot_id=snapshot.id,
+            result_type='hardness_prediction',
+            phase='full',
+            location='all',
+        )
+
+        tempering_cfg = ht_config.get('tempering', {})
+        if tempering_cfg.get('enabled') and grade.composition:
+            hp_c = grade.composition.hollomon_jaffe_c or 20.0
+            temp_c = tempering_cfg.get('temperature', 550)
+            hold_min = tempering_cfg.get('hold_time', 60)
+            hp = HardnessPredictor(grade.composition)
+            hjp_val = 0.0
+            for pos_key in POSITION_KEYS:
+                hv_q = hardness_result.hardness_hv.get(pos_key, 0)
+                if hv_q > 0:
+                    hv_t, hjp_val = hp.tempered_hardness(hv_q, temp_c, hold_min, hp_c)
+                    hardness_result.tempered_hardness_hv[pos_key] = round(hv_t, 1)
+                    hrc_t = hp.hv_to_hrc(hv_t)
+                    hardness_result.tempered_hardness_hrc[pos_key] = round(hrc_t, 1) if hrc_t else None
+            hardness_result.hollomon_jaffe_parameter = round(hjp_val, 0)
+            hardness_result.tempering_temperature = temp_c
+            hardness_result.tempering_time = hold_min
+
+        hardness_sim_result.set_data(hardness_result.to_dict())
+        hardness_sim_result.plot_image = visualization.create_hardness_profile_plot(
+            hardness_result,
+            title=f'Predicted Hardness - {sim.name}'
+        )
+        db.session.add(hardness_sim_result)
+    except Exception as e:
+        logger.warning('Hardness prediction failed: %s', e)
 
 
 def _run_comsol(sim: Simulation, snapshot: SimulationSnapshot) -> None:
@@ -104,102 +201,27 @@ def _run_comsol(sim: Simulation, snapshot: SimulationSnapshot) -> None:
         extractor = HeatTreatmentResultsExtractor(sim, snapshot)
         extractor.extract_and_store(solver_results, db_session=db.session)
 
-        # --- Phase prediction (same three-tier as builtin) ---
+        # --- Phase prediction & hardness (shared helpers) ---
         grade = sim.steel_grade
         diagram = grade.phase_diagrams.first() if grade else None
         trans_temps = diagram.temps_dict if diagram else {}
 
-        # Build combined time/center arrays for prediction
         combined_times, combined_center, combined_surface = extractor._combine_phases(solver_results)
-
-        tracker = None
-        phases = None
         t85 = solver_results.get('summary', {}).get('t_800_500')
 
+        tracker = None
         if combined_times is not None and combined_center is not None:
-            if diagram or (grade and grade.composition):
-                from app.services.phase_transformation import PhasePredictor
-                predictor = PhasePredictor(grade)
-                if predictor.is_available:
-                    phases = predictor.predict_phases_scheil(
-                        combined_times, combined_center, t85
-                    )
-                    logger.info("COMSOL: Phase prediction via JMAK/Scheil for %s",
-                                grade.designation)
-                else:
-                    if diagram:
-                        tracker = PhaseTracker(diagram)
-                        phases = tracker.predict_phases(
-                            combined_times, combined_center, t85
-                        )
+            tracker, _ = _predict_phases(
+                sim, snapshot, grade, diagram, combined_times, combined_center, t85
+            )
 
-                if phases:
-                    phase_result_obj = SimulationResult(
-                        simulation_id=sim.id,
-                        snapshot_id=snapshot.id,
-                        result_type='phase_fraction',
-                        phase='full',
-                        location='center',
-                    )
-                    phase_result_obj.set_phase_fractions(phases.to_dict())
-                    phase_result_obj.plot_image = visualization.create_phase_fraction_plot(
-                        phases.to_dict(),
-                        title=f'Predicted Phase Fractions - {sim.name}'
-                    )
-                    db.session.add(phase_result_obj)
+            if combined_surface is not None:
+                temp_2d = np.column_stack([combined_center, combined_surface])
+            else:
+                temp_2d = combined_center.reshape(-1, 1)
 
-            # --- Hardness prediction ---
-            if diagram and grade and grade.composition:
-                try:
-                    # Build 2D temperature array for hardness predictor
-                    if combined_surface is not None:
-                        temp_2d = np.column_stack([combined_center, combined_surface])
-                    else:
-                        temp_2d = combined_center.reshape(-1, 1)
-
-                    hardness_result = predict_hardness_profile(
-                        composition=grade.composition,
-                        temperatures=temp_2d,
-                        times=combined_times,
-                        phase_tracker=tracker,
-                    )
-
-                    hardness_sim_result = SimulationResult(
-                        simulation_id=sim.id,
-                        snapshot_id=snapshot.id,
-                        result_type='hardness_prediction',
-                        phase='full',
-                        location='all',
-                    )
-
-                    # Tempering hardness
-                    ht_config = sim.ht_config or {}
-                    tempering_cfg = ht_config.get('tempering', {})
-                    if tempering_cfg.get('enabled') and grade.composition:
-                        hp_c = grade.composition.hollomon_jaffe_c or 20.0
-                        temp_c = tempering_cfg.get('temperature', 550)
-                        hold_min = tempering_cfg.get('hold_time', 60)
-                        hp = HardnessPredictor(grade.composition)
-                        hjp_val = 0.0
-                        for pos_key in POSITION_KEYS:
-                            hv_q = hardness_result.hardness_hv.get(pos_key, 0)
-                            if hv_q > 0:
-                                hv_t, hjp_val = hp.tempered_hardness(hv_q, temp_c, hold_min, hp_c)
-                                hardness_result.tempered_hardness_hv[pos_key] = round(hv_t, 1)
-                                hrc_t = hp.hv_to_hrc(hv_t)
-                                hardness_result.tempered_hardness_hrc[pos_key] = round(hrc_t, 1) if hrc_t else None
-                        hardness_result.hollomon_jaffe_parameter = round(hjp_val, 0)
-                        hardness_result.tempering_temperature = temp_c
-                        hardness_result.tempering_time = hold_min
-
-                    hardness_sim_result.set_data(hardness_result.to_dict())
-                    hardness_sim_result.plot_image = visualization.create_hardness_profile_plot(
-                        hardness_result,
-                        title=f'Predicted Hardness - {sim.name}'
-                    )
-                    db.session.add(hardness_sim_result)
-                except Exception as e:
-                    logger.warning('COMSOL: Hardness prediction failed: %s', e)
+            ht_config = sim.ht_config or {}
+            _predict_hardness(sim, snapshot, grade, ht_config, temp_2d, combined_times, tracker)
 
             # --- CCT overlay ---
             try:
@@ -227,6 +249,12 @@ def _run_comsol(sim: Simulation, snapshot: SimulationSnapshot) -> None:
                     db.session.add(cct_result)
             except Exception as e:
                 logger.warning('COMSOL: CCT overlay failed: %s', e)
+
+            # --- Absorbed power plots for heating/tempering phases ---
+            try:
+                _add_comsol_absorbed_power(sim, snapshot, solver_results)
+            except Exception as e:
+                logger.warning('COMSOL: Absorbed power plots failed: %s', e)
 
         # Update simulation status
         sim.status = STATUS_COMPLETED
@@ -435,82 +463,11 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     )
     db.session.add(profile_result)
 
-    # Phase transformation prediction (based on quenching cooling)
-    # Use PhasePredictor with three-tier fallback: JMAK Scheil > simplified PhaseTracker
-    tracker = None
-    phases = None
-    if diagram or grade.composition:
-        from app.services.phase_transformation import PhasePredictor
-        predictor = PhasePredictor(grade)
-        if predictor.is_available:
-            # Tier 2: JMAK/Scheil prediction
-            phases = predictor.predict_phases_scheil(result.time, result.center_temp, result.t8_5)
-            logger.info("Phase prediction via JMAK/Scheil for %s", grade.designation)
-        else:
-            # Tier 3: Simplified CCT-based (original PhaseTracker)
-            if diagram:
-                tracker = PhaseTracker(diagram)
-                phases = tracker.predict_phases(result.time, result.center_temp, result.t8_5)
-
-        if phases:
-            phase_result_obj = SimulationResult(
-                simulation_id=sim.id,
-                snapshot_id=snapshot.id,
-                result_type='phase_fraction',
-                phase='full',
-                location='center'
-            )
-            phase_result_obj.set_phase_fractions(phases.to_dict())
-            phase_result_obj.plot_image = visualization.create_phase_fraction_plot(
-                phases.to_dict(),
-                title=f'Predicted Phase Fractions - {sim.name}'
-            )
-            db.session.add(phase_result_obj)
-
-    # Hardness prediction (requires composition and phase diagram)
-    if diagram and grade.composition:
-        try:
-            hardness_result = predict_hardness_profile(
-                composition=grade.composition,
-                temperatures=result.temperature,
-                times=result.time,
-                phase_tracker=tracker
-            )
-
-            hardness_sim_result = SimulationResult(
-                simulation_id=sim.id,
-                snapshot_id=snapshot.id,
-                result_type='hardness_prediction',
-                phase='full',
-                location='all'
-            )
-            # Tempering hardness calculation
-            tempering_cfg = ht_config.get('tempering', {})
-            if tempering_cfg.get('enabled') and grade.composition:
-                hp_c = grade.composition.hollomon_jaffe_c or 20.0
-                temp_c = tempering_cfg.get('temperature', 550)
-                hold_min = tempering_cfg.get('hold_time', 60)
-                predictor = HardnessPredictor(grade.composition)
-                hjp_val = 0.0
-                for pos_key in POSITION_KEYS:
-                    hv_q = hardness_result.hardness_hv.get(pos_key, 0)
-                    if hv_q > 0:
-                        hv_t, hjp_val = predictor.tempered_hardness(hv_q, temp_c, hold_min, hp_c)
-                        hardness_result.tempered_hardness_hv[pos_key] = round(hv_t, 1)
-                        hrc_t = predictor.hv_to_hrc(hv_t)
-                        hardness_result.tempered_hardness_hrc[pos_key] = round(hrc_t, 1) if hrc_t else None
-                hardness_result.hollomon_jaffe_parameter = round(hjp_val, 0)
-                hardness_result.tempering_temperature = temp_c
-                hardness_result.tempering_time = hold_min
-
-            hardness_sim_result.set_data(hardness_result.to_dict())
-            hardness_sim_result.plot_image = visualization.create_hardness_profile_plot(
-                hardness_result,
-                title=f'Predicted Hardness - {sim.name}'
-            )
-            db.session.add(hardness_sim_result)
-        except Exception as e:
-            logger.warning('Hardness prediction failed: %s', e)
+    # Phase prediction & hardness (shared helpers)
+    tracker, _ = _predict_phases(
+        sim, snapshot, grade, diagram, result.time, result.center_temp, result.t8_5
+    )
+    _predict_hardness(sim, snapshot, grade, ht_config, result.temperature, result.time, tracker)
 
     # Cooling rate plot
     rate_result = SimulationResult(
@@ -625,3 +582,83 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     new_results = SimulationResult.query.filter_by(snapshot_id=snapshot.id).all()
     SnapshotService.update_summary(snapshot, new_results)
     db.session.commit()
+
+
+def _add_comsol_absorbed_power(
+    sim: Simulation,
+    snapshot: 'SimulationSnapshot',
+    solver_results: dict
+) -> None:
+    """Add absorbed power plots for COMSOL heating/tempering phases.
+
+    Power = mass * Cp * dT/dt.  Requires geometry and material properties
+    which are not available inside the results extractor.
+    """
+    import numpy as np
+
+    grade = sim.steel_grade
+    if not grade:
+        return
+
+    # Calculate mass from geometry
+    geo_type = sim.geometry_type
+    if geo_type == GEOMETRY_CAD:
+        geo_type = sim.cad_equivalent_type or 'cylinder'
+        geo_params = sim.cad_equivalent_geometry_dict or sim.geometry_dict
+    else:
+        geo_params = sim.geometry_dict
+
+    geometry = create_geometry(geo_type, geo_params)
+
+    rho_prop = grade.get_property('density')
+    density = rho_prop.data_dict.get('value', 7850) if rho_prop else 7850
+    mass = geometry.volume * density
+
+    cp_prop = grade.get_property('specific_heat')
+
+    def get_cp_at_temp(temp):
+        if cp_prop:
+            if cp_prop.property_type == 'constant':
+                return cp_prop.data_dict.get('value', 500.0)
+            elif cp_prop.property_type == 'curve':
+                from app.services.property_evaluator import evaluate_property
+                val = evaluate_property(cp_prop, temperature=temp)
+                return val if val else 500.0
+        return 500.0
+
+    for phase_name, phase_data in solver_results.get('phases', {}).items():
+        if phase_name not in ('heating', 'tempering'):
+            continue
+
+        times = phase_data.get('times', [])
+        center = phase_data.get('center_temps', [])
+        if not times or len(times) < 3 or not center:
+            continue
+
+        times_arr = np.array(times)
+        center_arr = np.array(center)
+        cp_values = np.array([get_cp_at_temp(t) for t in center_arr])
+
+        # Build 2D temperature array (same helper approach as extractor)
+        surface = phase_data.get('surface_temps', [])
+        if surface and len(surface) == len(center):
+            temp_2d = np.column_stack([center_arr, np.array(surface)])
+        else:
+            temp_2d = center_arr
+
+        phase_label = phase_name.title()
+
+        power_result = SimulationResult(
+            simulation_id=sim.id,
+            snapshot_id=snapshot.id,
+            result_type='absorbed_power',
+            phase=phase_name,
+            location='all',
+        )
+        power_result.plot_image = visualization.create_absorbed_power_plot(
+            times_arr, temp_2d,
+            mass=mass, cp_values=cp_values,
+            title=f'Absorbed Power ({phase_label}) - {sim.name}',
+            phase_name=phase_name,
+        )
+        db.session.add(power_result)
