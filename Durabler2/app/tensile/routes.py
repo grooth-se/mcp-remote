@@ -460,6 +460,11 @@ def specimen():
                 # NORMAL MODE: E from extensometer
                 E = analyzer.calculate_youngs_modulus(stress, strain, area_unc, L0)
 
+                # Correct extensometer strain zero (ISO 6892-1 Annex G)
+                # Removes extensometer settling offset so Rp0.2 offset line
+                # intersects the curve at the correct strain
+                strain = analyzer.correct_strain_origin(stress, strain)
+
                 # E_disp - Young's modulus from displacement (using 15-40% Rm range)
                 try:
                     E_disp = analyzer.calculate_youngs_modulus_displacement(

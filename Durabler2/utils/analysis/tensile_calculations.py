@@ -150,6 +150,33 @@ class TensileAnalyzer:
 
         return (elastic_stress, elastic_strain, slope, intercept, r2, std_err)
 
+    def correct_strain_origin(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Correct extensometer strain zero per ISO 6892-1 Annex G.
+
+        Fits the elastic line via Theil-Sen and shifts the strain axis so
+        the elastic line passes through the origin (zero stress at zero
+        strain).  This removes extensometer settling offset.
+
+        Returns corrected strain array (same length as input).
+        """
+        try:
+            (_, _, slope, intercept, _, _) = self._find_elastic_modulus_robust(
+                stress, strain)
+        except (ValueError, ImportError):
+            return strain
+
+        if slope <= 0:
+            return strain
+
+        # Strain offset: where the elastic line crosses zero stress
+        strain_offset = -intercept / slope
+        return strain - strain_offset
+
     def calculate_youngs_modulus(
         self,
         stress: np.ndarray,
