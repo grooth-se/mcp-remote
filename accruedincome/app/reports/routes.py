@@ -7,6 +7,7 @@ import urllib.error
 import pandas as pd
 from flask import render_template, request, current_app, send_file, flash, redirect, url_for
 from . import reports_bp
+from app.extensions import db
 from app.models import FactProjectMonthly, UploadSession
 from .services.excel_export import export_project_report, export_financial_statements, export_management_reports
 from .services.financial_reports import FinancialReportGenerator
@@ -342,6 +343,22 @@ def management_generate():
     except Exception as e:
         flash(f'Error generating reports: {str(e)}', 'error')
         return redirect(url_for('reports.management'))
+
+
+@reports_bp.route('/delete/<closing_date>', methods=['POST'])
+def delete_closing_date(closing_date):
+    """Delete all project data for a given closing date."""
+    count = FactProjectMonthly.query.filter_by(closing_date=closing_date).count()
+    if count == 0:
+        flash(f'No data found for {closing_date}.', 'warning')
+    else:
+        FactProjectMonthly.query.filter_by(closing_date=closing_date).delete()
+        # Also remove any upload sessions tied to this closing date
+        UploadSession.query.filter_by(closing_date=closing_date).delete()
+        db.session.commit()
+        flash(f'Deleted {count} project records for {closing_date}.', 'success')
+
+    return redirect(url_for('reports.index'))
 
 
 @reports_bp.route('/export/<closing_date>')
