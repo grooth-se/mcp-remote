@@ -33,6 +33,11 @@ def launch(app_code):
         flash('You do not have permission to access this application.', 'danger')
         return redirect(url_for('dashboard.index'))
 
+    # Verify app is reachable before redirecting
+    if not check_health(app.internal_url):
+        flash(f'{app.app_name} is currently offline.', 'warning')
+        return redirect(url_for('dashboard.index'))
+
     # Generate a token for the app
     from flask import current_app
     token = generate_token(current_user.id, current_app.config['TOKEN_EXPIRY_HOURS'])
@@ -40,6 +45,10 @@ def launch(app_code):
     log_access(current_user.id, app.id, 'access_app', request.remote_addr,
                details=f'Launched {app.app_name}')
 
-    # Redirect to the app's URL via nginx proxy path with token
-    launch_url = f'/app/{app_code}/?token={token}'
+    # Behind nginx: use /app/<code>/ prefix path
+    # Local dev: redirect directly to the app's internal_url
+    if current_app.config.get('BEHIND_PROXY'):
+        launch_url = f'/app/{app_code}/?token={token}'
+    else:
+        launch_url = f'{app.internal_url}/?token={token}'
     return redirect(launch_url)

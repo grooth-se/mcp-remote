@@ -18,6 +18,7 @@ services:
       - DATABASE_PATH=/data/portal.db
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - BEHIND_PROXY=true
     volumes:
       - portal_data:/data
     restart: unless-stopped
@@ -34,6 +35,7 @@ services:
       - PORTAL_URL=http://portal:5000
       - PORTAL_EXTERNAL_URL=/
       - PORTAL_AUTH_ENABLED=true
+      - MG5_INTEGRATION_URL=http://mg5integration:5004
     volumes:
       - accruedincome_data:/data
       - accruedincome_uploads:/app/app/static/uploads
@@ -110,17 +112,56 @@ services:
       - mg5integration
     restart: unless-stopped
 
-  # --- Uncomment when ready ---
+  mpqpgenerator:
+    build: ../mpqp-generator
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${MPQP_SECRET_KEY:-change-me}
+      - DATABASE_URL=sqlite:////app/data/mpqp.db
+      - APP_CODE=mpqpgenerator
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_EXTERNAL_URL=/
+      - PORTAL_AUTH_ENABLED=true
+      - OLLAMA_HOST=http://172.18.0.1:11434
+      - LLM_MODEL=llama3.1:8b
+      - EMBEDDING_MODEL=nomic-embed-text
+      - HISTORICAL_PATH=/data/historical_projects
+      - GUNICORN_WORKERS=1
+      - GUNICORN_TIMEOUT=300
+    ports:
+      - "5003:5003"
+    volumes:
+      - mpqp_data:/app/data
+      - /mnt/projects:/data/historical_projects:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - portal
+    restart: unless-stopped
 
-  # mpqpgenerator:
-  #   build: ../mpqp-generator
-  #   environment:
-  #     - FLASK_CONFIG=production
-  #     - PORTAL_URL=http://portal:5000
-  #     - PORTAL_AUTH_ENABLED=true
-  #   depends_on:
-  #     - portal
-  #   restart: unless-stopped
+  trb:
+    build: ../trb
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${TRB_SECRET_KEY:-change-me}
+      - DATABASE_URL=sqlite:////data/trb.db
+      - DURABLER2_DATABASE_URL=sqlite:////durabler2_data/durabler.db
+      - DURABLER2_REPORTS_FOLDER=/app/durabler2_reports
+      - APP_CODE=trb
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_EXTERNAL_URL=/
+      - PORTAL_AUTH_ENABLED=true
+    volumes:
+      - trb_data:/data
+      - trb_output:/app/trb_output
+      - durabler2_data:/durabler2_data:ro
+      - durabler2_reports:/app/durabler2_reports:ro
+    depends_on:
+      - portal
+      - durabler2
+    restart: unless-stopped
+
+  # --- Uncomment when ready ---
 
   # heattreattracker:
   #   build: ../heattreattracker
@@ -147,3 +188,6 @@ volumes:
   mg5_data:
   mg5_exports:
   spinventory_data:
+  mpqp_data:
+  trb_data:
+  trb_output:

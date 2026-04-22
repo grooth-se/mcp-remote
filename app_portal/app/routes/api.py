@@ -50,7 +50,7 @@ def validate_token_endpoint():
             if perm:
                 role = perm.role or target_app.default_role
             elif user.is_admin:
-                role = target_app.default_role
+                role = 'admin'
 
     return jsonify({
         'valid': True,

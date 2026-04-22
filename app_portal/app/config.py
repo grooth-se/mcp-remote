@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 basedir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 
@@ -10,11 +11,12 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Session
-    SESSION_LIFETIME_HOURS = int(os.environ.get('SESSION_LIFETIME', 8))
+    SESSION_LIFETIME_HOURS = int(os.environ.get('SESSION_LIFETIME', 24))
     REMEMBER_ME_DAYS = int(os.environ.get('REMEMBER_ME_DAYS', 7))
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=int(os.environ.get('SESSION_LIFETIME', 24)))
 
     # Token
-    TOKEN_EXPIRY_HOURS = int(os.environ.get('TOKEN_EXPIRY', 8))
+    TOKEN_EXPIRY_HOURS = int(os.environ.get('TOKEN_EXPIRY', 24))
 
     # Password
     MIN_PASSWORD_LENGTH = 8
@@ -24,6 +26,10 @@ class Config:
 
     # App health check
     HEALTH_CHECK_TIMEOUT = 3  # seconds
+
+    # Set True when running behind nginx reverse proxy (Docker deployment)
+    # When False (local dev), launch redirects directly to app's internal_url
+    BEHIND_PROXY = os.environ.get('BEHIND_PROXY', 'false').lower() == 'true'
 
 
 class TestingConfig(Config):

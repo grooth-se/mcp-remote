@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
@@ -35,6 +35,7 @@ def login():
         user = authenticate(form.username.data, form.password.data)
         if user:
             login_user(user, remember=form.remember_me.data)
+            session.permanent = True
             log_access(user.id, None, 'login', request.remote_addr)
             next_page = request.args.get('next')
             return redirect(next_page or url_for('dashboard.index'))

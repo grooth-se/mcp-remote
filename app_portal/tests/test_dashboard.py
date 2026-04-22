@@ -34,11 +34,27 @@ def test_dashboard_empty_for_user_without_perms(user_logged_in_client, sample_ap
     assert b'No applications available' in resp.data
 
 
-def test_launch_app_admin(logged_in_client, sample_app):
-    resp = logged_in_client.get(f'/launch/{sample_app.app_code}')
+def test_launch_app_admin_local(logged_in_client, sample_app):
+    """Local dev mode: redirects directly to app's internal_url."""
+    with patch('app.routes.dashboard.check_health', return_value=True):
+        resp = logged_in_client.get(f'/launch/{sample_app.app_code}')
     assert resp.status_code == 302
-    assert '/app/testapp/' in resp.location
-    assert 'token=' in resp.location
+    assert 'http://localhost:9999/?token=' in resp.location
+
+
+def test_launch_app_admin_behind_proxy(app, logged_in_client, sample_app):
+    """Behind proxy: redirects to /app/<code>/ prefix path."""
+    app.config['BEHIND_PROXY'] = True
+    with patch('app.routes.dashboard.check_health', return_value=True):
+        resp = logged_in_client.get(f'/launch/{sample_app.app_code}')
+    assert resp.status_code == 302
+    assert '/app/testapp/?token=' in resp.location
+
+
+def test_launch_app_offline(logged_in_client, sample_app):
+    with patch('app.routes.dashboard.check_health', return_value=False):
+        resp = logged_in_client.get(f'/launch/{sample_app.app_code}', follow_redirects=True)
+    assert b'currently offline' in resp.data
 
 
 def test_launch_app_no_permission(user_logged_in_client, sample_app):
