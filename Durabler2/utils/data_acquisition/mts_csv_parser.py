@@ -168,11 +168,29 @@ def parse_mts_csv(filepath: Path) -> MTSTestData:
     force = df[force_col].values if force_col else np.array([])
     extension = df[ext_col].values if ext_col else np.array([])
 
-    # Apply absolute value - MTS outputs negative values in machine coordinate system
-    # Tensile test: displacement increases, force increases until fracture
-    displacement = np.abs(displacement)
-    force = np.abs(force)
-    extension = np.abs(extension)
+    # MTS may output negative values depending on machine coordinate convention.
+    # Instead of np.abs (which breaks when data crosses zero), detect the
+    # dominant direction and flip the sign if the channel runs negative during
+    # loading.  The strain calculation later uses relative change from the
+    # first data point, so the absolute start value doesn't matter — only
+    # the sign convention (increasing = tension) needs to be correct.
+    if len(force) > 10:
+        # Force should be predominantly positive during a tensile test.
+        # If the median of the upper half is negative, flip the sign.
+        upper = force[len(force)//4:]  # skip preload region
+        if np.median(upper) < 0:
+            force = -force
+
+    if len(displacement) > 10:
+        # Displacement should increase during tension.
+        # If net displacement change is negative, flip the sign.
+        if displacement[-1] - displacement[0] < 0:
+            displacement = -displacement
+
+    if len(extension) > 10:
+        # Extension should increase during tension.
+        if extension[-1] - extension[0] < 0:
+            extension = -extension
 
     return MTSTestData(
         time=time,
