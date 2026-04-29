@@ -3,14 +3,14 @@
 Reports are computed from verification data and can be exported to Excel.
 """
 
-from decimal import Decimal
 from collections import OrderedDict
+from decimal import Decimal
 from io import BytesIO
+
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models.accounting import Account, Verification, VerificationRow, FiscalYear
-from app.models.company import Company
+from app.models.accounting import Account, Verification, VerificationRow
 
 
 def get_profit_and_loss(company_id, fiscal_year_id):
@@ -217,14 +217,14 @@ def export_report_to_excel(report_data, report_type, company_name, fiscal_year):
         BytesIO with Excel file content
     """
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, Border, Side
+    from openpyxl.styles import Border, Font, Side
 
     wb = Workbook()
     ws = wb.active
 
     bold = Font(bold=True)
     header_font = Font(bold=True, size=14)
-    thin_border = Border(bottom=Side(style='thin'))
+    Border(bottom=Side(style='thin'))
 
     if report_type == 'pnl':
         ws.title = 'Resultaträkning'
@@ -295,7 +295,7 @@ def export_report_to_excel(report_data, report_type, company_name, fiscal_year):
         ws.append([f'Huvudbok {fiscal_year.start_date} - {fiscal_year.end_date}'])
         ws.append([])
 
-        for key, data in report_data.items():
+        for _key, data in report_data.items():
             ws.append([f'{data["account_number"]} {data["account_name"]}'])
             ws.cell(row=ws.max_row, column=1).font = bold
             ws.append(['Datum', 'Ver.nr', 'Beskrivning', 'Debet', 'Kredit'])

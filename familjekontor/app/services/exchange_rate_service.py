@@ -1,8 +1,9 @@
 """Exchange rate service — fetch rates from Riksbanken and manage DB cache."""
 
-from datetime import date, timedelta
-from decimal import Decimal, ROUND_HALF_UP
 import logging
+from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
+
 import requests
 
 from app.extensions import db
@@ -53,13 +54,15 @@ def fetch_rate_from_riksbanken(currency_code, rate_date):
 
         # API returns 1 foreign = X SEK (e.g. 1 EUR = 10.65 SEK)
         rate = api_value.quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
-        inverse_rate = (Decimal('1') / api_value).quantize(Decimal('0.000001'), rounding=ROUND_HALF_UP)
+        inverse_rate = (Decimal('1') / api_value).quantize(
+            Decimal('0.000001'), rounding=ROUND_HALF_UP
+        )
 
         return rate, inverse_rate
 
     except requests.RequestException as e:
         logger.warning(f'Riksbanken API error for {currency_code} {date_str}: {e}')
-        raise ValueError(f'Kunde inte hämta kurs från Riksbanken: {e}')
+        raise ValueError(f'Kunde inte hämta kurs från Riksbanken: {e}') from e
 
 
 def get_rate(currency_code, rate_date):
@@ -73,9 +76,7 @@ def get_rate(currency_code, rate_date):
         return Decimal('1.0')
 
     # Check DB cache
-    cached = ExchangeRate.query.filter_by(
-        currency_code=currency_code, rate_date=rate_date
-    ).first()
+    cached = ExchangeRate.query.filter_by(currency_code=currency_code, rate_date=rate_date).first()
     if cached:
         return Decimal(str(cached.rate))
 
@@ -90,9 +91,7 @@ def get_rate(currency_code, rate_date):
     # Fallback: find nearest rate within 7 days
     for delta in range(1, 8):
         for d in [rate_date - timedelta(days=delta), rate_date + timedelta(days=delta)]:
-            cached = ExchangeRate.query.filter_by(
-                currency_code=currency_code, rate_date=d
-            ).first()
+            cached = ExchangeRate.query.filter_by(currency_code=currency_code, rate_date=d).first()
             if cached:
                 return Decimal(str(cached.rate))
 
@@ -104,9 +103,11 @@ def get_latest_rate(currency_code):
     if currency_code == 'SEK':
         return Decimal('1.0')
 
-    cached = ExchangeRate.query.filter_by(
-        currency_code=currency_code
-    ).order_by(ExchangeRate.rate_date.desc()).first()
+    cached = (
+        ExchangeRate.query.filter_by(currency_code=currency_code)
+        .order_by(ExchangeRate.rate_date.desc())
+        .first()
+    )
 
     if cached:
         return Decimal(str(cached.rate))

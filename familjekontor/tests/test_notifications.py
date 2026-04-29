@@ -5,19 +5,21 @@ from decimal import Decimal
 
 import pytest
 
-from app.models.company import Company
-from app.models.user import User
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import Supplier, SupplierInvoice
-from app.models.document import Document
-from app.models.tax import Deadline
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.budget import BudgetLine
+from app.models.company import Company
+from app.models.document import Document
+from app.models.invoice import Supplier, SupplierInvoice
 from app.models.notification import Notification
+from app.models.tax import Deadline
+from app.models.user import User
 from app.services.notification_service import (
-    generate_notifications, get_unread_count, get_recent_notifications,
-    mark_as_read, mark_all_read,
+    generate_notifications,
+    get_recent_notifications,
+    get_unread_count,
+    mark_all_read,
+    mark_as_read,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

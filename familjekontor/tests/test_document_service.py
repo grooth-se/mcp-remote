@@ -1,20 +1,24 @@
 """Tests for document management service (Phase 4D)."""
-import os
 import io
+import os
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
+from app.models.document import Document
 from app.models.invoice import Supplier, SupplierInvoice
 from app.models.user import User
-from app.models.document import Document
 from app.services.document_service import (
-    upload_document, get_documents, attach_to_verification,
-    attach_to_invoice, detach_document, delete_document,
+    attach_to_invoice,
+    attach_to_verification,
+    delete_document,
+    detach_document,
     get_document_file_path,
+    get_documents,
+    upload_document,
 )
 
 

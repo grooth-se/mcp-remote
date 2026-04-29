@@ -1,12 +1,12 @@
 """Global search service (Phase 7A)."""
 
 from flask import url_for
-from sqlalchemy import cast, String
+from sqlalchemy import String, cast
 
 from app.extensions import db
-from app.models.accounting import Verification, Account
-from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice
+from app.models.accounting import Account, Verification
 from app.models.document import Document
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
 from app.models.salary import Employee
 
 

@@ -7,9 +7,9 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 from app.extensions import db
-from app.models.bank import BankAccount, BankTransaction
-from app.models.accounting import Verification, VerificationRow, Account
+from app.models.accounting import Verification
 from app.models.audit import AuditLog
+from app.models.bank import BankAccount, BankTransaction
 
 
 def create_bank_account(company_id, bank_name, account_number, clearing_number=None,
@@ -344,8 +344,8 @@ def get_candidate_verifications(company_id, fiscal_year_id, amount, date_range=7
     """Find potential matching verifications for a transaction."""
     abs_amount = abs(float(amount))
     today = date.today()
-    date_from = today - timedelta(days=date_range)
-    date_to = today + timedelta(days=date_range)
+    today - timedelta(days=date_range)
+    today + timedelta(days=date_range)
 
     candidates = Verification.query.filter(
         Verification.company_id == company_id,

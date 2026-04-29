@@ -176,6 +176,7 @@ def generate_report_pdf(report_type, company_id, fiscal_year_id, **kwargs):
         return None
 
     from flask import render_template
+
     from app.extensions import db
     from app.models.accounting import FiscalYear
     from app.models.company import Company

@@ -5,13 +5,15 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.services.cashflow_service import (
-    get_cash_flow_statement, get_monthly_cash_flow,
-    get_cash_flow_forecast, export_cashflow_to_excel, _classify_counterparts,
+    _classify_counterparts,
+    export_cashflow_to_excel,
+    get_cash_flow_forecast,
+    get_cash_flow_statement,
+    get_monthly_cash_flow,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

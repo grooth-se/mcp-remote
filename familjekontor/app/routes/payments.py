@@ -1,6 +1,8 @@
 from datetime import datetime
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from flask_login import login_required
+
 from app.services.payment_service import get_all_payments
 
 payments_bp = Blueprint('payments', __name__)

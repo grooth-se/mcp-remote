@@ -4,12 +4,16 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.services.consolidation_service import (
-    create_consolidation_group, add_member, remove_member,
-    get_consolidated_pnl, get_consolidated_balance_sheet,
-    create_elimination, export_consolidated_report,
+    add_member,
+    create_consolidation_group,
+    create_elimination,
+    export_consolidated_report,
+    get_consolidated_balance_sheet,
+    get_consolidated_pnl,
+    remove_member,
 )
 
 

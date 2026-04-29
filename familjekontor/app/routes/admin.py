@@ -1,10 +1,12 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
-from flask_login import login_required, current_user
-from app.extensions import db, limiter
-from app.models.user import User
-from app.models.audit import AuditLog
-from app.forms.admin import UserForm
 from functools import wraps
+
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required
+
+from app.extensions import db, limiter
+from app.forms.admin import UserForm
+from app.models.audit import AuditLog
+from app.models.user import User
 
 admin_bp = Blueprint('admin', __name__)
 

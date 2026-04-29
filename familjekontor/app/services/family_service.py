@@ -5,15 +5,12 @@ No database migration — everything is computed on-the-fly.
 """
 
 from datetime import date, timedelta
-from decimal import Decimal
 
-from app.extensions import db
-from app.models.company import Company
 from app.models.accounting import FiscalYear
 from app.models.audit import AuditLog
+from app.models.company import Company
 from app.models.notification import Notification
 from app.models.tax import Deadline
-
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -222,8 +219,8 @@ def get_family_wealth_summary():
     Returns dict with net_worth, allocation percentages,
     total_dividends, and per_company breakdown.
     """
-    from app.services.report_service import get_balance_sheet
     from app.services.dashboard_service import get_kpi_data
+    from app.services.report_service import get_balance_sheet
 
     pairs = _get_companies_with_fy()
     total_equity = 0.0

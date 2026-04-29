@@ -1,6 +1,7 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, jsonify, render_template, request
+
+from app.extensions import csrf, db, limiter, login_manager, migrate
 from config import config
-from app.extensions import db, migrate, login_manager, csrf, limiter
 
 
 def create_app(config_name=None):
@@ -26,42 +27,42 @@ def create_app(config_name=None):
 
     # Import models so Alembic sees them
     from app import models  # noqa: F401
+    from app.routes.accounting import accounting_bp
+    from app.routes.admin import admin_bp
+    from app.routes.ai_assistant import ai_bp
+    from app.routes.annual_report import annual_report_bp
+    from app.routes.arap import arap_bp
+    from app.routes.assets import assets_bp
 
     # Register blueprints
     from app.routes.auth import auth_bp
-    from app.routes.dashboard import dashboard_bp
-    from app.routes.companies import companies_bp
-    from app.routes.accounting import accounting_bp
-    from app.routes.invoices import invoices_bp
-    from app.routes.sie import sie_bp
-    from app.routes.reports import reports_bp
-    from app.routes.admin import admin_bp
-    from app.routes.tax import tax_bp
-    from app.routes.salary import salary_bp
     from app.routes.bank import bank_bp
+    from app.routes.batch import batch_bp
     from app.routes.budget import budget_bp
-    from app.routes.documents import documents_bp
-    from app.routes.consolidation import consolidation_bp
-    from app.routes.payments import payments_bp
-    from app.routes.payment_files import payment_files_bp
+    from app.routes.cashflow import cashflow_bp
     from app.routes.closing import closing_bp
+    from app.routes.companies import companies_bp
+    from app.routes.comparison import comparison_bp
+    from app.routes.consolidation import consolidation_bp
     from app.routes.currency import currency_bp
-    from app.routes.recurring import recurring_bp
-    from app.routes.annual_report import annual_report_bp
-    from app.routes.assets import assets_bp
+    from app.routes.dashboard import dashboard_bp
+    from app.routes.documents import documents_bp
+    from app.routes.family import family_bp
+    from app.routes.favorites import favorites_bp
     from app.routes.governance import governance_bp
     from app.routes.investments import investments_bp
-    from app.routes.ai_assistant import ai_bp
-    from app.routes.ratios import ratios_bp
-    from app.routes.cashflow import cashflow_bp
-    from app.routes.comparison import comparison_bp
-    from app.routes.arap import arap_bp
-    from app.routes.report_center import report_center_bp
+    from app.routes.invoices import invoices_bp
     from app.routes.notifications import notification_bp
-    from app.routes.batch import batch_bp
-    from app.routes.favorites import favorites_bp
-    from app.routes.family import family_bp
+    from app.routes.payment_files import payment_files_bp
+    from app.routes.payments import payments_bp
+    from app.routes.ratios import ratios_bp
     from app.routes.real_estate import realestate_bp
+    from app.routes.recurring import recurring_bp
+    from app.routes.report_center import report_center_bp
+    from app.routes.reports import reports_bp
+    from app.routes.salary import salary_bp
+    from app.routes.sie import sie_bp
+    from app.routes.tax import tax_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -158,6 +159,7 @@ def create_app(config_name=None):
     @app.context_processor
     def inject_active_company():
         from flask import session
+
         from app.models.company import Company
         active_company = None
         companies = []

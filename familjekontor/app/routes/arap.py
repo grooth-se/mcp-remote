@@ -1,13 +1,17 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, session, jsonify, request
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import login_required
 
 from app.extensions import db
 from app.models.accounting import FiscalYear
 from app.models.company import Company
 from app.services.arap_service import (
-    get_ar_aging_by_customer, get_ap_aging_by_supplier,
-    get_dso, get_dpo, get_top_customers, get_top_suppliers,
+    get_ap_aging_by_supplier,
+    get_ar_aging_by_customer,
     get_customer_revenue_breakdown,
+    get_dpo,
+    get_dso,
+    get_top_customers,
+    get_top_suppliers,
 )
 
 arap_bp = Blueprint('arap', __name__)

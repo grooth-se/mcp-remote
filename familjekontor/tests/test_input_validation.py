@@ -3,12 +3,12 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-
 from werkzeug.datastructures import MultiDict
-from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import SupplierInvoice, CustomerInvoice, Supplier, Customer
+
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.bank import BankAccount, BankTransaction
+from app.models.company import Company
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
 from app.models.tax import Deadline
 
 

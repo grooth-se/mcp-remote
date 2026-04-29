@@ -1,8 +1,7 @@
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileRequired, FileAllowed
-from wtforms import StringField, SelectField, DateField, SubmitField
-from wtforms.validators import DataRequired, Optional, Length
-
+from flask_wtf.file import FileAllowed, FileField, FileRequired
+from wtforms import DateField, SelectField, StringField, SubmitField
+from wtforms.validators import DataRequired, Length, Optional
 
 DOCUMENT_TYPE_CHOICES = [
     ('faktura', 'Faktura'),

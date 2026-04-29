@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SelectField, SubmitField
-from wtforms.validators import DataRequired, Email, Optional, Length, ValidationError
+from wtforms import PasswordField, SelectField, StringField, SubmitField
+from wtforms.validators import DataRequired, Email, Length, Optional, ValidationError
 
 
 def strong_password(form, field):

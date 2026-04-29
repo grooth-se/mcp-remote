@@ -1,14 +1,25 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, session, request
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
+from app.forms.asset import AssetDisposalForm, DepreciationRunForm, FixedAssetForm
 from app.models.accounting import FiscalYear
-from app.models.asset import FixedAsset, DepreciationRun, ASSET_CATEGORY_DEFAULTS, ASSET_CATEGORY_LABELS
-from app.forms.asset import FixedAssetForm, DepreciationRunForm, AssetDisposalForm
+from app.models.asset import (
+    ASSET_CATEGORY_DEFAULTS,
+    ASSET_CATEGORY_LABELS,
+    DepreciationRun,
+)
 from app.services.asset_service import (
-    create_asset, update_asset, get_assets, get_asset,
-    get_accumulated_depreciation, calculate_monthly_depreciation,
-    generate_depreciation_run, post_depreciation_run, dispose_asset,
-    get_depreciation_schedule, get_asset_note_data,
+    calculate_monthly_depreciation,
+    create_asset,
+    dispose_asset,
+    generate_depreciation_run,
+    get_accumulated_depreciation,
+    get_asset,
+    get_assets,
+    get_depreciation_schedule,
+    post_depreciation_run,
+    update_asset,
 )
 
 assets_bp = Blueprint('assets', __name__)

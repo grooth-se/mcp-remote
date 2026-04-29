@@ -1,17 +1,20 @@
 """Tests for Phase 10F: Tax Planning Recommendations."""
 
-import pytest
 from datetime import date, datetime
 from decimal import Decimal
 
-from app.models.company import Company
+import pytest
+
 from app.models.accounting import FiscalYear
-from app.models.salary import SalaryRun
+from app.models.company import Company
 from app.models.governance import DividendDecision
+from app.models.salary import SalaryRun
 from app.models.tax import TaxReturn
 from app.services.tax_planning_service import (
-    get_tax_planning_suggestions, get_group_tax_overview,
-    IBB, SALARY_THRESHOLD,
+    IBB,
+    SALARY_THRESHOLD,
+    get_group_tax_overview,
+    get_tax_planning_suggestions,
 )
 
 

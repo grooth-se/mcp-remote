@@ -1,13 +1,31 @@
+from datetime import UTC
 from decimal import Decimal
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, send_file, jsonify
-from flask_login import login_required, current_user
+
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+from flask_login import current_user, login_required
+
 from app.extensions import db, limiter
-from app.models.accounting import FiscalYear, Account
-from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice, InvoiceLineItem
-from app.models.bank import BankAccount
+from app.forms.invoice import (
+    CustomerForm,
+    CustomerInvoiceForm,
+    InvoiceLineItemForm,
+    SupplierForm,
+    SupplierInvoiceForm,
+)
+from app.models.accounting import Account, FiscalYear
 from app.models.audit import AuditLog
-from app.forms.invoice import (SupplierForm, SupplierInvoiceForm, CustomerForm,
-                                CustomerInvoiceForm, InvoiceLineItemForm)
+from app.models.bank import BankAccount
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
 from app.services import document_service
 from app.services.accounting_service import create_verification
 from app.services.invoice_pdf_service import create_customer_invoice_verification
@@ -364,8 +382,8 @@ def pay_supplier_invoice(invoice_id):
     if invoice:
         old_status = invoice.status
         invoice.status = 'paid'
-        from datetime import datetime, timezone
-        invoice.paid_at = datetime.now(timezone.utc)
+        from datetime import datetime
+        invoice.paid_at = datetime.now(UTC)
 
         audit = AuditLog(
             company_id=invoice.company_id, user_id=current_user.id,
@@ -584,8 +602,8 @@ def send_customer_invoice(invoice_id):
         return redirect(url_for('invoices.customer_invoices'))
     if invoice:
         invoice.status = 'sent'
-        from datetime import datetime, timezone
-        invoice.sent_at = datetime.now(timezone.utc)
+        from datetime import datetime
+        invoice.sent_at = datetime.now(UTC)
         db.session.commit()
         flash('Fakturan har markerats som skickad.', 'success')
     return redirect(url_for('invoices.customer_invoices'))
@@ -604,8 +622,8 @@ def mark_customer_invoice_paid(invoice_id):
         return redirect(url_for('invoices.customer_invoices'))
     if invoice:
         invoice.status = 'paid'
-        from datetime import datetime, timezone
-        invoice.paid_at = datetime.now(timezone.utc)
+        from datetime import datetime
+        invoice.paid_at = datetime.now(UTC)
 
         # Auto-create payment verification
         company_id = invoice.company_id
@@ -910,7 +928,7 @@ def customer_vat_suggestion(customer_id):
     if not customer or customer.company_id != company_id:
         return jsonify({'error': 'Kund hittades inte'}), 404
 
-    from app.services.vat_service import get_vat_type_for_customer, get_vat_display_text
+    from app.services.vat_service import get_vat_display_text, get_vat_type_for_customer
     vat_type = get_vat_type_for_customer(customer.country, customer.vat_number)
     display_text = get_vat_display_text(vat_type)
     return jsonify({

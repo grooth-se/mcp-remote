@@ -1,16 +1,23 @@
 """AI Assistant routes — chat interface, query endpoint, admin status."""
 
 from flask import (
-    Blueprint, render_template, redirect, url_for, flash,
-    request, session, jsonify,
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
 )
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
+
 from app.extensions import db
 from app.models.accounting import FiscalYear
 from app.models.company import Company
-from app.utils.ai_client import get_ollama_status, is_ollama_available
 from app.services import ai_service
-from app.services.report_service import get_profit_and_loss, get_balance_sheet
+from app.services.report_service import get_balance_sheet, get_profit_and_loss
+from app.utils.ai_client import get_ollama_status
 
 ai_bp = Blueprint('ai', __name__)
 

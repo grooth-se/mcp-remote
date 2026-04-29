@@ -2,6 +2,7 @@
 
 from datetime import date
 from decimal import Decimal
+
 from app.services.sie_handler import SIEParser, _account_type_from_number
 
 

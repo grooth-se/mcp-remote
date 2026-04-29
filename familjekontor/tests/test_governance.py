@@ -3,20 +3,36 @@ from datetime import date
 from decimal import Decimal
 
 from app.extensions import db
+from app.models.accounting import Account, FiscalYear
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account
 from app.models.governance import (
-    BoardMember, ShareClass, Shareholder, ShareholderHolding,
-    DividendDecision, AGMMinutes, BOARD_ROLE_LABELS,
+    BOARD_ROLE_LABELS,
+    AGMMinutes,
+    BoardMember,
+    DividendDecision,
+    ShareClass,
+    Shareholder,
+    ShareholderHolding,
 )
 from app.services.governance_service import (
-    create_board_member, update_board_member, end_appointment,
-    get_board_members, get_board_for_annual_report,
-    create_share_class, get_share_classes,
-    create_shareholder, get_shareholders,
-    add_holding, get_ownership_summary, get_share_register,
-    create_dividend_decision, pay_dividend, get_dividends,
-    create_agm_minutes, get_agm_history, get_agm,
+    add_holding,
+    create_agm_minutes,
+    create_board_member,
+    create_dividend_decision,
+    create_share_class,
+    create_shareholder,
+    end_appointment,
+    get_agm,
+    get_agm_history,
+    get_board_for_annual_report,
+    get_board_members,
+    get_dividends,
+    get_ownership_summary,
+    get_share_classes,
+    get_share_register,
+    get_shareholders,
+    pay_dividend,
+    update_board_member,
 )
 
 

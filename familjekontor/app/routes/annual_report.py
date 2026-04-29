@@ -1,17 +1,22 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, session, send_file
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, send_file, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
+from app.forms.annual_report import AnnualReportForm
 from app.models.accounting import FiscalYear
 from app.models.annual_report import AnnualReport
-from app.forms.annual_report import AnnualReportForm
 from app.services.annual_report_service import (
-    get_or_create_report, save_report, get_multi_year_overview,
-    get_average_employees, finalize_report, reopen_report,
+    finalize_report,
     generate_annual_report_pdf,
+    get_average_employees,
+    get_multi_year_overview,
+    get_or_create_report,
+    reopen_report,
+    save_report,
 )
-from app.services.report_service import get_profit_and_loss, get_balance_sheet
 from app.services.asset_service import get_asset_note_data
 from app.services.governance_service import get_board_for_annual_report
+from app.services.report_service import get_balance_sheet, get_profit_and_loss
 
 annual_report_bp = Blueprint('annual_report', __name__)
 

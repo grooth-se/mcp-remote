@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -12,9 +13,9 @@ class BudgetLine(db.Model):
     period_month = db.Column(db.Integer, nullable=False)  # 1-12
     amount = db.Column(db.Numeric(15, 2), default=0)
     notes = db.Column(db.String(200), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
-                           onupdate=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC),
+                           onupdate=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='budget_lines')
     fiscal_year = db.relationship('FiscalYear', backref='budget_lines')

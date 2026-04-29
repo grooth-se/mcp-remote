@@ -4,20 +4,21 @@ Auto-populates from accounting data, supports manual tax adjustments,
 calculates taxable income and corporate tax.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from io import BytesIO
+
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models.tax import TaxReturn, TaxReturnAdjustment, TAX_RATES
-from app.models.accounting import Account, Verification, VerificationRow, FiscalYear
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-
+from app.models.tax import TAX_RATES, TaxReturn, TaxReturnAdjustment
 
 # ---------------------------------------------------------------------------
 # P&L extraction helpers
 # ---------------------------------------------------------------------------
+
 
 def _sum_accounts(company_id, fiscal_year_id, prefix_list, sign='debit'):
     """Sum account balances for given account number prefixes.
@@ -27,18 +28,20 @@ def _sum_accounts(company_id, fiscal_year_id, prefix_list, sign='debit'):
     """
     total = Decimal('0')
     for prefix in prefix_list:
-        rows = db.session.query(
-            func.coalesce(func.sum(VerificationRow.debit), 0).label('d'),
-            func.coalesce(func.sum(VerificationRow.credit), 0).label('c'),
-        ).join(
-            Verification, Verification.id == VerificationRow.verification_id
-        ).join(
-            Account, Account.id == VerificationRow.account_id
-        ).filter(
-            Account.company_id == company_id,
-            Verification.fiscal_year_id == fiscal_year_id,
-            Account.account_number.like(f'{prefix}%'),
-        ).first()
+        rows = (
+            db.session.query(
+                func.coalesce(func.sum(VerificationRow.debit), 0).label('d'),
+                func.coalesce(func.sum(VerificationRow.credit), 0).label('c'),
+            )
+            .join(Verification, Verification.id == VerificationRow.verification_id)
+            .join(Account, Account.id == VerificationRow.account_id)
+            .filter(
+                Account.company_id == company_id,
+                Verification.fiscal_year_id == fiscal_year_id,
+                Account.account_number.like(f'{prefix}%'),
+            )
+            .first()
+        )
 
         if rows:
             if sign == 'credit':
@@ -61,7 +64,9 @@ def _extract_pnl_data(company_id, fiscal_year_id):
     external = _sum_accounts(company_id, fiscal_year_id, ['5', '6'], sign='debit')
 
     # Personnel costs (7xxx excl depreciation 78xx) — debit side
-    personnel = _sum_accounts(company_id, fiscal_year_id, ['70', '71', '72', '73', '74', '75', '76', '77'], sign='debit')
+    personnel = _sum_accounts(
+        company_id, fiscal_year_id, ['70', '71', '72', '73', '74', '75', '76', '77'], sign='debit'
+    )
 
     # Depreciation (78xx) — debit side
     depreciation = _sum_accounts(company_id, fiscal_year_id, ['78'], sign='debit')
@@ -70,7 +75,9 @@ def _extract_pnl_data(company_id, fiscal_year_id):
     fin_income = _sum_accounts(company_id, fiscal_year_id, ['80', '81', '82', '83'], sign='credit')
 
     # Financial expenses (84xx-89xx) — debit side
-    fin_expense = _sum_accounts(company_id, fiscal_year_id, ['84', '85', '86', '87', '88', '89'], sign='debit')
+    fin_expense = _sum_accounts(
+        company_id, fiscal_year_id, ['84', '85', '86', '87', '88', '89'], sign='debit'
+    )
 
     operating_expenses = cogs + external + personnel
     net_income = net_revenue - operating_expenses - depreciation + fin_income - fin_expense
@@ -89,6 +96,7 @@ def _extract_pnl_data(company_id, fiscal_year_id):
 # ---------------------------------------------------------------------------
 # CRUD
 # ---------------------------------------------------------------------------
+
 
 def create_tax_return(company_id, fiscal_year_id, created_by=None):
     """Create a new tax return, auto-populated from accounting data."""
@@ -157,9 +165,12 @@ def create_tax_return(company_id, fiscal_year_id, created_by=None):
 
 def _get_previous_deficit(company_id, current_year):
     """Get accumulated deficit from previous year's tax return."""
-    prev = TaxReturn.query.filter_by(company_id=company_id).filter(
-        TaxReturn.tax_year < current_year
-    ).order_by(TaxReturn.tax_year.desc()).first()
+    prev = (
+        TaxReturn.query.filter_by(company_id=company_id)
+        .filter(TaxReturn.tax_year < current_year)
+        .order_by(TaxReturn.tax_year.desc())
+        .first()
+    )
 
     if prev and prev.taxable_income < 0:
         return abs(prev.taxable_income)
@@ -173,9 +184,9 @@ def get_tax_return(return_id):
 
 def get_tax_returns(company_id):
     """List all tax returns for a company."""
-    return TaxReturn.query.filter_by(company_id=company_id).order_by(
-        TaxReturn.tax_year.desc()
-    ).all()
+    return (
+        TaxReturn.query.filter_by(company_id=company_id).order_by(TaxReturn.tax_year.desc()).all()
+    )
 
 
 def refresh_from_accounting(return_id):
@@ -204,9 +215,15 @@ def update_adjustments(return_id, data):
     if not tr or tr.status != 'draft':
         return None
 
-    fields = ['non_deductible_expenses', 'non_taxable_income',
-              'depreciation_tax_diff', 'other_adjustments_add',
-              'other_adjustments_deduct', 'previous_deficit', 'notes']
+    fields = [
+        'non_deductible_expenses',
+        'non_taxable_income',
+        'depreciation_tax_diff',
+        'other_adjustments_add',
+        'other_adjustments_deduct',
+        'previous_deficit',
+        'notes',
+    ]
     for f in fields:
         if f in data and data[f] is not None:
             setattr(tr, f, data[f])
@@ -304,7 +321,7 @@ def submit_tax_return(return_id):
     if not tr or tr.status != 'draft':
         return None
     tr.status = 'submitted'
-    tr.submitted_at = datetime.now(timezone.utc)
+    tr.submitted_at = datetime.now(UTC)
     db.session.commit()
     return tr
 
@@ -323,6 +340,7 @@ def approve_tax_return(return_id):
 # Export
 # ---------------------------------------------------------------------------
 
+
 def export_tax_return_excel(return_id):
     """Export a tax return as formatted Excel."""
     tr = db.session.get(TaxReturn, return_id)
@@ -331,7 +349,7 @@ def export_tax_return_excel(return_id):
 
     try:
         from openpyxl import Workbook
-        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.styles import Font, PatternFill
     except ImportError:
         return None
 
@@ -407,7 +425,13 @@ def export_tax_return_excel(return_id):
     for cell in ws[ws.max_row]:
         cell.fill = green_fill
 
-    ws.append(['Skattemässigt resultat före underskottsavdrag', '', float(tr.taxable_income_before_deficit or 0)])
+    ws.append(
+        [
+            'Skattemässigt resultat före underskottsavdrag',
+            '',
+            float(tr.taxable_income_before_deficit or 0),
+        ]
+    )
     ws.append(['Underskott föregående år', '', float(tr.previous_deficit or 0)])
     ws.append(['Beskattningsbart resultat', '', float(tr.taxable_income or 0)])
     ws.cell(row=ws.max_row, column=1).font = bold

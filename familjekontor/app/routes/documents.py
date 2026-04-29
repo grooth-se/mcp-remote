@@ -1,13 +1,23 @@
 from datetime import date, datetime
-from flask import (Blueprint, render_template, redirect, url_for, flash,
-                   request, session, send_file, jsonify)
-from app.services.csv_export_service import export_csv
-from flask_login import login_required, current_user
+
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+from flask_login import current_user, login_required
+
 from app.extensions import db, limiter
+from app.forms.document import DocumentFilterForm, DocumentUploadForm
 from app.models.document import Document
-from app.models.accounting import Verification
-from app.forms.document import DocumentUploadForm, DocumentFilterForm
 from app.services import document_service
+from app.services.csv_export_service import export_csv
 
 documents_bp = Blueprint('documents', __name__)
 

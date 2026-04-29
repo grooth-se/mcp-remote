@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """CLI script for batch importing SIE files."""
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.services.sie_handler import import_sie, read_sie_file
 from run import app
-from app.extensions import db
-from app.services.sie_handler import read_sie_file, import_sie
 
 
 def main():

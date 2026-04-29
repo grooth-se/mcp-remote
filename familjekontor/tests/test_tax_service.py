@@ -2,24 +2,25 @@
 
 from datetime import date
 from decimal import Decimal
+
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.tax import VATReport, Deadline, TaxPayment
+from app.models.tax import Deadline, TaxPayment, VATReport
 from app.services.tax_service import (
+    calculate_employer_tax_for_period,
     calculate_vat_for_period,
-    get_vat_periods_for_year,
+    complete_deadline,
     create_vat_report,
     finalize_vat_report,
-    seed_deadlines_for_year,
-    get_upcoming_deadlines,
     get_overdue_deadlines,
-    complete_deadline,
-    record_tax_payment,
-    list_tax_payments,
     get_tax_payment_summary,
-    calculate_employer_tax_for_period,
+    get_upcoming_deadlines,
+    get_vat_periods_for_year,
+    list_tax_payments,
+    record_tax_payment,
+    seed_deadlines_for_year,
 )
 
 

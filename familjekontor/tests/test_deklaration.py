@@ -5,14 +5,21 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.models.tax import TaxReturn, TaxReturnAdjustment
 from app.services.deklaration_service import (
-    create_tax_return, get_tax_return, get_tax_returns,
-    update_adjustments, add_adjustment_line, remove_adjustment_line,
-    refresh_from_accounting, submit_tax_return, approve_tax_return,
-    export_tax_return_excel, get_deklaration_summary,
+    add_adjustment_line,
+    approve_tax_return,
+    create_tax_return,
+    export_tax_return_excel,
+    get_deklaration_summary,
+    get_tax_return,
+    get_tax_returns,
+    refresh_from_accounting,
+    remove_adjustment_line,
+    submit_tax_return,
+    update_adjustments,
 )
 
 

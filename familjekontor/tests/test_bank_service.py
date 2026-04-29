@@ -4,15 +4,21 @@ from decimal import Decimal
 
 import pytest
 
-from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.bank import BankAccount, BankTransaction
+from app.models.company import Company
 from app.models.user import User
 from app.services.bank_service import (
-    create_bank_account, parse_bank_csv, import_bank_transactions,
-    auto_match_transactions, manual_match_transaction, unmatch_transaction,
-    ignore_transaction, get_reconciliation_summary, get_unmatched_transactions,
+    auto_match_transactions,
+    create_bank_account,
     get_candidate_verifications,
+    get_reconciliation_summary,
+    get_unmatched_transactions,
+    ignore_transaction,
+    import_bank_transactions,
+    manual_match_transaction,
+    parse_bank_csv,
+    unmatch_transaction,
 )
 
 

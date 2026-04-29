@@ -7,19 +7,21 @@ from io import BytesIO
 import pytest
 
 from app.extensions import db as _db
-from app.models.company import Company
-from app.models.user import User
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice
-from app.models.document import Document
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.audit import AuditLog
+from app.models.company import Company
+from app.models.document import Document
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
+from app.models.user import User
 from app.services.batch_service import (
-    batch_approve_supplier_invoices, batch_delete_verifications,
-    batch_delete_documents, batch_export_verifications,
-    batch_export_supplier_invoices, batch_export_customer_invoices,
+    batch_approve_supplier_invoices,
+    batch_delete_documents,
+    batch_delete_verifications,
+    batch_export_customer_invoices,
     batch_export_documents,
+    batch_export_supplier_invoices,
+    batch_export_verifications,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

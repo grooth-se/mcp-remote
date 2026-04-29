@@ -1,6 +1,7 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, SelectField, DecimalField, DateField, IntegerField, SubmitField
-from wtforms.validators import DataRequired, Optional, Length, NumberRange
+from wtforms import DateField, DecimalField, IntegerField, SelectField, StringField, SubmitField
+from wtforms.validators import DataRequired, Length, NumberRange, Optional
+
 from app.utils.currency import currency_choices
 
 

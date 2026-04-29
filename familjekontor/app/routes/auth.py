@@ -1,11 +1,12 @@
 from urllib.parse import urlparse
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request
-from flask_login import login_user, logout_user, login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required, login_user, logout_user
+
 from app.extensions import db, limiter
-from app.models.user import User
-from app.models.audit import AuditLog
 from app.forms.auth import LoginForm
+from app.models.audit import AuditLog
+from app.models.user import User
 
 auth_bp = Blueprint('auth', __name__)
 

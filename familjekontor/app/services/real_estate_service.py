@@ -3,8 +3,8 @@
 from decimal import Decimal
 
 from app.extensions import db
+from app.models.accounting import Account, Verification, VerificationRow
 from app.models.real_estate import RealEstate
-from app.models.accounting import Account, Verification, VerificationRow, FiscalYear
 
 
 def get_real_estates(company_id, active_only=True):

@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
-from app.extensions import db
+from datetime import UTC, datetime
 
+from app.extensions import db
 
 # K2 category defaults: (asset_account, depreciation_account, expense_account, useful_life_months)
 ASSET_CATEGORY_DEFAULTS = {
@@ -57,7 +57,7 @@ class FixedAsset(db.Model):
     purchase_verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
 
     # Tracking
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
     company = db.relationship('Company', backref='fixed_assets')
@@ -91,7 +91,7 @@ class DepreciationRun(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, posted
     verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
     total_amount = db.Column(db.Numeric(15, 2), default=0)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
     company = db.relationship('Company', backref='depreciation_runs')

@@ -1,22 +1,35 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, session, request
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
+from app.forms.investment import (
+    HoldingAdjustForm,
+    HoldingEditForm,
+    ImportForm,
+    PortfolioForm,
+    PriceUpdateForm,
+    TransactionForm,
+)
 from app.models.accounting import FiscalYear
 from app.models.investment import (
-    InvestmentPortfolio, InvestmentHolding, InvestmentTransaction,
-    INSTRUMENT_TYPE_LABELS, TRANSACTION_TYPE_LABELS,
-)
-from app.forms.investment import (
-    PortfolioForm, TransactionForm, ImportForm, PriceUpdateForm,
-    HoldingEditForm, HoldingAdjustForm,
+    INSTRUMENT_TYPE_LABELS,
+    TRANSACTION_TYPE_LABELS,
 )
 from app.services.investment_service import (
-    create_portfolio, get_portfolios, get_portfolio,
-    get_holding, get_holding_transactions, update_holding_price,
-    update_holding_metadata, adjust_holding, delete_holding,
-    create_transaction, get_portfolio_summary,
-    get_dividend_income_summary, get_interest_income_summary,
-    parse_csv, import_nordnet_transactions,
+    adjust_holding,
+    create_portfolio,
+    create_transaction,
+    delete_holding,
+    get_dividend_income_summary,
+    get_holding,
+    get_holding_transactions,
+    get_interest_income_summary,
+    get_portfolio,
+    get_portfolio_summary,
+    import_nordnet_transactions,
+    parse_csv,
+    update_holding_metadata,
+    update_holding_price,
 )
 
 investments_bp = Blueprint('investments', __name__)

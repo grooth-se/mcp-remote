@@ -1,12 +1,16 @@
 """Tests for accounting service."""
 
-import pytest
 from datetime import date
 from decimal import Decimal
+
+import pytest
+
+from app.models.accounting import Account, FiscalYear, Verification
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification
 from app.services.accounting_service import (
-    create_verification, get_next_verification_number, get_trial_balance,
+    create_verification,
+    get_next_verification_number,
+    get_trial_balance,
 )
 
 

@@ -2,12 +2,13 @@
 
 from datetime import date
 from decimal import Decimal
+
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.tax import VATReport, Deadline, TaxPayment
-from app.services.tax_service import seed_deadlines_for_year, create_vat_report
+from app.models.tax import Deadline, TaxPayment, VATReport
+from app.services.tax_service import create_vat_report, seed_deadlines_for_year
 
 
 @pytest.fixture

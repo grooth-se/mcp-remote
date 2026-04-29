@@ -2,15 +2,16 @@
 
 from datetime import date
 from decimal import Decimal
+
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.services.accounting_service import (
-    create_verification,
-    preview_closing,
     close_fiscal_year,
+    create_verification,
     get_trial_balance,
+    preview_closing,
 )
 
 

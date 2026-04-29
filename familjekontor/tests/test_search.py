@@ -5,14 +5,13 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.user import User
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice
 from app.models.document import Document
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
 from app.models.salary import Employee
+from app.models.user import User
 from app.services.search_service import global_search
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

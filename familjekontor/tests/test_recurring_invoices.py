@@ -5,14 +5,17 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, VerificationRow
 from app.models.invoice import Customer, CustomerInvoice, InvoiceLineItem
 from app.models.recurring_invoice import RecurringInvoiceTemplate, RecurringLineItem
 from app.models.user import User
 from app.services.recurring_invoice_service import (
-    get_due_templates, get_due_count, advance_next_date,
-    generate_invoice_from_template, generate_all_due,
+    advance_next_date,
+    generate_all_due,
+    generate_invoice_from_template,
+    get_due_count,
+    get_due_templates,
 )
 
 

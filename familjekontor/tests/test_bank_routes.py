@@ -4,9 +4,9 @@ from decimal import Decimal
 
 import pytest
 
-from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.bank import BankAccount, BankTransaction
+from app.models.company import Company
 from app.services.bank_service import create_bank_account
 
 

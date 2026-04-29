@@ -1,7 +1,14 @@
 from flask_wtf import FlaskForm
-from wtforms import (StringField, SelectField, DecimalField, TextAreaField,
-                     SubmitField, DateField, IntegerField)
-from wtforms.validators import DataRequired, Optional, Length, NumberRange
+from wtforms import (
+    DateField,
+    DecimalField,
+    IntegerField,
+    SelectField,
+    StringField,
+    SubmitField,
+    TextAreaField,
+)
+from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
 
 class ConsolidationGroupForm(FlaskForm):

@@ -1,14 +1,15 @@
 """Invoice PDF service: line items, totals, PDF generation."""
 
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, timezone
 
 from flask import render_template
+
 from app.extensions import db
-from app.models.invoice import CustomerInvoice, InvoiceLineItem
-from app.models.accounting import FiscalYear, Account
-from app.models.company import Company
+from app.models.accounting import Account
 from app.models.audit import AuditLog
+from app.models.company import Company
+from app.models.invoice import CustomerInvoice, InvoiceLineItem
 from app.services.accounting_service import create_verification
 
 
@@ -165,6 +166,7 @@ def generate_invoice_pdf(invoice_id):
         return html
 
     import os
+
     from flask import current_app
 
     pdf_dir = os.path.join(current_app.static_folder, 'invoices', str(company.id))
@@ -189,6 +191,7 @@ def get_invoice_pdf_path(invoice_id):
         return None
 
     import os
+
     from flask import current_app
     return os.path.join(current_app.static_folder, invoice.pdf_path)
 
@@ -199,7 +202,7 @@ def mark_invoice_sent(invoice_id, user_id):
         return False
 
     invoice.status = 'sent'
-    invoice.sent_at = datetime.now(timezone.utc)
+    invoice.sent_at = datetime.now(UTC)
 
     audit = AuditLog(
         company_id=invoice.company_id, user_id=user_id,

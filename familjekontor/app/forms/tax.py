@@ -1,10 +1,16 @@
 from datetime import date
+
 from flask_wtf import FlaskForm
 from wtforms import (
-    SelectField, IntegerField, DecimalField, StringField,
-    TextAreaField, DateField, SubmitField,
+    DateField,
+    DecimalField,
+    IntegerField,
+    SelectField,
+    StringField,
+    SubmitField,
+    TextAreaField,
 )
-from wtforms.validators import DataRequired, Optional, NumberRange, Length
+from wtforms.validators import DataRequired, NumberRange, Optional
 
 
 class VATGenerateForm(FlaskForm):

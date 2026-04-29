@@ -1,9 +1,12 @@
 """Tests for validation utilities."""
 
 from datetime import date
+
 from app.utils.validators import (
-    validate_org_number, validate_verification_balance,
-    validate_date_in_fiscal_year, format_org_number,
+    format_org_number,
+    validate_date_in_fiscal_year,
+    validate_org_number,
+    validate_verification_balance,
 )
 
 

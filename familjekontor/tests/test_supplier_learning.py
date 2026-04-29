@@ -1,12 +1,16 @@
 """Tests for Phase 10A: Supplier Learning / Account Mapping."""
 
 import pytest
-from app.models.invoice import Supplier, SupplierInvoice
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
+
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
+from app.models.invoice import Supplier, SupplierInvoice
 from app.services.ai_service import (
-    suggest_account, record_supplier_mapping, get_supplier_mappings,
-    delete_supplier_mapping, _check_supplier_mappings,
+    _check_supplier_mappings,
+    delete_supplier_mapping,
+    get_supplier_mappings,
+    record_supplier_mapping,
+    suggest_account,
 )
 
 
@@ -221,7 +225,7 @@ class TestSupplierMappingsRoute:
 
         resp = logged_in_client.get(f'/invoices/suppliers/{supplier.id}/mappings')
         assert resp.status_code == 200
-        assert 'Inga mappningar'.encode() in resp.data
+        assert b'Inga mappningar' in resp.data
 
     def test_delete_mapping_route(self, logged_in_client, db):
         company = Company(name='Route AB', org_number='556222-2222', company_type='AB')
@@ -261,4 +265,4 @@ class TestSupplierMappingsRoute:
             follow_redirects=True,
         )
         assert resp.status_code == 200
-        assert 'hittades inte'.encode() in resp.data
+        assert b'hittades inte' in resp.data

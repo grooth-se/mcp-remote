@@ -4,16 +4,19 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear
 from app.models.invoice import Customer, CustomerInvoice, InvoiceLineItem
 from app.models.user import User
-from app.models.accounting import Account, Verification, VerificationRow
 from app.services.invoice_pdf_service import (
-    add_line_item, update_line_item, remove_line_item,
-    recalculate_invoice_totals, generate_next_invoice_number,
-    generate_invoice_pdf, mark_invoice_sent,
+    add_line_item,
     create_customer_invoice_verification,
+    generate_invoice_pdf,
+    generate_next_invoice_number,
+    mark_invoice_sent,
+    recalculate_invoice_totals,
+    remove_line_item,
+    update_line_item,
 )
 
 

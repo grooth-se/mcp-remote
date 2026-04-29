@@ -4,13 +4,11 @@ natural language queries, and annual report text generation.
 All functions degrade gracefully when Ollama is unavailable.
 """
 
-import re
 import logging
-from decimal import Decimal
+import re
 
-from flask import current_app
 from app.extensions import db
-from app.utils.ai_client import generate_text, generate_structured, is_ollama_available
+from app.utils.ai_client import generate_structured, generate_text, is_ollama_available
 
 logger = logging.getLogger(__name__)
 

@@ -1,22 +1,29 @@
 import os
-import mimetypes
 from datetime import date, datetime
+
 from flask import (
-    Blueprint, render_template, redirect, url_for, flash,
-    request, session, current_app, send_file,
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    send_file,
+    session,
+    url_for,
 )
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
+
 from app.extensions import db
-from app.models.company import Company
-from app.models.accounting import FiscalYear, Account
-from app.models.document import Document
-from app.forms.company import CompanyForm, FiscalYearForm, CertificateUploadForm
-from app.services.company_service import create_company
-from app.services import document_service as doc_svc
-from app.utils.validators import validate_org_number
-from app.utils.security import safe_path
+from app.forms.company import CertificateUploadForm, CompanyForm, FiscalYearForm
+from app.models.accounting import FiscalYear
 from app.models.audit import AuditLog
+from app.models.company import Company
+from app.models.document import Document
+from app.services import document_service as doc_svc
+from app.services.company_service import create_company
+from app.utils.security import safe_path
+from app.utils.validators import validate_org_number
 
 companies_bp = Blueprint('companies', __name__)
 

@@ -1,6 +1,7 @@
 """Cost center model for tracking expenses/revenue by department or project."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -15,7 +16,7 @@ class CostCenter(db.Model):
     code = db.Column(db.String(20), nullable=False)
     name = db.Column(db.String(200), nullable=False)
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='cost_centers')
 

@@ -5,14 +5,14 @@ and detailed account-level transaction views.
 """
 
 from collections import OrderedDict
-from decimal import Decimal
 
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models.accounting import Account, Verification, VerificationRow, FiscalYear
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.services.report_service import (
-    get_profit_and_loss, get_balance_sheet, _get_account_balances,
+    get_balance_sheet,
+    get_profit_and_loss,
 )
 
 

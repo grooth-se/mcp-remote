@@ -1,0 +1,42 @@
+# Tooling config for the familjekontor project.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+# Quiet output by default; pass -v on the command line for verbose runs.
+addopts = "-q"
+# Suppress noisy warnings from Flask/SQLAlchemy in tests.
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    "migrations/versions",  # Alembic-generated; not worth linting
+    "instance",
+    "data",
+]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E501",  # line length is enforced by the formatter
+    "E402",  # module-level imports not at top — Flask blueprints need this
+    "E712",  # `Column == True` is the SQLAlchemy filter idiom, not a Python truthy check
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test idioms: unused fixtures (F401), assertion patterns (B011, B017),
+# unused locals from setup helpers with side effects (F841), loop var conventions (B007),
+# legacy `l` variable name (E741).
+"tests/*" = ["F401", "E501", "F841", "B007", "B011", "B017", "E741"]
+# Model package re-exports the public API; unused-import flags are noise here.
+"app/models/__init__.py" = ["F401"]
+# App factory imports blueprints late on purpose; tolerate F401 for any noqa misses.
+"app/__init__.py" = ["F401"]

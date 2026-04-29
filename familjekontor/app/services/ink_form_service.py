@@ -9,14 +9,13 @@ from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
 
-from flask import render_template, current_app
+from flask import render_template
 
 from app.extensions import db
-from app.models.tax import TaxReturn
 from app.models.accounting import FiscalYear
 from app.models.company import Company
+from app.models.tax import TaxReturn
 from app.services.deklaration_service import _sum_accounts
-
 
 # ---------------------------------------------------------------------------
 # INK2R Balansräkning (Balance Sheet) field definitions
@@ -572,7 +571,7 @@ def generate_sru_file(return_id):
     def _emit_fields(blankett, fields_dict):
         """Emit #FLT lines for all fields with SRU codes and values."""
         lines.append(f'#BLANKETT {blankett}')
-        for key, field in fields_dict.items():
+        for _key, field in fields_dict.items():
             sru = field.get('sru_code')
             val = field.get('value')
             if sru and val is not None:

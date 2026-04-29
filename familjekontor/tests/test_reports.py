@@ -1,11 +1,13 @@
 """Tests for report service."""
 
-import pytest
 from datetime import date
+
+import pytest
+
+from app.models.accounting import Account, FiscalYear
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account
 from app.services.accounting_service import create_verification
-from app.services.report_service import get_profit_and_loss, get_balance_sheet, get_general_ledger
+from app.services.report_service import get_balance_sheet, get_general_ledger, get_profit_and_loss
 
 
 @pytest.fixture

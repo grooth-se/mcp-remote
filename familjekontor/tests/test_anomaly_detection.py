@@ -1,19 +1,20 @@
 """Tests for Phase 10E: Anomaly Detection."""
 
-import pytest
 from datetime import date, datetime
 from decimal import Decimal
 
+import pytest
+
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.models.invoice import Supplier, SupplierInvoice
 from app.services.anomaly_service import (
-    detect_anomalies,
     detect_amount_outliers,
+    detect_anomalies,
     detect_duplicate_payments,
-    detect_weekend_bookings,
-    detect_round_number_bias,
     detect_missing_sequences,
+    detect_round_number_bias,
+    detect_weekend_bookings,
 )
 
 

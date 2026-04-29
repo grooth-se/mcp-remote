@@ -1,9 +1,10 @@
 """Tests for database models."""
 
 from datetime import date
-from app.models.user import User
+
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
+from app.models.user import User
 
 
 def test_user_password(db):

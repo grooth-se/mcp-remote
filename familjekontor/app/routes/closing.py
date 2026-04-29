@@ -1,8 +1,9 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, session
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
 from app.models.accounting import FiscalYear
-from app.services.accounting_service import preview_closing, close_fiscal_year
+from app.services.accounting_service import close_fiscal_year, preview_closing
 
 closing_bp = Blueprint('closing', __name__)
 

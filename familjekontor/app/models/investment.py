@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
-from app.extensions import db
+from datetime import UTC, datetime
 
+from app.extensions import db
 
 PORTFOLIO_TYPE_LABELS = {
     'aktiedepå': 'Aktiedepå',
@@ -46,7 +46,7 @@ class InvestmentPortfolio(db.Model):
     currency = db.Column(db.String(3), default='SEK')
     ledger_account = db.Column(db.String(10), nullable=True)
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='investment_portfolios')
     holdings = db.relationship('InvestmentHolding', backref='portfolio',
@@ -81,7 +81,7 @@ class InvestmentHolding(db.Model):
     unrealized_gain = db.Column(db.Numeric(15, 2), nullable=True)
     last_price_date = db.Column(db.Date, nullable=True)
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     # Extended fields for direct investments, loans, bonds
     org_number = db.Column(db.String(15), nullable=True)
@@ -126,7 +126,7 @@ class InvestmentTransaction(db.Model):
     verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
     import_batch = db.Column(db.String(50), nullable=True)
     note = db.Column(db.String(500), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='investment_transactions')
     verification = db.relationship('Verification')

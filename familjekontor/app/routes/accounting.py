@@ -1,14 +1,15 @@
-from datetime import date
 from decimal import Decimal
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, jsonify, send_file
-from flask_login import login_required, current_user
-from app.extensions import db
+
+from flask import Blueprint, flash, redirect, render_template, request, send_file, session, url_for
+from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.audit import AuditLog
+
+from app.extensions import db
 from app.forms.accounting import VerificationForm
-from app.services.accounting_service import create_verification, get_trial_balance
+from app.models.accounting import Account, FiscalYear, Verification
+from app.models.audit import AuditLog
 from app.services import document_service
+from app.services.accounting_service import create_verification, get_trial_balance
 
 accounting_bp = Blueprint('accounting', __name__)
 

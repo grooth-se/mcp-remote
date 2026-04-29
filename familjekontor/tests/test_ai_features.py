@@ -2,22 +2,28 @@
 
 from datetime import date
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.utils.ai_client import (
-    is_ollama_available, get_available_models,
-    generate_text, generate_structured, get_ollama_status,
-)
 from app.services.ai_service import (
-    analyze_invoice_text, suggest_account, batch_categorize,
-    interpret_financial_query, generate_verksamhetsbeskrivning,
-    generate_vasentliga_handelser, _regex_invoice_fallback,
+    _regex_invoice_fallback,
+    analyze_invoice_text,
+    batch_categorize,
+    generate_vasentliga_handelser,
+    generate_verksamhetsbeskrivning,
+    interpret_financial_query,
+    suggest_account,
 )
-
+from app.utils.ai_client import (
+    generate_structured,
+    generate_text,
+    get_available_models,
+    get_ollama_status,
+    is_ollama_available,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures

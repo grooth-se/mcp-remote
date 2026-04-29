@@ -1,29 +1,48 @@
 from datetime import date
 from io import BytesIO
+
 from flask import (
-    Blueprint, render_template, redirect, url_for, flash,
-    request, session, send_file,
+    Blueprint,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
 )
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
+
 from app.extensions import db
-from app.models.tax import VATReport, Deadline, TaxPayment, TaxReturn
+from app.forms.deklaration import (
+    AdjustmentLineForm,
+    TaxReturnAdjustmentsForm,
+    TaxReturnCreateForm,
+)
+from app.forms.tax import (
+    DeadlineForm,
+    DeadlineSeedForm,
+    TaxPaymentForm,
+    VATFinalizeForm,
+    VATGenerateForm,
+)
 from app.models.accounting import FiscalYear
 from app.models.company import Company
-from app.forms.tax import (
-    VATGenerateForm, VATFinalizeForm, DeadlineForm,
-    DeadlineSeedForm, TaxPaymentForm,
-)
-from app.forms.deklaration import (
-    TaxReturnCreateForm, TaxReturnAdjustmentsForm, AdjustmentLineForm,
-)
+from app.models.tax import Deadline, TaxPayment, TaxReturn, VATReport
+from app.services import deklaration_service, ink_form_service
 from app.services.tax_service import (
-    get_vat_periods_for_year, create_vat_report, finalize_vat_report,
-    seed_deadlines_for_year, get_upcoming_deadlines, get_overdue_deadlines,
-    complete_deadline, record_tax_payment, list_tax_payments,
-    get_tax_payment_summary, calculate_employer_tax_for_period,
+    calculate_employer_tax_for_period,
+    complete_deadline,
+    create_vat_report,
+    finalize_vat_report,
+    get_overdue_deadlines,
+    get_tax_payment_summary,
+    get_upcoming_deadlines,
+    get_vat_periods_for_year,
+    list_tax_payments,
+    record_tax_payment,
+    seed_deadlines_for_year,
 )
-from app.services import deklaration_service
-from app.services import ink_form_service
 
 tax_bp = Blueprint('tax', __name__)
 

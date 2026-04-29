@@ -2,15 +2,19 @@
 
 import pytest
 
-from app.models.user import User
 from app.models.company import Company
 from app.models.favorite import UserFavorite
+from app.models.user import User
 from app.services.favorite_service import (
-    get_user_favorites, add_favorite, remove_favorite,
-    toggle_favorite, reorder_favorites, update_favorite,
-    seed_default_favorites, MAX_FAVORITES,
+    MAX_FAVORITES,
+    add_favorite,
+    get_user_favorites,
+    remove_favorite,
+    reorder_favorites,
+    seed_default_favorites,
+    toggle_favorite,
+    update_favorite,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

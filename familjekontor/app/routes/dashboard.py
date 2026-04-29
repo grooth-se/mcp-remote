@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, session, redirect, url_for, jsonify, request, flash
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import limiter
-from app.services.company_service import get_company_summary
 from app.models.accounting import Verification
 from app.models.audit import AuditLog
+from app.services.company_service import get_company_summary
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -26,7 +27,7 @@ def index():
     anomaly_count = 0
 
     # Seed default favorites on first visit
-    from app.services.favorite_service import seed_default_favorites, get_user_favorites
+    from app.services.favorite_service import get_user_favorites, seed_default_favorites
     seed_default_favorites(current_user.id)
     user_favorites = get_user_favorites(current_user.id)
 
@@ -45,8 +46,10 @@ def index():
             ).order_by(Verification.verification_date.desc()).limit(10).all()
 
             from app.services.dashboard_service import (
-                get_kpi_data, get_invoice_aging, get_salary_overview,
                 get_fiscal_year_progress,
+                get_invoice_aging,
+                get_kpi_data,
+                get_salary_overview,
             )
             kpi_data = get_kpi_data(company_id, fy.id)
             aging_data = get_invoice_aging(company_id)
@@ -67,7 +70,7 @@ def index():
             company_id=company_id
         ).order_by(AuditLog.timestamp.desc()).limit(10).all()
 
-        from app.services.tax_service import get_upcoming_deadlines, get_overdue_deadlines
+        from app.services.tax_service import get_overdue_deadlines, get_upcoming_deadlines
         upcoming_deadlines = get_upcoming_deadlines(company_id, days_ahead=30)
         overdue_deadlines = get_overdue_deadlines(company_id)
     else:

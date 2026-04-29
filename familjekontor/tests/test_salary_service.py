@@ -2,23 +2,24 @@
 
 from datetime import date
 from decimal import Decimal
+
 import pytest
 
+from app.models.accounting import Account, FiscalYear
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account
-from app.models.salary import Employee, SalaryRun, SalaryEntry
+from app.models.salary import Employee, SalaryEntry, SalaryRun
 from app.services.salary_service import (
-    calculate_tax_deduction,
+    approve_salary_run,
     calculate_employer_contributions,
     calculate_pension,
+    calculate_tax_deduction,
     create_salary_run,
-    recalculate_salary_entry,
-    recalculate_all_entries,
-    approve_salary_run,
-    mark_salary_run_paid,
-    generate_salary_slip,
     generate_agi_data,
     generate_collectum_data,
+    generate_salary_slip,
+    mark_salary_run_paid,
+    recalculate_all_entries,
+    recalculate_salary_entry,
 )
 
 

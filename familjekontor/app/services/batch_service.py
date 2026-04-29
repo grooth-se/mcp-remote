@@ -1,12 +1,11 @@
 """Batch operations service (Phase 7C)."""
 
-from flask_login import current_user
 
 from app.extensions import db
 from app.models.accounting import Verification, VerificationRow
-from app.models.invoice import SupplierInvoice, CustomerInvoice
-from app.models.document import Document
 from app.models.audit import AuditLog
+from app.models.document import Document
+from app.models.invoice import CustomerInvoice, SupplierInvoice
 from app.services.csv_export_service import export_csv
 
 
@@ -28,7 +27,7 @@ def batch_approve_supplier_invoices(ids, company_id, user_id):
         db.session.add(AuditLog(
             user_id=user_id, company_id=company_id,
             entity_type='supplier_invoice', entity_id=inv.id,
-            action='approve', new_values=f'Batch-godkänd',
+            action='approve', new_values='Batch-godkänd',
         ))
         approved += 1
     db.session.commit()

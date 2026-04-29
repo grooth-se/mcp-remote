@@ -4,12 +4,12 @@ Computes KPIs from P&L and Balance Sheet data, with traffic-light benchmarks
 and multi-year trend support.
 """
 
-from app.extensions import db
 from app.models.accounting import FiscalYear
 from app.services.report_service import (
-    get_profit_and_loss, get_balance_sheet, _get_account_balances,
+    _get_account_balances,
+    get_balance_sheet,
+    get_profit_and_loss,
 )
-
 
 # Swedish SME benchmarks (low = warning threshold, high = good threshold)
 BENCHMARKS = {
@@ -42,7 +42,7 @@ def get_financial_ratios(company_id, fiscal_year_id):
     bs = get_balance_sheet(company_id, fiscal_year_id)
 
     revenue = pnl['sections']['Nettoomsättning']['total']
-    cogs = pnl['sections']['Kostnad sålda varor']['total']
+    pnl['sections']['Kostnad sålda varor']['total']
     gross_profit = pnl['gross_profit']
     operating_result = pnl['operating_result']
     result_before_tax = pnl['result_before_tax']
@@ -102,19 +102,25 @@ def get_financial_ratios(company_id, fiscal_year_id):
 
     liquidity = {
         'current_ratio': {
-            'value': round(_safe_div(current_assets, st_liabilities), 2) if _safe_div(current_assets, st_liabilities) is not None else None,
+            'value': round(_safe_div(current_assets, st_liabilities), 2)
+            if _safe_div(current_assets, st_liabilities) is not None
+            else None,
             'label': 'Balanslikviditet',
             'format': 'ratio',
             'description': 'Omsättningstillgångar / Kortfristiga skulder',
         },
         'quick_ratio': {
-            'value': round(_safe_div(current_assets - inventory, st_liabilities), 2) if _safe_div(current_assets - inventory, st_liabilities) is not None else None,
+            'value': round(_safe_div(current_assets - inventory, st_liabilities), 2)
+            if _safe_div(current_assets - inventory, st_liabilities) is not None
+            else None,
             'label': 'Kassalikviditet',
             'format': 'ratio',
             'description': '(Omsättningstillgångar - Varulager) / Kortfristiga skulder',
         },
         'cash_ratio': {
-            'value': round(_safe_div(cash, st_liabilities), 2) if _safe_div(cash, st_liabilities) is not None else None,
+            'value': round(_safe_div(cash, st_liabilities), 2)
+            if _safe_div(cash, st_liabilities) is not None
+            else None,
             'label': 'Kassagrad',
             'format': 'ratio',
             'description': 'Likvida medel / Kortfristiga skulder',
@@ -129,7 +135,9 @@ def get_financial_ratios(company_id, fiscal_year_id):
 
     solvency = {
         'debt_to_equity': {
-            'value': round(_safe_div(total_debt, equity), 2) if _safe_div(total_debt, equity) is not None else None,
+            'value': round(_safe_div(total_debt, equity), 2)
+            if _safe_div(total_debt, equity) is not None
+            else None,
             'label': 'Skuldsättningsgrad',
             'format': 'ratio',
             'description': 'Totala skulder / Eget kapital',
@@ -141,7 +149,9 @@ def get_financial_ratios(company_id, fiscal_year_id):
             'description': 'Eget kapital / Totala tillgångar',
         },
         'interest_coverage': {
-            'value': round(_safe_div(operating_result, fin_costs), 1) if _safe_div(operating_result, fin_costs) is not None else None,
+            'value': round(_safe_div(operating_result, fin_costs), 1)
+            if _safe_div(operating_result, fin_costs) is not None
+            else None,
             'label': 'Räntetäckningsgrad',
             'format': 'ratio',
             'description': 'Rörelseresultat / Finansiella kostnader',
@@ -150,7 +160,9 @@ def get_financial_ratios(company_id, fiscal_year_id):
 
     efficiency = {
         'asset_turnover': {
-            'value': round(_safe_div(float(revenue), total_assets), 2) if _safe_div(float(revenue), total_assets) is not None else None,
+            'value': round(_safe_div(float(revenue), total_assets), 2)
+            if _safe_div(float(revenue), total_assets) is not None
+            else None,
             'label': 'Kapitalets omsättningshastighet',
             'format': 'ratio',
             'description': 'Nettoomsättning / Totala tillgångar',
@@ -170,11 +182,12 @@ def get_multi_year_ratios(company_id, num_years=5):
 
     Returns: {years: [int], ratios: {name: [value|None]}}
     """
-    fiscal_years = (FiscalYear.query
-                    .filter_by(company_id=company_id)
-                    .order_by(FiscalYear.year.asc())
-                    .limit(num_years)
-                    .all())
+    fiscal_years = (
+        FiscalYear.query.filter_by(company_id=company_id)
+        .order_by(FiscalYear.year.asc())
+        .limit(num_years)
+        .all()
+    )
 
     years = []
     all_ratios = {}
@@ -192,7 +205,7 @@ def get_multi_year_ratios(company_id, num_years=5):
         ('efficiency', 'asset_turnover'),
     ]
 
-    for section, key in ratio_keys:
+    for _section, key in ratio_keys:
         all_ratios[key] = []
 
     for fy in fiscal_years:
@@ -238,14 +251,16 @@ def get_ratio_summary(company_id, fiscal_year_id):
                 else:
                     status = 'danger'
 
-            summary.append({
-                'name': key,
-                'label': ratio['label'],
-                'value': value,
-                'format': ratio['format'],
-                'description': ratio['description'],
-                'status': status,
-                'section': section_name,
-            })
+            summary.append(
+                {
+                    'name': key,
+                    'label': ratio['label'],
+                    'value': value,
+                    'format': ratio['format'],
+                    'description': ratio['description'],
+                    'status': status,
+                    'section': section_name,
+                }
+            )
 
     return summary

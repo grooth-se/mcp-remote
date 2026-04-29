@@ -1,11 +1,12 @@
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileAllowed
-from wtforms import (StringField, SelectField, DateField, DecimalField,
-                     TextAreaField, SubmitField)
-from wtforms.validators import DataRequired, Optional, Length
+from flask_wtf.file import FileAllowed, FileField
+from wtforms import DateField, DecimalField, SelectField, StringField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, Length, Optional
 
 from app.models.investment import (
-    PORTFOLIO_TYPE_LABELS, INSTRUMENT_TYPE_LABELS, TRANSACTION_TYPE_LABELS,
+    INSTRUMENT_TYPE_LABELS,
+    PORTFOLIO_TYPE_LABELS,
+    TRANSACTION_TYPE_LABELS,
 )
 
 PORTFOLIO_TYPE_CHOICES = [

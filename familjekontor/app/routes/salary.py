@@ -1,22 +1,36 @@
-from datetime import date
 from flask import (
-    Blueprint, render_template, redirect, url_for, flash,
-    request, session, send_file,
+    Blueprint,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
 )
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
+
 from app.extensions import db
-from app.models.salary import Employee, SalaryRun, SalaryEntry
-from app.models.accounting import FiscalYear
-from app.models.company import Company
-from app.models.audit import AuditLog
 from app.forms.salary import (
-    EmployeeForm, SalaryRunForm, SalaryEntryEditForm,
-    SalaryPayForm, CollectumPeriodForm,
+    CollectumPeriodForm,
+    EmployeeForm,
+    SalaryEntryEditForm,
+    SalaryPayForm,
+    SalaryRunForm,
 )
+from app.models.accounting import FiscalYear
+from app.models.audit import AuditLog
+from app.models.company import Company
+from app.models.salary import Employee, SalaryEntry, SalaryRun
 from app.services.salary_service import (
-    create_salary_run, recalculate_salary_entry, recalculate_all_entries,
-    approve_salary_run, mark_salary_run_paid,
-    generate_salary_slip, generate_agi_data, generate_collectum_data,
+    approve_salary_run,
+    create_salary_run,
+    generate_agi_data,
+    generate_collectum_data,
+    generate_salary_slip,
+    mark_salary_run_paid,
+    recalculate_all_entries,
+    recalculate_salary_entry,
 )
 
 salary_bp = Blueprint('salary', __name__)

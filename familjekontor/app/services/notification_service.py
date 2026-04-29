@@ -181,8 +181,8 @@ def _check_document_expiry(user_id, company_id, days_ahead=30):
 
 def _check_budget_variance(user_id, company_id, threshold=20.0):
     """Create notifications for accounts with budget variance exceeding threshold %."""
+    from app.models.accounting import Account, FiscalYear, VerificationRow
     from app.models.budget import BudgetLine
-    from app.models.accounting import FiscalYear, Account, VerificationRow
     fy = FiscalYear.query.filter_by(
         company_id=company_id, status='open'
     ).first()

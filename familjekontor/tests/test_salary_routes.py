@@ -2,12 +2,13 @@
 
 from datetime import date
 from decimal import Decimal
+
 import pytest
 
+from app.models.accounting import Account, FiscalYear
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account
 from app.models.salary import Employee, SalaryRun
-from app.services.salary_service import create_salary_run, approve_salary_run
+from app.services.salary_service import approve_salary_run, create_salary_run
 
 
 @pytest.fixture

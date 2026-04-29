@@ -1,17 +1,18 @@
 """Tests for Phase 10H: AI Business Analysis Reports."""
 
-import pytest
 from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 
+import pytest
+
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.services.business_analysis_service import (
-    generate_business_analysis,
-    _template_profitability,
-    _template_liquidity,
     _template_arap,
+    _template_liquidity,
+    _template_profitability,
+    generate_business_analysis,
 )
 
 

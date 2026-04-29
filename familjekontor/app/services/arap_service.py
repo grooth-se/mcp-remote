@@ -3,13 +3,10 @@
 Provides aging analysis, DSO/DPO, and top customer/supplier rankings.
 """
 
-from datetime import date as date_type, timedelta
-from collections import OrderedDict
-
-from sqlalchemy import func, case
+from datetime import date as date_type
 
 from app.extensions import db
-from app.models.invoice import CustomerInvoice, SupplierInvoice, Customer, Supplier
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
 from app.services.report_service import _get_account_balances
 
 
@@ -20,10 +17,11 @@ def get_ar_aging_by_customer(company_id):
     """
     today = date_type.today()
 
-    invoices = (CustomerInvoice.query
-                .filter_by(company_id=company_id)
-                .filter(CustomerInvoice.status.in_(['sent', 'draft', 'overdue']))
-                .all())
+    invoices = (
+        CustomerInvoice.query.filter_by(company_id=company_id)
+        .filter(CustomerInvoice.status.in_(['sent', 'draft', 'overdue']))
+        .all()
+    )
 
     customer_data = {}
     for inv in invoices:
@@ -83,10 +81,11 @@ def get_ap_aging_by_supplier(company_id):
     """
     today = date_type.today()
 
-    invoices = (SupplierInvoice.query
-                .filter_by(company_id=company_id)
-                .filter(SupplierInvoice.status.in_(['pending', 'approved']))
-                .all())
+    invoices = (
+        SupplierInvoice.query.filter_by(company_id=company_id)
+        .filter(SupplierInvoice.status.in_(['pending', 'approved']))
+        .all()
+    )
 
     supplier_data = {}
     for inv in invoices:
@@ -171,14 +170,17 @@ def get_dpo(company_id, fiscal_year_id):
 def get_top_customers(company_id, fiscal_year_id, limit=10):
     """Top customers by invoiced amount with average payment days."""
     from app.models.accounting import FiscalYear
+
     fy = db.session.get(FiscalYear, fiscal_year_id)
 
-    invoices = (CustomerInvoice.query
-                .filter_by(company_id=company_id)
-                .filter(
-                    CustomerInvoice.invoice_date >= fy.start_date,
-                    CustomerInvoice.invoice_date <= fy.end_date,
-                ).all())
+    invoices = (
+        CustomerInvoice.query.filter_by(company_id=company_id)
+        .filter(
+            CustomerInvoice.invoice_date >= fy.start_date,
+            CustomerInvoice.invoice_date <= fy.end_date,
+        )
+        .all()
+    )
 
     customer_totals = {}
     for inv in invoices:
@@ -200,16 +202,18 @@ def get_top_customers(company_id, fiscal_year_id, limit=10):
             customer_totals[cid]['payment_days'].append(days)
 
     result = []
-    for cid, data in customer_totals.items():
+    for _cid, data in customer_totals.items():
         avg_days = None
         if data['payment_days']:
             avg_days = round(sum(data['payment_days']) / len(data['payment_days']), 0)
-        result.append({
-            'customer_name': data['customer_name'],
-            'total_amount': round(data['total_amount'], 2),
-            'invoice_count': data['invoice_count'],
-            'avg_payment_days': avg_days,
-        })
+        result.append(
+            {
+                'customer_name': data['customer_name'],
+                'total_amount': round(data['total_amount'], 2),
+                'invoice_count': data['invoice_count'],
+                'avg_payment_days': avg_days,
+            }
+        )
 
     result.sort(key=lambda r: -r['total_amount'])
     return result[:limit]
@@ -218,14 +222,17 @@ def get_top_customers(company_id, fiscal_year_id, limit=10):
 def get_top_suppliers(company_id, fiscal_year_id, limit=10):
     """Top suppliers by invoiced amount with average payment days."""
     from app.models.accounting import FiscalYear  # noqa: F811
+
     fy = db.session.get(FiscalYear, fiscal_year_id)
 
-    invoices = (SupplierInvoice.query
-                .filter_by(company_id=company_id)
-                .filter(
-                    SupplierInvoice.invoice_date >= fy.start_date,
-                    SupplierInvoice.invoice_date <= fy.end_date,
-                ).all())
+    invoices = (
+        SupplierInvoice.query.filter_by(company_id=company_id)
+        .filter(
+            SupplierInvoice.invoice_date >= fy.start_date,
+            SupplierInvoice.invoice_date <= fy.end_date,
+        )
+        .all()
+    )
 
     supplier_totals = {}
     for inv in invoices:
@@ -247,16 +254,18 @@ def get_top_suppliers(company_id, fiscal_year_id, limit=10):
             supplier_totals[sid]['payment_days'].append(days)
 
     result = []
-    for sid, data in supplier_totals.items():
+    for _sid, data in supplier_totals.items():
         avg_days = None
         if data['payment_days']:
             avg_days = round(sum(data['payment_days']) / len(data['payment_days']), 0)
-        result.append({
-            'supplier_name': data['supplier_name'],
-            'total_amount': round(data['total_amount'], 2),
-            'invoice_count': data['invoice_count'],
-            'avg_payment_days': avg_days,
-        })
+        result.append(
+            {
+                'supplier_name': data['supplier_name'],
+                'total_amount': round(data['total_amount'], 2),
+                'invoice_count': data['invoice_count'],
+                'avg_payment_days': avg_days,
+            }
+        )
 
     result.sort(key=lambda r: -r['total_amount'])
     return result[:limit]
@@ -271,7 +280,7 @@ def get_customer_revenue_breakdown(company_id, fiscal_year_id, limit=10):
     if not top:
         return {'labels': [], 'values': []}
 
-    total_all = sum(c['total_amount'] for c in top)
+    sum(c['total_amount'] for c in top)
     labels = []
     values = []
     others = 0.0

@@ -1,15 +1,23 @@
 """Favorites routes (Phase 7D)."""
 
 from flask import (
-    Blueprint, render_template, redirect, url_for, flash,
-    request, jsonify,
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
 )
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
 
 from app.services.favorite_service import (
-    get_user_favorites, add_favorite, remove_favorite,
-    toggle_favorite, reorder_favorites, update_favorite,
+    get_user_favorites,
+    remove_favorite,
+    reorder_favorites,
     seed_default_favorites,
+    toggle_favorite,
+    update_favorite,
 )
 
 favorites_bp = Blueprint('favorites', __name__)
@@ -77,8 +85,8 @@ def delete(favorite_id):
 @login_required
 def reset():
     """Delete all favorites and re-seed defaults."""
-    from app.models.favorite import UserFavorite
     from app.extensions import db
+    from app.models.favorite import UserFavorite
     UserFavorite.query.filter_by(user_id=current_user.id).delete()
     db.session.commit()
     seed_default_favorites(current_user.id)

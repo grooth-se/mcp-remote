@@ -2,9 +2,11 @@
 
 from datetime import date, timedelta
 from decimal import Decimal
+
 from sqlalchemy import func
+
 from app.extensions import db
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.audit import AuditLog
 
 
@@ -226,7 +228,7 @@ def close_fiscal_year(company_id, fiscal_year_id, created_by=None):
         raise ValueError('Räkenskapsåret är redan stängt')
 
     trial = get_trial_balance(company_id, fiscal_year_id)
-    balance_accounts = [t for t in trial if t['account_number'][0] in ('1', '2')]
+    [t for t in trial if t['account_number'][0] in ('1', '2')]
     result_accounts = [t for t in trial if t['account_number'][0] in ('3', '4', '5', '6', '7', '8')]
 
     year_result = -sum(t['balance'] for t in result_accounts)

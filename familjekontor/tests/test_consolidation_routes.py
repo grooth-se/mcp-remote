@@ -4,9 +4,9 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.services.consolidation_service import create_consolidation_group, add_member
+from app.services.consolidation_service import add_member, create_consolidation_group
 
 
 @pytest.fixture

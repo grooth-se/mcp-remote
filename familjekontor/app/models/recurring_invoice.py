@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -19,7 +20,7 @@ class RecurringInvoiceTemplate(db.Model):
     active = db.Column(db.Boolean, default=True)
     last_generated_at = db.Column(db.DateTime, nullable=True)
     invoices_generated = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='recurring_templates')
     customer = db.relationship('Customer', backref='recurring_templates')

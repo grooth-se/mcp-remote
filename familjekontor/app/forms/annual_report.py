@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import TextAreaField, StringField, DateField, SubmitField
-from wtforms.validators import Optional, Length
+from wtforms import DateField, StringField, SubmitField, TextAreaField
+from wtforms.validators import Length, Optional
 
 
 class AnnualReportForm(FlaskForm):

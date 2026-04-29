@@ -4,7 +4,8 @@ import os
 import pytest
 
 from app import create_app
-from app.extensions import db as _db, limiter
+from app.extensions import db as _db
+from app.extensions import limiter
 from app.models.audit import AuditLog
 from config import ProductionConfig
 
@@ -81,8 +82,9 @@ class TestOpenRedirect:
 
 class TestPasswordPolicy:
     def _validate_password(self, app, password):
-        from app.forms.admin import UserForm
         from werkzeug.datastructures import MultiDict
+
+        from app.forms.admin import UserForm
         with app.test_request_context():
             form = UserForm(formdata=MultiDict({
                 'username': 'test', 'email': 'a@b.com',

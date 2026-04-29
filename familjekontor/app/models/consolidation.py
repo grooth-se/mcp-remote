@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
-from app.extensions import db
+from datetime import UTC, datetime
 
+from app.extensions import db
 
 CONSOLIDATION_METHOD_LABELS = {
     'full': 'Full konsolidering',
@@ -16,7 +16,7 @@ class ConsolidationGroup(db.Model):
     name = db.Column(db.String(200), nullable=False)
     parent_company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)
     description = db.Column(db.String(500), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     parent_company = db.relationship('Company', backref='consolidation_groups')
     members = db.relationship('ConsolidationGroupMember', backref='group',
@@ -70,7 +70,7 @@ class IntercompanyElimination(db.Model):
     account_number = db.Column(db.String(10), nullable=False)
     amount = db.Column(db.Numeric(15, 2), nullable=False)
     description = db.Column(db.String(500), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     fiscal_year = db.relationship('FiscalYear', backref='eliminations')
     from_company = db.relationship('Company', foreign_keys=[from_company_id])
@@ -94,7 +94,7 @@ class IntercompanyMatch(db.Model):
     status = db.Column(db.String(20), default='suggested')  # suggested / confirmed / rejected
     elimination_id = db.Column(db.Integer, db.ForeignKey('intercompany_eliminations.id'),
                                nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company_a = db.relationship('Company', foreign_keys=[company_a_id])
     company_b = db.relationship('Company', foreign_keys=[company_b_id])
@@ -116,7 +116,7 @@ class AcquisitionGoodwill(db.Model):
     goodwill_amount = db.Column(db.Numeric(15, 2), nullable=False)
     amortization_period_months = db.Column(db.Integer, default=60)  # K2 max 5 years
     accumulated_amortization = db.Column(db.Numeric(15, 2), default=0)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='goodwill_entries')
 

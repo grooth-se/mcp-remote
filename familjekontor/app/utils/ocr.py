@@ -98,10 +98,11 @@ def _extract_with_pdfplumber(pdf_path):
 def _extract_pdf_with_tesseract(pdf_path):
     """Convert PDF to images and run Tesseract on each page."""
     try:
-        import pytesseract
-        from PIL import Image
         import subprocess
         import tempfile
+
+        import pytesseract
+        from PIL import Image
 
         # Use pdftoppm to convert PDF to images
         with tempfile.TemporaryDirectory() as tmpdir:

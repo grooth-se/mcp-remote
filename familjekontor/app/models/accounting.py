@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -52,7 +53,7 @@ class Verification(db.Model):
     description = db.Column(db.String(500))
     verification_type = db.Column(db.String(20))  # supplier, customer, bank, salary, manual
     source = db.Column(db.String(50))  # 'manual', 'sie_import', etc.
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
     rows = db.relationship('VerificationRow', backref='verification', lazy='select',

@@ -1,10 +1,16 @@
 from flask_wtf import FlaskForm
-from wtforms import (StringField, SelectField, DateField, DecimalField,
-                     IntegerField, TextAreaField, SubmitField)
-from wtforms.validators import DataRequired, Optional, Length, NumberRange
+from wtforms import (
+    DateField,
+    DecimalField,
+    IntegerField,
+    SelectField,
+    StringField,
+    SubmitField,
+    TextAreaField,
+)
+from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
 from app.models.asset import ASSET_CATEGORY_LABELS
-
 
 CATEGORY_CHOICES = [('', '-- Välj kategori --')] + [
     (k, v) for k, v in ASSET_CATEGORY_LABELS.items()

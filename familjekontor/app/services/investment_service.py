@@ -7,13 +7,14 @@ from datetime import date
 from decimal import Decimal
 
 from app.extensions import db
-from app.models.investment import (
-    InvestmentPortfolio, InvestmentHolding, InvestmentTransaction,
-)
-from app.models.accounting import FiscalYear, Account
+from app.models.accounting import Account, FiscalYear
 from app.models.audit import AuditLog
+from app.models.investment import (
+    InvestmentHolding,
+    InvestmentPortfolio,
+    InvestmentTransaction,
+)
 from app.services.accounting_service import create_verification
-
 
 # ---------------------------------------------------------------------------
 # Helpers

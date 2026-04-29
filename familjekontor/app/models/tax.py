@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
+
 from app.extensions import db
 
 
@@ -22,9 +23,9 @@ class VATReport(db.Model):
     vat_to_pay = db.Column(db.Numeric(15, 2), default=0)     # net
     status = db.Column(db.String(20), default='draft')  # draft, final, filed
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
-                           onupdate=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC),
+                           onupdate=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='vat_reports')
     fiscal_year = db.relationship('FiscalYear')
@@ -49,7 +50,7 @@ class Deadline(db.Model):
     completed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     auto_generated = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='deadlines')
     completer = db.relationship('User', foreign_keys=[completed_by])
@@ -71,7 +72,7 @@ class TaxPayment(db.Model):
     verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='tax_payments')
     deadline = db.relationship('Deadline', backref='payments')
@@ -142,7 +143,7 @@ class TaxReturn(db.Model):
 
     notes = db.Column(db.Text, nullable=True)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
     submitted_at = db.Column(db.DateTime, nullable=True)
 
     company = db.relationship('Company', backref='tax_returns')
@@ -176,7 +177,7 @@ class TaxReturnAdjustment(db.Model):
     description = db.Column(db.String(500), nullable=False)
     amount = db.Column(db.Numeric(15, 2), nullable=False)
     sru_code = db.Column(db.String(10), nullable=True)  # Optional SRU field reference
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     def __repr__(self):
         return f'<TaxReturnAdjustment {self.adjustment_type} {self.amount}>'

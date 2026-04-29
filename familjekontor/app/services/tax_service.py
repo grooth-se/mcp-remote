@@ -1,13 +1,14 @@
 """Tax & compliance service - VAT reporting, deadlines, and tax payments."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from sqlalchemy import func
-from app.extensions import db
-from app.models.tax import VATReport, Deadline, TaxPayment
-from app.models.accounting import Account, Verification, VerificationRow, FiscalYear
-from app.models.company import Company
 
+from sqlalchemy import func
+
+from app.extensions import db
+from app.models.accounting import Account, Verification, VerificationRow
+from app.models.company import Company
+from app.models.tax import Deadline, TaxPayment, VATReport
 
 # ---------------------------------------------------------------------------
 # VAT
@@ -357,7 +358,7 @@ def complete_deadline(deadline_id, completed_by, notes=None):
     if not deadline:
         return None
     deadline.status = 'completed'
-    deadline.completed_at = datetime.now(timezone.utc)
+    deadline.completed_at = datetime.now(UTC)
     deadline.completed_by = completed_by
     if notes:
         deadline.notes = notes

@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -11,7 +12,7 @@ class ExchangeRate(db.Model):
     rate = db.Column(db.Numeric(12, 6), nullable=False)  # 1 foreign = X SEK
     inverse_rate = db.Column(db.Numeric(12, 6), nullable=True)  # Riksbanken raw: 1 SEK = X foreign
     source = db.Column(db.String(20), default='manual')  # riksbanken / manual
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     __table_args__ = (
         db.UniqueConstraint('currency_code', 'rate_date', name='uq_currency_rate_date'),

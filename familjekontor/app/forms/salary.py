@@ -1,10 +1,16 @@
 from datetime import date
+
 from flask_wtf import FlaskForm
 from wtforms import (
-    StringField, IntegerField, DecimalField, SelectField,
-    DateField, TextAreaField, BooleanField, SubmitField,
+    DateField,
+    DecimalField,
+    IntegerField,
+    SelectField,
+    StringField,
+    SubmitField,
+    TextAreaField,
 )
-from wtforms.validators import DataRequired, Optional, NumberRange, Email, Length
+from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional
 
 
 class EmployeeForm(FlaskForm):

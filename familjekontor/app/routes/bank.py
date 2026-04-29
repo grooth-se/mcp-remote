@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
-from app.models.bank import BankAccount, BankTransaction
-from app.models.accounting import FiscalYear
 from app.forms.bank import BankAccountForm, BankImportForm, ManualMatchForm
+from app.models.accounting import FiscalYear
+from app.models.bank import BankAccount, BankTransaction
 from app.services import bank_service
 
 bank_bp = Blueprint('bank', __name__)

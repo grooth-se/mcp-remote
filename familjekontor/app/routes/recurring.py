@@ -1,13 +1,17 @@
 from datetime import date
 from decimal import Decimal
-from flask import Blueprint, render_template, redirect, url_for, flash, session, request
-from flask_login import login_required, current_user
+
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
+from app.forms.recurring_invoice import RecurringInvoiceTemplateForm, RecurringLineItemForm
 from app.models.invoice import Customer, CustomerInvoice
 from app.models.recurring_invoice import RecurringInvoiceTemplate, RecurringLineItem
-from app.forms.recurring_invoice import RecurringInvoiceTemplateForm, RecurringLineItemForm
 from app.services.recurring_invoice_service import (
-    get_due_templates, get_due_count, generate_invoice_from_template, generate_all_due,
+    generate_all_due,
+    generate_invoice_from_template,
+    get_due_count,
 )
 
 recurring_bp = Blueprint('recurring', __name__)

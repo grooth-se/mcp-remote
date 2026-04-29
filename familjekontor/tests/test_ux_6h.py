@@ -4,8 +4,8 @@ from datetime import date
 
 from app import create_app
 from app.extensions import db
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 
 
 def _setup_company(logged_in_client):

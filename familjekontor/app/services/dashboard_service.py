@@ -1,13 +1,13 @@
 """Dashboard analytics service: KPIs, charts, multi-company overview."""
 
-from datetime import date, timedelta
-from decimal import Decimal
+from datetime import date
+
 from sqlalchemy import func
 
 from app.extensions import db
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import SupplierInvoice, CustomerInvoice
+from app.models.invoice import CustomerInvoice, SupplierInvoice
 from app.models.salary import SalaryRun
 
 

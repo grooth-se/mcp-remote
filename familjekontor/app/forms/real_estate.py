@@ -1,8 +1,8 @@
 """Forms for real estate management."""
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, DecimalField, IntegerField, TextAreaField, SelectField
-from wtforms.validators import DataRequired, Optional, Length
+from wtforms import DecimalField, IntegerField, SelectField, StringField, TextAreaField
+from wtforms.validators import DataRequired, Length, Optional
 
 
 class RealEstateForm(FlaskForm):

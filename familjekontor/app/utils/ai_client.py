@@ -5,6 +5,7 @@ All functions return None or sensible defaults when Ollama is unavailable.
 
 import json
 import logging
+
 from flask import current_app
 
 logger = logging.getLogger(__name__)

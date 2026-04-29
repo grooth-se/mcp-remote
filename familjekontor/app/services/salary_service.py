@@ -1,13 +1,12 @@
 """Salary service for payroll processing, tax, pension, and reporting."""
 
-from datetime import date, datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from datetime import UTC, date, datetime
+from decimal import ROUND_HALF_UP, Decimal
 
 from app.extensions import db
-from app.models.salary import Employee, SalaryRun, SalaryEntry, MONTH_NAMES_SV
-from app.models.accounting import FiscalYear, Account
+from app.models.accounting import Account
+from app.models.salary import MONTH_NAMES_SV, Employee, SalaryEntry, SalaryRun
 from app.services.accounting_service import create_verification
-
 
 # ---------------------------------------------------------------------------
 # Tax calculation
@@ -362,7 +361,7 @@ def approve_salary_run(run_id, user_id):
 
     run.verification_id = verification.id
     run.approved_by = user_id
-    run.approved_at = datetime.now(timezone.utc)
+    run.approved_at = datetime.now(UTC)
     run.status = 'approved'
     db.session.commit()
     return run

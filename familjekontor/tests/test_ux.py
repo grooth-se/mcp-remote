@@ -4,9 +4,9 @@ from datetime import date
 import pytest
 
 from app.extensions import db
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import Supplier, Customer, SupplierInvoice, CustomerInvoice
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
 from app.models.salary import Employee
 
 

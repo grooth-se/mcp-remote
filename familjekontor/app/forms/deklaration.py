@@ -2,9 +2,13 @@
 
 from flask_wtf import FlaskForm
 from wtforms import (
-    SelectField, DecimalField, TextAreaField, SubmitField, StringField,
+    DecimalField,
+    SelectField,
+    StringField,
+    SubmitField,
+    TextAreaField,
 )
-from wtforms.validators import DataRequired, Optional, NumberRange
+from wtforms.validators import DataRequired, NumberRange, Optional
 
 
 class TaxReturnCreateForm(FlaskForm):

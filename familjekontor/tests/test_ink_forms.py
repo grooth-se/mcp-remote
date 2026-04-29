@@ -5,17 +5,20 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.user import User
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.models.tax import TaxReturn
+from app.models.user import User
 from app.services.deklaration_service import create_tax_return
 from app.services.ink_form_service import (
-    compute_ink2r, compute_ink2s, compute_ink2_main,
-    compute_ink4r, compute_ink4s, compute_all_ink_data,
+    compute_all_ink_data,
+    compute_ink2_main,
+    compute_ink2r,
+    compute_ink2s,
+    compute_ink4r,
+    compute_ink4s,
     generate_sru_file,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

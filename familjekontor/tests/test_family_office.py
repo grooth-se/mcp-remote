@@ -1,15 +1,15 @@
 """Tests for Family Office / Multi-Company Features (Phase 8)."""
 
-import pytest
 from datetime import date, timedelta
 
-from app.models.user import User
-from app.models.company import Company
+import pytest
+
 from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.audit import AuditLog
+from app.models.company import Company
 from app.models.notification import Notification
 from app.models.tax import Deadline
-
+from app.models.user import User
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -1,6 +1,7 @@
 """Real estate model for property tracking beyond generic fixed assets."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -22,7 +23,7 @@ class RealEstate(db.Model):
     rent_account = db.Column(db.String(10), default='3910')
     notes = db.Column(db.Text)
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='real_estates')
     asset = db.relationship('FixedAsset', backref=db.backref('real_estate', uselist=False))

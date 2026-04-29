@@ -1,14 +1,20 @@
 """Tests for Phase 10B: Cost Center Management UI."""
 
-import pytest
 from datetime import date
 from decimal import Decimal
-from app.models.cost_center import CostCenter
+
+import pytest
+
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
+from app.models.cost_center import CostCenter
 from app.services.cost_center_service import (
-    get_cost_centers, create_cost_center, update_cost_center,
-    delete_cost_center, get_cost_center_pnl, get_all_cost_centers_pnl,
+    create_cost_center,
+    delete_cost_center,
+    get_all_cost_centers_pnl,
+    get_cost_center_pnl,
+    get_cost_centers,
+    update_cost_center,
 )
 
 
@@ -258,7 +264,7 @@ class TestCostCenterRoutes:
                                       data={'code': '', 'name': ''},
                                       follow_redirects=True)
         assert resp.status_code == 200
-        assert 'Kod och namn'.encode() in resp.data
+        assert b'Kod och namn' in resp.data
 
     def test_edit_wrong_company(self, logged_in_client, db):
         c1 = Company(name='A', org_number='556444-0001', company_type='AB')
@@ -273,7 +279,7 @@ class TestCostCenterRoutes:
         resp = logged_in_client.get(f'/accounting/cost-centers/{cc.id}/edit',
                                      follow_redirects=True)
         assert resp.status_code == 200
-        assert 'hittades inte'.encode() in resp.data
+        assert b'hittades inte' in resp.data
 
     def test_new_form_get(self, logged_in_client, db):
         self._setup_company(db, logged_in_client)

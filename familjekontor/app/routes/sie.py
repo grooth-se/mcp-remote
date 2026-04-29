@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session, Response
-from flask_login import login_required, current_user
+from flask import Blueprint, Response, flash, redirect, render_template, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
+from app.forms.sie import SIEExportForm, SIEImportForm
 from app.models.accounting import FiscalYear
-from app.forms.sie import SIEImportForm, SIEExportForm
-from app.services.sie_handler import read_sie_file, import_sie, export_sie
+from app.services.sie_handler import export_sie, import_sie, read_sie_file
 
 sie_bp = Blueprint('sie', __name__)
 

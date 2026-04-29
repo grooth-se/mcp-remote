@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -18,7 +19,7 @@ class Supplier(db.Model):
     default_currency = db.Column(db.String(3), default='SEK')
     active = db.Column(db.Boolean, default=True)
     learned_mappings = db.Column(db.JSON, nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     invoices = db.relationship('SupplierInvoice', backref='supplier', lazy='dynamic')
     company = db.relationship('Company', backref='suppliers')
@@ -55,7 +56,7 @@ class SupplierInvoice(db.Model):
     payment_verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
     document_id = db.Column(db.Integer, db.ForeignKey('documents.id', use_alter=True, name='fk_supplier_invoice_document'), nullable=True)
     paid_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='supplier_invoices')
     verification = db.relationship('Verification', foreign_keys=[verification_id])
@@ -81,7 +82,7 @@ class Customer(db.Model):
     payment_terms = db.Column(db.Integer, default=30)
     default_currency = db.Column(db.String(3), default='SEK')
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     invoices = db.relationship('CustomerInvoice', backref='customer', lazy='dynamic')
     company = db.relationship('Company', backref='customers')
@@ -111,7 +112,7 @@ class CustomerInvoice(db.Model):
     payment_verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
     sent_at = db.Column(db.DateTime)
     paid_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     # Phase 4F: PDF invoicing fields
     invoice_prefix = db.Column(db.String(20), nullable=True)

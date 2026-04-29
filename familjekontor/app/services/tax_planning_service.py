@@ -7,15 +7,15 @@ Provides Swedish owner-employee tax optimization guidance:
 - Group structure suggestions
 """
 
-from decimal import Decimal
 from datetime import date
+from decimal import Decimal
 
 from app.extensions import db
+from app.models.accounting import FiscalYear
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, VerificationRow, Verification
-from app.models.tax import TaxReturn
-from app.models.salary import SalaryRun
 from app.models.governance import DividendDecision
+from app.models.salary import SalaryRun
+from app.models.tax import TaxReturn
 
 # Inkomstbasbelopp 2026 (updated annually)
 IBB = Decimal('77600')
@@ -223,7 +223,7 @@ def _asset_purchase_timing(company_id, fy):
 def _group_structure_suggestion(company_id, fy):
     """Suggest holding company if standalone AB with high income."""
     # Check if already in a consolidation group
-    from app.models.consolidation import ConsolidationGroup, ConsolidationGroupMember
+    from app.models.consolidation import ConsolidationGroupMember
     is_in_group = ConsolidationGroupMember.query.filter_by(company_id=company_id).first()
 
     if is_in_group:

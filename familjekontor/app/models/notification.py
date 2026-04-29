@@ -1,6 +1,7 @@
 """Notification model (Phase 7B)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -18,7 +19,7 @@ class Notification(db.Model):
     read = db.Column(db.Boolean, default=False)
     entity_type = db.Column(db.String(50), nullable=True)
     entity_id = db.Column(db.Integer, nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     user = db.relationship('User', backref='notifications')
     company = db.relationship('Company', backref='notifications')

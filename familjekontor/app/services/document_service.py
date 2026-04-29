@@ -3,15 +3,15 @@
 import os
 import re
 import uuid
-from datetime import datetime, timezone
-from werkzeug.utils import secure_filename
+from datetime import datetime
 
 from flask import current_app
-from app.extensions import db
-from app.utils.security import safe_path
-from app.models.document import Document
-from app.models.audit import AuditLog
+from werkzeug.utils import secure_filename
 
+from app.extensions import db
+from app.models.audit import AuditLog
+from app.models.document import Document
+from app.utils.security import safe_path
 
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt'}
 
@@ -318,7 +318,7 @@ def analyze_invoice_pdf(file_storage):
         return result
 
     lines = text.split('\n')
-    text_lower = text.lower()
+    text.lower()
 
     # Invoice number — try regex patterns first
     for pattern in INVOICE_NUMBER_PATTERNS:

@@ -1,12 +1,13 @@
 """Tests for Phase 10G: Enhanced Cash Flow Forecasting."""
 
-import pytest
 from datetime import date
 from decimal import Decimal
 
+import pytest
+
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import Supplier, SupplierInvoice, Customer
+from app.models.invoice import Customer, Supplier, SupplierInvoice
 from app.models.recurring_invoice import RecurringInvoiceTemplate, RecurringLineItem
 from app.models.tax import TaxPayment
 from app.services.cashflow_service import get_enhanced_cash_flow_forecast

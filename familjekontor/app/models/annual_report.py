@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -29,9 +30,9 @@ class AnnualReport(db.Model):
     # PDF
     pdf_path = db.Column(db.String(500), nullable=True)
 
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
-                           onupdate=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC),
+                           onupdate=lambda: datetime.now(UTC))
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
     company = db.relationship('Company', backref='annual_reports')

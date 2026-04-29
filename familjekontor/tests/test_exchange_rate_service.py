@@ -2,18 +2,18 @@
 
 from datetime import date, timedelta
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from app.models.exchange_rate import ExchangeRate
 from app.services.exchange_rate_service import (
     fetch_rate_from_riksbanken,
-    get_rate,
     get_latest_rate,
+    get_rate,
     save_manual_rate,
     save_rate_to_db,
 )
-
 
 # === Model tests ===
 

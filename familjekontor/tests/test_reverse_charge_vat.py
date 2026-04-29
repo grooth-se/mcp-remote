@@ -1,14 +1,18 @@
 """Tests for Phase 10D: Reverse Charge VAT for International Customers."""
 
-import pytest
 from decimal import Decimal
-from app.models.invoice import Customer, CustomerInvoice
-from app.models.company import Company
-from app.services.vat_service import (
-    get_vat_type_for_customer, validate_eu_vat_number,
-    get_vat_display_text, compute_invoice_vat, EU_COUNTRIES,
-)
 
+import pytest
+
+from app.models.company import Company
+from app.models.invoice import Customer, CustomerInvoice
+from app.services.vat_service import (
+    EU_COUNTRIES,
+    compute_invoice_vat,
+    get_vat_display_text,
+    get_vat_type_for_customer,
+    validate_eu_vat_number,
+)
 
 # ---- Service tests ----
 

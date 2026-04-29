@@ -1,15 +1,21 @@
 """Tests for Phase 10C: Real Estate Register."""
 
-import pytest
 from datetime import date
 from decimal import Decimal
-from app.models.real_estate import RealEstate
+
+import pytest
+
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
+from app.models.real_estate import RealEstate
 from app.services.real_estate_service import (
-    get_real_estates, create_real_estate, update_real_estate,
-    delete_real_estate, calculate_property_tax, get_rental_income_ytd,
+    calculate_property_tax,
+    create_real_estate,
+    delete_real_estate,
     get_real_estate_summary,
+    get_real_estates,
+    get_rental_income_ytd,
+    update_real_estate,
 )
 
 
@@ -242,4 +248,4 @@ class TestRealEstateRoutes:
             sess['active_company_id'] = c1.id
         resp = logged_in_client.get(f'/assets/real-estate/{prop.id}', follow_redirects=True)
         assert resp.status_code == 200
-        assert 'hittades inte'.encode() in resp.data
+        assert b'hittades inte' in resp.data

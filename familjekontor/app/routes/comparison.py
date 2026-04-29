@@ -1,12 +1,15 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, session, jsonify, request
-from flask_login import login_required
 from datetime import datetime
+
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
+from flask_login import login_required
 
 from app.extensions import db
 from app.models.accounting import FiscalYear
 from app.models.company import Company
 from app.services.comparison_service import (
-    compare_periods, get_yoy_analysis, get_account_drilldown,
+    compare_periods,
+    get_account_drilldown,
+    get_yoy_analysis,
 )
 
 comparison_bp = Blueprint('comparison', __name__)

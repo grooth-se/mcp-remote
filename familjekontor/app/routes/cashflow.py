@@ -1,12 +1,25 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, session, jsonify, request, send_file
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
 from flask_login import login_required
+
 from app.extensions import db
 from app.models.accounting import FiscalYear
 from app.models.company import Company
 from app.services.cashflow_service import (
-    get_cash_flow_statement, get_monthly_cash_flow,
-    get_cash_flow_forecast, get_enhanced_cash_flow_forecast,
     export_cashflow_to_excel,
+    get_cash_flow_forecast,
+    get_cash_flow_statement,
+    get_enhanced_cash_flow_forecast,
+    get_monthly_cash_flow,
 )
 
 cashflow_bp = Blueprint('cashflow', __name__)

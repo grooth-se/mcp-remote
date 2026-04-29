@@ -1,12 +1,13 @@
 """Tests for payment_service functions."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime, timezone
 from decimal import Decimal
+
 import pytest
 
-from app.models.company import Company
 from app.models.accounting import FiscalYear
-from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice
+from app.models.company import Company
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
 from app.models.tax import TaxPayment
 from app.services.payment_service import get_all_payments
 
@@ -35,7 +36,7 @@ def payment_data(db, company):
         due_date=date(2026, 2, 10),
         total_amount=Decimal('5000.00'),
         status='paid',
-        paid_at=datetime(2026, 2, 5, tzinfo=timezone.utc),
+        paid_at=datetime(2026, 2, 5, tzinfo=UTC),
     )
     db.session.add(si)
 
@@ -52,7 +53,7 @@ def payment_data(db, company):
         due_date=date(2026, 2, 15),
         total_amount=Decimal('10000.00'),
         status='paid',
-        paid_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        paid_at=datetime(2026, 3, 1, tzinfo=UTC),
     )
     db.session.add(ci)
 
@@ -177,7 +178,7 @@ class TestCompanyIsolation:
             company_id=other.id, supplier_id=supplier.id,
             invoice_number='X-001', invoice_date=date(2026, 1, 1),
             due_date=date(2026, 2, 1), total_amount=Decimal('9999'),
-            status='paid', paid_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+            status='paid', paid_at=datetime(2026, 2, 1, tzinfo=UTC),
         )
         db.session.add(si)
         db.session.commit()

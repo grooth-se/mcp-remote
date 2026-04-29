@@ -3,8 +3,8 @@ import os
 from datetime import date
 
 from app.extensions import db
+from app.models.accounting import Account, FiscalYear
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account
 
 
 def _setup_company(logged_in_client):

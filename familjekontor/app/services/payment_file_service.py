@@ -4,11 +4,11 @@ import io
 import logging
 import os
 import xml.etree.ElementTree as ET
-from datetime import date, datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from app.extensions import db
-from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
+from app.models.accounting import Account, FiscalYear
 from app.models.audit import AuditLog
 from app.models.bank import BankAccount
 from app.models.invoice import Supplier, SupplierInvoice
@@ -226,7 +226,7 @@ def generate_pain001_xml(payment_file_id):
     # Group Header
     grp_hdr = _sub(root, 'GrpHdr')
     _sub(grp_hdr, 'MsgId', pf.batch_reference)
-    _sub(grp_hdr, 'CreDtTm', datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S'))
+    _sub(grp_hdr, 'CreDtTm', datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%S'))
     _sub(grp_hdr, 'NbOfTxs', str(pf.number_of_transactions))
     _sub(grp_hdr, 'CtrlSum', f'{pf.total_amount:.2f}')
 
@@ -547,7 +547,7 @@ def confirm_batch_paid(payment_file_id, user_id):
         return False, ['Batch kan inte bekräftas i nuvarande status.']
 
     errors = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     for instr in pf.instructions:
         invoice = db.session.get(SupplierInvoice, instr.supplier_invoice_id)

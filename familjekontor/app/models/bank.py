@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -16,7 +17,7 @@ class BankAccount(db.Model):
     balance = db.Column(db.Numeric(15, 2), default=0)
     ledger_account = db.Column(db.String(10), default='1930')
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='bank_accounts')
     transactions = db.relationship('BankTransaction', backref='bank_account', lazy='dynamic')
@@ -45,7 +46,7 @@ class BankTransaction(db.Model):
     matched_verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
     status = db.Column(db.String(20), default='unmatched')  # unmatched, matched, ignored
     import_batch = db.Column(db.String(50), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='bank_transactions')
     matched_verification = db.relationship('Verification', backref='bank_transactions')

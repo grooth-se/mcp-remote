@@ -1,12 +1,10 @@
 """Anomaly detection service: rule-based detection of unusual transactions."""
 
 import statistics
-from datetime import timedelta
-from decimal import Decimal
 from collections import defaultdict
 
 from app.extensions import db
-from app.models.accounting import Verification, VerificationRow, Account, FiscalYear
+from app.models.accounting import Account, Verification, VerificationRow
 from app.models.invoice import SupplierInvoice
 
 

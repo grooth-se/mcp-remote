@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -13,7 +14,7 @@ class AuditLog(db.Model):
     entity_id = db.Column(db.Integer)
     old_values = db.Column(db.JSON)
     new_values = db.Column(db.JSON)
-    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     user = db.relationship('User')
 

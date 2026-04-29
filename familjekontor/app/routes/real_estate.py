@@ -1,17 +1,20 @@
 """Routes for real estate register management."""
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, session, url_for
+from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.models.real_estate import RealEstate
+from app.forms.real_estate import RealEstateForm
 from app.models.accounting import FiscalYear
 from app.models.asset import FixedAsset
-from app.forms.real_estate import RealEstateForm
+from app.models.real_estate import RealEstate
 from app.services.real_estate_service import (
-    get_real_estates, create_real_estate, update_real_estate,
-    delete_real_estate, calculate_property_tax, get_rental_income_ytd,
+    calculate_property_tax,
+    create_real_estate,
+    delete_real_estate,
     get_real_estate_summary,
+    get_rental_income_ytd,
+    update_real_estate,
 )
 
 realestate_bp = Blueprint('realestate', __name__)

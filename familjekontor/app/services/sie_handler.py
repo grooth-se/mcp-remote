@@ -6,13 +6,11 @@ accounting data between Swedish accounting software.
 Handles CP437/ISO-8859-1 encoding used by older Swedish systems.
 """
 
-import re
 from datetime import date, datetime
 from decimal import Decimal
-from io import StringIO
 
 from app.extensions import db
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
 
 
@@ -424,11 +422,11 @@ def export_sie(company_id, fiscal_year_id):
     now = datetime.now()
 
     # Header
-    lines.append(f'#FLAGGA 0')
-    lines.append(f'#PROGRAM "PsalmGears" "1.0"')
-    lines.append(f'#FORMAT PC8')
+    lines.append('#FLAGGA 0')
+    lines.append('#PROGRAM "PsalmGears" "1.0"')
+    lines.append('#FORMAT PC8')
     lines.append(f'#GEN {now.strftime("%Y%m%d")}')
-    lines.append(f'#SIETYP 4')
+    lines.append('#SIETYP 4')
     lines.append(f'#FNAMN "{company.name}"')
     lines.append(f'#ORGNR {company.org_number}')
     lines.append(f'#VALUTA {company.base_currency}')

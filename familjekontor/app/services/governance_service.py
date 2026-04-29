@@ -1,16 +1,19 @@
 """Governance service: board members, shareholders, dividends, AGM."""
 
 from decimal import Decimal
-from sqlalchemy import func
-from app.extensions import db
-from app.models.governance import (
-    BoardMember, ShareClass, Shareholder, ShareholderHolding,
-    DividendDecision, AGMMinutes,
-)
-from app.models.accounting import FiscalYear, Account
-from app.models.audit import AuditLog
-from app.services.accounting_service import create_verification
 
+from app.extensions import db
+from app.models.accounting import Account, FiscalYear
+from app.models.audit import AuditLog
+from app.models.governance import (
+    AGMMinutes,
+    BoardMember,
+    DividendDecision,
+    ShareClass,
+    Shareholder,
+    ShareholderHolding,
+)
+from app.services.accounting_service import create_verification
 
 # ---------------------------------------------------------------------------
 # Board Members

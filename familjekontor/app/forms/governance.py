@@ -1,10 +1,17 @@
 from flask_wtf import FlaskForm
-from wtforms import (StringField, SelectField, DateField, DecimalField,
-                     IntegerField, TextAreaField, BooleanField, SubmitField)
-from wtforms.validators import DataRequired, Optional, Length, NumberRange
+from wtforms import (
+    BooleanField,
+    DateField,
+    DecimalField,
+    IntegerField,
+    SelectField,
+    StringField,
+    SubmitField,
+    TextAreaField,
+)
+from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
-from app.models.governance import BOARD_ROLE_LABELS, MEETING_TYPE_LABELS, ACQUISITION_TYPE_LABELS
-
+from app.models.governance import ACQUISITION_TYPE_LABELS, BOARD_ROLE_LABELS, MEETING_TYPE_LABELS
 
 ROLE_CHOICES = [('', '-- Välj roll --')] + [
     (k, v) for k, v in BOARD_ROLE_LABELS.items()

@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -19,7 +20,7 @@ class PaymentFile(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     confirmed_at = db.Column(db.DateTime, nullable=True)
     confirmed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='payment_files')
     bank_account = db.relationship('BankAccount', backref='payment_files')

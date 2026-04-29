@@ -1,20 +1,18 @@
 """Årsredovisning (Annual Report) service — K2 compliant."""
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from flask import render_template, current_app
+from flask import current_app, render_template
 
 from app.extensions import db
-from app.models.annual_report import AnnualReport
 from app.models.accounting import FiscalYear
-from app.models.company import Company
-from app.models.salary import Employee
+from app.models.annual_report import AnnualReport
 from app.models.audit import AuditLog
-from app.services.report_service import get_profit_and_loss, get_balance_sheet
+from app.models.salary import Employee
 from app.services.asset_service import get_asset_note_data
 from app.services.governance_service import get_board_for_annual_report
-
+from app.services.report_service import get_balance_sheet, get_profit_and_loss
 
 K2_BOILERPLATE = (
     'Årsredovisningen har upprättats enligt årsredovisningslagen och '
@@ -75,7 +73,7 @@ def save_report(report_id, form_data):
         if field in form_data:
             setattr(report, field, form_data[field])
 
-    report.updated_at = datetime.now(timezone.utc)
+    report.updated_at = datetime.now(UTC)
     db.session.commit()
     return report
 
@@ -142,7 +140,7 @@ def finalize_report(report_id, user_id=None):
         return None
 
     report.status = 'final'
-    report.updated_at = datetime.now(timezone.utc)
+    report.updated_at = datetime.now(UTC)
 
     audit = AuditLog(
         company_id=report.company_id, user_id=user_id,
@@ -161,7 +159,7 @@ def reopen_report(report_id, user_id=None):
         return None
 
     report.status = 'draft'
-    report.updated_at = datetime.now(timezone.utc)
+    report.updated_at = datetime.now(UTC)
 
     audit = AuditLog(
         company_id=report.company_id, user_id=user_id,

@@ -3,18 +3,18 @@
 Cross-company views: dashboard, cash flow, wealth summary, alerts.
 """
 
-from flask import Blueprint, render_template, jsonify
-from flask_login import login_required, current_user
+from flask import Blueprint, jsonify, render_template
+from flask_login import current_user, login_required
 
 from app.services.family_service import (
-    get_family_dashboard_data,
-    get_family_revenue_trend,
-    get_family_health_indicators,
-    get_cross_company_cashflow,
-    get_family_wealth_summary,
-    get_cross_company_alerts,
-    get_upcoming_deadlines_all,
     get_activity_feed,
+    get_cross_company_alerts,
+    get_cross_company_cashflow,
+    get_family_dashboard_data,
+    get_family_health_indicators,
+    get_family_revenue_trend,
+    get_family_wealth_summary,
+    get_upcoming_deadlines_all,
 )
 
 family_bp = Blueprint('family', __name__)

@@ -1,14 +1,15 @@
 """Budget & Forecast service: grid editor, variance analysis, forecast."""
 
+from collections import OrderedDict
 from decimal import Decimal
 from io import BytesIO
-from collections import OrderedDict
+
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models.budget import BudgetLine
-from app.models.accounting import Account, Verification, VerificationRow, FiscalYear
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.audit import AuditLog
+from app.models.budget import BudgetLine
 
 
 def get_budget_grid(company_id, fiscal_year_id):
@@ -179,7 +180,7 @@ def get_forecast(company_id, fiscal_year_id):
     today = date.today()
     current_month = today.month
 
-    grid = get_budget_grid(company_id, fiscal_year_id)
+    get_budget_grid(company_id, fiscal_year_id)
 
     # Get actual monthly totals (revenue - expenses)
     monthly_actual = {}
@@ -318,7 +319,7 @@ def export_budget_to_excel(company_id, fiscal_year_id, company_name):
     for cell in ws[ws.max_row]:
         cell.font = bold
 
-    for acc_id, data in grid.items():
+    for _acc_id, data in grid.items():
         row = [data['number'], data['name']]
         for m in range(1, 13):
             row.append(round(data['months'].get(m, 0), 2))

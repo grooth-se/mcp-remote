@@ -5,8 +5,8 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
-from app.extensions import db
+from datetime import UTC, datetime
 
+from app.extensions import db
 
 BOARD_ROLE_LABELS = {
     'ordforande': 'Ordförande',
@@ -37,7 +37,7 @@ class BoardMember(db.Model):
     appointed_by = db.Column(db.String(100), nullable=True)
     email = db.Column(db.String(120), nullable=True)
     phone = db.Column(db.String(20), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='board_members_list')
 
@@ -62,7 +62,7 @@ class ShareClass(db.Model):
     votes_per_share = db.Column(db.Integer, default=1)
     par_value = db.Column(db.Numeric(10, 2), nullable=True)
     total_shares = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='share_classes')
     holdings = db.relationship('ShareholderHolding', backref='share_class',
@@ -85,7 +85,7 @@ class Shareholder(db.Model):
     personal_or_org_number = db.Column(db.String(20), nullable=True)
     address = db.Column(db.String(300), nullable=True)
     is_company = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='shareholders')
     holdings = db.relationship('ShareholderHolding', backref='shareholder',
@@ -106,7 +106,7 @@ class ShareholderHolding(db.Model):
     acquisition_type = db.Column(db.String(30), default='kop')
     price_per_share = db.Column(db.Numeric(15, 2), nullable=True)
     note = db.Column(db.String(500), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     @property
     def acquisition_label(self):
@@ -130,7 +130,7 @@ class DividendDecision(db.Model):
     payment_date = db.Column(db.Date, nullable=True)
     status = db.Column(db.String(20), default='beslutad')  # beslutad, betald
     verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='dividend_decisions')
     fiscal_year = db.relationship('FiscalYear', backref='dividend_decisions')
@@ -154,7 +154,7 @@ class AGMMinutes(db.Model):
     resolutions = db.Column(db.Text, nullable=True)
     attendees = db.Column(db.Text, nullable=True)
     document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='agm_minutes')
     fiscal_year = db.relationship('FiscalYear', backref='agm_minutes')

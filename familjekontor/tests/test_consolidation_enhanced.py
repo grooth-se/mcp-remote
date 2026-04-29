@@ -6,18 +6,26 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.consolidation import IntercompanyMatch, AcquisitionGoodwill
+from app.models.consolidation import AcquisitionGoodwill, IntercompanyMatch
 from app.services.consolidation_service import (
-    create_consolidation_group, add_member,
-    get_consolidated_pnl, get_consolidated_balance_sheet,
-    calculate_effective_ownership, calculate_minority_interest,
-    detect_intercompany_transactions, confirm_match, reject_match,
+    add_member,
+    calculate_effective_ownership,
+    calculate_goodwill_amortization,
+    calculate_minority_interest,
+    confirm_match,
+    create_consolidation_group,
+    detect_intercompany_transactions,
+    export_consolidated_report,
+    get_consolidated_balance_sheet,
+    get_consolidated_cash_flow,
+    get_consolidated_pnl,
+    get_goodwill_entries,
     get_pending_matches,
-    register_acquisition, calculate_goodwill_amortization,
-    get_total_remaining_goodwill, get_goodwill_entries,
-    get_consolidated_cash_flow, export_consolidated_report,
+    get_total_remaining_goodwill,
+    register_acquisition,
+    reject_match,
 )
 
 

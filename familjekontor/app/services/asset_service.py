@@ -1,11 +1,19 @@
 """Asset management service: fixed asset register, depreciation, disposal."""
 
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
+
 from sqlalchemy import func
+
 from app.extensions import db
-from app.models.asset import FixedAsset, DepreciationRun, DepreciationEntry, ASSET_CATEGORY_DEFAULTS, ASSET_CATEGORY_LABELS
-from app.models.accounting import FiscalYear, Account, Verification
+from app.models.accounting import Account, FiscalYear
+from app.models.asset import (
+    ASSET_CATEGORY_DEFAULTS,
+    ASSET_CATEGORY_LABELS,
+    DepreciationEntry,
+    DepreciationRun,
+    FixedAsset,
+)
 from app.models.audit import AuditLog
 from app.services.accounting_service import create_verification
 

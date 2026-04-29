@@ -3,16 +3,12 @@ and simple cash flow projection.
 """
 
 from io import BytesIO
-from collections import OrderedDict
-from datetime import date as date_type
-from decimal import Decimal
-
-from sqlalchemy import func, extract
 
 from app.extensions import db
-from app.models.accounting import Account, Verification, VerificationRow, FiscalYear
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.services.report_service import (
-    get_profit_and_loss, get_balance_sheet, _get_account_balances,
+    _get_account_balances,
+    get_profit_and_loss,
 )
 
 
@@ -25,19 +21,15 @@ def get_cash_flow_statement(company_id, fiscal_year_id):
     Returns dict with operating, investing, financing sections + totals.
     """
     pnl = get_profit_and_loss(company_id, fiscal_year_id)
-    bs = get_balance_sheet(company_id, fiscal_year_id)
 
     # Get prior year balance sheet
     fy = db.session.get(FiscalYear, fiscal_year_id)
-    prior_fy = (FiscalYear.query
-                .filter_by(company_id=company_id)
-                .filter(FiscalYear.year < fy.year)
-                .order_by(FiscalYear.year.desc())
-                .first())
-
-    prior_bs = None
-    if prior_fy:
-        prior_bs = get_balance_sheet(company_id, prior_fy.id)
+    prior_fy = (
+        FiscalYear.query.filter_by(company_id=company_id)
+        .filter(FiscalYear.year < fy.year)
+        .order_by(FiscalYear.year.desc())
+        .first()
+    )
 
     # Helper to get balance for account prefix from raw balances
     def _prefix_balance(balances, prefixes):
@@ -80,7 +72,9 @@ def get_cash_flow_statement(company_id, fiscal_year_id):
 
     delta_receivables = -(receivables - receivables_prior)
     if delta_receivables:
-        adjustments.append({'label': 'Förändring kundfordringar', 'amount': round(delta_receivables, 2)})
+        adjustments.append(
+            {'label': 'Förändring kundfordringar', 'amount': round(delta_receivables, 2)}
+        )
 
     delta_inventory = -(inventory - inventory_prior)
     if delta_inventory:
@@ -88,7 +82,9 @@ def get_cash_flow_statement(company_id, fiscal_year_id):
 
     delta_payables = payables - payables_prior
     if delta_payables:
-        adjustments.append({'label': 'Förändring leverantörsskulder', 'amount': round(delta_payables, 2)})
+        adjustments.append(
+            {'label': 'Förändring leverantörsskulder', 'amount': round(delta_payables, 2)}
+        )
 
     operating_total = result_before_tax + sum(a['amount'] for a in adjustments)
 
@@ -97,27 +93,33 @@ def get_cash_flow_statement(company_id, fiscal_year_id):
     net_investment = -(fixed_current - fixed_prior + depreciation)
     investing_items = []
     if net_investment:
-        investing_items.append({
-            'label': 'Förvärv/försäljning av anläggningstillgångar',
-            'amount': round(net_investment, 2),
-        })
+        investing_items.append(
+            {
+                'label': 'Förvärv/försäljning av anläggningstillgångar',
+                'amount': round(net_investment, 2),
+            }
+        )
     investing_total = sum(i['amount'] for i in investing_items)
 
     # FINANCING ACTIVITIES
     financing_items = []
     delta_equity = equity_current - equity_prior - result_before_tax
     if abs(delta_equity) > 0.01:
-        financing_items.append({
-            'label': 'Förändring eget kapital (exkl årets resultat)',
-            'amount': round(delta_equity, 2),
-        })
+        financing_items.append(
+            {
+                'label': 'Förändring eget kapital (exkl årets resultat)',
+                'amount': round(delta_equity, 2),
+            }
+        )
 
     delta_lt_debt = lt_debt_current - lt_debt_prior
     if abs(delta_lt_debt) > 0.01:
-        financing_items.append({
-            'label': 'Förändring långfristiga skulder',
-            'amount': round(delta_lt_debt, 2),
-        })
+        financing_items.append(
+            {
+                'label': 'Förändring långfristiga skulder',
+                'amount': round(delta_lt_debt, 2),
+            }
+        )
     financing_total = sum(i['amount'] for i in financing_items)
 
     total_cash_flow = round(operating_total + investing_total + financing_total, 2)
@@ -150,33 +152,34 @@ def get_monthly_cash_flow(company_id, fiscal_year_id):
 
     Returns dict with labels and monthly arrays.
     """
-    fy = db.session.get(FiscalYear, fiscal_year_id)
-    months = list(range(1, 13))
-    labels = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun',
-              'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec']
+    labels = ['Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec']
 
     operating = [0.0] * 12
     investing = [0.0] * 12
     financing = [0.0] * 12
 
     # Get all verifications with cash account rows
-    cash_rows = (db.session.query(
-        Verification.id,
-        Verification.verification_date,
-        VerificationRow.debit,
-        VerificationRow.credit,
-        Account.account_number,
-    ).join(VerificationRow, VerificationRow.verification_id == Verification.id)
-     .join(Account, Account.id == VerificationRow.account_id)
-     .filter(
-         Verification.company_id == company_id,
-         Verification.fiscal_year_id == fiscal_year_id,
-         Account.account_number.like('19%'),
-     ).all())
+    cash_rows = (
+        db.session.query(
+            Verification.id,
+            Verification.verification_date,
+            VerificationRow.debit,
+            VerificationRow.credit,
+            Account.account_number,
+        )
+        .join(VerificationRow, VerificationRow.verification_id == Verification.id)
+        .join(Account, Account.id == VerificationRow.account_id)
+        .filter(
+            Verification.company_id == company_id,
+            Verification.fiscal_year_id == fiscal_year_id,
+            Account.account_number.like('19%'),
+        )
+        .all()
+    )
 
     # Group by verification ID
     cash_by_ver = {}
-    for ver_id, ver_date, debit, credit, acct_num in cash_rows:
+    for ver_id, ver_date, debit, credit, _acct_num in cash_rows:
         if ver_id not in cash_by_ver:
             cash_by_ver[ver_id] = {'date': ver_date, 'amount': 0.0}
         cash_by_ver[ver_id]['amount'] += float(debit) - float(credit)
@@ -187,12 +190,15 @@ def get_monthly_cash_flow(company_id, fiscal_year_id):
         amount = ver_info['amount']
 
         # Get counterpart accounts
-        counterparts = (db.session.query(Account.account_number)
-                        .join(VerificationRow, VerificationRow.account_id == Account.id)
-                        .filter(
-                            VerificationRow.verification_id == ver_id,
-                            ~Account.account_number.like('19%'),
-                        ).all())
+        counterparts = (
+            db.session.query(Account.account_number)
+            .join(VerificationRow, VerificationRow.account_id == Account.id)
+            .filter(
+                VerificationRow.verification_id == ver_id,
+                ~Account.account_number.like('19%'),
+            )
+            .all()
+        )
 
         category = _classify_counterparts([c[0] for c in counterparts])
 
@@ -203,7 +209,7 @@ def get_monthly_cash_flow(company_id, fiscal_year_id):
         else:
             operating[month_idx] += amount
 
-    net = [round(o + i + f, 2) for o, i, f in zip(operating, investing, financing)]
+    net = [round(o + i + f, 2) for o, i, f in zip(operating, investing, financing, strict=False)]
     cumulative = []
     running = 0.0
     for n in net:
@@ -359,11 +365,12 @@ def get_enhanced_cash_flow_forecast(company_id, fiscal_year_id, forecast_months=
     # Seasonal patterns from prior year
     seasonal_factors = {}
     has_seasonal = False
-    prior_fy = (FiscalYear.query
-                .filter_by(company_id=company_id)
-                .filter(FiscalYear.year < fy.year)
-                .order_by(FiscalYear.year.desc())
-                .first())
+    prior_fy = (
+        FiscalYear.query.filter_by(company_id=company_id)
+        .filter(FiscalYear.year < fy.year)
+        .order_by(FiscalYear.year.desc())
+        .first()
+    )
 
     if prior_fy:
         prior_monthly = get_monthly_cash_flow(company_id, prior_fy.id)
@@ -373,7 +380,9 @@ def get_enhanced_cash_flow_forecast(company_id, fiscal_year_id, forecast_months=
             prior_avg = sum(prior_values[i] for i in prior_data) / len(prior_data)
             if abs(prior_avg) > 0.01:
                 for m in range(12):
-                    seasonal_factors[m] = prior_values[m] / prior_avg if prior_values[m] != 0 else 1.0
+                    seasonal_factors[m] = (
+                        prior_values[m] / prior_avg if prior_values[m] != 0 else 1.0
+                    )
                 has_seasonal = True
 
     # Known obligations: pending supplier invoices + recurring templates + tax payments
@@ -418,12 +427,14 @@ def _add_known_obligations(company_id, fy, obligations):
     from app.models.tax import TaxPayment
 
     # Pending supplier invoices due within FY
-    pending = SupplierInvoice.query.filter_by(
-        company_id=company_id, status='pending'
-    ).filter(
-        SupplierInvoice.due_date >= fy.start_date,
-        SupplierInvoice.due_date <= fy.end_date,
-    ).all()
+    pending = (
+        SupplierInvoice.query.filter_by(company_id=company_id, status='pending')
+        .filter(
+            SupplierInvoice.due_date >= fy.start_date,
+            SupplierInvoice.due_date <= fy.end_date,
+        )
+        .all()
+    )
 
     for inv in pending:
         if inv.due_date and inv.total_amount:
@@ -431,21 +442,25 @@ def _add_known_obligations(company_id, fy, obligations):
             obligations[month_idx] -= float(inv.total_amount)
 
     # Recurring invoice templates (expected income)
-    templates = RecurringInvoiceTemplate.query.filter_by(
-        company_id=company_id, active=True
-    ).all()
+    templates = RecurringInvoiceTemplate.query.filter_by(company_id=company_id, active=True).all()
 
     for tmpl in templates:
         if tmpl.next_date and fy.start_date <= tmpl.next_date <= fy.end_date:
-            total = sum(float(li.unit_price or 0) * float(li.quantity or 1) for li in tmpl.line_items)
+            total = sum(
+                float(li.unit_price or 0) * float(li.quantity or 1) for li in tmpl.line_items
+            )
             if total > 0:
                 month_idx = tmpl.next_date.month - 1
                 obligations[month_idx] += total
 
     # Historical tax payments for recurring months (use prior year pattern)
-    prior_payments = TaxPayment.query.filter_by(company_id=company_id).filter(
-        db.extract('year', TaxPayment.payment_date) == fy.year - 1,
-    ).all()
+    prior_payments = (
+        TaxPayment.query.filter_by(company_id=company_id)
+        .filter(
+            db.extract('year', TaxPayment.payment_date) == fy.year - 1,
+        )
+        .all()
+    )
 
     for tp in prior_payments:
         if tp.payment_date and tp.amount:

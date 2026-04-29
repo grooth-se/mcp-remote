@@ -1,21 +1,22 @@
 """Multi-company consolidation service: consolidated P&L, balance sheet,
 intercompany detection, minority interest, goodwill, cash flow."""
 
-from decimal import Decimal
 from collections import OrderedDict
-from datetime import date
+from decimal import Decimal
 from io import BytesIO
 
-from app.extensions import db
-from app.models.consolidation import (
-    ConsolidationGroup, ConsolidationGroupMember, IntercompanyElimination,
-    IntercompanyMatch, AcquisitionGoodwill,
-)
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.company import Company
-from app.services.report_service import get_profit_and_loss, get_balance_sheet
 from sqlalchemy import func
 
+from app.extensions import db
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
+from app.models.consolidation import (
+    AcquisitionGoodwill,
+    ConsolidationGroup,
+    ConsolidationGroupMember,
+    IntercompanyElimination,
+    IntercompanyMatch,
+)
+from app.services.report_service import get_balance_sheet, get_profit_and_loss
 
 # ---------------------------------------------------------------------------
 # Group & Member CRUD

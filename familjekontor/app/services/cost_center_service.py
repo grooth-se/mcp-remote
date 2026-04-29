@@ -3,8 +3,8 @@
 from decimal import Decimal
 
 from app.extensions import db
+from app.models.accounting import Account, Verification, VerificationRow
 from app.models.cost_center import CostCenter
-from app.models.accounting import Account, Verification, VerificationRow, FiscalYear
 
 
 def get_cost_centers(company_id, active_only=True):

@@ -1,14 +1,15 @@
 """Recurring invoice service: template management and invoice generation."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from app.extensions import db
-from app.models.recurring_invoice import RecurringInvoiceTemplate, RecurringLineItem
 from app.models.invoice import CustomerInvoice, InvoiceLineItem
+from app.models.recurring_invoice import RecurringInvoiceTemplate
 from app.services.invoice_pdf_service import (
-    generate_next_invoice_number, recalculate_invoice_totals,
     create_customer_invoice_verification,
+    generate_next_invoice_number,
+    recalculate_invoice_totals,
 )
 
 
@@ -165,7 +166,7 @@ def generate_invoice_from_template(template_id):
 
     # Advance template
     template.next_date = advance_next_date(invoice_date, template.interval)
-    template.last_generated_at = datetime.now(timezone.utc)
+    template.last_generated_at = datetime.now(UTC)
     template.invoices_generated = (template.invoices_generated or 0) + 1
 
     db.session.commit()

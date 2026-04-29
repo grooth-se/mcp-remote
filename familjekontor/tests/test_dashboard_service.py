@@ -4,12 +4,16 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.models.invoice import Customer, CustomerInvoice
 from app.services.dashboard_service import (
-    get_multi_company_overview, get_kpi_data, get_revenue_expense_trend,
-    get_cash_flow_data, get_invoice_aging, get_fiscal_year_progress,
+    get_cash_flow_data,
+    get_fiscal_year_progress,
+    get_invoice_aging,
+    get_kpi_data,
+    get_multi_company_overview,
+    get_revenue_expense_trend,
     get_salary_overview,
 )
 

@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 
@@ -16,7 +17,7 @@ class Document(db.Model):
     expiry_date = db.Column(db.Date)
     reminder_date = db.Column(db.Date)
     uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     # Links to accounting entities (Phase 4D)
     verification_id = db.Column(db.Integer, db.ForeignKey('verifications.id'), nullable=True)

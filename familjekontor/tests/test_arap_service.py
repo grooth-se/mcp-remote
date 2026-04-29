@@ -5,16 +5,18 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import Customer, Supplier, CustomerInvoice, SupplierInvoice
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
 from app.services.arap_service import (
-    get_ar_aging_by_customer, get_ap_aging_by_supplier,
-    get_dso, get_dpo,
-    get_top_customers, get_top_suppliers,
+    get_ap_aging_by_supplier,
+    get_ar_aging_by_customer,
     get_customer_revenue_breakdown,
+    get_dpo,
+    get_dso,
+    get_top_customers,
+    get_top_suppliers,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

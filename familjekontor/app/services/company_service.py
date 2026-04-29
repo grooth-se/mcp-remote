@@ -1,9 +1,10 @@
 """Company management service."""
 
 from datetime import date
+
 from app.extensions import db
+from app.models.accounting import Account, FiscalYear
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account
 from app.utils.bas_kontoplan import seed_accounts_for_company
 
 
@@ -54,7 +55,7 @@ def create_company(name, org_number, company_type, accounting_standard='K2',
 def get_company_summary(company_id):
     """Get summary stats for a company."""
     from app.models.accounting import Verification
-    from app.models.invoice import SupplierInvoice, CustomerInvoice
+    from app.models.invoice import CustomerInvoice, SupplierInvoice
 
     company = db.session.get(Company, company_id)
     if not company:

@@ -158,7 +158,7 @@ def _get_arap_section(company_id, fiscal_year_id, has_ai):
     dpo = None
 
     try:
-        from app.services.arap_service import get_dso, get_dpo
+        from app.services.arap_service import get_dpo, get_dso
         dso = get_dso(company_id, fiscal_year_id)
         dpo = get_dpo(company_id, fiscal_year_id)
     except Exception:

@@ -1,12 +1,14 @@
 """Notification center routes (Phase 7B)."""
 
-from flask import Blueprint, render_template, session, redirect, url_for, jsonify, request
-from flask_login import login_required, current_user
+from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required
 
-from app.extensions import csrf
 from app.services.notification_service import (
-    get_unread_count, get_recent_notifications, get_all_notifications,
-    mark_as_read, mark_all_read,
+    get_all_notifications,
+    get_recent_notifications,
+    get_unread_count,
+    mark_all_read,
+    mark_as_read,
 )
 
 notification_bp = Blueprint('notifications', __name__)

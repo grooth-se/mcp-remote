@@ -6,15 +6,17 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.user import User
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.models.saved_report import SavedReport
+from app.models.user import User
 from app.services.report_center_service import (
-    get_available_reports, save_report_config, get_saved_reports,
-    delete_saved_report, generate_report_pdf,
+    delete_saved_report,
+    generate_report_pdf,
+    get_available_reports,
+    get_saved_reports,
+    save_report_config,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

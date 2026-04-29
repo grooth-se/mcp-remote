@@ -2,14 +2,19 @@
 from datetime import date
 
 from app.extensions import db
-from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.salary import Employee
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.annual_report import AnnualReport
+from app.models.company import Company
+from app.models.salary import Employee
 from app.services.annual_report_service import (
-    get_or_create_report, save_report, get_multi_year_overview,
-    get_average_employees, finalize_report, reopen_report,
-    get_k2_boilerplate, K2_BOILERPLATE,
+    K2_BOILERPLATE,
+    finalize_report,
+    get_average_employees,
+    get_k2_boilerplate,
+    get_multi_year_overview,
+    get_or_create_report,
+    reopen_report,
+    save_report,
 )
 
 

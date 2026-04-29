@@ -3,17 +3,17 @@
 from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
+
 import pytest
 
-from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice
-from app.models.exchange_rate import ExchangeRate
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.bank import BankAccount
-from app.services.exchange_rate_service import save_rate_to_db
+from app.models.company import Company
+from app.models.exchange_rate import ExchangeRate
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
 from app.services.accounting_service import create_verification
-from app.utils.currency import calculate_fx_gain_loss, SUPPORTED_CURRENCIES
-
+from app.services.exchange_rate_service import save_rate_to_db
+from app.utils.currency import SUPPORTED_CURRENCIES, calculate_fx_gain_loss
 
 # === Currency utility tests ===
 

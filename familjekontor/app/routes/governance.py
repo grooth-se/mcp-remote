@@ -1,22 +1,38 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, session, request
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
+from app.forms.governance import (
+    AGMForm,
+    BoardMemberForm,
+    DividendForm,
+    HoldingForm,
+    ShareClassForm,
+    ShareholderForm,
+)
 from app.models.accounting import FiscalYear
 from app.models.governance import (
-    BoardMember, ShareClass, Shareholder, ShareholderHolding,
-    DividendDecision, AGMMinutes, BOARD_ROLE_LABELS,
-)
-from app.forms.governance import (
-    BoardMemberForm, ShareClassForm, ShareholderForm,
-    HoldingForm, DividendForm, AGMForm,
+    BOARD_ROLE_LABELS,
+    BoardMember,
 )
 from app.services.governance_service import (
-    create_board_member, update_board_member, end_appointment,
-    get_board_members, create_share_class, get_share_classes,
-    create_shareholder, get_shareholders, add_holding,
-    get_ownership_summary, get_share_register,
-    create_dividend_decision, pay_dividend, get_dividends,
-    create_agm_minutes, get_agm_history, get_agm,
+    add_holding,
+    create_agm_minutes,
+    create_board_member,
+    create_dividend_decision,
+    create_share_class,
+    create_shareholder,
+    end_appointment,
+    get_agm,
+    get_agm_history,
+    get_board_members,
+    get_dividends,
+    get_ownership_summary,
+    get_share_classes,
+    get_share_register,
+    get_shareholders,
+    pay_dividend,
+    update_board_member,
 )
 
 governance_bp = Blueprint('governance', __name__)

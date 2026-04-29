@@ -5,12 +5,13 @@ from decimal import Decimal
 
 import pytest
 
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
 from app.services.ratio_service import (
-    get_financial_ratios, get_multi_year_ratios, get_ratio_summary,
+    get_financial_ratios,
+    get_multi_year_ratios,
+    get_ratio_summary,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -1,13 +1,16 @@
 from datetime import date
-from decimal import Decimal
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.extensions import limiter
-from app.models.exchange_rate import ExchangeRate
 from app.forms.currency import ExchangeRateForm, FetchRatesForm
+from app.models.exchange_rate import ExchangeRate
 from app.services.exchange_rate_service import (
-    get_rate, save_manual_rate, fetch_rates_for_range, RIKSBANKEN_SERIES,
+    RIKSBANKEN_SERIES,
+    fetch_rates_for_range,
+    get_rate,
+    save_manual_rate,
 )
 
 currency_bp = Blueprint('currency', __name__)

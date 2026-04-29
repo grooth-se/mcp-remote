@@ -1,10 +1,13 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, session, jsonify, request
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import login_required
+
 from app.extensions import db
 from app.models.accounting import FiscalYear
 from app.models.company import Company
 from app.services.ratio_service import (
-    get_financial_ratios, get_multi_year_ratios, get_ratio_summary,
+    get_financial_ratios,
+    get_multi_year_ratios,
+    get_ratio_summary,
 )
 
 ratios_bp = Blueprint('ratios', __name__)

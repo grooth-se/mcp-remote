@@ -1,16 +1,21 @@
-from flask import (Blueprint, render_template, redirect, url_for, flash,
-                   request, session, send_file)
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, send_file, session, url_for
+from flask_login import current_user, login_required
+
 from app.extensions import db
-from app.models.company import Company
-from app.models.accounting import FiscalYear
-from app.models.consolidation import (
-    ConsolidationGroup, ConsolidationGroupMember, IntercompanyElimination,
-    IntercompanyMatch, AcquisitionGoodwill,
-)
 from app.forms.consolidation import (
-    ConsolidationGroupForm, AddMemberForm,
-    ConsolidationReportForm, EliminationForm, GoodwillForm,
+    AddMemberForm,
+    ConsolidationGroupForm,
+    ConsolidationReportForm,
+    EliminationForm,
+    GoodwillForm,
+)
+from app.models.accounting import FiscalYear
+from app.models.company import Company
+from app.models.consolidation import (
+    AcquisitionGoodwill,
+    ConsolidationGroup,
+    IntercompanyElimination,
+    IntercompanyMatch,
 )
 from app.services import consolidation_service
 

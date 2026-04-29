@@ -7,14 +7,13 @@ from decimal import Decimal
 import pytest
 
 from app.extensions import db as _db
-from app.models.company import Company
-from app.models.accounting import FiscalYear, Account, Verification, VerificationRow
-from app.models.invoice import Supplier, SupplierInvoice, Customer, CustomerInvoice
-from app.models.document import Document
-from app.models.tax import VATReport, Deadline
+from app.models.accounting import Account, FiscalYear, Verification, VerificationRow
 from app.models.bank import BankAccount, BankTransaction
+from app.models.company import Company
+from app.models.document import Document
+from app.models.invoice import Customer, CustomerInvoice, Supplier, SupplierInvoice
+from app.models.tax import Deadline, VATReport
 from app.utils.security import safe_path
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from app.extensions import db
 
 MONTH_NAMES_SV = [
@@ -25,7 +26,7 @@ class Employee(db.Model):
     bank_clearing = db.Column(db.String(10), nullable=True)
     bank_account = db.Column(db.String(20), nullable=True)
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='employees')
     salary_entries = db.relationship('SalaryEntry', backref='employee', lazy='dynamic')
@@ -62,7 +63,7 @@ class SalaryRun(db.Model):
     approved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     approved_at = db.Column(db.DateTime, nullable=True)
     paid_date = db.Column(db.Date, nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
     company = db.relationship('Company', backref='salary_runs')
     fiscal_year = db.relationship('FiscalYear', backref='salary_runs')
