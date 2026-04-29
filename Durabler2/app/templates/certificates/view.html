@@ -82,6 +82,12 @@
                     Brinell
                 </a>
             </div>
+            <div class="col-md-4 col-lg-2">
+                <a href="{{ url_for('charpy.new') }}?certificate={{ cert.id }}" class="btn btn-outline-secondary w-100 py-3" style="border-color: #0d6efd; color: #0d6efd;">
+                    <i class="bi bi-hammer d-block fs-3 mb-1"></i>
+                    Charpy
+                </a>
+            </div>
         </div>
     </div>
 </div>
@@ -374,7 +380,7 @@
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
                                 <strong>{{ test.test_id }}</strong>
-                                <span class="badge ms-1" style="background-color: {{ '#0d6efd' if test.test_method == 'TENSILE' else '#198754' if test.test_method == 'SONIC' else '#ffc107' if test.test_method == 'FCGR' else '#dc3545' if test.test_method == 'CTOD' else '#0dcaf0' if test.test_method == 'KIC' else '#6f42c1' if test.test_method == 'VICKERS' else '#d63384' if test.test_method == 'BRINELL' else '#6c757d' }}; color: {{ '#000' if test.test_method == 'FCGR' else '#fff' }}">{{ test.test_method }}</span>
+                                <span class="badge ms-1" style="background-color: {{ '#0d6efd' if test.test_method == 'TENSILE' else '#198754' if test.test_method == 'SONIC' else '#ffc107' if test.test_method == 'FCGR' else '#dc3545' if test.test_method == 'CTOD' else '#0dcaf0' if test.test_method == 'KIC' else '#6f42c1' if test.test_method == 'VICKERS' else '#d63384' if test.test_method == 'BRINELL' else '#0d6efd' if test.test_method == 'CHARPY' else '#6c757d' }}; color: {{ '#000' if test.test_method == 'FCGR' else '#fff' }}">{{ test.test_method }}</span>
                                 <br>
                                 <small class="text-muted">
                                     {{ test.specimen_id or '-' }} |
@@ -410,6 +416,10 @@
                                     </a>
                                     {% elif test.test_method == 'BRINELL' %}
                                     <a href="{{ url_for('brinell.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                    {% elif test.test_method == 'CHARPY' %}
+                                    <a href="{{ url_for('charpy.view', test_id=test.id) }}" class="btn btn-outline-primary" title="View Test">
                                         <i class="bi bi-eye"></i> View
                                     </a>
                                     {% else %}

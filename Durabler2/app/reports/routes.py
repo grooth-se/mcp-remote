@@ -343,6 +343,10 @@ def generate_report(cert_id):
             # Generate Brinell report
             _generate_brinell_report(certificate, test_record, output_path)
 
+        elif test_record.test_method == 'CHARPY':
+            # Generate Charpy report
+            _generate_charpy_report(certificate, test_record, output_path)
+
         else:
             flash(f'Report generation for {test_record.test_method} not yet implemented.', 'warning')
             return redirect(url_for('certificates.view', cert_id=cert_id))
@@ -2403,6 +2407,350 @@ def _generate_brinell_report(certificate, test_record, output_path):
         footer_run = footer_para.add_run(disclaimer_text)
         footer_run.font.size = Pt(7)
         footer_run.italic = True
+
+    doc.save(output_path)
+
+    if chart_path and chart_path.exists():
+        import os
+        os.remove(chart_path)
+
+
+def _generate_charpy_report(certificate, test_record, output_path):
+    """Generate Charpy Impact Word report for certificate approval workflow."""
+    import numpy as np
+    from docx import Document
+    from docx.shared import Inches, Pt, Cm, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from app.models import AnalysisResult
+
+    test_params = test_record.geometry if test_record.geometry else {}
+    readings = test_params.get('readings', [])
+
+    results = {}
+    analysis_records = AnalysisResult.query.filter_by(test_record_id=test_record.id).all()
+    for ar in analysis_records:
+        if ar.parameter_name == 'mean_energy':
+            results['mean_energy'] = {'value': ar.value, 'uncertainty': ar.uncertainty}
+        else:
+            results[ar.parameter_name] = ar.value
+    results['uncertainty_budget'] = test_params.get('uncertainty_budget', {})
+
+    # Chart
+    chart_path = None
+    if readings:
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
+        energies = [r['absorbed_energy'] for r in readings]
+        specimen_ids = [r.get('specimen_id', f'#{i+1}') for i, r in enumerate(readings)]
+        mean_val = np.mean(energies)
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        x = range(len(energies))
+        bars = ax.bar(x, energies, color='#0d6efd', width=0.6)
+        ax.axhline(y=mean_val, color='grey', linestyle=':', linewidth=2, label='Mean')
+        for bar, e in zip(bars, energies):
+            ax.text(bar.get_x() + bar.get_width()/2., bar.get_height() + max(energies)*0.02,
+                    f'{e:.1f}', ha='center', va='bottom', fontsize=9)
+
+        temp = test_params.get('test_temperature', test_record.temperature or 23)
+        ax.set_xlabel('Specimen')
+        ax.set_ylabel('Absorbed Energy (J)')
+        ax.set_title(f'Absorbed Energy at {temp}\u00b0C')
+        ax.set_xticks(x)
+        ax.set_xticklabels(specimen_ids)
+        ax.legend(loc='upper right')
+        ax.set_ylim(0, max(energies) * 1.25)
+        ax.grid(True, alpha=0.3, axis='y')
+
+        chart_path = Path(current_app.config['REPORTS_FOLDER']) / f'charpy_chart_{test_record.id}.png'
+        fig.savefig(chart_path, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+
+    temp = test_params.get('test_temperature', test_record.temperature or 23)
+    notch_type = test_params.get('notch_type', 'V')
+    notch_label = 'V-notch (45\u00b0, r=0.25mm)' if notch_type == 'V' else 'U-notch (r=1mm)'
+
+    test_info = {
+        'certificate_number': certificate.certificate_number_with_rev,
+        'test_project': certificate.test_order or '',
+        'customer': certificate.customer or '',
+        'customer_order': certificate.customer_order or '',
+        'product_sn': certificate.product_sn or '',
+        'specimen_id': test_record.specimen_id or '',
+        'customer_specimen_info': certificate.customer_specimen_info or '',
+        'material': certificate.material or '',
+        'requirement': certificate.requirement or '',
+        'location_orientation': test_params.get('location_orientation', certificate.location_orientation or ''),
+        'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
+        'test_temperature': temp,
+        'notch_type': notch_label,
+        'specimen_size': test_params.get('specimen_size', '10x10'),
+        'notes': test_params.get('notes', ''),
+        'operator': current_user.full_name if current_user.full_name else current_user.username,
+    }
+
+    class ResultProxy:
+        def __init__(self, data):
+            self._data = data
+        @property
+        def mean_energy(self):
+            d = self._data.get('mean_energy', {})
+            return type('MV', (), {'value': d.get('value', 0), 'uncertainty': d.get('uncertainty', 0)})()
+        @property
+        def std_dev(self):
+            return self._data.get('std_dev', 0)
+        @property
+        def range_value(self):
+            return self._data.get('range', 0)
+        @property
+        def min_value(self):
+            return self._data.get('min_value', 0)
+        @property
+        def max_value(self):
+            return self._data.get('max_value', 0)
+        @property
+        def n_specimens(self):
+            return self._data.get('n_specimens', 0)
+        @property
+        def mean_lateral_expansion(self):
+            return self._data.get('mean_lateral_expansion')
+        @property
+        def mean_shear_area(self):
+            return self._data.get('mean_shear_area')
+
+    rp = ResultProxy(results)
+    requirement_value = test_info.get('requirement', '') or '-'
+
+    doc = Document()
+    style = doc.styles['Normal']
+    style.paragraph_format.space_before = Pt(0)
+    style.paragraph_format.space_after = Pt(3)
+    style.paragraph_format.line_spacing = 1.0
+    style.font.size = Pt(10)
+
+    dark_green = RGBColor(0x00, 0x64, 0x00)
+    for i in range(1, 4):
+        hs = doc.styles[f'Heading {i}']
+        hs.paragraph_format.space_before = Pt(8)
+        hs.paragraph_format.space_after = Pt(4)
+        hs.font.color.rgb = dark_green
+
+    logo_path = _get_logo_path()
+
+    for section in doc.sections:
+        section.top_margin = Cm(1.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(2.0)
+        section.right_margin = Cm(2.0)
+        header = section.header
+        header.is_linked_to_previous = False
+
+        lp = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+        lp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        lp.paragraph_format.space_after = Pt(0)
+        if logo_path:
+            lp.add_run().add_picture(str(logo_path), width=Cm(5.0))
+
+        tp = header.add_paragraph()
+        tp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        tp.paragraph_format.space_before = Pt(0)
+        tp.paragraph_format.space_after = Pt(0)
+        tr = tp.add_run('Charpy Impact Test Report')
+        tr.bold = True
+        tr.font.size = Pt(12)
+
+        sp = header.add_paragraph()
+        sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        sp.paragraph_format.space_before = Pt(0)
+        sp.paragraph_format.space_after = Pt(0)
+        sp.add_run('ASTM E23 / ISO 148-1').font.size = Pt(8)
+
+        cp = header.add_paragraph()
+        cp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        cp.paragraph_format.space_before = Pt(0)
+        cp.paragraph_format.space_after = Pt(0)
+        cp.add_run(f"Certificate: {test_info.get('certificate_number', '')}").font.size = Pt(8)
+
+        dp = header.add_paragraph()
+        dp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        dp.paragraph_format.space_before = Pt(0)
+        dp.paragraph_format.space_after = Pt(0)
+        dp.add_run(f"Date: {test_info.get('test_date', '')}").font.size = Pt(8)
+
+    # Test Information
+    heading = doc.add_heading('Test Information', level=1)
+    heading.paragraph_format.space_before = Pt(0)
+    heading.paragraph_format.space_after = Pt(6)
+
+    info_data = [
+        ('Test Project:', test_info.get('test_project', ''), 'Test Temperature:', f"{test_info.get('test_temperature', '-40')} \u00b0C"),
+        ('Customer:', test_info.get('customer', ''), 'Test Standard:', 'ASTM E23 / ISO 148-1'),
+        ('Customer Order:', test_info.get('customer_order', ''), 'Test Equipment:', 'Analog Charpy impact tester'),
+        ('Product S/N:', test_info.get('specimen_id', ''), 'Notch Type:', test_info.get('notch_type', '')),
+        ('Material:', test_info.get('material', ''), 'Specimen Size:', f"{test_info.get('specimen_size', '10x10')} mm"),
+        ('Customer Specimen Info:', test_info.get('customer_specimen_info', ''), 'Notch Orientation:', test_info.get('location_orientation', '')),
+        ('Requirement:', test_info.get('requirement', ''), 'Operator:', test_info.get('operator', '')),
+    ]
+
+    table = doc.add_table(rows=len(info_data), cols=4)
+    table.style = 'Table Grid'
+    for i, (l1, v1, l2, v2) in enumerate(info_data):
+        table.rows[i].cells[0].text = l1
+        table.rows[i].cells[1].text = str(v1) if v1 else ''
+        table.rows[i].cells[2].text = l2
+        table.rows[i].cells[3].text = str(v2) if v2 else ''
+        if table.rows[i].cells[0].paragraphs[0].runs:
+            table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+        if table.rows[i].cells[2].paragraphs[0].runs:
+            table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
+        for cell in table.rows[i].cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+    # Results Summary
+    heading = doc.add_heading('Results Summary', level=1)
+    heading.paragraph_format.space_before = Pt(12)
+    heading.paragraph_format.space_after = Pt(6)
+
+    result_rows = [
+        ('Mean Absorbed Energy', f'{rp.mean_energy.value:.1f} \u00b1 {rp.mean_energy.uncertainty:.1f}', 'J'),
+        ('Standard Deviation', f'{rp.std_dev:.1f}', 'J'),
+        ('Range', f'{rp.range_value:.1f}', 'J'),
+        ('Minimum', f'{rp.min_value:.1f}', 'J'),
+        ('Maximum', f'{rp.max_value:.1f}', 'J'),
+        ('Number of Specimens', str(rp.n_specimens), '-'),
+    ]
+    if rp.mean_lateral_expansion is not None:
+        result_rows.append(('Mean Lateral Expansion', f'{rp.mean_lateral_expansion:.2f}', 'mm'))
+    if rp.mean_shear_area is not None:
+        result_rows.append(('Mean Shear Fracture Area', f'{rp.mean_shear_area:.0f}', '%'))
+    result_rows.append(('Requirement', requirement_value, '-'))
+
+    table = doc.add_table(rows=len(result_rows) + 1, cols=3)
+    table.style = 'Table Grid'
+    for i, h in enumerate(['Parameter', 'Value', 'Unit']):
+        table.rows[0].cells[i].text = h
+        table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+    for i, (p, v, u) in enumerate(result_rows):
+        table.rows[i+1].cells[0].text = p
+        table.rows[i+1].cells[1].text = v
+        table.rows[i+1].cells[2].text = u
+    for row in table.rows:
+        for cell in row.cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+    # Individual Specimens
+    heading = doc.add_heading('Individual Specimens', level=1)
+    heading.paragraph_format.space_before = Pt(12)
+    heading.paragraph_format.space_after = Pt(6)
+
+    has_le = any(r.get('lateral_expansion') is not None for r in readings)
+    has_sa = any(r.get('shear_fracture_area') is not None for r in readings)
+    cols = ['#', 'Specimen ID', 'Energy (J)']
+    if has_le:
+        cols.append('Lat. Exp. (mm)')
+    if has_sa:
+        cols.append('Shear (%)')
+
+    table = doc.add_table(rows=len(readings) + 1, cols=len(cols))
+    table.style = 'Table Grid'
+    for i, h in enumerate(cols):
+        table.rows[0].cells[i].text = h
+        table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+    for i, r in enumerate(readings):
+        table.rows[i+1].cells[0].text = str(r.get('specimen_number', i+1))
+        table.rows[i+1].cells[1].text = r.get('specimen_id', f'#{i+1}')
+        table.rows[i+1].cells[2].text = f"{r.get('absorbed_energy', 0):.1f}"
+        ci = 3
+        if has_le:
+            le = r.get('lateral_expansion')
+            table.rows[i+1].cells[ci].text = f"{le:.2f}" if le is not None else '-'
+            ci += 1
+        if has_sa:
+            sa = r.get('shear_fracture_area')
+            table.rows[i+1].cells[ci].text = f"{sa:.0f}" if sa is not None else '-'
+    for row in table.rows:
+        for cell in row.cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+    # Chart
+    if chart_path and chart_path.exists():
+        heading = doc.add_heading('Absorbed Energy Chart', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+        doc.add_picture(str(chart_path), width=Inches(5.5))
+        doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # Photos
+    photo_paths, temp_photos = _get_photo_paths(test_record)
+    if photo_paths:
+        heading = doc.add_heading('Fracture Surface', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+        for pp in photo_paths:
+            if pp.exists():
+                doc.add_picture(str(pp), width=Inches(4.0))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _cleanup_temp_files(temp_photos)
+
+    # Approval signatures
+    heading = doc.add_heading('Approval', level=1)
+    heading.paragraph_format.space_before = Pt(12)
+    heading.paragraph_format.space_after = Pt(6)
+
+    sig_table = doc.add_table(rows=4, cols=2)
+    sig_table.style = 'Table Grid'
+    sig_table.rows[0].cells[0].text = 'Role'
+    sig_table.rows[0].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[0].cells[1].text = 'Name / Signature'
+    sig_table.rows[0].cells[1].paragraphs[0].runs[0].bold = True
+    sig_table.rows[1].cells[0].text = 'Test Engineer:'
+    sig_table.rows[1].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[1].cells[1].text = test_info.get('operator', '')
+    sig_table.rows[2].cells[0].text = 'Approved by:'
+    sig_table.rows[2].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[2].cells[1].text = ''
+    sig_table.rows[3].cells[0].text = 'Third Party Approval:'
+    sig_table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[3].cells[1].text = ''
+
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    sig_row_height = Cm(1.5)
+    for row in sig_table.rows:
+        for cell in row.cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+    for row in [sig_table.rows[1], sig_table.rows[2], sig_table.rows[3]]:
+        tr_el = row._tr
+        trPr = tr_el.get_or_add_trPr()
+        trHeight = trPr.find(qn('w:trHeight'))
+        if trHeight is None:
+            trHeight = OxmlElement('w:trHeight')
+            trPr.append(trHeight)
+        trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))
+        trHeight.set(qn('w:hRule'), 'exact')
+
+    # Disclaimer
+    disclaimer_text = (
+        "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
+        "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
+        "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
+        "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
+        "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
+    )
+    for section in doc.sections:
+        footer = section.footer
+        footer.is_linked_to_previous = False
+        footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        footer_para.clear()
+        fr = footer_para.add_run(disclaimer_text)
+        fr.font.size = Pt(7)
+        fr.italic = True
 
     doc.save(output_path)
 

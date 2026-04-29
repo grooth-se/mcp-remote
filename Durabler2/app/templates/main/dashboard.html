@@ -96,6 +96,18 @@
         </div>
     </div>
 
+    <!-- Charpy -->
+    <div class="col-md-4 col-lg-3">
+        <div class="card h-100 test-card">
+            <div class="card-body text-center">
+                <i class="bi bi-hammer display-4 mb-1" style="color: #0d6efd;"></i>
+                <h5 class="card-title">Charpy Impact</h5>
+                <p class="card-text text-muted small">ISO 148-1, ASTM E23</p>
+                <a href="{{ url_for('charpy.index') }}" class="btn stretched-link" style="background-color: #0d6efd; color: white;">Open</a>
+            </div>
+        </div>
+    </div>
+
     <!-- Certificate Register -->
     <div class="col-md-4 col-lg-3">
         <div class="card h-100 test-card">
@@ -200,6 +212,8 @@
                                     <a href="{{ url_for('vickers.view', test_id=test.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
                                     {% elif test.test_method == 'BRINELL' %}
                                     <a href="{{ url_for('brinell.view', test_id=test.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
+                                    {% elif test.test_method == 'CHARPY' %}
+                                    <a href="{{ url_for('charpy.view', test_id=test.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
                                     {% else %}
                                     <a href="#" class="btn btn-sm btn-outline-secondary disabled">View</a>
                                     {% endif %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Charpy Report{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('charpy.index') }}">Charpy Tests</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('charpy.view', test_id=test.id) }}">{{ test.test_id }}</a></li>
+        <li class="breadcrumb-item active">Generate Report</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0"><i class="bi bi-file-earmark-pdf"></i> Generate Charpy Report</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <div class="card bg-light mb-2">
+                        <div class="card-body">
+                            <h6 class="card-title">Test Information</h6>
+                            <dl class="row mb-0">
+                                <dt class="col-5">Test ID:</dt>
+                                <dd class="col-7">{{ test.test_id }}</dd>
+                                <dt class="col-5">Specimen:</dt>
+                                <dd class="col-7">{{ test.specimen_id or '-' }}</dd>
+                                <dt class="col-5">Material:</dt>
+                                <dd class="col-7">{{ test.material or '-' }}</dd>
+                                <dt class="col-5">Temperature:</dt>
+                                <dd class="col-7">{{ test.temperature if test.temperature is not none else '-' }} °C</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        {{ form.certificate_number.label(class="form-label") }}
+                        {{ form.certificate_number(class="form-control") }}
+                    </div>
+
+                    <div class="mb-2">
+                        {{ form.include_photo.label(class="form-label") }}
+                        {{ form.include_photo(class="form-select") }}
+                    </div>
+
+                    <div class="mb-2">
+                        {{ form.include_uncertainty_budget.label(class="form-label") }}
+                        {{ form.include_uncertainty_budget(class="form-select") }}
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-success btn-lg") }}
+                        <a href="{{ url_for('charpy.view', test_id=test.id) }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-eye"></i> Report Contents</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li><i class="bi bi-check text-success"></i> Test identification and conditions</li>
+                    <li><i class="bi bi-check text-success"></i> Test temperature, notch type, specimen size</li>
+                    <li><i class="bi bi-check text-success"></i> Mean absorbed energy with expanded uncertainty (k=2)</li>
+                    <li><i class="bi bi-check text-success"></i> Statistical summary (std dev, range, min, max)</li>
+                    <li><i class="bi bi-check text-success"></i> Individual specimens table (energy, lat. exp., shear %)</li>
+                    <li><i class="bi bi-check text-success"></i> Absorbed energy bar chart</li>
+                    <li><i class="bi bi-check text-success"></i> Uncertainty budget (ISO 17025)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -52,6 +52,7 @@ def create_app(config_name='default'):
     from .kic import kic_bp
     from .vickers import vickers_bp
     from .brinell import brinell_bp
+    from .charpy import charpy_bp
     from .certificates import certificates_bp
     from .reports import reports_bp
     from .statistics import statistics_bp
@@ -66,6 +67,7 @@ def create_app(config_name='default'):
     app.register_blueprint(kic_bp, url_prefix='/kic')
     app.register_blueprint(vickers_bp, url_prefix='/vickers')
     app.register_blueprint(brinell_bp, url_prefix='/brinell')
+    app.register_blueprint(charpy_bp, url_prefix='/charpy')
     app.register_blueprint(certificates_bp, url_prefix='/certificates')
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(statistics_bp, url_prefix='/statistics')

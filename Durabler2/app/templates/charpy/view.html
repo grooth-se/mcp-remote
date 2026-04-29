@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Charpy Test - {{ test.test_id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('charpy.index') }}">Charpy Tests</a></li>
+        <li class="breadcrumb-item active">{{ test.test_id }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+        <h2><i class="bi bi-hammer"></i> {{ test.test_id }}</h2>
+        <p class="text-muted mb-0">
+            {{ test.specimen_id or 'No specimen ID' }} |
+            {{ test.material or 'No material' }} |
+            {{ test_params.get('test_temperature', test.temperature) }}°C |
+            {{ test.test_date.strftime('%Y-%m-%d') if test.test_date else 'No date' }}
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('charpy.report', test_id=test.id) }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-pdf"></i> Generate Report
+        </a>
+        <a href="{{ url_for('charpy.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left column: Results -->
+    <div class="col-lg-4">
+        <!-- Results Summary -->
+        <div class="card mb-2">
+            <div class="card-header text-white" style="background-color: #0d6efd;">
+                <h5 class="mb-0"><i class="bi bi-hammer"></i> Results Summary</h5>
+            </div>
+            <div class="card-body">
+                {% if results.get('mean_energy') %}
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td><strong>Mean Energy</strong></td>
+                        <td>{{ '%.1f'|format(results.mean_energy.value) }} &pm; {{ '%.1f'|format(results.mean_energy.uncertainty) }} J</td>
+                    </tr>
+                    <tr><td>Std Dev</td><td>{{ '%.1f'|format(results.get('std_dev', 0)) }} J</td></tr>
+                    <tr><td>Range</td><td>{{ '%.1f'|format(results.get('range', 0)) }} J</td></tr>
+                    <tr><td>Min</td><td>{{ '%.1f'|format(results.get('min_value', 0)) }} J</td></tr>
+                    <tr><td>Max</td><td>{{ '%.1f'|format(results.get('max_value', 0)) }} J</td></tr>
+                    <tr><td>N Specimens</td><td>{{ results.get('n_specimens', 0)|int }}</td></tr>
+                    {% if results.get('mean_lateral_expansion') is not none %}
+                    <tr><td>Mean Lat. Exp.</td><td>{{ '%.2f'|format(results.mean_lateral_expansion) }} mm</td></tr>
+                    {% endif %}
+                    {% if results.get('mean_shear_area') is not none %}
+                    <tr><td>Mean Shear %</td><td>{{ '%.0f'|format(results.mean_shear_area) }} %</td></tr>
+                    {% endif %}
+                </table>
+                {% else %}
+                <p class="text-muted mb-0">No analysis results yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Test Parameters -->
+        <div class="card mb-2">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-gear"></i> Test Parameters</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td>Temperature</td><td>{{ test_params.get('test_temperature', test.temperature) }} °C</td></tr>
+                    <tr><td>Notch Type</td><td>{{ 'V-notch' if test_params.get('notch_type') == 'V' else 'U-notch' }}</td></tr>
+                    <tr><td>Specimen Size</td><td>{{ test_params.get('specimen_size', '10x10') }} mm</td></tr>
+                    <tr><td>Orientation</td><td>{{ test_params.get('location_orientation', '-') }}</td></tr>
+                    {% if test.certificate_number %}
+                    <tr><td>Certificate</td><td>{{ test.certificate_number }}</td></tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Uncertainty Budget -->
+        {% if results.get('uncertainty_budget') %}
+        <div class="card mb-2">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-percent"></i> Uncertainty Budget (k=2)</h6>
+            </div>
+            <div class="card-body">
+                {% set ub = results.uncertainty_budget %}
+                <table class="table table-sm mb-0">
+                    <tr><td>Type A (Repeatability)</td><td>{{ '%.2f'|format(ub.get('u_A', 0)) }} J</td></tr>
+                    <tr><td>Machine Calibration</td><td>{{ '%.2f'|format(ub.get('u_machine', 0)) }} J</td></tr>
+                    <tr><td>Specimen Dimensions</td><td>{{ '%.2f'|format(ub.get('u_dimension', 0)) }} J</td></tr>
+                    <tr class="table-secondary"><td><strong>Combined (u_c)</strong></td><td><strong>{{ '%.2f'|format(ub.get('u_combined', 0)) }} J</strong></td></tr>
+                    <tr class="table-primary"><td><strong>Expanded (U, k=2)</strong></td><td><strong>{{ '%.2f'|format(ub.get('U_expanded', 0)) }} J</strong></td></tr>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Photo -->
+        {% if photo_url %}
+        <div class="card mb-2">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-camera"></i> Fracture Surface</h6>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ photo_url }}" class="img-fluid rounded" alt="Fracture surface" style="max-height: 300px;">
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right column: Chart and Readings -->
+    <div class="col-lg-8">
+        <!-- Energy Chart -->
+        {% if energy_chart %}
+        <div class="card mb-2">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Absorbed Energy</h6>
+            </div>
+            <div class="card-body">
+                {{ energy_chart | safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Individual Specimens Table -->
+        {% if readings %}
+        <div class="card mb-2">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-list-ol"></i> Individual Specimens</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Specimen ID</th>
+                            <th>Energy (J)</th>
+                            <th>Lat. Exp. (mm)</th>
+                            <th>Shear (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in readings %}
+                        <tr>
+                            <td>{{ r.get('specimen_number', loop.index) }}</td>
+                            <td>{{ r.get('specimen_id', '-') }}</td>
+                            <td><strong>{{ '%.1f'|format(r.get('absorbed_energy', 0)) }}</strong></td>
+                            <td>{{ '%.2f'|format(r.lateral_expansion) if r.get('lateral_expansion') is not none else '-' }}</td>
+                            <td>{{ '%.0f'|format(r.shear_fracture_area) if r.get('shear_fracture_area') is not none else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
