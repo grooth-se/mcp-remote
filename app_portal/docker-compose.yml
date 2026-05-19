@@ -141,6 +141,24 @@ services:
       - portal
     restart: unless-stopped
 
+  subcalc:
+    build: ../subcalc
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${SUBCALC_SECRET_KEY:-change-me}
+      - DATABASE_URL=sqlite:////data/subcalc.db
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${SUBCALC_ADMIN_PASSWORD:-admin}
+      - APP_CODE=subcalc
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_EXTERNAL_URL=/
+      - PORTAL_AUTH_ENABLED=false
+    volumes:
+      - subcalc_data:/data
+    depends_on:
+      - portal
+    restart: unless-stopped
+
   trb:
     build: ../trb
     environment:
@@ -191,5 +209,6 @@ volumes:
   mg5_exports:
   spinventory_data:
   mpqp_data:
+  subcalc_data:
   trb_data:
   trb_output:
