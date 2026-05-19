@@ -63,7 +63,7 @@ class ReportApproval(db.Model):
     certificate_number = db.Column(db.String(50), index=True)
 
     # Legacy: keep test_record_id for backwards compatibility during migration
-    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id'),
+    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id', ondelete='CASCADE'),
                                nullable=True, unique=True, index=True)
 
     status = db.Column(db.String(20), default=STATUS_DRAFT, index=True)

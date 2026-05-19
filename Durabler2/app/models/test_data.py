@@ -17,7 +17,7 @@ class RawTestData(db.Model):
     __tablename__ = 'raw_test_data'
 
     id = db.Column(db.Integer, primary_key=True)
-    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id'),
+    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id', ondelete='CASCADE'),
                                nullable=False, index=True)
 
     # File information
@@ -69,7 +69,7 @@ class TestPhoto(db.Model):
     __tablename__ = 'test_photos'
 
     id = db.Column(db.Integer, primary_key=True)
-    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id'),
+    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id', ondelete='CASCADE'),
                                nullable=False, index=True)
 
     # Photo information
@@ -160,7 +160,7 @@ class ReportFile(db.Model):
     __tablename__ = 'report_files'
 
     id = db.Column(db.Integer, primary_key=True)
-    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id'),
+    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id', ondelete='CASCADE'),
                                nullable=False, index=True)
 
     # Report information

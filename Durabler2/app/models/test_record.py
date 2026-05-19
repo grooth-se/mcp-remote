@@ -75,7 +75,7 @@ class AnalysisResult(db.Model):
     __tablename__ = 'analysis_results'
 
     id = db.Column(db.Integer, primary_key=True)
-    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id'), nullable=False)
+    test_record_id = db.Column(db.Integer, db.ForeignKey('test_records.id', ondelete='CASCADE'), nullable=False)
 
     parameter_name = db.Column(db.String(50), nullable=False)  # Rp02, Rm, E, etc.
     value = db.Column(db.Float)
