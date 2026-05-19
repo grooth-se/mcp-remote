@@ -55,6 +55,8 @@ services:
       - PORTAL_AUTH_ENABLED=true
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+    ports:
+      - "5002:5005"
     volumes:
       - durabler2_data:/data
       - durabler2_reports:/app/reports
