@@ -79,6 +79,10 @@ def _ensure_local_user(portal_data):
 
 def init_portal_auth(app):
     """Register portal auth middleware and before_request hook."""
+    # Distinct session cookie per app so apps served on the same origin under
+    # /app/<code>/ don't overwrite each other's (or the portal's) session cookie.
+    app_code = app.config.get("APP_CODE", "app")
+    app.config["SESSION_COOKIE_NAME"] = f"session_{app_code}"
     app.wsgi_app = ScriptNameMiddleware(app.wsgi_app)
 
     @app.before_request

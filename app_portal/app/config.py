@@ -11,6 +11,11 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Session
+    # Distinct cookie name so the portal's login session is not overwritten by
+    # apps served on the same origin under /app/<code>/. Every Flask app behind
+    # nginx otherwise defaults to a cookie named "session" at path "/", and they
+    # clobber each other. See also each app's init_portal_auth().
+    SESSION_COOKIE_NAME = 'portal_session'
     SESSION_LIFETIME_HOURS = int(os.environ.get('SESSION_LIFETIME', 24))
     REMEMBER_ME_DAYS = int(os.environ.get('REMEMBER_ME_DAYS', 7))
     PERMANENT_SESSION_LIFETIME = timedelta(hours=int(os.environ.get('SESSION_LIFETIME', 24)))

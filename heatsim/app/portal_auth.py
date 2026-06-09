@@ -130,6 +130,11 @@ class ScriptNameMiddleware:
 def init_portal_auth(app):
     """Register the before_request hook and WSGI middleware."""
 
+    # Distinct session cookie per app so apps served on the same origin under
+    # /app/<code>/ don't overwrite each other's (or the portal's) session cookie.
+    app_code = app.config.get("APP_CODE", "app")
+    app.config["SESSION_COOKIE_NAME"] = f"session_{app_code}"
+
     # Install SCRIPT_NAME middleware so url_for() / redirect() include prefix
     app.wsgi_app = ScriptNameMiddleware(app.wsgi_app)
 
