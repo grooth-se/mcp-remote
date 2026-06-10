@@ -210,13 +210,18 @@
         <!-- Certificate Approval Workflow -->
         <div class="card mb-2">
             <div class="card-header {% if cert.approval and cert.approval.status == 'PUBLISHED' %}bg-success text-white{% elif cert.approval and cert.approval.status == 'PENDING_REVIEW' %}bg-warning{% elif cert.approval and cert.approval.status == 'REJECTED' %}bg-danger text-white{% else %}bg-light{% endif %}">
-                <h5 class="mb-0">
-                    <i class="bi bi-file-earmark-check"></i> Report Approval
-                    {% if cert.approval %}
-                    <span class="badge bg-{{ cert.approval.status_color }} ms-2">{{ cert.approval.status_label }}</span>
-                    {% else %}
-                    <span class="badge bg-secondary ms-2">Not Started</span>
-                    {% endif %}
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    <span>
+                        <i class="bi bi-file-earmark-check"></i> Report Approval
+                        {% if cert.approval %}
+                        <span class="badge bg-{{ cert.approval.status_color }} ms-2">{{ cert.approval.status_label }}</span>
+                        {% else %}
+                        <span class="badge bg-secondary ms-2">Not Started</span>
+                        {% endif %}
+                    </span>
+                    <a href="{{ url_for('reports.help_page') }}" title="How does the approval workflow work?">
+                        <i class="bi bi-question-circle"></i>
+                    </a>
                 </h5>
             </div>
             <div class="card-body">

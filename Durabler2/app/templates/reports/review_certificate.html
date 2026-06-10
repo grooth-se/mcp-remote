@@ -169,8 +169,19 @@
                             <li>Download and review the Word report</li>
                             <li>Click "Approve & Sign" to auto-generate signed PDF</li>
                         </ol>
+                        <a href="{{ url_for('reports.help_page') }}" class="small">
+                            <i class="bi bi-question-circle"></i> Workflow help
+                        </a>
                     </div>
 
+                    {% if is_own_submission %}
+                    <div class="alert alert-danger mb-2">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>You submitted this report yourself.</strong>
+                        It must be approved by another approver (four-eyes principle).
+                        You can still reject it to return it to draft.
+                    </div>
+                    {% else %}
                     <!-- Primary: Automatic Approve & Sign -->
                     <a href="{{ url_for('reports.approve', cert_id=certificate.id) }}"
                        class="btn btn-success btn-lg w-100 mb-2">
@@ -200,7 +211,10 @@
                                             </label>
                                             <input type="file" name="signed_pdf" id="signed_pdf"
                                                    class="form-control" accept=".pdf" required>
-                                            <div class="form-text">Upload a PDF signed with external software</div>
+                                            <div class="form-text">
+                                                Upload a PDF signed with external software.
+                                                The file must be complete, including any attachment pages.
+                                            </div>
                                         </div>
                                         <button type="submit" class="btn btn-outline-success w-100"
                                                 onclick="return confirm('Approve this report with the uploaded PDF?')">
@@ -211,6 +225,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
 
                     <hr>
 

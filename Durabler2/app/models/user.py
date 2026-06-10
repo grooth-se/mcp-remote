@@ -75,8 +75,12 @@ class User(UserMixin, db.Model):
 
     @property
     def can_submit(self) -> bool:
-        """Check if user can submit reports for approval."""
-        return self.role in [ROLE_OPERATOR, ROLE_ENGINEER, ROLE_APPROVER, ROLE_ADMIN]
+        """Check if user can submit reports for approval.
+
+        Operators can create tests but not create/submit reports
+        (see role table in CLAUDE.md).
+        """
+        return self.role in [ROLE_ENGINEER, ROLE_APPROVER, ROLE_ADMIN]
 
     @property
     def is_admin(self) -> bool:

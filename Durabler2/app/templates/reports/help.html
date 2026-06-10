@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Help - Report Approval{% endblock %}
+
+{% block content %}
+<div class="container">
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('reports.index') }}">Reports</a></li>
+            <li class="breadcrumb-item active">Help</li>
+        </ol>
+    </nav>
+
+    <h1><i class="bi bi-question-circle"></i> Report Approval Workflow - Help</h1>
+    <p class="lead">
+        How a test report goes from raw test data to a published, signed PDF certificate.
+    </p>
+
+    <!-- Workflow Overview -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-diagram-3"></i> Workflow Overview</h5>
+        </div>
+        <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <span class="badge bg-secondary fs-6">Draft</span>
+                <i class="bi bi-arrow-right"></i>
+                <span class="badge bg-warning text-dark fs-6">Pending Review</span>
+                <i class="bi bi-arrow-right"></i>
+                <span class="badge bg-primary fs-6">Published</span>
+            </div>
+            <ol class="mb-0">
+                <li><strong>Create the certificate</strong> and run the tests linked to it (Certificates &rarr; New).</li>
+                <li><strong>Generate the Word report</strong> from the certificate page, or upload your own .docx.
+                    The report is stored on the server with status <span class="badge bg-secondary">Draft</span>.</li>
+                <li><strong>Edit if needed</strong>: download the Word file, edit it locally, and upload it back.
+                    Each upload replaces the working copy on the server.</li>
+                <li><strong>Submit for approval</strong>. The report is locked
+                    (<span class="badge bg-warning text-dark">Pending Review</span>) and appears in the
+                    approvers' <a href="{{ url_for('reports.index') }}">Reports</a> queue.</li>
+                <li><strong>An approver reviews</strong> the certificate data, test results, and the Word document, then either:
+                    <ul>
+                        <li><strong>Approve &amp; Sign</strong> - the system stamps the approval into the report,
+                            converts it to PDF, appends any PDF attachment, and signs it with the company
+                            X.509 certificate. Status becomes <span class="badge bg-primary">Published</span>.</li>
+                        <li><strong>Reject</strong> - with mandatory comments. Status becomes
+                            <span class="badge bg-danger">Rejected</span> and the report goes back to the engineer.</li>
+                    </ul>
+                </li>
+                <li><strong>Download the published PDF</strong> from the certificate page or the report register.
+                    Published PDFs are immutable; a SHA-256 hash is stored for integrity verification.</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Roles -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-people"></i> Who Can Do What</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-bordered mb-2">
+                <thead class="table-light">
+                    <tr>
+                        <th>Role</th>
+                        <th>User ID</th>
+                        <th>Permissions in the approval workflow</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Operator</strong></td>
+                        <td><code>DUR-OPR-xxx</code></td>
+                        <td>Run tests and view data. Cannot create or submit reports.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Test Engineer</strong></td>
+                        <td><code>DUR-ENG-xxx</code></td>
+                        <td>Generate/upload/edit reports and submit them for approval.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Approver</strong></td>
+                        <td><code>DUR-APR-xxx</code></td>
+                        <td>Everything an engineer can, plus review, approve &amp; sign, reject,
+                            and replace published PDFs.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Administrator</strong></td>
+                        <td><code>DUR-ADM-xxx</code></td>
+                        <td>All of the above, plus user management and certificate deletion.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="alert alert-warning mb-0">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Four-eyes principle:</strong> the person who submitted a report cannot approve it,
+                even with the approver role. A second approver must review and sign.
+            </div>
+        </div>
+    </div>
+
+    <!-- Step by step: Engineer -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-person-workspace"></i> Step by Step: Test Engineer</h5>
+        </div>
+        <div class="card-body">
+            <ol class="mb-0">
+                <li>Open the certificate (Certificates &rarr; click the certificate number).</li>
+                <li>In the <strong>Report Approval</strong> card, click
+                    <span class="badge bg-primary">Generate Word Report</span> to create the report from
+                    test data, or upload an existing .docx instead.</li>
+                <li>Optional: click <strong>Download Word for Editing</strong>, adjust the document in Word,
+                    then use <strong>Upload Edited</strong> to save it back.</li>
+                <li>Click <span class="badge bg-success">Submit for Approval</span>. The report is now locked -
+                    you cannot upload new versions while it is pending.</li>
+                <li>If the report is <span class="badge bg-danger">Rejected</span>, the rejection reason is shown
+                    on the certificate page. Fix the Word document, upload it, and re-submit.</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Step by step: Approver -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-patch-check"></i> Step by Step: Approver</h5>
+        </div>
+        <div class="card-body">
+            <ol class="mb-2">
+                <li>Open <a href="{{ url_for('reports.index') }}">Reports</a> &rarr; <strong>Pending Review</strong>
+                    (a red badge in the navbar shows how many reports are waiting).</li>
+                <li>Click <strong>Review</strong> on a report. Check the certificate data, the test results,
+                    and download the Word document to verify its content.</li>
+                <li>Choose one:
+                    <ul>
+                        <li><strong>Approve &amp; Sign</strong> - confirm on the signing page. The system creates
+                            the signed PDF automatically.</li>
+                        <li><strong>Manual PDF upload</strong> (fallback) - if automatic conversion/signing is not
+                            available, upload a PDF you signed with external software.
+                            <em>The uploaded file must be complete, including any attachment pages.</em></li>
+                        <li><strong>Reject</strong> - enter a comment explaining what must be corrected.</li>
+                    </ul>
+                </li>
+            </ol>
+            <div class="alert alert-info mb-0">
+                <i class="bi bi-info-circle"></i>
+                <strong>Signing requirements:</strong> automatic signing needs LibreOffice (Word&rarr;PDF conversion),
+                the <code>endesive</code> library, and the company .p12 certificate in the <code>certs/</code> folder.
+                The signing page shows which of these are available. Without a certificate, the PDF is published
+                unsigned (a warning is shown).
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-chat-question"></i> Frequently Asked Questions</h5>
+        </div>
+        <div class="card-body">
+            <dl class="mb-0">
+                <dt>A published report contains an error. How do I fix it?</dt>
+                <dd>Published reports are immutable. Open the certificate and click
+                    <strong>Create Revision</strong> - this creates a new certificate revision
+                    (e.g. <code>DUR-2026-1001 Rev.2</code>) with its own report workflow that supersedes
+                    the original. Approvers can also <strong>Replace signed PDF</strong> on the certificate page
+                    if only the PDF file itself must be swapped (the replaced file is archived).</dd>
+
+                <dt class="mt-3">Why can't I approve a report I submitted?</dt>
+                <dd>ISO 17025 requires independent review. Ask another approver to review it.</dd>
+
+                <dt class="mt-3">Why is the Submit button missing?</dt>
+                <dd>Either no Word report has been generated/uploaded yet, the report is already pending or
+                    published, or your role does not allow submitting (operators cannot submit reports).</dd>
+
+                <dt class="mt-3">Where are the files stored?</dt>
+                <dd>Draft Word documents: <code>reports/drafts/</code>.
+                    Published PDFs: <code>reports/signed/&lt;year&gt;/</code>.
+                    Replaced PDFs are archived in <code>reports/archive/&lt;year&gt;/</code>.</dd>
+
+                <dt class="mt-3">What does the PDF attachment do?</dt>
+                <dd>If a test record has a PDF attachment (e.g. raw data or external results), its pages are
+                    automatically appended to the report PDF <em>before</em> signing, so the published document
+                    is complete and the signature stays valid.</dd>
+
+                <dt class="mt-3">Is everything logged?</dt>
+                <dd>Yes. Every workflow action (start, upload, submit, approve, reject, PDF replacement) is
+                    written to the audit trail with user, timestamp, and IP address.</dd>
+            </dl>
+        </div>
+    </div>
+</div>
+{% endblock %}

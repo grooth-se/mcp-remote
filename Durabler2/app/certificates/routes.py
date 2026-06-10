@@ -337,6 +337,16 @@ def delete(cert_id):
         flash(f'Cannot delete {cert.certificate_number} - has linked test records.', 'danger')
         return redirect(url_for('certificates.view', cert_id=cert_id))
 
+    # Published reports must never be deleted (ISO 17025) - supersede with a revision instead
+    if cert.approval:
+        from app.models import STATUS_PUBLISHED
+        if cert.approval.status == STATUS_PUBLISHED:
+            flash(f'Cannot delete {cert.certificate_number} - a published report exists. '
+                  f'Create a revision to supersede it instead.', 'danger')
+            return redirect(url_for('certificates.view', cert_id=cert_id))
+        # Remove the approval record along with the certificate (avoids orphans)
+        db.session.delete(cert.approval)
+
     cert_num = cert.certificate_number_with_rev
 
     # Audit log

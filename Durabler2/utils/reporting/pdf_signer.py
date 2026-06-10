@@ -228,6 +228,42 @@ def calculate_pdf_hash(pdf_path: Path) -> str:
     return sha256.hexdigest()
 
 
+def append_pdf_attachment(pdf_path: Path, attachment_data: bytes) -> None:
+    """Append attachment PDF pages to an existing PDF file (in place).
+
+    Must run BEFORE cryptographic signing — rewriting a signed PDF
+    invalidates its signature.
+
+    Parameters
+    ----------
+    pdf_path : Path
+        PDF file to append to (modified in place)
+    attachment_data : bytes
+        Raw bytes of the attachment PDF
+
+    Raises
+    ------
+    PDFSigningError
+        If pypdf is unavailable or the merge fails
+    """
+    if not HAS_PYPDF:
+        raise PDFSigningError(
+            "pypdf not installed - cannot merge PDF attachment. "
+            "Run: pip install pypdf"
+        )
+    import io
+    try:
+        writer = PdfWriter()
+        for page in PdfReader(str(pdf_path)).pages:
+            writer.add_page(page)
+        for page in PdfReader(io.BytesIO(attachment_data)).pages:
+            writer.add_page(page)
+        with open(pdf_path, 'wb') as f:
+            writer.write(f)
+    except Exception as e:
+        raise PDFSigningError(f"Failed to merge PDF attachment: {e}") from e
+
+
 def sign_pdf(
     pdf_path: Path,
     output_path: Path,
@@ -426,14 +462,17 @@ def sign_report(
     cert_password: str = '',
     signer_name: str = '',
     signer_user_id: str = '',
-    logo_path: Optional[Path] = None
+    logo_path: Optional[Path] = None,
+    attachment_pdf: Optional[bytes] = None
 ) -> dict:
     """Complete workflow to stamp approval, convert, and sign a test report.
 
     1. Stamp approval (logo + name + date) into Word doc's 'Approved by' cell
     2. Convert stamped Word document to PDF via LibreOffice
-    3. Apply invisible X.509 cryptographic signature to PDF
-    4. Return signing details for audit trail
+    3. Append PDF attachment pages (if any) — before signing, so the
+       signature stays valid
+    4. Apply invisible X.509 cryptographic signature to PDF
+    5. Return signing details for audit trail
 
     Parameters
     ----------
@@ -453,6 +492,8 @@ def sign_report(
         User ID of the signer (e.g., 'DUR-APP-001')
     logo_path : Path, optional
         Path to Durabler logo for the approval stamp
+    attachment_pdf : bytes, optional
+        Raw bytes of a PDF attachment to append before signing
 
     Returns
     -------
@@ -512,7 +553,12 @@ def sign_report(
         # Step 2: Convert stamped Word to PDF
         convert_word_to_pdf(stamped_word, unsigned_pdf)
 
-    # Step 3: Sign the PDF (invisible cryptographic signature)
+    # Step 3: Append attachment pages BEFORE signing (signing must come last,
+    # rewriting a signed PDF would invalidate the signature)
+    if attachment_pdf:
+        append_pdf_attachment(unsigned_pdf, attachment_pdf)
+
+    # Step 4: Sign the PDF (invisible cryptographic signature)
     signed_path, pdf_hash, sign_timestamp = sign_pdf(
         pdf_path=unsigned_pdf,
         output_path=signed_pdf,
@@ -543,12 +589,13 @@ def create_placeholder_signed_pdf(
     certificate_number: str,
     signer_name: str = '',
     signer_user_id: str = '',
-    logo_path: Optional[Path] = None
+    logo_path: Optional[Path] = None,
+    attachment_pdf: Optional[bytes] = None
 ) -> dict:
     """Create a placeholder 'signed' PDF when actual signing is not available.
 
-    Stamps the approval into the Word doc, converts to PDF, but does NOT
-    apply a cryptographic signature.
+    Stamps the approval into the Word doc, converts to PDF, appends any
+    PDF attachment, but does NOT apply a cryptographic signature.
     """
     year = datetime.now().year
     signed_folder = output_folder / 'signed' / str(year)
@@ -574,6 +621,8 @@ def create_placeholder_signed_pdf(
                     logo_path=logo_path
                 )
                 convert_word_to_pdf(stamped_word, signed_pdf)
+            if attachment_pdf:
+                append_pdf_attachment(signed_pdf, attachment_pdf)
             pdf_hash = calculate_pdf_hash(signed_pdf)
         except PDFSigningError:
             signed_pdf.write_bytes(b'%PDF-1.4\n% Placeholder - signing not available\n')

@@ -30,17 +30,30 @@ from app.models import (
 def index():
     """List all reports with approval status."""
     status_filter = request.args.get('status', '')
+    test_method_filter = request.args.get('test_method', '')
 
     query = ReportApproval.query
 
     if status_filter:
         query = query.filter(ReportApproval.status == status_filter)
 
+    if test_method_filter:
+        query = query.filter(db.or_(
+            ReportApproval.cert.has(
+                Certificate.test_records.any(TestRecord.test_method == test_method_filter)),
+            ReportApproval.test_record.has(TestRecord.test_method == test_method_filter),
+        ))
+
     reports = query.order_by(ReportApproval.created_at.desc()).all()
+
+    test_methods = [m[0] for m in db.session.query(TestRecord.test_method)
+                    .distinct().order_by(TestRecord.test_method).all() if m[0]]
 
     return render_template('reports/index.html',
                            reports=reports,
                            status_filter=status_filter,
+                           test_method_filter=test_method_filter,
+                           test_methods=test_methods,
                            status_labels=APPROVAL_STATUS_LABELS,
                            status_colors=STATUS_COLORS)
 
@@ -58,6 +71,13 @@ def pending():
                            reports=reports,
                            status_labels=APPROVAL_STATUS_LABELS,
                            status_colors=STATUS_COLORS)
+
+
+@reports_bp.route('/help')
+@login_required
+def help_page():
+    """User help: how the report approval workflow works."""
+    return render_template('reports/help.html')
 
 
 @reports_bp.route('/certificate/<int:cert_id>/start', methods=['POST'])
@@ -554,6 +574,12 @@ def submit(cert_id):
         flash('Please generate a Word report first.', 'warning')
         return redirect(url_for('certificates.view', cert_id=cert_id))
 
+    word_full = Path(current_app.config['REPORTS_FOLDER']) / certificate.approval.word_report_path
+    if not word_full.exists():
+        flash('The Word report file is missing on the server. '
+              'Please regenerate or upload the report before submitting.', 'danger')
+        return redirect(url_for('certificates.view', cert_id=cert_id))
+
     certificate.approval.submit_for_approval(current_user)
 
     # Audit log
@@ -593,10 +619,14 @@ def review(cert_id):
     # Get all test records for this certificate
     test_records = certificate.test_records.all()
 
+    # Four-eyes principle: submitter cannot approve their own report
+    is_own_submission = certificate.approval.submitted_by_id == current_user.id
+
     return render_template('reports/review_certificate.html',
                            certificate=certificate,
                            approval=certificate.approval,
                            test_records=test_records,
+                           is_own_submission=is_own_submission,
                            status_labels=APPROVAL_STATUS_LABELS,
                            status_colors=STATUS_COLORS)
 
@@ -623,6 +653,12 @@ def approve(cert_id):
 
     if not certificate.approval or not certificate.approval.can_review:
         flash('This report cannot be approved.', 'danger')
+        return redirect(url_for('certificates.view', cert_id=cert_id))
+
+    # ISO 17025 four-eyes principle: the submitter cannot approve their own report
+    if certificate.approval.submitted_by_id == current_user.id:
+        flash('You submitted this report yourself - it must be approved by '
+              'another approver (four-eyes principle).', 'danger')
         return redirect(url_for('certificates.view', cert_id=cert_id))
 
     if not certificate.approval.word_report_path:
@@ -654,6 +690,21 @@ def approve(cert_id):
     approver_name = current_user.full_name or current_user.username
     word_path = reports_folder / certificate.approval.word_report_path
 
+    # Load PDF attachment (if any) up front: it must be merged BEFORE the
+    # cryptographic signature is applied, otherwise the signature is invalidated
+    attachment_data = None
+    attachment_filename = None
+    first_test_record = certificate.test_records.first()
+    if first_test_record:
+        from app.models import ReportFile
+        attachment = ReportFile.query.filter_by(
+            test_record_id=first_test_record.id,
+            report_type='pdf_attachment'
+        ).first()
+        if attachment:
+            attachment_data = attachment.get_data()
+            attachment_filename = attachment.original_filename
+
     # Check if manual PDF upload was provided (fallback mode)
     if 'signed_pdf' in request.files and request.files['signed_pdf'].filename:
         import hashlib
@@ -669,6 +720,13 @@ def approve(cert_id):
         safe_cert_num = certificate.certificate_number_with_rev.replace(' ', '_').replace('/', '-')
         output_pdf = signed_folder / f"{safe_cert_num}_signed.pdf"
         pdf_file.save(output_pdf)
+
+        # A manually uploaded PDF must already be complete - appending the
+        # attachment here would invalidate any external digital signature
+        if attachment_data:
+            flash(f'Note: the PDF attachment ({attachment_filename}) was NOT '
+                  f'merged into the manually uploaded PDF. Make sure the '
+                  f'uploaded file already includes it.', 'warning')
 
         with open(output_pdf, 'rb') as f:
             pdf_hash = hashlib.sha256(f.read()).hexdigest()
@@ -689,7 +747,7 @@ def approve(cert_id):
                 logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
 
             if can_sign and signing_deps['can_convert']:
-                # Full automatic: stamp approval + convert + sign
+                # Full automatic: stamp approval + convert + merge attachment + sign
                 result = sign_report(
                     word_report_path=word_path,
                     output_folder=reports_folder,
@@ -698,7 +756,8 @@ def approve(cert_id):
                     cert_password=cert_password,
                     signer_name=approver_name,
                     signer_user_id=current_user.user_id or current_user.username,
-                    logo_path=logo_path if logo_path.exists() else None
+                    logo_path=logo_path if logo_path.exists() else None,
+                    attachment_pdf=attachment_data
                 )
                 signing_method = 'x509_signed'
             elif signing_deps['can_convert']:
@@ -709,7 +768,8 @@ def approve(cert_id):
                     certificate_number=certificate.certificate_number_with_rev,
                     signer_name=approver_name,
                     signer_user_id=current_user.user_id or current_user.username,
-                    logo_path=logo_path if logo_path.exists() else None
+                    logo_path=logo_path if logo_path.exists() else None,
+                    attachment_pdf=attachment_data
                 )
                 signing_method = 'converted_unsigned'
             else:
@@ -727,50 +787,6 @@ def approve(cert_id):
         except PDFSigningError as e:
             flash(f'PDF signing failed: {e}', 'danger')
             return redirect(url_for('reports.approve', cert_id=cert_id))
-
-    # Merge PDF attachment if one exists for this test record
-    test_record = certificate.test_records.first()
-    if test_record and pdf_path:
-        try:
-            from pypdf import PdfReader, PdfWriter
-            from app.models import ReportFile
-            import hashlib
-
-            attachment = ReportFile.query.filter_by(
-                test_record_id=test_record.id,
-                report_type='pdf_attachment'
-            ).first()
-
-            if attachment:
-                attachment_data = attachment.get_data()
-                if attachment_data:
-                    signed_pdf_full = reports_folder / pdf_path
-                    writer = PdfWriter()
-
-                    # Add report pages
-                    report_reader = PdfReader(str(signed_pdf_full))
-                    for page in report_reader.pages:
-                        writer.add_page(page)
-
-                    # Add attachment pages
-                    import io
-                    attach_reader = PdfReader(io.BytesIO(attachment_data))
-                    for page in attach_reader.pages:
-                        writer.add_page(page)
-
-                    # Write merged PDF back
-                    with open(signed_pdf_full, 'wb') as f:
-                        writer.write(f)
-
-                    # Recalculate hash
-                    with open(signed_pdf_full, 'rb') as f:
-                        pdf_hash = hashlib.sha256(f.read()).hexdigest()
-
-                    current_app.logger.info(
-                        f'Merged PDF attachment ({attachment.original_filename}) '
-                        f'into report {certificate.certificate_number_with_rev}')
-        except Exception as e:
-            current_app.logger.warning(f'PDF attachment merge failed: {e}')
 
     # Mark as approved and published
     certificate.approval.approve(current_user)

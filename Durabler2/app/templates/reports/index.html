@@ -88,8 +88,28 @@
                                     <strong>{{ report.certificate_number or '-' }}</strong>
                                 </a>
                             </td>
-                            <td>{{ report.test_record.test_method if report.test_record else '-' }}</td>
-                            <td>{{ report.test_record.specimen_id if report.test_record else '-' }}</td>
+                            <td>
+                                {% if report.cert %}
+                                    {% for test in report.cert.test_records %}
+                                    <span class="badge bg-secondary">{{ test.test_method }}</span>
+                                    {% else %}
+                                    -
+                                    {% endfor %}
+                                {% elif report.test_record %}
+                                    {{ report.test_record.test_method }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if report.cert %}
+                                    {{ report.cert.test_article_sn or '-' }}
+                                {% elif report.test_record %}
+                                    {{ report.test_record.specimen_id or '-' }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
                             <td>
                                 <span class="badge bg-{{ status_colors.get(report.status, 'secondary') }}">
                                     {{ status_labels.get(report.status, report.status) }}
