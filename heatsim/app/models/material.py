@@ -163,8 +163,21 @@ class MaterialProperty(db.Model):
 
     @property
     def is_temperature_dependent(self) -> bool:
-        """Check if property depends on temperature."""
-        return "temperature" in self.dependencies_list
+        """Check if property depends on temperature.
+
+        User-created properties often leave the dependencies field blank,
+        so fall back to inferring temperature-dependence from the stored data.
+        """
+        if "temperature" in self.dependencies_list:
+            return True
+        if self.property_type in (PROPERTY_TYPE_CURVE, PROPERTY_TYPE_TABLE):
+            return "temperature" in self.data_dict
+        if self.property_type == PROPERTY_TYPE_POLYNOMIAL:
+            return self.data_dict.get("variable", "temperature") == "temperature"
+        if self.property_type == PROPERTY_TYPE_EQUATION:
+            variables = self.data_dict.get("variables") or {}
+            return "temperature" in variables.values()
+        return False
 
     @property
     def data_dict(self) -> dict:

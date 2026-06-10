@@ -207,6 +207,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (targetId) {
             document.getElementById(targetId).style.display = 'block';
         }
+
+        // Curves are temperature-dependent by definition
+        const depsInput = document.querySelector('input[name="dependencies"]');
+        if (depsInput && (selected === 'curve' || selected === 'table') && !depsInput.value.trim()) {
+            depsInput.value = 'temperature';
+        }
     }
 
     propertyType.addEventListener('change', updateTypeFields);

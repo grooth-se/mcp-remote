@@ -240,6 +240,15 @@ def properties(id):
                     )
             data = {"equation": form.equation.data, "variables": variables}
 
+        # Curve data is temperature-based by definition — make sure the
+        # dependency is recorded so the overview shows the chart/evaluate UI
+        dependencies = form.dependencies.data
+        if prop_type == PROPERTY_TYPE_CURVE:
+            deps_list = [d.strip() for d in (dependencies or "").split(",") if d.strip()]
+            if "temperature" not in deps_list:
+                deps_list.insert(0, "temperature")
+            dependencies = ", ".join(deps_list)
+
         # Check if property already exists
         existing = MaterialProperty.query.filter_by(
             steel_grade_id=grade.id, property_name=prop_name
@@ -252,7 +261,7 @@ def properties(id):
                 {
                     "property_type": prop_type,
                     "units": form.units.data,
-                    "dependencies": form.dependencies.data,
+                    "dependencies": dependencies,
                     "notes": form.notes.data,
                 },
             )
@@ -260,7 +269,7 @@ def properties(id):
                 changes["data"] = (existing.data_dict, data)
             existing.property_type = prop_type
             existing.units = form.units.data
-            existing.dependencies = form.dependencies.data
+            existing.dependencies = dependencies
             existing.notes = form.notes.data
             existing.set_data(data)
             if changes:
@@ -275,7 +284,7 @@ def properties(id):
                 property_name=prop_name,
                 property_type=prop_type,
                 units=form.units.data,
-                dependencies=form.dependencies.data,
+                dependencies=dependencies,
                 notes=form.notes.data,
             )
             prop.set_data(data)

@@ -181,6 +181,50 @@ class TestProperties:
         ).first()
         assert prop.data_dict == {"temperature": [20.0, 200.0], "value": [46.5, 44.0]}
 
+    def test_curve_without_dependencies_gets_temperature(
+        self, logged_in_client, sample_steel_grade, db
+    ):
+        """Curve saved with a blank dependencies field is still chartable."""
+        curve_data = json.dumps({"temperature": [20, 200], "value": [46, 44]})
+        logged_in_client.post(
+            f"/materials/{sample_steel_grade.id}/properties",
+            data={
+                "property_name": "thermal_conductivity",
+                "property_type": "curve",
+                "units": "W/(m·K)",
+                "dependencies": "",
+                "curve_data": curve_data,
+                "notes": "",
+            },
+        )
+        prop = MaterialProperty.query.filter_by(
+            steel_grade_id=sample_steel_grade.id, property_name="thermal_conductivity"
+        ).first()
+        assert prop.dependencies == "temperature"
+        assert prop.is_temperature_dependent
+
+    def test_legacy_curve_without_dependencies_is_temperature_dependent(
+        self, logged_in_client, sample_steel_grade, db
+    ):
+        """Existing curve rows with empty dependencies infer from data and
+        show the chart/evaluate UI on the material overview."""
+        prop = MaterialProperty(
+            steel_grade_id=sample_steel_grade.id,
+            property_name="thermal_conductivity",
+            property_type="curve",
+            units="W/(m·K)",
+            dependencies=None,
+        )
+        prop.set_data({"temperature": [20, 200], "value": [46, 44]})
+        db.session.add(prop)
+        db.session.commit()
+
+        assert prop.is_temperature_dependent
+
+        rv = logged_in_client.get(f"/materials/{sample_steel_grade.id}")
+        assert rv.status_code == 200
+        assert b"View Plot" in rv.data or b"propPlotModal" in rv.data
+
     def test_create_curve_malformed_rejected(self, logged_in_client, sample_steel_grade, db):
         rv = logged_in_client.post(
             f"/materials/{sample_steel_grade.id}/properties",
