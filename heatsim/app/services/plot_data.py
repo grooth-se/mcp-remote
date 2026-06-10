@@ -362,32 +362,19 @@ def dtdt_temp(sim, phase):
 def _mass_and_cp(sim):
     """(mass, cp_func) from geometry + material, mirroring simulation_runner."""
     from app.services import create_geometry
-    from app.services.property_evaluator import evaluate_property
+    from app.services.property_evaluator import evaluate_scalar
 
     geometry = create_geometry(sim.geometry_type, sim.geometry_dict)
     grade = sim.steel_grade
 
-    density = 7850.0
     rho_prop = grade.get_property("density") if grade else None
-    if rho_prop:
-        try:
-            density = float(rho_prop.data_dict.get("value", 7850.0))
-        except (TypeError, ValueError):
-            density = 7850.0
+    density = evaluate_scalar(rho_prop, 7850.0, temperature=20.0)
     mass = geometry.volume * density
 
     cp_prop = grade.get_property("specific_heat") if grade else None
 
     def cp_func(temp):
-        if cp_prop:
-            if cp_prop.property_type == "constant":
-                try:
-                    return float(cp_prop.data_dict.get("value", 500.0))
-                except (TypeError, ValueError):
-                    return 500.0
-            val = evaluate_property(cp_prop, temperature=temp)
-            return val if val else 500.0
-        return 500.0
+        return evaluate_scalar(cp_prop, 500.0, temperature=temp)
 
     return mass, cp_func
 

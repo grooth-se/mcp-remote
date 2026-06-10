@@ -26,6 +26,7 @@ from app.services import (
     visualization,
 )
 from app.services.hardness_predictor import POSITION_KEYS, HardnessPredictor
+from app.services.property_evaluator import evaluate_scalar
 from app.services.snapshot_service import SnapshotService
 
 logger = logging.getLogger(__name__)
@@ -303,25 +304,40 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     # Build solver config
     solver_config = SolverConfig.from_dict(sim.solver_dict)
 
-    # Get material properties
+    # Get heat treatment config
+    ht_config = sim.ht_config
+    if not ht_config:
+        ht_config = sim.create_default_ht_config()
+
+    # Get material properties. k and cp are interpolated per node inside the
+    # solver; density and emissivity are reduced to scalars here (density at
+    # room temperature, emissivity at the furnace temperature where radiation
+    # dominates), so curve-type definitions work instead of crashing.
     grade = sim.steel_grade
     k_prop = grade.get_property("thermal_conductivity")
     cp_prop = grade.get_property("specific_heat")
     rho_prop = grade.get_property("density")
     emiss_prop = grade.get_property("emissivity")
 
-    density = 7850
-    if rho_prop:
-        density = rho_prop.data_dict.get("value", 7850)
+    if not k_prop or not cp_prop:
+        missing = [
+            name
+            for name, prop in [("thermal_conductivity", k_prop), ("specific_heat", cp_prop)]
+            if not prop
+        ]
+        logger.warning(
+            "Simulation %d: grade %s is missing %s - using generic steel defaults",
+            sim.id,
+            grade.designation,
+            ", ".join(missing),
+        )
 
-    emissivity = 0.85
-    if emiss_prop:
-        emissivity = emiss_prop.data_dict.get("value", 0.85)
-
-    # Get heat treatment config
-    ht_config = sim.ht_config
-    if not ht_config:
-        ht_config = sim.create_default_ht_config()
+    heating_cfg = ht_config.get("heating", {})
+    emissivity_ref_temp = (
+        heating_cfg.get("target_temperature", 850.0) if heating_cfg.get("enabled") else 20.0
+    )
+    density = evaluate_scalar(rho_prop, 7850.0, temperature=20.0)
+    emissivity = evaluate_scalar(emiss_prop, 0.85, temperature=emissivity_ref_temp)
 
     # Create multi-phase solver
     solver = MultiPhaseHeatSolver(geometry, config=solver_config)
@@ -574,15 +590,7 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
         # Create Cp interpolation function
         def get_cp_at_temp(temp):
             """Get specific heat at given temperature."""
-            if cp_prop:
-                if cp_prop.property_type == "constant":
-                    return cp_prop.data_dict.get("value", 500.0)
-                elif cp_prop.property_type == "curve":
-                    from app.services.property_evaluator import evaluate_property
-
-                    val = evaluate_property(cp_prop, temperature=temp)
-                    return val if val else 500.0
-            return 500.0
+            return evaluate_scalar(cp_prop, 500.0, temperature=temp)
 
         for phase_result in result.phase_results:
             if phase_result.phase_name not in ("heating", "tempering"):
@@ -647,21 +655,13 @@ def _add_comsol_absorbed_power(
     geometry = create_geometry(geo_type, geo_params)
 
     rho_prop = grade.get_property("density")
-    density = rho_prop.data_dict.get("value", 7850) if rho_prop else 7850
+    density = evaluate_scalar(rho_prop, 7850.0, temperature=20.0)
     mass = geometry.volume * density
 
     cp_prop = grade.get_property("specific_heat")
 
     def get_cp_at_temp(temp):
-        if cp_prop:
-            if cp_prop.property_type == "constant":
-                return cp_prop.data_dict.get("value", 500.0)
-            elif cp_prop.property_type == "curve":
-                from app.services.property_evaluator import evaluate_property
-
-                val = evaluate_property(cp_prop, temperature=temp)
-                return val if val else 500.0
-        return 500.0
+        return evaluate_scalar(cp_prop, 500.0, temperature=temp)
 
     for phase_name, phase_data in solver_results.get("phases", {}).items():
         if phase_name not in ("heating", "tempering"):

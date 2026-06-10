@@ -857,6 +857,42 @@ class TestFallbackChain:
             assert "full_cycle" in types
             assert "cooling_rate" in types
 
+    def test_builtin_solver_with_curve_density_and_emissivity(self, app, db):
+        """Curve-type density/emissivity are reduced to scalars, not crashes."""
+        with app.app_context():
+            sim = self._create_runnable_sim(db.session)
+            sim.set_solver_config(
+                {
+                    "solver_type": "builtin",
+                    "n_nodes": 11,
+                    "dt": 1.0,
+                    "max_time": 60,
+                }
+            )
+            grade_id = sim.steel_grade_id
+
+            rho = MaterialProperty.query.filter_by(
+                steel_grade_id=grade_id, property_name="density"
+            ).first()
+            rho.property_type = "curve"
+            rho.set_data({"temperature": [20.0, 800.0], "value": [7850.0, 7600.0]})
+
+            emiss = MaterialProperty(
+                steel_grade_id=grade_id,
+                property_name="emissivity",
+                property_type="curve",
+            )
+            emiss.set_data({"temperature": [20.0, 1000.0], "value": [0.3, 0.9]})
+            db.session.add(emiss)
+            db.session.commit()
+
+            from app.services.simulation_runner import run_heat_treatment
+
+            run_heat_treatment(sim.id)
+
+            db.session.refresh(sim)
+            assert sim.status == STATUS_COMPLETED
+
     def test_both_paths_fail_marks_simulation_failed(self, app, db):
         """If both COMSOL and builtin fail, simulation should be marked FAILED."""
         with app.app_context():

@@ -102,6 +102,19 @@
     </div>
 </div>
 
+{% if missing_material_props %}
+<div class="alert alert-warning d-flex align-items-center" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    <div>
+        <strong>{{ sim.steel_grade.designation }}</strong> has no
+        {{ missing_material_props|join(', ') }} defined &mdash; the simulation
+        falls back to generic steel defaults for these.
+        <a href="{{ url_for('materials.properties', id=sim.steel_grade_id) }}" class="alert-link">
+            Add the missing properties</a> for accurate results.
+    </div>
+</div>
+{% endif %}
+
 {% if sim.error_message %}
 <div class="alert alert-danger py-1">
     <strong>Error:</strong> {{ sim.error_message }}

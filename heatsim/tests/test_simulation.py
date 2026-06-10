@@ -228,6 +228,36 @@ class TestSimulationView:
         assert rv.status_code == 200
         assert b"Test Sim" in rv.data
 
+    def test_warns_when_thermal_properties_missing(self, logged_in_client, sample_simulation):
+        """Grade without k/cp/density gets a defaults warning on the view page."""
+        rv = logged_in_client.get(f"/simulation/{sample_simulation.id}")
+        assert rv.status_code == 200
+        assert b"generic steel defaults" in rv.data
+        assert b"thermal conductivity" in rv.data
+
+    def test_no_warning_when_properties_defined(
+        self, logged_in_client, sample_simulation, sample_steel_grade, db
+    ):
+        from app.models import MaterialProperty
+
+        for name, value in [
+            ("thermal_conductivity", 44.5),
+            ("specific_heat", 475.0),
+            ("density", 7850.0),
+        ]:
+            prop = MaterialProperty(
+                steel_grade_id=sample_steel_grade.id,
+                property_name=name,
+                property_type="constant",
+            )
+            prop.set_data({"value": value})
+            db.session.add(prop)
+        db.session.commit()
+
+        rv = logged_in_client.get(f"/simulation/{sample_simulation.id}")
+        assert rv.status_code == 200
+        assert b"generic steel defaults" not in rv.data
+
     def test_access_denied(self, logged_in_client, db, sample_steel_grade, admin_user):
         """Viewing another user's simulation redirects away."""
         sim = Simulation(

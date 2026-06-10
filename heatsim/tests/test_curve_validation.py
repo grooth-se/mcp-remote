@@ -86,3 +86,62 @@ class TestParseCurveData:
     def test_booleans_rejected(self):
         data, errors = parse_curve_data({"temperature": [True, 20], "value": [1, 2]})
         assert data is None
+
+
+class TestEvaluateScalar:
+    """evaluate_scalar must reduce any property type to a usable number."""
+
+    def _prop(self, db, grade, name, ptype, data):
+        from app.models import MaterialProperty
+
+        prop = MaterialProperty(
+            steel_grade_id=grade.id, property_name=name, property_type=ptype
+        )
+        prop.set_data(data)
+        db.session.add(prop)
+        db.session.commit()
+        return prop
+
+    def test_none_returns_default(self):
+        from app.services.property_evaluator import evaluate_scalar
+
+        assert evaluate_scalar(None, 7850.0) == 7850.0
+
+    def test_constant(self, db, sample_steel_grade):
+        from app.services.property_evaluator import evaluate_scalar
+
+        prop = self._prop(db, sample_steel_grade, "density", "constant", {"value": 7700})
+        assert evaluate_scalar(prop, 7850.0) == 7700.0
+
+    def test_curve_evaluated_at_reference_temperature(self, db, sample_steel_grade):
+        from app.services.property_evaluator import evaluate_scalar
+
+        prop = self._prop(
+            db,
+            sample_steel_grade,
+            "emissivity",
+            "curve",
+            {"temperature": [0.0, 1000.0], "value": [0.2, 0.8]},
+        )
+        assert evaluate_scalar(prop, 0.85, temperature=500.0) == 0.5
+
+    def test_curve_density_does_not_crash(self, db, sample_steel_grade):
+        """A curve-type density used to leak a list into the solver."""
+        from app.services.property_evaluator import evaluate_scalar
+
+        prop = self._prop(
+            db,
+            sample_steel_grade,
+            "density",
+            "curve",
+            {"temperature": [20.0, 800.0], "value": [7850.0, 7600.0]},
+        )
+        result = evaluate_scalar(prop, 7850.0, temperature=20.0)
+        assert isinstance(result, float)
+        assert result == 7850.0
+
+    def test_garbage_data_returns_default(self, db, sample_steel_grade):
+        from app.services.property_evaluator import evaluate_scalar
+
+        prop = self._prop(db, sample_steel_grade, "density", "constant", {"value": "junk!"})
+        assert evaluate_scalar(prop, 7850.0) == 7850.0

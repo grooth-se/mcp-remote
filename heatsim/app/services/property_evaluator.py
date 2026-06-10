@@ -238,6 +238,38 @@ def evaluate_property(property_model, **conditions) -> float | None:
     return evaluator.evaluate(**conditions)
 
 
+def evaluate_scalar(property_model, default: float, temperature: float = 20.0) -> float:
+    """Evaluate a property to a single scalar, whatever its type.
+
+    Constants return their value; curves/polynomials/equations are evaluated
+    at the given reference temperature. Missing properties, unevaluable data
+    and non-numeric values all fall back to the default — callers that need
+    one representative number (density, emissivity) can never crash on a
+    user-defined curve property.
+
+    Parameters
+    ----------
+    property_model : MaterialProperty or None
+        The property to evaluate
+    default : float
+        Value to use when the property is missing or unevaluable
+    temperature : float
+        Reference temperature in Celsius for temperature-dependent types
+
+    Returns
+    -------
+    float
+        Evaluated scalar value
+    """
+    if property_model is None:
+        return default
+    try:
+        value = PropertyEvaluator(property_model).evaluate(temperature=temperature)
+        return float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
 class PropertyPlotter:
     """Generate plots for temperature-dependent material properties."""
 

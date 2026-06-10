@@ -538,6 +538,19 @@ def view(id):
     if resp:
         return resp
 
+    # Warn when key thermal properties are missing — the solver silently
+    # falls back to generic steel defaults (k=40 W/(m·K), cp=500 J/(kg·K),
+    # rho=7850 kg/m³) for these
+    missing_material_props = []
+    if sim.steel_grade:
+        for prop_name, label in [
+            ("thermal_conductivity", "thermal conductivity"),
+            ("specific_heat", "specific heat"),
+            ("density", "density"),
+        ]:
+            if not sim.steel_grade.get_property(prop_name):
+                missing_material_props.append(label)
+
     # Get results from latest completed snapshot (or all if no snapshots)
     latest_snapshot = sim.snapshots.filter_by(status="completed").first()
     if latest_snapshot:
@@ -627,6 +640,7 @@ def view(id):
         "simulation/results.html",
         sim=sim,
         results=results,
+        missing_material_props=missing_material_props,
         latest_snapshot=latest_snapshot,
         cooling_curves=cooling_curves,
         profiles=profiles,
@@ -2902,16 +2916,12 @@ def measured_absorbed_power_plot_step(id, step):
         return Response("No measured data", status=404)
 
     # Get geometry and material properties for mass calculation
+    from app.services.property_evaluator import evaluate_scalar
+
     geometry = create_geometry(sim.geometry_type, sim.geometry_dict)
     grade = sim.steel_grade
 
-    # Get density
-    rho_prop = grade.get_property("density")
-    density = 7850
-    if rho_prop:
-        density = rho_prop.data_dict.get("value", 7850)
-
-    # Calculate mass
+    density = evaluate_scalar(grade.get_property("density"), 7850.0, temperature=20.0)
     mass = geometry.volume * density
 
     # Get Cp property for interpolation
@@ -2919,15 +2929,7 @@ def measured_absorbed_power_plot_step(id, step):
 
     def get_cp_at_temp(temp):
         """Get specific heat at given temperature."""
-        if cp_prop:
-            if cp_prop.property_type == "constant":
-                return cp_prop.data_dict.get("value", 500.0)
-            elif cp_prop.property_type == "curve":
-                from app.services.property_evaluator import evaluate_property
-
-                val = evaluate_property(cp_prop, temperature=temp)
-                return val if val else 500.0
-        return 500.0
+        return evaluate_scalar(cp_prop, 500.0, temperature=temp)
 
     # Generate absorbed power plot
     plot_data = visualization.create_measured_absorbed_power_plot(
