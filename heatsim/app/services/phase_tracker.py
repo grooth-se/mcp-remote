@@ -8,8 +8,9 @@ Implements:
 - Simplified CCT-based phase prediction
 - Koistinen-Marburger equation for martensite fraction
 """
+
 from dataclasses import dataclass
-from typing import Dict, Optional
+
 import numpy as np
 
 from app.models import PhaseDiagram
@@ -18,6 +19,7 @@ from app.models import PhaseDiagram
 @dataclass
 class PhaseResult:
     """Phase transformation results."""
+
     martensite: float = 0.0
     bainite: float = 0.0
     ferrite: float = 0.0
@@ -27,16 +29,18 @@ class PhaseResult:
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
-            'martensite': self.martensite,
-            'bainite': self.bainite,
-            'ferrite': self.ferrite,
-            'pearlite': self.pearlite,
-            'retained_austenite': self.retained_austenite
+            "martensite": self.martensite,
+            "bainite": self.bainite,
+            "ferrite": self.ferrite,
+            "pearlite": self.pearlite,
+            "retained_austenite": self.retained_austenite,
         }
 
-    def normalize(self) -> 'PhaseResult':
+    def normalize(self) -> "PhaseResult":
         """Ensure fractions sum to 1.0."""
-        total = self.martensite + self.bainite + self.ferrite + self.pearlite + self.retained_austenite
+        total = (
+            self.martensite + self.bainite + self.ferrite + self.pearlite + self.retained_austenite
+        )
         if total > 0:
             self.martensite /= total
             self.bainite /= total
@@ -56,7 +60,7 @@ class PhaseTracker:
     # Koistinen-Marburger coefficient (typical for steels)
     KM_COEFFICIENT = 0.011  # K^-1
 
-    def __init__(self, phase_diagram: Optional[PhaseDiagram] = None):
+    def __init__(self, phase_diagram: PhaseDiagram | None = None):
         """Initialize phase tracker.
 
         Parameters
@@ -69,12 +73,12 @@ class PhaseTracker:
         # Get transformation temperatures
         if phase_diagram:
             temps = phase_diagram.temps_dict
-            self.ms = temps.get('Ms', 350)
-            self.mf = temps.get('Mf', 200)
-            self.bs = temps.get('Bs', 550)
-            self.bf = temps.get('Bf', 400)
-            self.ac1 = temps.get('Ac1', 727)
-            self.ac3 = temps.get('Ac3', 850)
+            self.ms = temps.get("Ms", 350)
+            self.mf = temps.get("Mf", 200)
+            self.bs = temps.get("Bs", 550)
+            self.bf = temps.get("Bf", 400)
+            self.ac1 = temps.get("Ac1", 727)
+            self.ac3 = temps.get("Ac3", 850)
         else:
             # Default values for plain carbon steel
             self.ms = 350
@@ -85,10 +89,7 @@ class PhaseTracker:
             self.ac3 = 850
 
     def predict_phases(
-        self,
-        times: np.ndarray,
-        temperatures: np.ndarray,
-        t8_5: Optional[float] = None
+        self, times: np.ndarray, temperatures: np.ndarray, t8_5: float | None = None
     ) -> PhaseResult:
         """Predict final phase fractions from cooling curve.
 
@@ -143,10 +144,7 @@ class PhaseTracker:
         return result.normalize()
 
     def _calculate_cooling_rate(
-        self,
-        times: np.ndarray,
-        temperatures: np.ndarray,
-        t8_5: Optional[float] = None
+        self, times: np.ndarray, temperatures: np.ndarray, t8_5: float | None = None
     ) -> float:
         """Calculate cooling rate in transformation range."""
         if t8_5 is not None and t8_5 > 0:
@@ -190,10 +188,10 @@ class PhaseTracker:
     def get_transformation_temps(self) -> dict:
         """Get transformation temperatures as dict."""
         return {
-            'Ac1': self.ac1,
-            'Ac3': self.ac3,
-            'Ms': self.ms,
-            'Mf': self.mf,
-            'Bs': self.bs,
-            'Bf': self.bf,
+            "Ac1": self.ac1,
+            "Ac3": self.ac3,
+            "Ms": self.ms,
+            "Mf": self.mf,
+            "Bs": self.bs,
+            "Bf": self.bf,
         }

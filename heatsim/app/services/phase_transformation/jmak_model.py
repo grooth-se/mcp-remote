@@ -11,8 +11,9 @@ b(T) model options:
     - Arrhenius: b = b0 * exp(-Q / (R * T_K))
     - Polynomial: b = sum(a_i * T^i)
 """
+
 import math
-from typing import Callable, Optional, Dict, List, Tuple
+from collections.abc import Callable
 
 import numpy as np
 from scipy.optimize import curve_fit
@@ -40,8 +41,10 @@ def gaussian_b_function(b_max: float, t_nose: float, sigma: float) -> Callable:
     callable
         Function b(T) -> float
     """
+
     def b_func(T):
         return b_max * math.exp(-0.5 * ((T - t_nose) / sigma) ** 2)
+
     return b_func
 
 
@@ -69,10 +72,11 @@ def arrhenius_b_function(b0: float, Q: float) -> Callable:
         if T_K <= 0:
             return 0.0
         return b0 * math.exp(-Q / (R * T_K))
+
     return b_func
 
 
-def polynomial_b_function(coefficients: List[float]) -> Callable:
+def polynomial_b_function(coefficients: list[float]) -> Callable:
     """Create a polynomial b(T) function.
 
     b(T) = a0 + a1*T + a2*T^2 + ...
@@ -87,9 +91,11 @@ def polynomial_b_function(coefficients: List[float]) -> Callable:
     callable
         Function b(T) -> float
     """
+
     def b_func(T):
         val = sum(c * T**i for i, c in enumerate(coefficients))
         return max(val, 0.0)  # b must be non-negative
+
     return b_func
 
 
@@ -108,19 +114,14 @@ def create_b_function(model_type: str, parameters: dict) -> Callable:
     callable
         Function b(T) -> float
     """
-    if model_type == 'gaussian':
+    if model_type == "gaussian":
         return gaussian_b_function(
-            b_max=parameters['b_max'],
-            t_nose=parameters['t_nose'],
-            sigma=parameters['sigma']
+            b_max=parameters["b_max"], t_nose=parameters["t_nose"], sigma=parameters["sigma"]
         )
-    elif model_type == 'arrhenius':
-        return arrhenius_b_function(
-            b0=parameters['b0'],
-            Q=parameters['Q']
-        )
-    elif model_type == 'polynomial':
-        return polynomial_b_function(parameters['coefficients'])
+    elif model_type == "arrhenius":
+        return arrhenius_b_function(b0=parameters["b0"], Q=parameters["Q"])
+    elif model_type == "polynomial":
+        return polynomial_b_function(parameters["coefficients"])
     else:
         raise ValueError(f"Unknown b-function model type: {model_type}")
 
@@ -141,8 +142,9 @@ class JMAKModel:
         (T_min, T_max) in deg C where this model is valid
     """
 
-    def __init__(self, n: float, b_func: Callable,
-                 temp_range: Optional[Tuple[float, float]] = None):
+    def __init__(
+        self, n: float, b_func: Callable, temp_range: tuple[float, float] | None = None
+    ):
         self.n = n
         self.b_func = b_func
         self.temp_range = temp_range
@@ -174,12 +176,12 @@ class JMAKModel:
         if b <= 0:
             return 0.0
 
-        exponent = b * (time ** self.n)
+        exponent = b * (time**self.n)
         # Clamp to avoid overflow
         exponent = min(exponent, 700)
         return 1.0 - math.exp(-exponent)
 
-    def time_to_fraction(self, fraction: float, temperature: float) -> Optional[float]:
+    def time_to_fraction(self, fraction: float, temperature: float) -> float | None:
         """Calculate time required to reach a given fraction at temperature.
 
         t = (ln(1/(1-X)) / b(T))^(1/n)
@@ -237,11 +239,11 @@ class JMAKModel:
         if b <= 0:
             return 0.0
 
-        bt_n = b * (time ** self.n)
+        bt_n = b * (time**self.n)
         bt_n = min(bt_n, 700)
         return self.n * b * (time ** (self.n - 1)) * math.exp(-bt_n)
 
-    def incubation_time(self, temperature: float, threshold: float = 0.01) -> Optional[float]:
+    def incubation_time(self, temperature: float, threshold: float = 0.01) -> float | None:
         """Calculate incubation time (time to threshold fraction).
 
         Parameters
@@ -259,11 +261,9 @@ class JMAKModel:
         return self.time_to_fraction(threshold, temperature)
 
 
-def fit_jmak_parameters(temperatures: np.ndarray,
-                         times: np.ndarray,
-                         fractions: np.ndarray,
-                         model_type: str = 'gaussian'
-                         ) -> Tuple[float, str, dict]:
+def fit_jmak_parameters(
+    temperatures: np.ndarray, times: np.ndarray, fractions: np.ndarray, model_type: str = "gaussian"
+) -> tuple[float, str, dict]:
     """Fit JMAK parameters from experimental isothermal data.
 
     Expects data from multiple isothermal hold experiments at different
@@ -327,9 +327,9 @@ def fit_jmak_parameters(temperatures: np.ndarray,
     temp_arr = np.array(temp_for_b)
     b_arr = np.array(b_values)
 
-    if model_type == 'gaussian':
+    if model_type == "gaussian":
         b_params = _fit_gaussian_b(temp_arr, b_arr)
-    elif model_type == 'arrhenius':
+    elif model_type == "arrhenius":
         b_params = _fit_arrhenius_b(temp_arr, b_arr)
     else:
         raise ValueError(f"Unsupported model type for fitting: {model_type}")
@@ -350,23 +350,24 @@ def _fit_gaussian_b(temperatures: np.ndarray, b_values: np.ndarray) -> dict:
 
     try:
         popt, _ = curve_fit(
-            gaussian, temperatures, b_values,
+            gaussian,
+            temperatures,
+            b_values,
             p0=[b_max_init, t_nose_init, sigma_init],
-            bounds=([0, temperatures.min() - 100, 10],
-                    [np.inf, temperatures.max() + 100, 500]),
-            maxfev=10000
+            bounds=([0, temperatures.min() - 100, 10], [np.inf, temperatures.max() + 100, 500]),
+            maxfev=10000,
         )
         return {
-            'b_max': float(popt[0]),
-            't_nose': float(popt[1]),
-            'sigma': float(popt[2]),
+            "b_max": float(popt[0]),
+            "t_nose": float(popt[1]),
+            "sigma": float(popt[2]),
         }
     except (RuntimeError, ValueError):
         # Fallback: use raw values
         return {
-            'b_max': float(b_max_init),
-            't_nose': float(t_nose_init),
-            'sigma': float(sigma_init),
+            "b_max": float(b_max_init),
+            "t_nose": float(t_nose_init),
+            "sigma": float(sigma_init),
         }
 
 
@@ -380,13 +381,13 @@ def _fit_arrhenius_b(temperatures: np.ndarray, b_values: np.ndarray) -> dict:
     inv_T = 1.0 / T_K[b_values > 0]
 
     if len(ln_b) < 2:
-        return {'b0': 1.0, 'Q': 100000.0}
+        return {"b0": 1.0, "Q": 100000.0}
 
     coeffs = np.polyfit(inv_T, ln_b, 1)
     Q = -coeffs[0] * R
     b0 = math.exp(coeffs[1])
 
     return {
-        'b0': float(b0),
-        'Q': float(Q),
+        "b0": float(b0),
+        "Q": float(Q),
     }

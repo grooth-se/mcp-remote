@@ -1,4 +1,5 @@
 """Service for creating immutable simulation snapshots."""
+
 import json
 from datetime import datetime
 
@@ -23,32 +24,36 @@ class SnapshotService:
         SimulationSnapshot
             The created snapshot (flushed, has ID)
         """
-        max_version = db.session.query(
-            db.func.coalesce(db.func.max(SimulationSnapshot.version), 0)
-        ).filter(SimulationSnapshot.simulation_id == simulation.id).scalar()
+        max_version = (
+            db.session.query(db.func.coalesce(db.func.max(SimulationSnapshot.version), 0))
+            .filter(SimulationSnapshot.simulation_id == simulation.id)
+            .scalar()
+        )
 
         grade = simulation.steel_grade
 
         # Serialize material properties
         props = []
         for p in grade.properties.all():
-            props.append({
-                'name': p.property_name,
-                'type': p.property_type,
-                'units': p.units,
-                'dependencies': p.dependencies,
-                'data': p.data_dict,
-                'notes': p.notes,
-            })
+            props.append(
+                {
+                    "name": p.property_name,
+                    "type": p.property_type,
+                    "units": p.units,
+                    "dependencies": p.dependencies,
+                    "data": p.data_dict,
+                    "notes": p.notes,
+                }
+            )
 
         # Serialize phase diagram
         diagram = grade.phase_diagrams.first()
         diagram_data = None
         if diagram:
             diagram_data = {
-                'type': diagram.diagram_type,
-                'transformation_temps': diagram.temps_dict,
-                'curves': diagram.curves_dict,
+                "type": diagram.diagram_type,
+                "transformation_temps": diagram.temps_dict,
+                "curves": diagram.curves_dict,
             }
 
         # Serialize composition
@@ -59,13 +64,15 @@ class SnapshotService:
         # Serialize phase properties
         phase_props = []
         for pp in grade.phase_properties.all():
-            phase_props.append({
-                'phase': pp.phase,
-                'relative_density': pp.relative_density,
-                'thermal_expansion_coeff': pp.thermal_expansion_coeff,
-                'expansion_type': pp.expansion_type,
-                'reference_temperature': pp.reference_temperature,
-            })
+            phase_props.append(
+                {
+                    "phase": pp.phase,
+                    "relative_density": pp.relative_density,
+                    "thermal_expansion_coeff": pp.thermal_expansion_coeff,
+                    "expansion_type": pp.expansion_type,
+                    "reference_temperature": pp.reference_temperature,
+                }
+            )
 
         snapshot = SimulationSnapshot(
             simulation_id=simulation.id,
@@ -83,7 +90,7 @@ class SnapshotService:
             phase_properties_snapshot=json.dumps(phase_props),
             cad_filename=simulation.cad_filename,
             cad_analysis=simulation.cad_analysis,
-            cad_equivalent_type=getattr(simulation, 'cad_equivalent_type', None),
+            cad_equivalent_type=getattr(simulation, "cad_equivalent_type", None),
             user_id=simulation.user_id,
             started_at=datetime.utcnow(),
         )
@@ -126,12 +133,12 @@ class SnapshotService:
         for r in results:
             if r.t_800_500:
                 snapshot.t_800_500 = r.t_800_500
-            if r.result_type == 'hardness_prediction' and r.result_data:
+            if r.result_type == "hardness_prediction" and r.result_data:
                 try:
                     data = json.loads(r.result_data)
-                    if 'surface_hv' in data:
-                        snapshot.predicted_hardness_surface = data['surface_hv']
-                    if 'center_hv' in data:
-                        snapshot.predicted_hardness_center = data['center_hv']
+                    if "surface_hv" in data:
+                        snapshot.predicted_hardness_surface = data["surface_hv"]
+                    if "center_hv" in data:
+                        snapshot.predicted_hardness_center = data["center_hv"]
                 except (json.JSONDecodeError, KeyError):
                     pass

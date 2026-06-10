@@ -6,8 +6,9 @@ generate CCT (Continuous Cooling Transformation) diagram data.
 Output format matches that of cct_predictor.predict():
     {phase: {'start': [[t,T],...], 'finish': [[t,T],...]}}
 """
+
+
 import numpy as np
-from typing import Dict, List, Optional
 
 from .jmak_model import JMAKModel
 from .martensite_model import KoistinenMarburgerModel
@@ -15,15 +16,15 @@ from .scheil_additivity import calculate_cct_transformation
 
 
 def generate_cct_from_ttt(
-    jmak_models: Dict[str, JMAKModel],
-    martensite_model: Optional[KoistinenMarburgerModel] = None,
-    critical_temps: Optional[Dict[str, float]] = None,
-    cooling_rates: Optional[List[float]] = None,
+    jmak_models: dict[str, JMAKModel],
+    martensite_model: KoistinenMarburgerModel | None = None,
+    critical_temps: dict[str, float] | None = None,
+    cooling_rates: list[float] | None = None,
     austenitizing_temp: float = 900.0,
     end_temp: float = 25.0,
     start_fraction: float = 0.01,
-    finish_fraction: float = 0.99
-) -> Dict[str, Dict[str, List[List[float]]]]:
+    finish_fraction: float = 0.99,
+) -> dict[str, dict[str, list[list[float]]]]:
     """Generate CCT curves by running Scheil at multiple cooling rates.
 
     For each cooling rate, simulates a linear cooling curve from
@@ -64,7 +65,7 @@ def generate_cct_from_ttt(
         cooling_rates = np.logspace(-1, 2.3, 50).tolist()  # 0.1 to ~200 K/s
 
     curves = {}
-    phase_starts = {}   # phase -> list of (time, temp)
+    phase_starts = {}  # phase -> list of (time, temp)
     phase_finishes = {}  # phase -> list of (time, temp)
 
     for cr in sorted(cooling_rates):
@@ -79,13 +80,12 @@ def generate_cct_from_ttt(
 
         # Run Scheil additivity
         result = calculate_cct_transformation(
-            times, temperatures,
-            jmak_models, martensite_model, critical_temps
+            times, temperatures, jmak_models, martensite_model, critical_temps
         )
 
         # Extract start/finish points for each phase
         for phase in result.phase_fractions:
-            if phase == 'retained_austenite':
+            if phase == "retained_austenite":
                 continue
 
             frac = result.phase_fractions[phase]
@@ -96,7 +96,7 @@ def generate_cct_from_ttt(
 
             # Use absolute thresholds (not relative to final_frac)
             # This gives consistent detection across cooling rates
-            abs_start = start_fraction   # e.g. 0.01 = 1% absolute
+            abs_start = start_fraction  # e.g. 0.01 = 1% absolute
             abs_finish = min(finish_fraction * final_frac, final_frac * 0.99)
 
             # Start point: first time fraction exceeds 1% absolute
@@ -122,10 +122,10 @@ def generate_cct_from_ttt(
         if phase in phase_starts and len(phase_starts[phase]) >= 2:
             # Sort by time ascending (natural CCT ordering: fast cooling left, slow right)
             start_pts = sorted(phase_starts[phase], key=lambda p: p[0])
-            phase_dict['start'] = start_pts
+            phase_dict["start"] = start_pts
         if phase in phase_finishes and len(phase_finishes[phase]) >= 2:
             finish_pts = sorted(phase_finishes[phase], key=lambda p: p[0])
-            phase_dict['finish'] = finish_pts
+            phase_dict["finish"] = finish_pts
 
         if phase_dict:
             curves[phase] = phase_dict
@@ -134,13 +134,13 @@ def generate_cct_from_ttt(
 
 
 def generate_cct_phase_fractions(
-    jmak_models: Dict[str, JMAKModel],
-    martensite_model: Optional[KoistinenMarburgerModel] = None,
-    critical_temps: Optional[Dict[str, float]] = None,
-    cooling_rates: Optional[List[float]] = None,
+    jmak_models: dict[str, JMAKModel],
+    martensite_model: KoistinenMarburgerModel | None = None,
+    critical_temps: dict[str, float] | None = None,
+    cooling_rates: list[float] | None = None,
     austenitizing_temp: float = 900.0,
-    end_temp: float = 25.0
-) -> Dict[float, Dict[str, float]]:
+    end_temp: float = 25.0,
+) -> dict[float, dict[str, float]]:
     """Generate final phase fractions at each cooling rate.
 
     Useful for plotting phase fraction vs cooling rate diagrams.
@@ -175,8 +175,7 @@ def generate_cct_phase_fractions(
         temperatures = austenitizing_temp - cr * times
 
         result = calculate_cct_transformation(
-            times, temperatures,
-            jmak_models, martensite_model, critical_temps
+            times, temperatures, jmak_models, martensite_model, critical_temps
         )
 
         results[float(cr)] = result.final_fractions

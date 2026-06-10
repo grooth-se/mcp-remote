@@ -1,4 +1,5 @@
 """Service for tracking material property changes."""
+
 import json
 
 from app.extensions import db
@@ -13,11 +14,12 @@ class MaterialChangeTracker:
         """Get current user info from request context."""
         try:
             from flask_login import current_user
+
             if current_user and current_user.is_authenticated:
                 return current_user.id, current_user.username
         except RuntimeError:
             pass
-        return None, 'system'
+        return None, "system"
 
     @classmethod
     def log_create(cls, entity_type, entity, steel_grade_id):
@@ -27,7 +29,7 @@ class MaterialChangeTracker:
             entity_type=entity_type,
             entity_id=entity.id,
             steel_grade_id=steel_grade_id,
-            action='create',
+            action="create",
             new_value=json.dumps(repr(entity)),
             changed_by_id=user_id,
             changed_by_username=username,
@@ -49,7 +51,7 @@ class MaterialChangeTracker:
                 entity_type=entity_type,
                 entity_id=entity_id,
                 steel_grade_id=steel_grade_id,
-                action='update',
+                action="update",
                 field_name=field_name,
                 old_value=json.dumps(old_val) if old_val is not None else None,
                 new_value=json.dumps(new_val) if new_val is not None else None,
@@ -66,7 +68,7 @@ class MaterialChangeTracker:
             entity_type=entity_type,
             entity_id=entity_id,
             steel_grade_id=steel_grade_id,
-            action='delete',
+            action="delete",
             old_value=json.dumps(name) if name else None,
             changed_by_id=user_id,
             changed_by_username=username,

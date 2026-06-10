@@ -1,510 +1,518 @@
 """Forms for heat treatment simulation setup."""
+
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileAllowed
+from flask_wtf.file import FileAllowed, FileField
 from wtforms import (
-    StringField, TextAreaField, SelectField, FloatField,
-    IntegerField, BooleanField, SubmitField, RadioField
+    BooleanField,
+    FloatField,
+    IntegerField,
+    RadioField,
+    SelectField,
+    StringField,
+    SubmitField,
+    TextAreaField,
 )
-from wtforms.validators import DataRequired, Optional, NumberRange, Length
+from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
 from app.models.simulation import (
-    GEOMETRY_TYPES,
-    QUENCH_MEDIA, QUENCH_MEDIA_LABELS,
-    AGITATION_LEVELS, AGITATION_LABELS,
-    FURNACE_ATMOSPHERES, FURNACE_ATMOSPHERE_LABELS,
+    AGITATION_LABELS,
+    AGITATION_LEVELS,
+    FURNACE_ATMOSPHERE_LABELS,
+    FURNACE_ATMOSPHERES,
+    QUENCH_MEDIA,
+    QUENCH_MEDIA_LABELS,
 )
 
 
 class SimulationForm(FlaskForm):
     """Form for creating a new simulation."""
+
     name = StringField(
-        'Simulation Name',
+        "Simulation Name",
         validators=[DataRequired(), Length(max=100)],
-        render_kw={'placeholder': 'e.g., Shaft Quench Study'}
+        render_kw={"placeholder": "e.g., Shaft Quench Study"},
     )
     description = TextAreaField(
-        'Description',
+        "Description",
         validators=[Optional(), Length(max=500)],
-        render_kw={'rows': 3, 'placeholder': 'Optional description'}
+        render_kw={"rows": 3, "placeholder": "Optional description"},
     )
-    steel_grade_id = SelectField(
-        'Steel Grade',
-        coerce=int,
-        validators=[DataRequired()]
-    )
+    steel_grade_id = SelectField("Steel Grade", coerce=int, validators=[DataRequired()])
     geometry_type = SelectField(
-        'Geometry',
+        "Geometry",
         choices=[
-            ('cylinder', 'Cylinder (solid)'),
-            ('hollow_cylinder', 'Hollow Cylinder (OD/ID)'),
-            ('plate', 'Plate'),
-            ('ring', 'Ring (Ri/Ro)'),
-            ('cad', 'Import from CAD (STEP file)')
+            ("cylinder", "Cylinder (solid)"),
+            ("hollow_cylinder", "Hollow Cylinder (OD/ID)"),
+            ("plate", "Plate"),
+            ("ring", "Ring (Ri/Ro)"),
+            ("cad", "Import from CAD (STEP file)"),
         ],
-        default='cylinder'
+        default="cylinder",
     )
 
     # CAD geometry fields
     cad_file = FileField(
-        'STEP File',
-        validators=[FileAllowed(['step', 'stp'], 'Only STEP files (.step, .stp) are allowed')]
+        "STEP File",
+        validators=[FileAllowed(["step", "stp"], "Only STEP files (.step, .stp) are allowed")],
     )
     cad_equivalent_type = SelectField(
-        'Equivalent Geometry',
+        "Equivalent Geometry",
         choices=[
-            ('auto', 'Auto-detect'),
-            ('cylinder', 'Cylinder (radial heat transfer)'),
-            ('plate', 'Plate (through-thickness heat transfer)')
+            ("auto", "Auto-detect"),
+            ("cylinder", "Cylinder (radial heat transfer)"),
+            ("plate", "Plate (through-thickness heat transfer)"),
         ],
-        default='auto'
+        default="auto",
     )
 
-    submit = SubmitField('Create Simulation')
+    submit = SubmitField("Create Simulation")
 
 
 class GeometryForm(FlaskForm):
     """Form for geometry configuration."""
+
     # Cylinder - supports up to 1200mm diameter (600mm radius)
     radius = FloatField(
-        'Radius (mm)',
-        validators=[Optional(), NumberRange(min=1, max=1500)],
-        default=50
+        "Radius (mm)", validators=[Optional(), NumberRange(min=1, max=1500)], default=50
     )
     # Plate
     thickness = FloatField(
-        'Thickness (mm)',
-        validators=[Optional(), NumberRange(min=1, max=1500)],
-        default=20
+        "Thickness (mm)", validators=[Optional(), NumberRange(min=1, max=1500)], default=20
     )
     # Common
     length = FloatField(
-        'Length (mm)',
-        validators=[Optional(), NumberRange(min=1, max=5000)],
-        default=100
+        "Length (mm)", validators=[Optional(), NumberRange(min=1, max=5000)], default=100
     )
     width = FloatField(
-        'Width (mm)',
-        validators=[Optional(), NumberRange(min=1, max=5000)],
-        default=100
+        "Width (mm)", validators=[Optional(), NumberRange(min=1, max=5000)], default=100
     )
     # Ring - supports large rings up to 1200mm outer diameter
     inner_radius = FloatField(
-        'Inner Radius (mm)',
-        validators=[Optional(), NumberRange(min=1, max=1500)],
-        default=20
+        "Inner Radius (mm)", validators=[Optional(), NumberRange(min=1, max=1500)], default=20
     )
     outer_radius = FloatField(
-        'Outer Radius (mm)',
-        validators=[Optional(), NumberRange(min=1, max=1500)],
-        default=50
+        "Outer Radius (mm)", validators=[Optional(), NumberRange(min=1, max=1500)], default=50
     )
     # Hollow Cylinder - OD/ID notation (more common in engineering)
     outer_diameter = FloatField(
-        'Outer Diameter OD (mm)',
-        validators=[Optional(), NumberRange(min=2, max=3000)],
-        default=100
+        "Outer Diameter OD (mm)", validators=[Optional(), NumberRange(min=2, max=3000)], default=100
     )
     inner_diameter = FloatField(
-        'Inner Diameter ID (mm)',
-        validators=[Optional(), NumberRange(min=1, max=2990)],
-        default=40
+        "Inner Diameter ID (mm)", validators=[Optional(), NumberRange(min=1, max=2990)], default=40
     )
 
 
 class HeatingPhaseForm(FlaskForm):
     """Form for heating (austenitizing) phase configuration."""
-    enabled = BooleanField('Enable Heating Phase', default=True)
+
+    enabled = BooleanField("Enable Heating Phase", default=True)
 
     initial_temperature = FloatField(
-        'Initial Temperature (°C)',
+        "Initial Temperature (°C)",
         validators=[Optional(), NumberRange(min=-50, max=500)],
         default=25.0,
-        render_kw={'placeholder': 'Starting temperature'}
+        render_kw={"placeholder": "Starting temperature"},
     )
 
     target_temperature = FloatField(
-        'Austenitizing Temperature (°C)',
+        "Austenitizing Temperature (°C)",
         validators=[Optional(), NumberRange(min=500, max=1200)],
         default=850.0,
-        render_kw={'placeholder': 'Target furnace temperature'}
+        render_kw={"placeholder": "Target furnace temperature"},
     )
 
     hold_time = FloatField(
-        'Hold Time at Temperature (min)',
+        "Hold Time at Temperature (min)",
         validators=[Optional(), NumberRange(min=0, max=1440)],
         default=60.0,
-        render_kw={'placeholder': 'Soak time at target temp'}
+        render_kw={"placeholder": "Soak time at target temp"},
     )
 
     furnace_atmosphere = SelectField(
-        'Furnace Atmosphere',
+        "Furnace Atmosphere",
         choices=[(a, FURNACE_ATMOSPHERE_LABELS[a]) for a in FURNACE_ATMOSPHERES],
-        default='air'
+        default="air",
     )
 
     # Furnace ramp settings
-    cold_furnace = BooleanField('Cold Furnace Start', default=False)
+    cold_furnace = BooleanField("Cold Furnace Start", default=False)
 
     furnace_start_temperature = FloatField(
-        'Furnace Start Temperature (°C)',
+        "Furnace Start Temperature (°C)",
         validators=[Optional(), NumberRange(min=-50, max=500)],
         default=25.0,
-        render_kw={'placeholder': 'Initial furnace temperature'}
+        render_kw={"placeholder": "Initial furnace temperature"},
     )
 
     furnace_ramp_rate = FloatField(
-        'Furnace Ramp Rate (°C/min)',
+        "Furnace Ramp Rate (°C/min)",
         validators=[Optional(), NumberRange(min=0, max=50)],
         default=5.0,
-        render_kw={'placeholder': 'Furnace heating rate'}
+        render_kw={"placeholder": "Furnace heating rate"},
     )
 
     # End condition settings
     end_condition = SelectField(
-        'End Condition',
+        "End Condition",
         choices=[
-            ('equilibrium', 'Equilibrium (center within 5°C)'),
-            ('rate_threshold', 'Surface Rate Threshold'),
-            ('center_offset', 'Center Temperature Offset'),
+            ("equilibrium", "Equilibrium (center within 5°C)"),
+            ("rate_threshold", "Surface Rate Threshold"),
+            ("center_offset", "Center Temperature Offset"),
         ],
-        default='equilibrium'
+        default="equilibrium",
     )
 
     rate_threshold = FloatField(
-        'Surface Rate Threshold (°C/hr)',
+        "Surface Rate Threshold (°C/hr)",
         validators=[Optional(), NumberRange(min=0.1, max=10)],
         default=1.0,
-        render_kw={'placeholder': 'Trigger when dT/dt < this'}
+        render_kw={"placeholder": "Trigger when dT/dt < this"},
     )
 
     hold_time_after_trigger = FloatField(
-        'Hold After Trigger (min)',
+        "Hold After Trigger (min)",
         validators=[Optional(), NumberRange(min=0, max=1440)],
         default=30.0,
-        render_kw={'placeholder': 'Additional hold time after trigger'}
+        render_kw={"placeholder": "Additional hold time after trigger"},
     )
 
     center_offset = FloatField(
-        'Center Offset (°C)',
+        "Center Offset (°C)",
         validators=[Optional(), NumberRange(min=0, max=100)],
         default=3.0,
-        render_kw={'placeholder': 'End when center = target - offset'}
+        render_kw={"placeholder": "End when center = target - offset"},
     )
 
     # Heat transfer parameters
     furnace_htc = FloatField(
-        'Furnace HTC (W/m²K)',
+        "Furnace HTC (W/m²K)",
         validators=[Optional(), NumberRange(min=1, max=500)],
         default=25.0,
-        render_kw={'placeholder': 'Convection coefficient in furnace'}
+        render_kw={"placeholder": "Convection coefficient in furnace"},
     )
 
     furnace_emissivity = FloatField(
-        'Surface Emissivity',
-        validators=[Optional(), NumberRange(min=0, max=1)],
-        default=0.85
+        "Surface Emissivity", validators=[Optional(), NumberRange(min=0, max=1)], default=0.85
     )
 
-    use_radiation = BooleanField('Include Radiation Heat Transfer', default=True)
+    use_radiation = BooleanField("Include Radiation Heat Transfer", default=True)
 
 
 class TransferPhaseForm(FlaskForm):
     """Form for transfer phase (furnace to quench) configuration."""
-    enabled = BooleanField('Enable Transfer Phase', default=True)
+
+    enabled = BooleanField("Enable Transfer Phase", default=True)
 
     duration = FloatField(
-        'Transfer Time (s)',
+        "Transfer Time (s)",
         validators=[Optional(), NumberRange(min=0, max=600)],
         default=10.0,
-        render_kw={'placeholder': 'Time from furnace to quench (up to 10 min for large parts)'}
+        render_kw={"placeholder": "Time from furnace to quench (up to 10 min for large parts)"},
     )
 
     ambient_temperature = FloatField(
-        'Ambient Temperature (°C)',
+        "Ambient Temperature (°C)",
         validators=[Optional(), NumberRange(min=-50, max=100)],
-        default=25.0
+        default=25.0,
     )
 
     htc = FloatField(
-        'Air HTC (W/m²K)',
+        "Air HTC (W/m²K)",
         validators=[Optional(), NumberRange(min=1, max=100)],
         default=10.0,
-        render_kw={'placeholder': 'Natural convection in air'}
+        render_kw={"placeholder": "Natural convection in air"},
     )
 
     emissivity = FloatField(
-        'Surface Emissivity',
-        validators=[Optional(), NumberRange(min=0, max=1)],
-        default=0.85
+        "Surface Emissivity", validators=[Optional(), NumberRange(min=0, max=1)], default=0.85
     )
 
-    use_radiation = BooleanField('Include Radiation (significant at high temp)', default=True)
+    use_radiation = BooleanField("Include Radiation (significant at high temp)", default=True)
 
 
 class QuenchingPhaseForm(FlaskForm):
     """Form for quenching phase configuration."""
+
     media = SelectField(
-        'Quench Media',
-        choices=[(m, QUENCH_MEDIA_LABELS[m]) for m in QUENCH_MEDIA],
-        default='water'
+        "Quench Media", choices=[(m, QUENCH_MEDIA_LABELS[m]) for m in QUENCH_MEDIA], default="water"
     )
 
     media_temperature = FloatField(
-        'Media Temperature (°C)',
+        "Media Temperature (°C)",
         validators=[Optional(), NumberRange(min=0, max=200)],
         default=25.0,
-        render_kw={'placeholder': 'Quench bath temperature'}
+        render_kw={"placeholder": "Quench bath temperature"},
     )
 
     agitation = SelectField(
-        'Agitation Level',
+        "Agitation Level",
         choices=[(a, AGITATION_LABELS[a]) for a in AGITATION_LEVELS],
-        default='moderate'
+        default="moderate",
     )
 
     htc_override = FloatField(
-        'Custom HTC (W/m²K)',
+        "Custom HTC (W/m²K)",
         validators=[Optional(), NumberRange(min=10, max=50000)],
-        render_kw={'placeholder': 'Leave blank to calculate from media/agitation'}
+        render_kw={"placeholder": "Leave blank to calculate from media/agitation"},
     )
 
     duration = FloatField(
-        'Quench Duration (s)',
+        "Quench Duration (s)",
         validators=[Optional(), NumberRange(min=10, max=14400)],
         default=300.0,
-        render_kw={'placeholder': 'Time in quench tank (up to 4 hours for large parts)'}
+        render_kw={"placeholder": "Time in quench tank (up to 4 hours for large parts)"},
     )
 
     emissivity = FloatField(
-        'Surface Emissivity',
+        "Surface Emissivity",
         validators=[Optional(), NumberRange(min=0, max=1)],
         default=0.3,
-        render_kw={'placeholder': 'Lower due to steam/oil film'}
+        render_kw={"placeholder": "Lower due to steam/oil film"},
     )
 
-    use_radiation = BooleanField('Include Radiation (usually negligible in liquid)', default=False)
+    use_radiation = BooleanField("Include Radiation (usually negligible in liquid)", default=False)
 
 
 class TemperingPhaseForm(FlaskForm):
     """Form for tempering phase configuration."""
-    enabled = BooleanField('Enable Tempering Phase', default=False)
+
+    enabled = BooleanField("Enable Tempering Phase", default=False)
 
     temperature = FloatField(
-        'Tempering Temperature (°C)',
+        "Tempering Temperature (°C)",
         validators=[Optional(), NumberRange(min=100, max=750)],
         default=550.0,
-        render_kw={'placeholder': 'Tempering furnace temperature'}
+        render_kw={"placeholder": "Tempering furnace temperature"},
     )
 
     hold_time = FloatField(
-        'Hold Time (min)',
+        "Hold Time (min)",
         validators=[Optional(), NumberRange(min=1, max=1440)],
         default=120.0,
-        render_kw={'placeholder': 'Time at tempering temperature'}
+        render_kw={"placeholder": "Time at tempering temperature"},
     )
 
     # Furnace ramp settings (cold furnace start)
-    cold_furnace = BooleanField('Cold Furnace Start', default=False)
+    cold_furnace = BooleanField("Cold Furnace Start", default=False)
 
     furnace_start_temperature = FloatField(
-        'Furnace Start Temperature (°C)',
+        "Furnace Start Temperature (°C)",
         validators=[Optional(), NumberRange(min=-50, max=500)],
         default=25.0,
-        render_kw={'placeholder': 'Initial furnace temperature'}
+        render_kw={"placeholder": "Initial furnace temperature"},
     )
 
     furnace_ramp_rate = FloatField(
-        'Furnace Ramp Rate (°C/min)',
+        "Furnace Ramp Rate (°C/min)",
         validators=[Optional(), NumberRange(min=0, max=50)],
         default=5.0,
-        render_kw={'placeholder': 'Furnace heating rate'}
+        render_kw={"placeholder": "Furnace heating rate"},
     )
 
     # End condition settings (same as heating phase)
     end_condition = SelectField(
-        'End Condition',
+        "End Condition",
         choices=[
-            ('equilibrium', 'Equilibrium (center within 5°C)'),
-            ('rate_threshold', 'Surface Rate Threshold'),
-            ('center_offset', 'Center Temperature Offset'),
+            ("equilibrium", "Equilibrium (center within 5°C)"),
+            ("rate_threshold", "Surface Rate Threshold"),
+            ("center_offset", "Center Temperature Offset"),
         ],
-        default='equilibrium'
+        default="equilibrium",
     )
 
     rate_threshold = FloatField(
-        'Surface Rate Threshold (°C/hr)',
+        "Surface Rate Threshold (°C/hr)",
         validators=[Optional(), NumberRange(min=0.1, max=100)],
         default=1.0,
-        render_kw={'placeholder': 'Trigger when dT/dt < this'}
+        render_kw={"placeholder": "Trigger when dT/dt < this"},
     )
 
     hold_time_after_trigger = FloatField(
-        'Hold After Trigger (min)',
+        "Hold After Trigger (min)",
         validators=[Optional(), NumberRange(min=0, max=1440)],
         default=30.0,
-        render_kw={'placeholder': 'Additional hold time after trigger'}
+        render_kw={"placeholder": "Additional hold time after trigger"},
     )
 
     center_offset = FloatField(
-        'Center Offset (°C)',
+        "Center Offset (°C)",
         validators=[Optional(), NumberRange(min=0, max=100)],
         default=3.0,
-        render_kw={'placeholder': 'End when center = target - offset'}
+        render_kw={"placeholder": "End when center = target - offset"},
     )
 
     cooling_method = SelectField(
-        'Cooling After Tempering',
+        "Cooling After Tempering",
         choices=[
-            ('air', 'Air Cool'),
-            ('furnace', 'Furnace Cool'),
+            ("air", "Air Cool"),
+            ("furnace", "Furnace Cool"),
         ],
-        default='air'
+        default="air",
     )
 
     htc = FloatField(
-        'Cooling HTC (W/m²K)',
-        validators=[Optional(), NumberRange(min=1, max=500)],
-        default=25.0
+        "Cooling HTC (W/m²K)", validators=[Optional(), NumberRange(min=1, max=500)], default=25.0
     )
 
     emissivity = FloatField(
-        'Surface Emissivity',
-        validators=[Optional(), NumberRange(min=0, max=1)],
-        default=0.85
+        "Surface Emissivity", validators=[Optional(), NumberRange(min=0, max=1)], default=0.85
     )
 
 
 class SolverForm(FlaskForm):
     """Form for solver configuration."""
+
     solver_type = RadioField(
-        'Solver Type',
+        "Solver Type",
         choices=[
-            ('builtin', 'Built-in 1D FDM'),
-            ('comsol', 'COMSOL 3D FEM'),
+            ("builtin", "Built-in 1D FDM"),
+            ("comsol", "COMSOL 3D FEM"),
         ],
-        default='builtin'
+        default="builtin",
     )
     n_nodes = IntegerField(
-        'Number of Nodes',
-        validators=[DataRequired(), NumberRange(min=11, max=201)],
-        default=51
+        "Number of Nodes", validators=[DataRequired(), NumberRange(min=11, max=201)], default=51
     )
     dt = FloatField(
-        'Time Step (s)',
-        validators=[Optional(), NumberRange(min=0.001, max=60)],
-        default=0.1
+        "Time Step (s)", validators=[Optional(), NumberRange(min=0.001, max=60)], default=0.1
     )
     auto_dt = BooleanField(
-        'Auto-calculate time step',
+        "Auto-calculate time step",
         default=True,
-        description='Calculate dt to limit simulation to ~20,000 time steps'
+        description="Calculate dt to limit simulation to ~20,000 time steps",
     )
     max_time = FloatField(
-        'Maximum Simulation Time (s)',
+        "Maximum Simulation Time (s)",
         validators=[DataRequired(), NumberRange(min=10, max=180000)],
         default=1800,
-        render_kw={'placeholder': 'Total simulation time limit (up to 50 hours)'}
+        render_kw={"placeholder": "Total simulation time limit (up to 50 hours)"},
     )
-    submit = SubmitField('Save Configuration')
+    submit = SubmitField("Save Configuration")
 
 
 class HeatTreatmentSetupForm(FlaskForm):
     """Combined form for full heat treatment setup."""
+
     # This is used for the combined setup page
-    submit = SubmitField('Save Heat Treatment Configuration')
+    submit = SubmitField("Save Heat Treatment Configuration")
 
 
 class ParameterSweepForm(FlaskForm):
     """Form for parameter sweep configuration."""
-    parameter = SelectField('Parameter to Vary', choices=[
-        # Quenching parameters
-        ('quenching.media_temperature', 'Quench Media Temperature (°C)'),
-        ('quenching.duration', 'Quench Duration (s)'),
-        # Heating parameters
-        ('heating.target_temperature', 'Austenitizing Temperature (°C)'),
-        ('heating.hold_time', 'Austenitizing Hold Time (min)'),
-        # Tempering parameters
-        ('tempering.temperature', 'Tempering Temperature (°C)'),
-        ('tempering.hold_time', 'Tempering Hold Time (min)'),
-        # Geometry parameters
-        ('geometry.radius', 'Cylinder Radius (mm)'),
-        ('geometry.thickness', 'Plate Thickness (mm)'),
-        ('geometry.outer_diameter', 'Hollow Cylinder OD (mm)'),
-    ], validators=[DataRequired()])
-    min_value = FloatField('Minimum Value', validators=[DataRequired()])
-    max_value = FloatField('Maximum Value', validators=[DataRequired()])
-    steps = IntegerField('Number of Steps', default=5,
-                        validators=[DataRequired(), NumberRange(min=2, max=20)])
-    run_immediately = BooleanField('Run Simulations Immediately', default=False)
-    submit = SubmitField('Create Parameter Sweep')
+
+    parameter = SelectField(
+        "Parameter to Vary",
+        choices=[
+            # Quenching parameters
+            ("quenching.media_temperature", "Quench Media Temperature (°C)"),
+            ("quenching.duration", "Quench Duration (s)"),
+            # Heating parameters
+            ("heating.target_temperature", "Austenitizing Temperature (°C)"),
+            ("heating.hold_time", "Austenitizing Hold Time (min)"),
+            # Tempering parameters
+            ("tempering.temperature", "Tempering Temperature (°C)"),
+            ("tempering.hold_time", "Tempering Hold Time (min)"),
+            # Geometry parameters
+            ("geometry.radius", "Cylinder Radius (mm)"),
+            ("geometry.thickness", "Plate Thickness (mm)"),
+            ("geometry.outer_diameter", "Hollow Cylinder OD (mm)"),
+        ],
+        validators=[DataRequired()],
+    )
+    min_value = FloatField("Minimum Value", validators=[DataRequired()])
+    max_value = FloatField("Maximum Value", validators=[DataRequired()])
+    steps = IntegerField(
+        "Number of Steps", default=5, validators=[DataRequired(), NumberRange(min=2, max=20)]
+    )
+    run_immediately = BooleanField("Run Simulations Immediately", default=False)
+    submit = SubmitField("Create Parameter Sweep")
 
 
 class ProcessOptimizationForm(FlaskForm):
     """Form for process optimization setup."""
 
     # Objective
-    objective_output = SelectField('Objective Output', choices=[
-        ('hardness_hv_center', 'Center Hardness (HV)'),
-        ('hardness_hv_surface', 'Surface Hardness (HV)'),
-        ('t8_5', 't₈/₅ Cooling Time (s)'),
-        ('martensite', 'Martensite Fraction (%)'),
-        ('core_cooling_rate', 'Core Cooling Rate (°C/s)'),
-        ('surface_cooling_rate', 'Surface Cooling Rate (°C/s)'),
-    ], validators=[DataRequired()])
+    objective_output = SelectField(
+        "Objective Output",
+        choices=[
+            ("hardness_hv_center", "Center Hardness (HV)"),
+            ("hardness_hv_surface", "Surface Hardness (HV)"),
+            ("t8_5", "t₈/₅ Cooling Time (s)"),
+            ("martensite", "Martensite Fraction (%)"),
+            ("core_cooling_rate", "Core Cooling Rate (°C/s)"),
+            ("surface_cooling_rate", "Surface Cooling Rate (°C/s)"),
+        ],
+        validators=[DataRequired()],
+    )
 
-    objective_direction = SelectField('Objective Type', choices=[
-        ('target', 'Target Value'),
-        ('minimize', 'Minimize'),
-        ('maximize', 'Maximize'),
-    ], validators=[DataRequired()])
+    objective_direction = SelectField(
+        "Objective Type",
+        choices=[
+            ("target", "Target Value"),
+            ("minimize", "Minimize"),
+            ("maximize", "Maximize"),
+        ],
+        validators=[DataRequired()],
+    )
 
-    target_value = FloatField('Target Value', validators=[Optional()])
+    target_value = FloatField("Target Value", validators=[Optional()])
 
     # Optimizer settings
-    method = SelectField('Method', choices=[
-        ('nelder-mead', 'Nelder-Mead (Fast, Local Search)'),
-        ('differential_evolution', 'Differential Evolution (Global Search)'),
-    ], default='nelder-mead')
+    method = SelectField(
+        "Method",
+        choices=[
+            ("nelder-mead", "Nelder-Mead (Fast, Local Search)"),
+            ("differential_evolution", "Differential Evolution (Global Search)"),
+        ],
+        default="nelder-mead",
+    )
 
     max_iterations = IntegerField(
-        'Maximum Iterations', default=30,
-        validators=[DataRequired(), NumberRange(min=5, max=50)]
+        "Maximum Iterations", default=30, validators=[DataRequired(), NumberRange(min=5, max=50)]
     )
 
     # Parameters to optimize (checkbox + min/max bounds)
-    opt_aust_temp = BooleanField('Austenitizing Temperature')
-    opt_aust_temp_min = FloatField('Min', validators=[Optional()], default=750)
-    opt_aust_temp_max = FloatField('Max', validators=[Optional()], default=1100)
+    opt_aust_temp = BooleanField("Austenitizing Temperature")
+    opt_aust_temp_min = FloatField("Min", validators=[Optional()], default=750)
+    opt_aust_temp_max = FloatField("Max", validators=[Optional()], default=1100)
 
-    opt_quench_temp = BooleanField('Quench Media Temperature')
-    opt_quench_temp_min = FloatField('Min', validators=[Optional()], default=0)
-    opt_quench_temp_max = FloatField('Max', validators=[Optional()], default=80)
+    opt_quench_temp = BooleanField("Quench Media Temperature")
+    opt_quench_temp_min = FloatField("Min", validators=[Optional()], default=0)
+    opt_quench_temp_max = FloatField("Max", validators=[Optional()], default=80)
 
-    opt_quench_duration = BooleanField('Quench Duration')
-    opt_quench_duration_min = FloatField('Min', validators=[Optional()], default=30)
-    opt_quench_duration_max = FloatField('Max', validators=[Optional()], default=3600)
+    opt_quench_duration = BooleanField("Quench Duration")
+    opt_quench_duration_min = FloatField("Min", validators=[Optional()], default=30)
+    opt_quench_duration_max = FloatField("Max", validators=[Optional()], default=3600)
 
-    opt_temper_temp = BooleanField('Tempering Temperature')
-    opt_temper_temp_min = FloatField('Min', validators=[Optional()], default=100)
-    opt_temper_temp_max = FloatField('Max', validators=[Optional()], default=700)
+    opt_temper_temp = BooleanField("Tempering Temperature")
+    opt_temper_temp_min = FloatField("Min", validators=[Optional()], default=100)
+    opt_temper_temp_max = FloatField("Max", validators=[Optional()], default=700)
 
-    opt_temper_hold = BooleanField('Tempering Hold Time')
-    opt_temper_hold_min = FloatField('Min', validators=[Optional()], default=30)
-    opt_temper_hold_max = FloatField('Max', validators=[Optional()], default=480)
+    opt_temper_hold = BooleanField("Tempering Hold Time")
+    opt_temper_hold_min = FloatField("Min", validators=[Optional()], default=30)
+    opt_temper_hold_max = FloatField("Max", validators=[Optional()], default=480)
 
     # Optional constraint
-    constraint_enabled = BooleanField('Add Output Constraint')
-    constraint_output = SelectField('Constraint Output', choices=[
-        ('hardness_hv_center', 'Center Hardness (HV)'),
-        ('hardness_hv_surface', 'Surface Hardness (HV)'),
-        ('t8_5', 't₈/₅ Cooling Time (s)'),
-        ('martensite', 'Martensite Fraction (%)'),
-    ], validators=[Optional()])
-    constraint_operator = SelectField('Constraint', choices=[
-        ('gte', '≥'),
-        ('lte', '≤'),
-    ], validators=[Optional()])
-    constraint_value = FloatField('Value', validators=[Optional()])
+    constraint_enabled = BooleanField("Add Output Constraint")
+    constraint_output = SelectField(
+        "Constraint Output",
+        choices=[
+            ("hardness_hv_center", "Center Hardness (HV)"),
+            ("hardness_hv_surface", "Surface Hardness (HV)"),
+            ("t8_5", "t₈/₅ Cooling Time (s)"),
+            ("martensite", "Martensite Fraction (%)"),
+        ],
+        validators=[Optional()],
+    )
+    constraint_operator = SelectField(
+        "Constraint",
+        choices=[
+            ("gte", "≥"),
+            ("lte", "≤"),
+        ],
+        validators=[Optional()],
+    )
+    constraint_value = FloatField("Value", validators=[Optional()])
 
-    create_best_sim = BooleanField('Create simulation with best parameters', default=True)
-    submit = SubmitField('Run Optimization')
+    create_best_sim = BooleanField("Create simulation with best parameters", default=True)
+    submit = SubmitField("Run Optimization")

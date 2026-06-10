@@ -4,21 +4,24 @@ Builds and configures COMSOL models for multi-phase heat treatment,
 including geometry setup, material assignment, physics configuration,
 and piecewise boundary conditions spanning all phases in a single study.
 """
+
 import logging
-from typing import Optional, Dict, List, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .client import COMSOLClient, COMSOLError
+from .client import COMSOLClient
 
 
 def _jint_array(values):
     """Convert Python list to Java int[] for COMSOL selections via JPype."""
     try:
         import jpype
+
         return jpype.JArray(jpype.JInt)(values)
     except ImportError:
         return values
+
 
 if TYPE_CHECKING:
     from app.models.simulation import Simulation
@@ -27,47 +30,47 @@ logger = logging.getLogger(__name__)
 
 # Default boundary condition parameters per phase
 DEFAULT_BC_PARAMS = {
-    'heating': {
-        'htc': 25.0,            # W/m2K furnace convection
-        'ambient_temp': 850.0,  # furnace temperature
-        'emissivity': 0.85,
-        'use_radiation': True,
+    "heating": {
+        "htc": 25.0,  # W/m2K furnace convection
+        "ambient_temp": 850.0,  # furnace temperature
+        "emissivity": 0.85,
+        "use_radiation": True,
     },
-    'transfer': {
-        'htc': 10.0,            # W/m2K natural convection
-        'ambient_temp': 25.0,
-        'emissivity': 0.85,
-        'use_radiation': True,
+    "transfer": {
+        "htc": 10.0,  # W/m2K natural convection
+        "ambient_temp": 25.0,
+        "emissivity": 0.85,
+        "use_radiation": True,
     },
-    'quenching': {
-        'htc': 3000.0,          # W/m2K water quench
-        'ambient_temp': 25.0,
-        'emissivity': 0.3,
-        'use_radiation': False,
+    "quenching": {
+        "htc": 3000.0,  # W/m2K water quench
+        "ambient_temp": 25.0,
+        "emissivity": 0.3,
+        "use_radiation": False,
     },
-    'tempering': {
-        'htc': 25.0,
-        'ambient_temp': 550.0,
-        'emissivity': 0.85,
-        'use_radiation': True,
+    "tempering": {
+        "htc": 25.0,
+        "ambient_temp": 550.0,
+        "emissivity": 0.85,
+        "use_radiation": True,
     },
 }
 
 # Quench media base HTC values
 QUENCH_HTC = {
-    'water': 3000,
-    'oil': 800,
-    'polymer': 1200,
-    'brine': 4500,
-    'air': 25,
+    "water": 3000,
+    "oil": 800,
+    "polymer": 1200,
+    "brine": 4500,
+    "air": 25,
 }
 
 AGITATION_MULTIPLIER = {
-    'none': 1.0,
-    'mild': 1.3,
-    'moderate': 1.6,
-    'strong': 2.0,
-    'violent': 2.5,
+    "none": 1.0,
+    "mild": 1.3,
+    "moderate": 1.6,
+    "strong": 2.0,
+    "violent": 2.5,
 }
 
 
@@ -86,7 +89,7 @@ class HeatTreatmentModelBuilder:
         Simulation ORM object with geometry and HT configuration
     """
 
-    def __init__(self, client: COMSOLClient, simulation: 'Simulation'):
+    def __init__(self, client: COMSOLClient, simulation: "Simulation"):
         self.client = client
         self.simulation = simulation
         self._model = None
@@ -122,7 +125,7 @@ class HeatTreatmentModelBuilder:
         # 4. Build piecewise BC timeline
         ht_config = sim.ht_config or {}
         phase_timeline = self._build_phase_timeline(ht_config)
-        total_duration = phase_timeline[-1]['end_time'] if phase_timeline else 300.0
+        total_duration = phase_timeline[-1]["end_time"] if phase_timeline else 300.0
 
         # 5. Create piecewise interpolation functions
         self._create_piecewise_functions(model, phase_timeline)
@@ -136,8 +139,7 @@ class HeatTreatmentModelBuilder:
         # 8. Single transient study
         self._setup_transient_study(model, total_duration, phase_timeline)
 
-        logger.info("Built complete HT model for %s (%.0fs total)",
-                    sim.name, total_duration)
+        logger.info("Built complete HT model for %s (%.0fs total)", sim.name, total_duration)
         return model
 
     def create_model(self) -> Any:
@@ -159,7 +161,7 @@ class HeatTreatmentModelBuilder:
             self._setup_default_material(model)
 
         self._setup_physics(model)
-        self._setup_study(model, 'initial', 300.0)
+        self._setup_study(model, "initial", 300.0)
 
         logger.info("Created HT base model for simulation: %s", sim.name)
         return model
@@ -171,16 +173,15 @@ class HeatTreatmentModelBuilder:
         sim = self.simulation
         geo_config = sim.geometry_dict
 
-        if sim.geometry_type == 'cad' and sim.cad_file_path:
+        if sim.geometry_type == "cad" and sim.cad_file_path:
             try:
                 import os
+
                 if os.path.exists(sim.cad_file_path):
-                    with open(sim.cad_file_path, 'rb') as f:
+                    with open(sim.cad_file_path, "rb") as f:
                         cad_data = f.read()
                     self.client.import_cad(
-                        model, cad_data,
-                        sim.cad_filename or 'geometry.stp',
-                        format='step'
+                        model, cad_data, sim.cad_filename or "geometry.stp", format="step"
                     )
                     logger.info("Imported CAD geometry: %s", sim.cad_filename)
                     return
@@ -188,50 +189,48 @@ class HeatTreatmentModelBuilder:
                 logger.warning("CAD import failed, creating parametric: %s", e)
 
         geo_type = sim.geometry_type
-        if geo_type == 'cad':
-            geo_type = sim.cad_equivalent_type or 'cylinder'
+        if geo_type == "cad":
+            geo_type = sim.cad_equivalent_type or "cylinder"
             geo_config = sim.cad_equivalent_geometry_dict or geo_config
 
         try:
             java = model.java
-            java.component().create('comp1', True)
-            geom = java.component('comp1').geom().create('geom1', 3)
+            java.component().create("comp1", True)
+            geom = java.component("comp1").geom().create("geom1", 3)
 
-            if geo_type == 'cylinder':
-                radius = geo_config.get('radius', 0.05)
-                length = geo_config.get('length', 0.1)
-                cyl = geom.create('cyl1', 'Cylinder')
-                cyl.set('r', str(radius))
-                cyl.set('h', str(length))
+            if geo_type == "cylinder":
+                radius = geo_config.get("radius", 0.05)
+                length = geo_config.get("length", 0.1)
+                cyl = geom.create("cyl1", "Cylinder")
+                cyl.set("r", str(radius))
+                cyl.set("h", str(length))
 
-            elif geo_type == 'plate':
-                thickness = geo_config.get('thickness', 0.02)
-                width = geo_config.get('width', 0.1)
-                length = geo_config.get('length', 0.1)
-                blk = geom.create('blk1', 'Block')
-                blk.set('size', [str(width), str(thickness), str(length)])
+            elif geo_type == "plate":
+                thickness = geo_config.get("thickness", 0.02)
+                width = geo_config.get("width", 0.1)
+                length = geo_config.get("length", 0.1)
+                blk = geom.create("blk1", "Block")
+                blk.set("size", [str(width), str(thickness), str(length)])
 
-            elif geo_type in ('ring', 'hollow_cylinder'):
-                outer_r = geo_config.get('outer_radius',
-                          geo_config.get('outer_diameter', 0.1) / 2)
-                inner_r = geo_config.get('inner_radius',
-                          geo_config.get('inner_diameter', 0.05) / 2)
-                length = geo_config.get('length', 0.1)
-                cyl_out = geom.create('cyl1', 'Cylinder')
-                cyl_out.set('r', str(outer_r))
-                cyl_out.set('h', str(length))
-                cyl_in = geom.create('cyl2', 'Cylinder')
-                cyl_in.set('r', str(inner_r))
-                cyl_in.set('h', str(length))
-                diff = geom.create('dif1', 'Difference')
-                diff.selection('input').set('cyl1')
-                diff.selection('input2').set('cyl2')
+            elif geo_type in ("ring", "hollow_cylinder"):
+                outer_r = geo_config.get("outer_radius", geo_config.get("outer_diameter", 0.1) / 2)
+                inner_r = geo_config.get("inner_radius", geo_config.get("inner_diameter", 0.05) / 2)
+                length = geo_config.get("length", 0.1)
+                cyl_out = geom.create("cyl1", "Cylinder")
+                cyl_out.set("r", str(outer_r))
+                cyl_out.set("h", str(length))
+                cyl_in = geom.create("cyl2", "Cylinder")
+                cyl_in.set("r", str(inner_r))
+                cyl_in.set("h", str(length))
+                diff = geom.create("dif1", "Difference")
+                diff.selection("input").set("cyl1")
+                diff.selection("input2").set("cyl2")
             else:
-                cyl = geom.create('cyl1', 'Cylinder')
-                cyl.set('r', '0.05')
-                cyl.set('h', '0.1')
+                cyl = geom.create("cyl1", "Cylinder")
+                cyl.set("r", "0.05")
+                cyl.set("h", "0.1")
 
-            geom.run('fin')
+            geom.run("fin")
             logger.info("Created parametric geometry: %s", geo_type)
         except Exception as e:
             logger.warning("Geometry setup via Java API failed: %s", e)
@@ -242,14 +241,14 @@ class HeatTreatmentModelBuilder:
         """Create tetrahedral mesh with surface refinement."""
         try:
             java = model.java
-            mesh = java.component('comp1').mesh().create('mesh1')
+            mesh = java.component("comp1").mesh().create("mesh1")
 
             # Free tetrahedral meshing
-            ftet = mesh.create('ftet1', 'FreeTet')
+            ftet = mesh.create("ftet1", "FreeTet")
 
             # Size settings — pass integers as strings to avoid Java overload ambiguity
-            size = mesh.create('size1', 'Size')
-            size.set('hauto', '4')  # Moderate mesh density (1=coarsest, 9=finest)
+            size = mesh.create("size1", "Size")
+            size.set("hauto", "4")  # Moderate mesh density (1=coarsest, 9=finest)
 
             mesh.run()
             logger.info("Mesh created successfully")
@@ -261,8 +260,8 @@ class HeatTreatmentModelBuilder:
     def _setup_material(self, model: Any, steel: Any) -> None:
         """Configure material properties from steel grade."""
         try:
-            mat = model.java.component('comp1').material().create('mat1', 'Common')
-            mat.label(f'Steel - {steel.designation}')
+            mat = model.java.component("comp1").material().create("mat1", "Common")
+            mat.label(f"Steel - {steel.designation}")
             # Select all domains (use set('all') for material selection)
             mat.selection().set(_jint_array([1]))
             self._add_thermal_properties(model, mat, steel)
@@ -276,70 +275,71 @@ class HeatTreatmentModelBuilder:
 
         Property data_dict uses 'value' for both constant and curve data.
         """
-        props = mat.propertyGroup('def')
+        props = mat.propertyGroup("def")
 
-        k_prop = steel.get_property('thermal_conductivity')
+        k_prop = steel.get_property("thermal_conductivity")
         k_set = False
         if k_prop:
             data = k_prop.data_dict
-            if k_prop.property_type == 'constant':
-                props.set('thermalconductivity', f'{data.get("value", 45)}[W/(m*K)]')
+            if k_prop.property_type == "constant":
+                props.set("thermalconductivity", f"{data.get('value', 45)}[W/(m*K)]")
                 k_set = True
-            elif k_prop.property_type == 'curve':
-                temps = data.get('temperature', [])
-                values = data.get('values') or data.get('value', [])
+            elif k_prop.property_type == "curve":
+                temps = data.get("temperature", [])
+                values = data.get("values") or data.get("value", [])
                 if temps and values and len(temps) == len(values):
-                    self._create_interpolation(model, 'k_int', temps, values)
-                    props.set('thermalconductivity', 'k_int(T)')
+                    self._create_interpolation(model, "k_int", temps, values)
+                    props.set("thermalconductivity", "k_int(T)")
                     k_set = True
         if not k_set:
-            props.set('thermalconductivity', '45[W/(m*K)]')
+            props.set("thermalconductivity", "45[W/(m*K)]")
 
-        rho_prop = steel.get_property('density')
+        rho_prop = steel.get_property("density")
         rho_set = False
         if rho_prop:
             data = rho_prop.data_dict
-            if rho_prop.property_type == 'constant':
-                props.set('density', f'{data.get("value", 7850)}[kg/m^3]')
+            if rho_prop.property_type == "constant":
+                props.set("density", f"{data.get('value', 7850)}[kg/m^3]")
                 rho_set = True
-            elif rho_prop.property_type == 'curve':
-                temps = data.get('temperature', [])
-                values = data.get('values') or data.get('value', [])
+            elif rho_prop.property_type == "curve":
+                temps = data.get("temperature", [])
+                values = data.get("values") or data.get("value", [])
                 if temps and values and len(temps) == len(values):
-                    self._create_interpolation(model, 'rho_int', temps, values)
-                    props.set('density', 'rho_int(T)')
+                    self._create_interpolation(model, "rho_int", temps, values)
+                    props.set("density", "rho_int(T)")
                     rho_set = True
         if not rho_set:
-            props.set('density', '7850[kg/m^3]')
+            props.set("density", "7850[kg/m^3]")
 
-        cp_prop = steel.get_property('specific_heat')
+        cp_prop = steel.get_property("specific_heat")
         cp_set = False
         if cp_prop:
             data = cp_prop.data_dict
-            if cp_prop.property_type == 'constant':
-                props.set('heatcapacity', f'{data.get("value", 500)}[J/(kg*K)]')
+            if cp_prop.property_type == "constant":
+                props.set("heatcapacity", f"{data.get('value', 500)}[J/(kg*K)]")
                 cp_set = True
-            elif cp_prop.property_type == 'curve':
-                temps = data.get('temperature', [])
-                values = data.get('values') or data.get('value', [])
+            elif cp_prop.property_type == "curve":
+                temps = data.get("temperature", [])
+                values = data.get("values") or data.get("value", [])
                 if temps and values and len(temps) == len(values):
-                    self._create_interpolation(model, 'cp_int', temps, values)
-                    props.set('heatcapacity', 'cp_int(T)')
+                    self._create_interpolation(model, "cp_int", temps, values)
+                    props.set("heatcapacity", "cp_int(T)")
                     cp_set = True
         if not cp_set:
-            props.set('heatcapacity', '500[J/(kg*K)]')
+            props.set("heatcapacity", "500[J/(kg*K)]")
 
-    def _create_interpolation(self, model: Any, name: str,
-                              x_data: List[float], y_data: List[float]) -> None:
+    def _create_interpolation(
+        self, model: Any, name: str, x_data: list[float], y_data: list[float]
+    ) -> None:
         """Create interpolation function in COMSOL model."""
         try:
-            func = model.java.func().create(name, 'Interpolation')
-            func.set('source', 'table')
-            for i, (x, y) in enumerate(zip(x_data, y_data)):
-                func.setIndex('table', str(x), i, 0)
-                func.setIndex('table', str(y), i, 1)
-            func.set('interp', 'piecewisecubic')
-            func.set('extrap', 'linear')
+            func = model.java.func().create(name, "Interpolation")
+            func.set("source", "table")
+            for i, (x, y) in enumerate(zip(x_data, y_data, strict=False)):
+                func.setIndex("table", str(x), i, 0)
+                func.setIndex("table", str(y), i, 1)
+            func.set("interp", "piecewisecubic")
+            func.set("extrap", "linear")
         except Exception as e:
             logger.warning("Could not create interpolation function %s: %s", name, e)
 
@@ -349,20 +349,20 @@ class HeatTreatmentModelBuilder:
             java = model.java
             # Check if mat1 already exists (from failed _setup_material)
             try:
-                mat = java.component('comp1').material('mat1')
+                mat = java.component("comp1").material("mat1")
             except Exception:
-                mat = java.component('comp1').material().create('mat1', 'Common')
-            mat.label('Steel (Default)')
+                mat = java.component("comp1").material().create("mat1", "Common")
+            mat.label("Steel (Default)")
             mat.selection().set(_jint_array([1]))
-            mat.propertyGroup('def').set('thermalconductivity', '45[W/(m*K)]')
-            mat.propertyGroup('def').set('density', '7850[kg/m^3]')
-            mat.propertyGroup('def').set('heatcapacity', '500[J/(kg*K)]')
+            mat.propertyGroup("def").set("thermalconductivity", "45[W/(m*K)]")
+            mat.propertyGroup("def").set("density", "7850[kg/m^3]")
+            mat.propertyGroup("def").set("heatcapacity", "500[J/(kg*K)]")
         except Exception as e:
             logger.warning("Default material setup failed: %s", e)
 
     # ---- Piecewise BC timeline ----
 
-    def _build_phase_timeline(self, ht_config: dict) -> List[dict]:
+    def _build_phase_timeline(self, ht_config: dict) -> list[dict]:
         """Build timeline of phases with start/end times and BC params.
 
         Returns list of dicts with keys:
@@ -371,28 +371,30 @@ class HeatTreatmentModelBuilder:
         timeline = []
         t = 0.0
 
-        phase_order = ['heating', 'transfer', 'quenching', 'tempering']
+        phase_order = ["heating", "transfer", "quenching", "tempering"]
         for phase_name in phase_order:
             phase_config = ht_config.get(phase_name, {})
-            if not phase_config.get('enabled', phase_name == 'quenching'):
+            if not phase_config.get("enabled", phase_name == "quenching"):
                 continue
 
             duration = self._get_phase_duration(phase_name, phase_config)
             bc = self._get_bc_params(phase_name, phase_config)
 
-            timeline.append({
-                'phase_name': phase_name,
-                'start_time': t,
-                'end_time': t + duration,
-                'htc': bc['htc'],
-                'ambient_temp': bc['ambient_temp'],
-                'emissivity': bc['emissivity'],
-            })
+            timeline.append(
+                {
+                    "phase_name": phase_name,
+                    "start_time": t,
+                    "end_time": t + duration,
+                    "htc": bc["htc"],
+                    "ambient_temp": bc["ambient_temp"],
+                    "emissivity": bc["emissivity"],
+                }
+            )
             t += duration
 
         return timeline
 
-    def _create_piecewise_functions(self, model: Any, timeline: List[dict]) -> None:
+    def _create_piecewise_functions(self, model: Any, timeline: list[dict]) -> None:
         """Create piecewise interpolation functions h_conv(t) and T_amb(t)."""
         if not timeline:
             return
@@ -401,35 +403,35 @@ class HeatTreatmentModelBuilder:
         h_data = []
         t_data = []
         for phase in timeline:
-            t_start = phase['start_time']
-            t_end = phase['end_time']
-            h_data.append([t_start, phase['htc']])
-            h_data.append([t_end, phase['htc']])
-            t_data.append([t_start, phase['ambient_temp']])
-            t_data.append([t_end, phase['ambient_temp']])
+            t_start = phase["start_time"]
+            t_end = phase["end_time"]
+            h_data.append([t_start, phase["htc"]])
+            h_data.append([t_end, phase["htc"]])
+            t_data.append([t_start, phase["ambient_temp"]])
+            t_data.append([t_end, phase["ambient_temp"]])
 
         try:
             # h_conv(t) — row-by-row to avoid Java overload issues
-            h_func = model.java.func().create('h_conv_pw', 'Interpolation')
-            h_func.set('source', 'table')
+            h_func = model.java.func().create("h_conv_pw", "Interpolation")
+            h_func.set("source", "table")
             for i, row in enumerate(h_data):
-                h_func.setIndex('table', str(row[0]), i, 0)
-                h_func.setIndex('table', str(row[1]), i, 1)
-            h_func.set('interp', 'linear')
-            h_func.set('extrap', 'const')
-            h_func.set('argunit', 's')
-            h_func.set('fununit', 'W/(m^2*K)')
+                h_func.setIndex("table", str(row[0]), i, 0)
+                h_func.setIndex("table", str(row[1]), i, 1)
+            h_func.set("interp", "linear")
+            h_func.set("extrap", "const")
+            h_func.set("argunit", "s")
+            h_func.set("fununit", "W/(m^2*K)")
 
             # T_amb(t)
-            t_func = model.java.func().create('T_amb_pw', 'Interpolation')
-            t_func.set('source', 'table')
+            t_func = model.java.func().create("T_amb_pw", "Interpolation")
+            t_func.set("source", "table")
             for i, row in enumerate(t_data):
-                t_func.setIndex('table', str(row[0]), i, 0)
-                t_func.setIndex('table', str(row[1]), i, 1)
-            t_func.set('interp', 'linear')
-            t_func.set('extrap', 'const')
-            t_func.set('argunit', 's')
-            t_func.set('fununit', 'K')
+                t_func.setIndex("table", str(row[0]), i, 0)
+                t_func.setIndex("table", str(row[1]), i, 1)
+            t_func.set("interp", "linear")
+            t_func.set("extrap", "const")
+            t_func.set("argunit", "s")
+            t_func.set("fununit", "K")
 
             logger.info("Created piecewise BC functions: %d phases", len(timeline))
         except Exception as e:
@@ -443,25 +445,25 @@ class HeatTreatmentModelBuilder:
             java = model.java
 
             # Create Heat Transfer physics (auto-creates init1, solid1)
-            ht = java.component('comp1').physics().create('ht', 'HeatTransfer', 'geom1')
-            ht.label('Heat Transfer')
+            ht = java.component("comp1").physics().create("ht", "HeatTransfer", "geom1")
+            ht.label("Heat Transfer")
 
             # Initial temperature — modify existing init1 (auto-created by HeatTransfer)
-            heating_config = ht_config.get('heating', {})
-            if heating_config.get('enabled', False):
-                init_temp = heating_config.get('initial_temperature', 25.0)
+            heating_config = ht_config.get("heating", {})
+            if heating_config.get("enabled", False):
+                init_temp = heating_config.get("initial_temperature", 25.0)
             else:
-                init_temp = heating_config.get('target_temperature', 850.0)
+                init_temp = heating_config.get("target_temperature", 850.0)
 
-            init = ht.feature('init1')
-            init.set('Tinit', f'{init_temp}[degC]')
+            init = ht.feature("init1")
+            init.set("Tinit", f"{init_temp}[degC]")
 
             # Heat flux boundary with convective term on ALL external boundaries
-            hf = ht.create('hf1', 'HeatFluxBoundary', 2)
+            hf = ht.create("hf1", "HeatFluxBoundary", 2)
             hf.selection().all()
-            hf.set('HeatFluxType', 'ConvectiveHeatFlux')
-            hf.set('h', 'h_conv_pw(t)')
-            hf.set('Text', 'T_amb_pw(t)')
+            hf.set("HeatFluxType", "ConvectiveHeatFlux")
+            hf.set("h", "h_conv_pw(t)")
+            hf.set("Text", "T_amb_pw(t)")
 
             logger.info("Configured piecewise heat transfer physics")
         except Exception as e:
@@ -470,17 +472,17 @@ class HeatTreatmentModelBuilder:
     def _setup_physics(self, model: Any) -> None:
         """Configure Heat Transfer physics (legacy per-phase approach)."""
         try:
-            ht = model.java.component('comp1').physics().create('ht', 'HeatTransfer', 'geom1')
-            ht.label('Heat Transfer')
+            ht = model.java.component("comp1").physics().create("ht", "HeatTransfer", "geom1")
+            ht.label("Heat Transfer")
 
-            init = ht.create('init1', 'init', 3)
-            init.set('Tinit', '25[degC]')
+            init = ht.create("init1", "init", 3)
+            init.set("Tinit", "25[degC]")
 
             # Convective cooling with parametric h and T_amb
-            conv = ht.create('conv1', 'ConvectiveCooling', 2)
+            conv = ht.create("conv1", "ConvectiveCooling", 2)
             conv.selection().all()
-            conv.set('h', 'h_conv')
-            conv.set('Text', 'T_amb')
+            conv.set("h", "h_conv")
+            conv.set("Text", "T_amb")
 
             logger.info("Configured heat transfer physics")
         except Exception as e:
@@ -498,66 +500,64 @@ class HeatTreatmentModelBuilder:
         geo_config = sim.geometry_dict
         geo_type = sim.geometry_type
 
-        if geo_type == 'cad':
-            geo_type = sim.cad_equivalent_type or 'cylinder'
+        if geo_type == "cad":
+            geo_type = sim.cad_equivalent_type or "cylinder"
             geo_config = sim.cad_equivalent_geometry_dict or geo_config
 
         # Determine probe coordinates based on geometry
-        if geo_type == 'cylinder':
-            radius = geo_config.get('radius', 0.05)
-            length = geo_config.get('length', 0.1)
+        if geo_type == "cylinder":
+            radius = geo_config.get("radius", 0.05)
+            length = geo_config.get("length", 0.1)
             mid_z = length / 2
             positions = {
-                'center': [0, 0, mid_z],
-                'one_third': [radius / 3, 0, mid_z],
-                'two_thirds': [2 * radius / 3, 0, mid_z],
-                'surface': [radius * 0.99, 0, mid_z],  # Slightly inside to avoid boundary
+                "center": [0, 0, mid_z],
+                "one_third": [radius / 3, 0, mid_z],
+                "two_thirds": [2 * radius / 3, 0, mid_z],
+                "surface": [radius * 0.99, 0, mid_z],  # Slightly inside to avoid boundary
             }
-        elif geo_type == 'plate':
-            thickness = geo_config.get('thickness', 0.02)
-            width = geo_config.get('width', 0.1)
-            length = geo_config.get('length', 0.1)
+        elif geo_type == "plate":
+            thickness = geo_config.get("thickness", 0.02)
+            width = geo_config.get("width", 0.1)
+            length = geo_config.get("length", 0.1)
             mid_x = width / 2
             mid_z = length / 2
             positions = {
-                'center': [mid_x, thickness / 2, mid_z],
-                'one_third': [mid_x, thickness / 3, mid_z],
-                'two_thirds': [mid_x, 2 * thickness / 3, mid_z],
-                'surface': [mid_x, thickness * 0.99, mid_z],
+                "center": [mid_x, thickness / 2, mid_z],
+                "one_third": [mid_x, thickness / 3, mid_z],
+                "two_thirds": [mid_x, 2 * thickness / 3, mid_z],
+                "surface": [mid_x, thickness * 0.99, mid_z],
             }
-        elif geo_type in ('ring', 'hollow_cylinder'):
-            outer_r = geo_config.get('outer_radius',
-                      geo_config.get('outer_diameter', 0.1) / 2)
-            inner_r = geo_config.get('inner_radius',
-                      geo_config.get('inner_diameter', 0.05) / 2)
-            length = geo_config.get('length', 0.1)
+        elif geo_type in ("ring", "hollow_cylinder"):
+            outer_r = geo_config.get("outer_radius", geo_config.get("outer_diameter", 0.1) / 2)
+            inner_r = geo_config.get("inner_radius", geo_config.get("inner_diameter", 0.05) / 2)
+            length = geo_config.get("length", 0.1)
             mid_z = length / 2
             wall = outer_r - inner_r
             mid_r = inner_r + wall / 2
             positions = {
-                'center': [mid_r, 0, mid_z],
-                'one_third': [inner_r + wall / 3, 0, mid_z],
-                'two_thirds': [inner_r + 2 * wall / 3, 0, mid_z],
-                'surface': [outer_r * 0.99, 0, mid_z],
+                "center": [mid_r, 0, mid_z],
+                "one_third": [inner_r + wall / 3, 0, mid_z],
+                "two_thirds": [inner_r + 2 * wall / 3, 0, mid_z],
+                "surface": [outer_r * 0.99, 0, mid_z],
             }
         else:
             # Default cylinder
             positions = {
-                'center': [0, 0, 0.05],
-                'one_third': [0.017, 0, 0.05],
-                'two_thirds': [0.033, 0, 0.05],
-                'surface': [0.049, 0, 0.05],
+                "center": [0, 0, 0.05],
+                "one_third": [0.017, 0, 0.05],
+                "two_thirds": [0.033, 0, 0.05],
+                "surface": [0.049, 0, 0.05],
             }
 
         try:
             java = model.java
             for name, coords in positions.items():
-                ds_tag = f'probe_{name}'
-                ds = java.result().dataset().create(ds_tag, 'CutPoint3D')
-                ds.set('pointx', str(coords[0]))
-                ds.set('pointy', str(coords[1]))
-                ds.set('pointz', str(coords[2]))
-                ds.label(f'Probe: {name}')
+                ds_tag = f"probe_{name}"
+                ds = java.result().dataset().create(ds_tag, "CutPoint3D")
+                ds.set("pointx", str(coords[0]))
+                ds.set("pointy", str(coords[1]))
+                ds.set("pointz", str(coords[2]))
+                ds.label(f"Probe: {name}")
 
             logger.info("Created 4 probe datasets")
         except Exception as e:
@@ -565,52 +565,56 @@ class HeatTreatmentModelBuilder:
 
     # ---- Study ----
 
-    def _setup_transient_study(self, model: Any, total_duration: float,
-                                timeline: List[dict]) -> None:
+    def _setup_transient_study(
+        self, model: Any, total_duration: float, timeline: list[dict]
+    ) -> None:
         """Configure single transient study covering all phases."""
         try:
-            std = model.java.study().create('std1')
-            std.label('Transient Heat Treatment')
+            std = model.java.study().create("std1")
+            std.label("Transient Heat Treatment")
 
-            time_step = std.create('time', 'Transient')
+            time_step = std.create("time", "Transient")
 
             # Build output time list with finer steps during quenching
             time_points = set()
             for phase in timeline:
-                t0 = phase['start_time']
-                t1 = phase['end_time']
+                t0 = phase["start_time"]
+                t1 = phase["end_time"]
                 dur = t1 - t0
 
-                if phase['phase_name'] == 'quenching':
+                if phase["phase_name"] == "quenching":
                     # Fine timesteps during quenching (0.5s or dur/200)
                     dt = max(0.5, dur / 200)
                 else:
                     # Coarser for heating/transfer/tempering
                     dt = max(1.0, dur / 100)
 
-                for t in np.arange(t0, t1 + dt/2, dt):
+                for t in np.arange(t0, t1 + dt / 2, dt):
                     time_points.add(round(float(t), 2))
 
             sorted_times = sorted(time_points)
-            time_str = ' '.join(str(t) for t in sorted_times)
-            time_step.set('tlist', time_str)
-            time_step.set('rtol', '0.005')
+            time_str = " ".join(str(t) for t in sorted_times)
+            time_step.set("tlist", time_str)
+            time_step.set("rtol", "0.005")
 
-            logger.info("Configured transient study: %.0fs, %d output times",
-                        total_duration, len(sorted_times))
+            logger.info(
+                "Configured transient study: %.0fs, %d output times",
+                total_duration,
+                len(sorted_times),
+            )
         except Exception as e:
             logger.warning("Study setup failed: %s", e)
 
     def _setup_study(self, model: Any, phase_name: str, duration: float) -> None:
         """Configure transient study (legacy per-phase approach)."""
         try:
-            std = model.java.study().create('std1')
-            std.label(f'Transient HT - {phase_name}')
-            time_step = std.create('time', 'Transient')
+            std = model.java.study().create("std1")
+            std.label(f"Transient HT - {phase_name}")
+            time_step = std.create("time", "Transient")
             dt = max(0.1, duration / 200)
-            time_range = f'range(0,{dt},{duration})'
-            time_step.set('tlist', time_range)
-            time_step.set('rtol', '0.01')
+            time_range = f"range(0,{dt},{duration})"
+            time_step.set("tlist", time_range)
+            time_step.set("rtol", "0.01")
             logger.info("Configured study for phase: %s, duration: %ss", phase_name, duration)
         except Exception as e:
             logger.warning("Study setup failed: %s", e)
@@ -620,49 +624,60 @@ class HeatTreatmentModelBuilder:
     def build_phase(self, model: Any, phase_name: str, phase_config: dict) -> None:
         """Configure model for a specific phase (legacy approach)."""
         bc_params = self._get_bc_params(phase_name, phase_config)
-        self.client.set_parameter(model, 'h_conv', bc_params['htc'],
-                                  f'Convection HTC for {phase_name} [W/(m^2*K)]')
-        self.client.set_parameter(model, 'T_amb', bc_params['ambient_temp'],
-                                  f'Ambient temperature for {phase_name} [degC]')
-        self.client.set_parameter(model, 'emissivity', bc_params['emissivity'],
-                                  f'Surface emissivity for {phase_name} [-]')
+        self.client.set_parameter(
+            model, "h_conv", bc_params["htc"], f"Convection HTC for {phase_name} [W/(m^2*K)]"
+        )
+        self.client.set_parameter(
+            model,
+            "T_amb",
+            bc_params["ambient_temp"],
+            f"Ambient temperature for {phase_name} [degC]",
+        )
+        self.client.set_parameter(
+            model, "emissivity", bc_params["emissivity"], f"Surface emissivity for {phase_name} [-]"
+        )
 
         duration = self._get_phase_duration(phase_name, phase_config)
         try:
             dt = max(0.1, duration / 200)
-            time_range = f'range(0,{dt},{duration})'
-            std = model.java.study('std1')
-            std.feature('time').set('tlist', time_range)
+            time_range = f"range(0,{dt},{duration})"
+            std = model.java.study("std1")
+            std.feature("time").set("tlist", time_range)
         except Exception as e:
             logger.warning("Could not update study time for %s: %s", phase_name, e)
 
-        logger.info("Configured phase: %s (h=%.0f, T_amb=%.0f, dur=%.0fs)",
-                    phase_name, bc_params['htc'], bc_params['ambient_temp'], duration)
+        logger.info(
+            "Configured phase: %s (h=%.0f, T_amb=%.0f, dur=%.0fs)",
+            phase_name,
+            bc_params["htc"],
+            bc_params["ambient_temp"],
+            duration,
+        )
 
     # ---- Helper methods ----
 
     def _get_bc_params(self, phase_name: str, phase_config: dict) -> dict:
         """Extract boundary condition parameters for a phase."""
-        defaults = DEFAULT_BC_PARAMS.get(phase_name, DEFAULT_BC_PARAMS['quenching'])
+        defaults = DEFAULT_BC_PARAMS.get(phase_name, DEFAULT_BC_PARAMS["quenching"])
 
-        if phase_name == 'heating':
+        if phase_name == "heating":
             return {
-                'htc': phase_config.get('furnace_htc', defaults['htc']),
-                'ambient_temp': phase_config.get('target_temperature', defaults['ambient_temp']),
-                'emissivity': phase_config.get('furnace_emissivity', defaults['emissivity']),
-                'use_radiation': phase_config.get('use_radiation', defaults['use_radiation']),
+                "htc": phase_config.get("furnace_htc", defaults["htc"]),
+                "ambient_temp": phase_config.get("target_temperature", defaults["ambient_temp"]),
+                "emissivity": phase_config.get("furnace_emissivity", defaults["emissivity"]),
+                "use_radiation": phase_config.get("use_radiation", defaults["use_radiation"]),
             }
-        elif phase_name == 'transfer':
+        elif phase_name == "transfer":
             return {
-                'htc': phase_config.get('htc', defaults['htc']),
-                'ambient_temp': phase_config.get('ambient_temperature', defaults['ambient_temp']),
-                'emissivity': phase_config.get('emissivity', defaults['emissivity']),
-                'use_radiation': phase_config.get('use_radiation', defaults['use_radiation']),
+                "htc": phase_config.get("htc", defaults["htc"]),
+                "ambient_temp": phase_config.get("ambient_temperature", defaults["ambient_temp"]),
+                "emissivity": phase_config.get("emissivity", defaults["emissivity"]),
+                "use_radiation": phase_config.get("use_radiation", defaults["use_radiation"]),
             }
-        elif phase_name == 'quenching':
-            media = phase_config.get('media', 'water')
-            agitation = phase_config.get('agitation', 'none')
-            htc_override = phase_config.get('htc_override')
+        elif phase_name == "quenching":
+            media = phase_config.get("media", "water")
+            agitation = phase_config.get("agitation", "none")
+            htc_override = phase_config.get("htc_override")
             if htc_override:
                 htc = float(htc_override)
             else:
@@ -670,30 +685,32 @@ class HeatTreatmentModelBuilder:
                 multiplier = AGITATION_MULTIPLIER.get(agitation, 1.0)
                 htc = base_htc * multiplier
             return {
-                'htc': htc,
-                'ambient_temp': phase_config.get('media_temperature', 25.0),
-                'emissivity': phase_config.get('emissivity', defaults['emissivity']),
-                'use_radiation': phase_config.get('use_radiation', defaults['use_radiation']),
+                "htc": htc,
+                "ambient_temp": phase_config.get("media_temperature", 25.0),
+                "emissivity": phase_config.get("emissivity", defaults["emissivity"]),
+                "use_radiation": phase_config.get("use_radiation", defaults["use_radiation"]),
             }
-        elif phase_name == 'tempering':
+        elif phase_name == "tempering":
             return {
-                'htc': phase_config.get('htc', defaults['htc']),
-                'ambient_temp': phase_config.get('temperature', defaults['ambient_temp']),
-                'emissivity': phase_config.get('emissivity', defaults['emissivity']),
-                'use_radiation': phase_config.get('use_radiation', defaults.get('use_radiation', True)),
+                "htc": phase_config.get("htc", defaults["htc"]),
+                "ambient_temp": phase_config.get("temperature", defaults["ambient_temp"]),
+                "emissivity": phase_config.get("emissivity", defaults["emissivity"]),
+                "use_radiation": phase_config.get(
+                    "use_radiation", defaults.get("use_radiation", True)
+                ),
             }
         return defaults
 
     def _get_phase_duration(self, phase_name: str, phase_config: dict) -> float:
         """Get simulation duration for a phase in seconds."""
-        if phase_name == 'heating':
-            return phase_config.get('hold_time', 60.0) * 60.0
-        elif phase_name == 'transfer':
-            return phase_config.get('duration', 10.0)
-        elif phase_name == 'quenching':
-            return phase_config.get('duration', 300.0)
-        elif phase_name == 'tempering':
-            return phase_config.get('hold_time', 120.0) * 60.0
+        if phase_name == "heating":
+            return phase_config.get("hold_time", 60.0) * 60.0
+        elif phase_name == "transfer":
+            return phase_config.get("duration", 10.0)
+        elif phase_name == "quenching":
+            return phase_config.get("duration", 300.0)
+        elif phase_name == "tempering":
+            return phase_config.get("hold_time", 120.0) * 60.0
         return 300.0
 
     def get_model(self) -> Any:

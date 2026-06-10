@@ -1,4 +1,5 @@
 """System settings key-value store."""
+
 from datetime import datetime
 
 from app.extensions import db
@@ -6,12 +7,13 @@ from app.extensions import db
 
 class SystemSetting(db.Model):
     """Key-value settings store with typed values."""
-    __tablename__ = 'system_settings'
+
+    __tablename__ = "system_settings"
 
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(100), unique=True, nullable=False, index=True)
     value = db.Column(db.Text, nullable=True)
-    value_type = db.Column(db.String(10), default='string')  # string, int, float, bool
+    value_type = db.Column(db.String(10), default="string")  # string, int, float, bool
     description = db.Column(db.String(300), nullable=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = db.Column(db.String(80), nullable=True)
@@ -24,18 +26,18 @@ class SystemSetting(db.Model):
             return default
 
         try:
-            if setting.value_type == 'int':
+            if setting.value_type == "int":
                 return int(setting.value)
-            elif setting.value_type == 'float':
+            elif setting.value_type == "float":
                 return float(setting.value)
-            elif setting.value_type == 'bool':
-                return setting.value.lower() in ('true', '1', 'yes')
+            elif setting.value_type == "bool":
+                return setting.value.lower() in ("true", "1", "yes")
             return setting.value
         except (ValueError, AttributeError):
             return default
 
     @classmethod
-    def set(cls, key, value, value_type='string', description=None):
+    def set(cls, key, value, value_type="string", description=None):
         """Set a setting value."""
         from flask_login import current_user
 
@@ -50,7 +52,7 @@ class SystemSetting(db.Model):
         if description:
             setting.description = description
 
-        if current_user and hasattr(current_user, 'username') and current_user.is_authenticated:
+        if current_user and hasattr(current_user, "username") and current_user.is_authenticated:
             setting.updated_by = current_user.username
 
         db.session.commit()

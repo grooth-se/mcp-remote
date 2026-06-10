@@ -10,17 +10,21 @@ Chains sequential weld passes:
 This is the numerical equivalent of the COMSOL SequentialSolver
 but uses the 2D Goldak cross-section solver.
 """
+
 import logging
-from dataclasses import dataclass, field
-from typing import Optional, Dict, List
+from dataclasses import dataclass
 
 import numpy as np
 
 from .goldak_solver import (
-    GoldakSolver, GoldakParams, GoldakSolverConfig, GoldakResult,
-    estimate_pool_params, STEFAN_BOLTZMANN, DEFAULT_EMISSIVITY,
-    DEFAULT_CONVECTION_HTC, ARC_EFFICIENCIES,
-    DEFAULT_CONDUCTIVITY, DEFAULT_DENSITY, DEFAULT_SPECIFIC_HEAT,
+    DEFAULT_CONDUCTIVITY,
+    DEFAULT_CONVECTION_HTC,
+    DEFAULT_DENSITY,
+    DEFAULT_EMISSIVITY,
+    DEFAULT_SPECIFIC_HEAT,
+    STEFAN_BOLTZMANN,
+    GoldakSolver,
+    GoldakSolverConfig,
 )
 from .rosenthal_solver import RosenthalSolver
 
@@ -28,9 +32,9 @@ logger = logging.getLogger(__name__)
 
 # Grid resolution presets
 GRID_PRESETS = {
-    'coarse': GoldakSolverConfig(ny=21, nz=11, dt=0.1, output_interval=20),
-    'medium': GoldakSolverConfig(ny=41, nz=31, dt=0.05, output_interval=20),
-    'fine': GoldakSolverConfig(ny=61, nz=41, dt=0.02, output_interval=50),
+    "coarse": GoldakSolverConfig(ny=21, nz=11, dt=0.1, output_interval=20),
+    "medium": GoldakSolverConfig(ny=41, nz=31, dt=0.05, output_interval=20),
+    "fine": GoldakSolverConfig(ny=61, nz=41, dt=0.02, output_interval=50),
 }
 
 
@@ -58,35 +62,40 @@ class MultiPassResult:
     z_coords_mm : list
         z coordinates in mm
     """
+
     pass_results: list
     cumulative_peak_temp_map: np.ndarray
     cumulative_thermal_cycles: dict
     final_temperature_field: np.ndarray
     pass_summary: list
-    comparison_with_rosenthal: Optional[dict]
+    comparison_with_rosenthal: dict | None
     y_coords_mm: list
     z_coords_mm: list
 
     def to_dict(self) -> dict:
         """Convert to JSON-serializable dictionary."""
         return {
-            'pass_results': [r.to_dict() for r in self.pass_results],
-            'cumulative_peak_temp_map': self.cumulative_peak_temp_map.tolist(),
-            'cumulative_thermal_cycles': self.cumulative_thermal_cycles,
-            'final_temperature_field': self.final_temperature_field.tolist(),
-            'pass_summary': self.pass_summary,
-            'comparison_with_rosenthal': self.comparison_with_rosenthal,
-            'y_coords_mm': self.y_coords_mm,
-            'z_coords_mm': self.z_coords_mm,
-            'n_passes': len(self.pass_results),
+            "pass_results": [r.to_dict() for r in self.pass_results],
+            "cumulative_peak_temp_map": self.cumulative_peak_temp_map.tolist(),
+            "cumulative_thermal_cycles": self.cumulative_thermal_cycles,
+            "final_temperature_field": self.final_temperature_field.tolist(),
+            "pass_summary": self.pass_summary,
+            "comparison_with_rosenthal": self.comparison_with_rosenthal,
+            "y_coords_mm": self.y_coords_mm,
+            "z_coords_mm": self.z_coords_mm,
+            "n_passes": len(self.pass_results),
         }
 
 
 class GoldakMultiPassSolver:
     """Orchestrates multi-pass welding using Goldak 2D solver."""
 
-    def __init__(self, project, config: Optional[GoldakSolverConfig] = None,
-                 compare_with_rosenthal: bool = True):
+    def __init__(
+        self,
+        project,
+        config: GoldakSolverConfig | None = None,
+        compare_with_rosenthal: bool = True,
+    ):
         """
         Parameters
         ----------
@@ -102,10 +111,11 @@ class GoldakMultiPassSolver:
         self.compare = compare_with_rosenthal
 
     @classmethod
-    def with_preset(cls, project, preset: str = 'medium',
-                    compare: bool = True) -> 'GoldakMultiPassSolver':
+    def with_preset(
+        cls, project, preset: str = "medium", compare: bool = True
+    ) -> "GoldakMultiPassSolver":
         """Create solver with a named resolution preset."""
-        config = GRID_PRESETS.get(preset, GRID_PRESETS['medium'])
+        config = GRID_PRESETS.get(preset, GRID_PRESETS["medium"])
         return cls(project, config=config, compare_with_rosenthal=compare)
 
     def run(self, progress_callback=None) -> MultiPassResult:
@@ -119,7 +129,7 @@ class GoldakMultiPassSolver:
         5. Store results
         """
         project = self.project
-        strings = project.strings.order_by('string_number').all()
+        strings = project.strings.order_by("string_number").all()
 
         if not strings:
             raise ValueError("No weld strings configured for project")
@@ -127,7 +137,7 @@ class GoldakMultiPassSolver:
         n_passes = len(strings)
         pass_results = []
         pass_summaries = []
-        comparison_data = {'passes': []} if self.compare else None
+        comparison_data = {"passes": []} if self.compare else None
 
         # Initial temperature field (uniform preheat)
         current_field = None  # Will be created by first solver
@@ -139,8 +149,9 @@ class GoldakMultiPassSolver:
 
         for idx, string in enumerate(strings):
             pass_num = idx + 1
-            logger.info(f"Multi-pass: starting pass {pass_num}/{n_passes} "
-                        f"(string #{string.string_number})")
+            logger.info(
+                f"Multi-pass: starting pass {pass_num}/{n_passes} (string #{string.string_number})"
+            )
 
             if progress_callback:
                 progress_callback(idx / n_passes)
@@ -169,11 +180,11 @@ class GoldakMultiPassSolver:
             # Accumulate probe thermal cycles
             for probe_name, cycle in result.probe_thermal_cycles.items():
                 if probe_name not in cumulative_cycles:
-                    cumulative_cycles[probe_name] = {'times': [], 'temps': []}
+                    cumulative_cycles[probe_name] = {"times": [], "temps": []}
                 # Offset times by cumulative time
-                offset_times = [t + cumulative_time for t in cycle['times']]
-                cumulative_cycles[probe_name]['times'].extend(offset_times)
-                cumulative_cycles[probe_name]['temps'].extend(cycle['temps'])
+                offset_times = [t + cumulative_time for t in cycle["times"]]
+                cumulative_cycles[probe_name]["times"].extend(offset_times)
+                cumulative_cycles[probe_name]["temps"].extend(cycle["temps"])
 
             cumulative_time += self.config.total_time
 
@@ -187,7 +198,9 @@ class GoldakMultiPassSolver:
                 interpass_time_limit = string.effective_interpass_time or 600.0
 
                 current_field, cooling_time = self._apply_interpass_cooling(
-                    current_field, solver.y, solver.z,
+                    current_field,
+                    solver.y,
+                    solver.z,
                     target_temp=target_temp,
                     max_time=interpass_time_limit,
                 )
@@ -197,32 +210,31 @@ class GoldakMultiPassSolver:
                 # Record cooling in probe cycles
                 for probe_name, (iz, iy) in _get_probe_indices(solver).items():
                     if probe_name in cumulative_cycles:
-                        cumulative_cycles[probe_name]['times'].append(cumulative_time)
-                        cumulative_cycles[probe_name]['temps'].append(
-                            float(current_field[iz, iy]))
+                        cumulative_cycles[probe_name]["times"].append(cumulative_time)
+                        cumulative_cycles[probe_name]["temps"].append(float(current_field[iz, iy]))
 
             # Pass summary
             ny_mid = len(solver.y) // 2
             center_peak = float(result.peak_temperature_map[0, ny_mid])
             summary = {
-                'pass_number': pass_num,
-                'string_number': string.string_number,
-                'string_name': string.display_name,
-                'heat_input_kj_mm': string.effective_heat_input,
-                'travel_speed_mm_s': string.effective_travel_speed,
-                'peak_temperature': center_peak,
-                't8_5': result.center_t8_5,
-                'interpass_temp_before': round(interpass_temp_before, 1),
-                'interpass_cooling_time': round(interpass_cooling_time, 1),
-                'fusion_area_mm2': result.fusion_zone_area_mm2,
-                'solver_wall_time': result.solver_info.get('wall_time_s', 0),
+                "pass_number": pass_num,
+                "string_number": string.string_number,
+                "string_name": string.display_name,
+                "heat_input_kj_mm": string.effective_heat_input,
+                "travel_speed_mm_s": string.effective_travel_speed,
+                "peak_temperature": center_peak,
+                "t8_5": result.center_t8_5,
+                "interpass_temp_before": round(interpass_temp_before, 1),
+                "interpass_cooling_time": round(interpass_cooling_time, 1),
+                "fusion_area_mm2": result.fusion_zone_area_mm2,
+                "solver_wall_time": result.solver_info.get("wall_time_s", 0),
             }
             pass_summaries.append(summary)
 
             # Rosenthal comparison for this pass
             if self.compare:
                 comp = self._compare_with_rosenthal(project, string, result, solver)
-                comparison_data['passes'].append(comp)
+                comparison_data["passes"].append(comp)
 
         # Final temperature field
         final_field = current_field if current_field is not None else np.array([])
@@ -258,10 +270,14 @@ class GoldakMultiPassSolver:
         )
         return cfg
 
-    def _apply_interpass_cooling(self, field: np.ndarray,
-                                  y: np.ndarray, z: np.ndarray,
-                                  target_temp: float,
-                                  max_time: float = 600.0) -> tuple:
+    def _apply_interpass_cooling(
+        self,
+        field: np.ndarray,
+        y: np.ndarray,
+        z: np.ndarray,
+        target_temp: float,
+        max_time: float = 600.0,
+    ) -> tuple:
         """Cool field via natural convection + radiation until max temp <= target.
 
         Uses simple explicit time-stepping with no heat source.
@@ -290,7 +306,7 @@ class GoldakMultiPassSolver:
         alpha = k / (rho * Cp)
 
         # Stability limit for explicit scheme
-        max_dt = 0.25 / (alpha * (1/dy**2 + 1/dz**2))
+        max_dt = 0.25 / (alpha * (1 / dy**2 + 1 / dz**2))
         dt_cool = min(dt_cool, max_dt * 0.9)
 
         t = 0.0
@@ -304,9 +320,14 @@ class GoldakMultiPassSolver:
             # Interior points
             for j in range(1, nz - 1):
                 for i in range(1, ny - 1):
-                    laplacian = (alpha * dt_cool *
-                                 ((T[j, i-1] - 2*T[j, i] + T[j, i+1]) / dy**2 +
-                                  (T[j-1, i] - 2*T[j, i] + T[j+1, i]) / dz**2))
+                    laplacian = (
+                        alpha
+                        * dt_cool
+                        * (
+                            (T[j, i - 1] - 2 * T[j, i] + T[j, i + 1]) / dy**2
+                            + (T[j - 1, i] - 2 * T[j, i] + T[j + 1, i]) / dz**2
+                        )
+                    )
                     T_new[j, i] = T[j, i] + laplacian
 
             # BCs: convection + radiation on surfaces
@@ -314,8 +335,8 @@ class GoldakMultiPassSolver:
             for i in range(ny):
                 # Top surface (z=0)
                 h = DEFAULT_CONVECTION_HTC + DEFAULT_EMISSIVITY * STEFAN_BOLTZMANN * (
-                    (T[0, i] + 273.15)**2 + (T_amb + 273.15)**2) * (
-                    (T[0, i] + 273.15) + (T_amb + 273.15))
+                    (T[0, i] + 273.15) ** 2 + (T_amb + 273.15) ** 2
+                ) * ((T[0, i] + 273.15) + (T_amb + 273.15))
                 q_loss = h * (T[0, i] - T_amb)
                 T_new[0, i] = T[0, i] - dt_cool * 2 * q_loss / (rho * Cp * dz)
                 # Diffusion from interior
@@ -333,7 +354,9 @@ class GoldakMultiPassSolver:
                     q_loss = h * (T[j, side_idx] - T_amb)
                     T_new[j, side_idx] -= dt_cool * 2 * q_loss / (rho * Cp * dy)
                     neighbor = 1 if side_idx == 0 else ny - 2
-                    T_new[j, side_idx] += alpha * dt_cool * 2 * (T[j, neighbor] - T[j, side_idx]) / dy**2
+                    T_new[j, side_idx] += (
+                        alpha * dt_cool * 2 * (T[j, neighbor] - T[j, side_idx]) / dy**2
+                    )
 
             T = np.maximum(T_new, T_amb)  # Don't go below ambient
             t += dt_cool
@@ -371,11 +394,11 @@ class GoldakMultiPassSolver:
 
             # HAZ width comparison
             ros_haz_widths = {}
-            for zone, temp in [('fusion', 1500), ('cghaz', 1100), ('fghaz', 900), ('ichaz', 727)]:
+            for zone, temp in [("fusion", 1500), ("cghaz", 1100), ("fghaz", 900), ("ichaz", 727)]:
                 ros_haz_widths[zone] = ros.haz_boundary_distance(temp, z=0.0) * 1000  # mm
 
             goldak_haz = {}
-            for zone, temp in [('fusion', 1500), ('cghaz', 1100), ('fghaz', 900), ('ichaz', 727)]:
+            for zone, temp in [("fusion", 1500), ("cghaz", 1100), ("fghaz", 900), ("ichaz", 727)]:
                 idx = np.where(goldak_peak < temp)[0]
                 if len(idx) > 0 and idx[0] > 0:
                     goldak_haz[zone] = float(distances_mm[idx[0]])
@@ -383,24 +406,25 @@ class GoldakMultiPassSolver:
                     goldak_haz[zone] = 0.0
 
             return {
-                'string_number': string.string_number,
-                'distances_mm': distances_mm.tolist(),
-                'rosenthal_peak_temps': ros_peak.tolist(),
-                'goldak_peak_temps': goldak_peak.tolist(),
-                'compare_distances_mm': [d * 1000 for d in compare_distances],
-                'rosenthal_t8_5': ros_t85,
-                'goldak_t8_5': goldak_t85,
-                'rosenthal_haz_widths': ros_haz_widths,
-                'goldak_haz_widths': goldak_haz,
+                "string_number": string.string_number,
+                "distances_mm": distances_mm.tolist(),
+                "rosenthal_peak_temps": ros_peak.tolist(),
+                "goldak_peak_temps": goldak_peak.tolist(),
+                "compare_distances_mm": [d * 1000 for d in compare_distances],
+                "rosenthal_t8_5": ros_t85,
+                "goldak_t8_5": goldak_t85,
+                "rosenthal_haz_widths": ros_haz_widths,
+                "goldak_haz_widths": goldak_haz,
             }
         except Exception as e:
             logger.warning(f"Rosenthal comparison failed: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
 
 def _get_probe_indices(solver: GoldakSolver) -> dict:
     """Get probe point grid indices for a solver."""
     from .goldak_solver import PROBE_POINTS
+
     indices = {}
     ny = len(solver.y)
     nz = len(solver.z)

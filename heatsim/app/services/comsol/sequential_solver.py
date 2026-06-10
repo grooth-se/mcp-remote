@@ -3,17 +3,19 @@
 Executes weld string simulations in sequence, managing temperature transfer
 between passes and tracking progress.
 """
+
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Callable, List, Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from .client import COMSOLClient, COMSOLError
 from .model_builder import WeldModelBuilder
 from .results_extractor import ResultsExtractor
 
 if TYPE_CHECKING:
-    from app.models.weld_project import WeldProject, WeldString, WeldResult
+    from app.models.weld_project import WeldProject, WeldResult, WeldString
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +42,12 @@ class SequentialSolver:
         Path to store result files
     """
 
-    def __init__(self, client: COMSOLClient, builder: WeldModelBuilder = None,
-                 results_folder: str = 'data/results'):
+    def __init__(
+        self,
+        client: COMSOLClient,
+        builder: WeldModelBuilder = None,
+        results_folder: str = "data/results",
+    ):
         """Initialize sequential solver.
 
         Parameters
@@ -61,11 +67,14 @@ class SequentialSolver:
 
         self._model = None
         self._cancelled = False
-        self._all_results: List['WeldResult'] = []
+        self._all_results: list[WeldResult] = []
 
-    def run_project(self, project: 'WeldProject',
-                    progress_callback: Optional[Callable[[int, int, str], None]] = None,
-                    db_session=None) -> List['WeldResult']:
+    def run_project(
+        self,
+        project: "WeldProject",
+        progress_callback: Callable[[int, int, str], None] | None = None,
+        db_session=None,
+    ) -> list["WeldResult"]:
         """Run full simulation sequence for a weld project.
 
         Parameters
@@ -89,8 +98,10 @@ class SequentialSolver:
             If simulation fails
         """
         from app.models.weld_project import (
-            STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
-            STRING_PENDING, STRING_RUNNING, STRING_COMPLETED, STRING_FAILED
+            STATUS_COMPLETED,
+            STATUS_FAILED,
+            STATUS_RUNNING,
+            STRING_FAILED,
         )
 
         self._cancelled = False
@@ -117,7 +128,7 @@ class SequentialSolver:
             project.comsol_model_path = str(model_path)
 
             # Get all strings in order
-            strings = list(project.strings.order_by('string_number').all())
+            strings = list(project.strings.order_by("string_number").all())
             total = len(strings)
             project.total_strings = total
 
@@ -127,7 +138,7 @@ class SequentialSolver:
             logger.info(f"Starting simulation of {total} strings")
 
             # Track previous results for temperature calculation
-            prev_temps: Dict[str, float] = {}
+            prev_temps: dict[str, float] = {}
             global_time = 0.0
 
             # Simulate each string in sequence
@@ -159,7 +170,7 @@ class SequentialSolver:
 
                     # Update prev_temps from results
                     for result in string_results:
-                        if result.result_type == 'temperature_field':
+                        if result.result_type == "temperature_field":
                             prev_temps[string.body_name] = result.peak_temperature or 1500.0
 
                 except Exception as e:
@@ -194,10 +205,13 @@ class SequentialSolver:
                 db_session.commit()
             raise COMSOLError(f"Project simulation failed: {e}")
 
-    def _simulate_string(self, string: 'WeldString',
-                         prev_temps: Dict[str, float],
-                         global_time: float,
-                         db_session=None) -> List['WeldResult']:
+    def _simulate_string(
+        self,
+        string: "WeldString",
+        prev_temps: dict[str, float],
+        global_time: float,
+        db_session=None,
+    ) -> list["WeldResult"]:
         """Simulate a single weld string.
 
         Parameters
@@ -216,9 +230,7 @@ class SequentialSolver:
         list of WeldResult
             Results from this string simulation
         """
-        from app.models.weld_project import (
-            STRING_RUNNING, STRING_COMPLETED, STRING_FAILED
-        )
+        from app.models.weld_project import STRING_COMPLETED, STRING_FAILED, STRING_RUNNING
 
         logger.info(f"Simulating string {string.string_number}: {string.display_name}")
 
@@ -238,7 +250,7 @@ class SequentialSolver:
             self.builder.update_study_time(self._model, start_time, end_time)
 
             # Run COMSOL study
-            self.client.run_study(self._model, 'std1')
+            self.client.run_study(self._model, "std1")
 
             # Extract results
             results = self.extractor.extract_string_results(
@@ -262,7 +274,7 @@ class SequentialSolver:
                 db_session.commit()
             raise
 
-    def _generate_project_results(self, project: 'WeldProject', db_session=None) -> None:
+    def _generate_project_results(self, project: "WeldProject", db_session=None) -> None:
         """Generate project-level combined results.
 
         Creates:
@@ -277,7 +289,7 @@ class SequentialSolver:
         db_session : Session, optional
             Database session
         """
-        from app.models.weld_project import WeldResult, RESULT_THERMAL_CYCLE
+        from app.models.weld_project import WeldResult
 
         logger.info("Generating project-level results")
 
@@ -289,14 +301,14 @@ class SequentialSolver:
         if vtk_files:
             try:
                 from .visualization import WeldVisualization
+
                 viz = WeldVisualization()
                 animation_path = project_folder / "animation.mp4"
 
                 # Sort VTK files by timestamp
                 vtk_files_sorted = sorted(vtk_files, key=lambda p: p.stem)
                 animation_bytes = viz.create_timelapse_animation(
-                    [f.read_bytes() for f in vtk_files_sorted],
-                    list(range(len(vtk_files_sorted)))
+                    [f.read_bytes() for f in vtk_files_sorted], list(range(len(vtk_files_sorted)))
                 )
 
                 if animation_bytes:
@@ -305,9 +317,9 @@ class SequentialSolver:
                     # Create animation result record
                     anim_result = WeldResult(
                         project_id=project.id,
-                        result_type='animation',
-                        location='full_model',
-                        animation_filename=str(animation_path)
+                        result_type="animation",
+                        location="full_model",
+                        animation_filename=str(animation_path),
                     )
                     if db_session:
                         db_session.add(anim_result)
@@ -339,21 +351,29 @@ class MockSequentialSolver(SequentialSolver):
     Generates synthetic results for development and testing.
     """
 
-    def _simulate_string(self, string: 'WeldString',
-                         prev_temps: Dict[str, float],
-                         global_time: float,
-                         db_session=None) -> List['WeldResult']:
+    def _simulate_string(
+        self,
+        string: "WeldString",
+        prev_temps: dict[str, float],
+        global_time: float,
+        db_session=None,
+    ) -> list["WeldResult"]:
         """Generate Rosenthal-based results for a string.
 
         Uses the analytical Rosenthal solution for physically correct
         thermal cycles instead of simple exponential decay.
         """
-        from app.models.weld_project import (
-            WeldResult, STRING_RUNNING, STRING_COMPLETED,
-            RESULT_THERMAL_CYCLE, RESULT_COOLING_RATE
-        )
-        import numpy as np
         import time
+
+        import numpy as np
+
+        from app.models.weld_project import (
+            RESULT_COOLING_RATE,
+            RESULT_THERMAL_CYCLE,
+            STRING_COMPLETED,
+            STRING_RUNNING,
+            WeldResult,
+        )
 
         logger.info(f"Mock simulating string {string.string_number} (Rosenthal)")
 
@@ -371,6 +391,7 @@ class MockSequentialSolver(SequentialSolver):
         # Build Rosenthal solver from project/string parameters
         try:
             from app.services.rosenthal_solver import RosenthalSolver
+
             solver = RosenthalSolver.from_weld_project(string.project, string)
         except Exception as e:
             logger.warning(f"Rosenthal solver init failed, using fallback: {e}")
@@ -378,10 +399,10 @@ class MockSequentialSolver(SequentialSolver):
 
         # Generate thermal cycles at multiple positions
         positions = {
-            'centerline': 0.001,  # 1mm from weld center
-            'cghaz': 0.003,       # 3mm — typically CGHAZ
-            'fghaz': 0.006,       # 6mm — FGHAZ region
-            'ichaz': 0.010,       # 10mm — ICHAZ region
+            "centerline": 0.001,  # 1mm from weld center
+            "cghaz": 0.003,  # 3mm — typically CGHAZ
+            "fghaz": 0.006,  # 6mm — FGHAZ region
+            "ichaz": 0.010,  # 10mm — ICHAZ region
         }
 
         duration = string.simulation_duration
@@ -403,7 +424,9 @@ class MockSequentialSolver(SequentialSolver):
             # Cooling rate in 800-500 range
             temp_mid = 0.5 * (temps[:-1] + temps[1:])
             mask_800_500 = (temp_mid > 500) & (temp_mid < 800)
-            cr_800_500 = float(np.mean(cooling_rates[mask_800_500])) if np.any(mask_800_500) else None
+            cr_800_500 = (
+                float(np.mean(cooling_rates[mask_800_500])) if np.any(mask_800_500) else None
+            )
 
             # Phase prediction
             phases = self._estimate_phases_from_rosenthal(t_800_500, string.project)
@@ -416,7 +439,7 @@ class MockSequentialSolver(SequentialSolver):
                 project_id=string.project_id,
                 string_id=string.id,
                 result_type=RESULT_THERMAL_CYCLE,
-                location=f'string_{string.string_number}_{loc_name}',
+                location=f"string_{string.string_number}_{loc_name}",
                 peak_temperature=peak_temp,
                 t_800_500=float(t_800_500) if t_800_500 else None,
                 cooling_rate_max=max_cooling_rate,
@@ -442,7 +465,7 @@ class MockSequentialSolver(SequentialSolver):
             project_id=string.project_id,
             string_id=string.id,
             result_type=RESULT_COOLING_RATE,
-            location=f'string_{string.string_number}_center',
+            location=f"string_{string.string_number}_center",
             cooling_rate_max=float(np.max(cr_cl)) if len(cr_cl) > 0 else 0.0,
         )
         rate_result.set_time_data(temp_mid_cl.tolist())
@@ -461,13 +484,11 @@ class MockSequentialSolver(SequentialSolver):
 
         return results
 
-    def _simulate_string_fallback(self, string: 'WeldString', db_session=None) -> list:
+    def _simulate_string_fallback(self, string: "WeldString", db_session=None) -> list:
         """Fallback exponential-decay simulation when Rosenthal fails."""
-        from app.models.weld_project import (
-            WeldResult, STRING_COMPLETED,
-            RESULT_THERMAL_CYCLE
-        )
         import numpy as np
+
+        from app.models.weld_project import RESULT_THERMAL_CYCLE, STRING_COMPLETED, WeldResult
 
         t_solid = string.effective_solidification_temp
         t_ambient = string.project.preheat_temperature if string.project else 20.0
@@ -478,13 +499,15 @@ class MockSequentialSolver(SequentialSolver):
 
         t_800_idx = np.argmax(temps < 800) if np.any(temps < 800) else -1
         t_500_idx = np.argmax(temps < 500) if np.any(temps < 500) else -1
-        t_800_500 = times[t_500_idx] - times[t_800_idx] if t_800_idx >= 0 and t_500_idx >= 0 else None
+        t_800_500 = (
+            times[t_500_idx] - times[t_800_idx] if t_800_idx >= 0 and t_500_idx >= 0 else None
+        )
 
         cycle_result = WeldResult(
             project_id=string.project_id,
             string_id=string.id,
             result_type=RESULT_THERMAL_CYCLE,
-            location=f'string_{string.string_number}_center',
+            location=f"string_{string.string_number}_center",
             peak_temperature=float(t_solid),
             t_800_500=float(t_800_500) if t_800_500 else None,
         )
@@ -502,15 +525,16 @@ class MockSequentialSolver(SequentialSolver):
 
         return [cycle_result]
 
-    def _estimate_phases_from_rosenthal(self, t_800_500: Optional[float], project) -> dict:
+    def _estimate_phases_from_rosenthal(self, t_800_500: float | None, project) -> dict:
         """Estimate phase fractions using PhaseTracker if available."""
         try:
-            from app.services.phase_tracker import PhaseTracker
             import numpy as np
+
+            from app.services.phase_tracker import PhaseTracker
 
             phase_diagram = None
             if project and project.steel_grade:
-                phase_diagram = getattr(project.steel_grade, 'phase_diagram', None)
+                phase_diagram = getattr(project.steel_grade, "phase_diagram", None)
 
             tracker = PhaseTracker(phase_diagram)
 
@@ -527,13 +551,16 @@ class MockSequentialSolver(SequentialSolver):
         # Fallback simple estimation
         return self._estimate_phases_simple(t_800_500)
 
-    def _predict_hardness(self, t_800_500: Optional[float], phases: dict, project) -> Optional[float]:
+    def _predict_hardness(
+        self, t_800_500: float | None, phases: dict, project
+    ) -> float | None:
         """Predict hardness using HardnessPredictor if composition available."""
         try:
             if project and project.steel_grade:
-                composition = getattr(project.steel_grade, 'composition', None)
+                composition = getattr(project.steel_grade, "composition", None)
                 if composition:
                     from app.services.hardness_predictor import HardnessPredictor
+
                     predictor = HardnessPredictor(composition)
                     t85 = t_800_500 if t_800_500 and t_800_500 > 0 else 5.0
                     return predictor.predict_hardness(phases, t85)
@@ -541,7 +568,7 @@ class MockSequentialSolver(SequentialSolver):
             pass
         return None
 
-    def _estimate_phases_simple(self, t_800_500: Optional[float]) -> dict:
+    def _estimate_phases_simple(self, t_800_500: float | None) -> dict:
         """Simple phase estimation fallback.
 
         Parameters
@@ -555,15 +582,15 @@ class MockSequentialSolver(SequentialSolver):
             Phase fractions (martensite, bainite, ferrite, pearlite)
         """
         if t_800_500 is None:
-            return {'martensite': 1.0, 'bainite': 0.0, 'ferrite': 0.0, 'pearlite': 0.0}
+            return {"martensite": 1.0, "bainite": 0.0, "ferrite": 0.0, "pearlite": 0.0}
 
         if t_800_500 < 5:
-            return {'martensite': 0.95, 'bainite': 0.05, 'ferrite': 0.0, 'pearlite': 0.0}
+            return {"martensite": 0.95, "bainite": 0.05, "ferrite": 0.0, "pearlite": 0.0}
         elif t_800_500 < 20:
             m_frac = max(0, 0.95 - (t_800_500 - 5) * 0.05)
-            return {'martensite': m_frac, 'bainite': 1 - m_frac, 'ferrite': 0.0, 'pearlite': 0.0}
+            return {"martensite": m_frac, "bainite": 1 - m_frac, "ferrite": 0.0, "pearlite": 0.0}
         elif t_800_500 < 60:
             b_frac = max(0.3, 0.8 - (t_800_500 - 20) * 0.01)
-            return {'martensite': 0.1, 'bainite': b_frac, 'ferrite': 0.9 - b_frac, 'pearlite': 0.0}
+            return {"martensite": 0.1, "bainite": b_frac, "ferrite": 0.9 - b_frac, "pearlite": 0.0}
         else:
-            return {'martensite': 0.0, 'bainite': 0.1, 'ferrite': 0.6, 'pearlite': 0.3}
+            return {"martensite": 0.0, "bainite": 0.1, "ferrite": 0.6, "pearlite": 0.3}

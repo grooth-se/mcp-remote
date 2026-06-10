@@ -1,4 +1,5 @@
 """Simulation snapshot model for immutable run history."""
+
 import json
 from datetime import datetime
 
@@ -7,11 +8,12 @@ from app.extensions import db
 
 class SimulationSnapshot(db.Model):
     """Immutable snapshot of simulation inputs captured at run time."""
-    __tablename__ = 'simulation_snapshots'
-    __bind_key__ = 'materials'
+
+    __tablename__ = "simulation_snapshots"
+    __bind_key__ = "materials"
 
     id = db.Column(db.Integer, primary_key=True)
-    simulation_id = db.Column(db.Integer, db.ForeignKey('simulations.id'), nullable=False)
+    simulation_id = db.Column(db.Integer, db.ForeignKey("simulations.id"), nullable=False)
     version = db.Column(db.Integer, nullable=False)
 
     # Frozen simulation config
@@ -50,14 +52,19 @@ class SimulationSnapshot(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
-    simulation = db.relationship('Simulation', backref=db.backref(
-        'snapshots', lazy='dynamic', order_by='SimulationSnapshot.version.desc()',
-        cascade='all, delete-orphan',
-    ))
+    simulation = db.relationship(
+        "Simulation",
+        backref=db.backref(
+            "snapshots",
+            lazy="dynamic",
+            order_by="SimulationSnapshot.version.desc()",
+            cascade="all, delete-orphan",
+        ),
+    )
 
     __table_args__ = (
-        db.UniqueConstraint('simulation_id', 'version', name='uq_sim_version'),
-        db.Index('ix_snapshots_simulation', 'simulation_id'),
+        db.UniqueConstraint("simulation_id", "version", name="uq_sim_version"),
+        db.Index("ix_snapshots_simulation", "simulation_id"),
     )
 
     @property
@@ -84,7 +91,11 @@ class SimulationSnapshot(db.Model):
     @property
     def material_props_dict(self):
         try:
-            return json.loads(self.material_properties_snapshot) if self.material_properties_snapshot else []
+            return (
+                json.loads(self.material_properties_snapshot)
+                if self.material_properties_snapshot
+                else []
+            )
         except json.JSONDecodeError:
             return []
 
@@ -105,7 +116,9 @@ class SimulationSnapshot(db.Model):
     @property
     def phase_props_dict(self):
         try:
-            return json.loads(self.phase_properties_snapshot) if self.phase_properties_snapshot else []
+            return (
+                json.loads(self.phase_properties_snapshot) if self.phase_properties_snapshot else []
+            )
         except json.JSONDecodeError:
             return []
 
@@ -114,4 +127,4 @@ class SimulationSnapshot(db.Model):
         return f"v{self.version}"
 
     def __repr__(self):
-        return f'<SimulationSnapshot sim={self.simulation_id} v{self.version}>'
+        return f"<SimulationSnapshot sim={self.simulation_id} v{self.version}>"

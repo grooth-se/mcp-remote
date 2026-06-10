@@ -5,9 +5,10 @@ Supports:
 - Plate: 1D through-thickness (x direction)
 - Ring: 1D radial with inner/outer boundaries
 """
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Tuple
+
 import numpy as np
 
 
@@ -48,6 +49,7 @@ class Cylinder(GeometryBase):
     length : float
         Axial length in meters (for volume calculations)
     """
+
     radius: float
     length: float = 1.0
 
@@ -79,7 +81,7 @@ class Cylinder(GeometryBase):
         return self.volume / self.outer_surface_area
 
     def __str__(self) -> str:
-        return f"Cylinder(R={self.radius*1000:.1f}mm, L={self.length*1000:.1f}mm)"
+        return f"Cylinder(R={self.radius * 1000:.1f}mm, L={self.length * 1000:.1f}mm)"
 
 
 @dataclass
@@ -97,6 +99,7 @@ class Plate(GeometryBase):
     length : float
         Plate length (for area calculations)
     """
+
     thickness: float
     width: float = 1.0
     length: float = 1.0
@@ -129,7 +132,7 @@ class Plate(GeometryBase):
         return self.thickness / 2
 
     def __str__(self) -> str:
-        return f"Plate(t={self.thickness*1000:.1f}mm)"
+        return f"Plate(t={self.thickness * 1000:.1f}mm)"
 
 
 @dataclass
@@ -145,6 +148,7 @@ class Ring(GeometryBase):
     length : float
         Axial length in meters
     """
+
     inner_radius: float
     outer_radius: float
     length: float = 1.0
@@ -187,7 +191,7 @@ class Ring(GeometryBase):
         return self.wall_thickness
 
     def __str__(self) -> str:
-        return f"Ring(Ri={self.inner_radius*1000:.1f}mm, Ro={self.outer_radius*1000:.1f}mm)"
+        return f"Ring(Ri={self.inner_radius * 1000:.1f}mm, Ro={self.outer_radius * 1000:.1f}mm)"
 
 
 @dataclass
@@ -206,6 +210,7 @@ class HollowCylinder(GeometryBase):
     length : float
         Axial length in meters
     """
+
     outer_diameter: float
     inner_diameter: float
     length: float = 1.0
@@ -258,7 +263,7 @@ class HollowCylinder(GeometryBase):
         return self.wall_thickness
 
     def __str__(self) -> str:
-        return f"HollowCylinder(OD={self.outer_diameter*1000:.1f}mm, ID={self.inner_diameter*1000:.1f}mm)"
+        return f"HollowCylinder(OD={self.outer_diameter * 1000:.1f}mm, ID={self.inner_diameter * 1000:.1f}mm)"
 
 
 def create_geometry(geometry_type: str, config: dict) -> GeometryBase:
@@ -276,28 +281,25 @@ def create_geometry(geometry_type: str, config: dict) -> GeometryBase:
     GeometryBase
         Geometry instance
     """
-    if geometry_type == 'cylinder':
-        return Cylinder(
-            radius=config.get('radius', 0.05),
-            length=config.get('length', 0.1)
-        )
-    elif geometry_type == 'plate':
+    if geometry_type == "cylinder":
+        return Cylinder(radius=config.get("radius", 0.05), length=config.get("length", 0.1))
+    elif geometry_type == "plate":
         return Plate(
-            thickness=config.get('thickness', 0.02),
-            width=config.get('width', 0.1),
-            length=config.get('length', 0.1)
+            thickness=config.get("thickness", 0.02),
+            width=config.get("width", 0.1),
+            length=config.get("length", 0.1),
         )
-    elif geometry_type == 'ring':
+    elif geometry_type == "ring":
         return Ring(
-            inner_radius=config.get('inner_radius', 0.02),
-            outer_radius=config.get('outer_radius', 0.05),
-            length=config.get('length', 0.1)
+            inner_radius=config.get("inner_radius", 0.02),
+            outer_radius=config.get("outer_radius", 0.05),
+            length=config.get("length", 0.1),
         )
-    elif geometry_type == 'hollow_cylinder':
+    elif geometry_type == "hollow_cylinder":
         return HollowCylinder(
-            outer_diameter=config.get('outer_diameter', 0.1),
-            inner_diameter=config.get('inner_diameter', 0.04),
-            length=config.get('length', 0.1)
+            outer_diameter=config.get("outer_diameter", 0.1),
+            inner_diameter=config.get("inner_diameter", 0.04),
+            length=config.get("length", 0.1),
         )
     else:
         raise ValueError(f"Unknown geometry type: {geometry_type}")

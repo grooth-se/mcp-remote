@@ -7,8 +7,8 @@ Supports:
 - Insulated (adiabatic) boundaries
 - Multi-phase heat treatment boundary conditions
 """
+
 from dataclasses import dataclass
-from typing import Optional
 
 # Stefan-Boltzmann constant
 STEFAN_BOLTZMANN = 5.67e-8  # W/(m²·K⁴)
@@ -29,10 +29,11 @@ class BoundaryCondition:
     radiation_ambient : float, optional
         Radiation sink temperature (default = ambient_temp)
     """
+
     htc: float
     ambient_temp: float
     emissivity: float = 0.0
-    radiation_ambient: Optional[float] = None
+    radiation_ambient: float | None = None
 
     # For time-varying boundary conditions
     _current_time: float = 0.0
@@ -83,14 +84,17 @@ class BoundaryCondition:
         if self.emissivity > 0:
             T_surf_K = surface_temp + 273.15
             T_amb_K = (self.radiation_ambient or self.ambient_temp) + 273.15
-            h_rad = self.emissivity * STEFAN_BOLTZMANN * (
-                T_surf_K**2 + T_amb_K**2
-            ) * (T_surf_K + T_amb_K)
+            h_rad = (
+                self.emissivity
+                * STEFAN_BOLTZMANN
+                * (T_surf_K**2 + T_amb_K**2)
+                * (T_surf_K + T_amb_K)
+            )
             h_eff += h_rad
 
         return h_eff
 
-    def update_ambient(self, new_ambient: float, new_radiation_ambient: Optional[float] = None):
+    def update_ambient(self, new_ambient: float, new_radiation_ambient: float | None = None):
         """Update ambient temperature (for phase transitions).
 
         Parameters
@@ -111,6 +115,7 @@ class InsulatedBoundary:
 
     Used for symmetry boundaries (center of cylinder/plate).
     """
+
     ambient_temp: float = 25.0  # Not used, but kept for interface consistency
 
     def heat_flux(self, surface_temp: float) -> float:
@@ -144,6 +149,7 @@ class RampingBoundaryCondition:
     emissivity : float
         Surface emissivity for radiation (0-1)
     """
+
     htc: float
     start_temp: float
     target_temp: float
@@ -166,7 +172,7 @@ class RampingBoundaryCondition:
         """Update current time for time-varying calculation."""
         self._current_time = time
 
-    def get_furnace_temperature(self, time: Optional[float] = None) -> float:
+    def get_furnace_temperature(self, time: float | None = None) -> float:
         """Get furnace temperature at given time.
 
         Parameters
@@ -243,14 +249,17 @@ class RampingBoundaryCondition:
         if self.emissivity > 0:
             T_surf_K = surface_temp + 273.15
             T_furn_K = furnace_temp + 273.15
-            h_rad = self.emissivity * STEFAN_BOLTZMANN * (
-                T_surf_K**2 + T_furn_K**2
-            ) * (T_surf_K + T_furn_K)
+            h_rad = (
+                self.emissivity
+                * STEFAN_BOLTZMANN
+                * (T_surf_K**2 + T_furn_K**2)
+                * (T_surf_K + T_furn_K)
+            )
             h_eff += h_rad
 
         return h_eff
 
-    def update_ambient(self, new_ambient: float, new_radiation_ambient: Optional[float] = None):
+    def update_ambient(self, new_ambient: float, new_radiation_ambient: float | None = None):
         """Update target temperature (for compatibility)."""
         self.target_temp = new_ambient
 
@@ -259,7 +268,7 @@ def create_heating_bc(
     target_temperature: float,
     htc: float = 25.0,
     emissivity: float = 0.85,
-    use_radiation: bool = True
+    use_radiation: bool = True,
 ) -> BoundaryCondition:
     """Create boundary condition for furnace heating phase.
 
@@ -283,7 +292,7 @@ def create_heating_bc(
         htc=htc,
         ambient_temp=target_temperature,
         emissivity=emissivity if use_radiation else 0.0,
-        radiation_ambient=target_temperature
+        radiation_ambient=target_temperature,
     )
 
 
@@ -293,7 +302,7 @@ def create_ramping_heating_bc(
     ramp_rate: float = 0.0,
     htc: float = 25.0,
     emissivity: float = 0.85,
-    use_radiation: bool = True
+    use_radiation: bool = True,
 ) -> RampingBoundaryCondition:
     """Create ramping boundary condition for furnace heating phase.
 
@@ -324,7 +333,7 @@ def create_ramping_heating_bc(
         start_temp=start_temperature,
         target_temp=target_temperature,
         ramp_rate=ramp_rate,
-        emissivity=emissivity if use_radiation else 0.0
+        emissivity=emissivity if use_radiation else 0.0,
     )
 
 
@@ -332,7 +341,7 @@ def create_transfer_bc(
     ambient_temperature: float = 25.0,
     htc: float = 10.0,
     emissivity: float = 0.85,
-    use_radiation: bool = True
+    use_radiation: bool = True,
 ) -> BoundaryCondition:
     """Create boundary condition for transfer phase (furnace to quench).
 
@@ -356,17 +365,17 @@ def create_transfer_bc(
         htc=htc,
         ambient_temp=ambient_temperature,
         emissivity=emissivity if use_radiation else 0.0,
-        radiation_ambient=ambient_temperature
+        radiation_ambient=ambient_temperature,
     )
 
 
 def create_quench_bc(
-    media: str = 'water',
+    media: str = "water",
     media_temperature: float = 25.0,
-    agitation: str = 'moderate',
-    htc_override: Optional[float] = None,
+    agitation: str = "moderate",
+    htc_override: float | None = None,
     emissivity: float = 0.3,
-    use_radiation: bool = False
+    use_radiation: bool = False,
 ) -> BoundaryCondition:
     """Create boundary condition for quenching phase.
 
@@ -401,7 +410,7 @@ def create_quench_bc(
         htc=htc,
         ambient_temp=media_temperature,
         emissivity=emissivity if use_radiation else 0.0,
-        radiation_ambient=media_temperature
+        radiation_ambient=media_temperature,
     )
 
 
@@ -409,7 +418,7 @@ def create_tempering_bc(
     temperature: float = 550.0,
     htc: float = 25.0,
     emissivity: float = 0.85,
-    cooling_method: str = 'air'
+    cooling_method: str = "air",
 ) -> BoundaryCondition:
     """Create boundary condition for tempering phase.
 
@@ -436,7 +445,7 @@ def create_tempering_bc(
         htc=htc,
         ambient_temp=temperature,
         emissivity=emissivity if use_radiation else 0.0,
-        radiation_ambient=temperature
+        radiation_ambient=temperature,
     )
 
 
@@ -444,7 +453,7 @@ def create_cooling_bc(
     ambient_temperature: float = 25.0,
     htc: float = 25.0,
     emissivity: float = 0.85,
-    cooling_method: str = 'air'
+    cooling_method: str = "air",
 ) -> BoundaryCondition:
     """Create boundary condition for cooling after tempering.
 
@@ -466,7 +475,7 @@ def create_cooling_bc(
     """
     # Air cooling: higher HTC, radiation significant at high temps
     # Furnace cooling: low HTC, use radiation
-    if cooling_method == 'air':
+    if cooling_method == "air":
         use_radiation = True
     else:
         # Furnace cooling - slow cooling with radiation
@@ -477,7 +486,7 @@ def create_cooling_bc(
         htc=htc,
         ambient_temp=ambient_temperature,
         emissivity=emissivity if use_radiation else 0.0,
-        radiation_ambient=ambient_temperature
+        radiation_ambient=ambient_temperature,
     )
 
 

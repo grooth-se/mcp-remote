@@ -5,19 +5,16 @@ test data. Supports:
 - Isothermal dilatometry (fraction vs time at constant temperature)
 - CCT dilatometry (fraction vs temperature at constant cooling rate)
 """
+
 import math
-from typing import Dict, List, Tuple, Optional
 
 import numpy as np
-from scipy.optimize import curve_fit, minimize
+from scipy.optimize import curve_fit
 
-from .jmak_model import JMAKModel, fit_jmak_parameters, create_b_function
+from .jmak_model import JMAKModel, fit_jmak_parameters
 
 
-def calibrate_isothermal(
-    data_points: List[Dict],
-    phase: str
-) -> Tuple[float, str, dict]:
+def calibrate_isothermal(data_points: list[dict], phase: str) -> tuple[float, str, dict]:
     """Calibrate JMAK parameters from isothermal dilatometry data.
 
     Each data point has: temperature, time, fraction_transformed.
@@ -38,20 +35,19 @@ def calibrate_isothermal(
     if len(data_points) < 3:
         raise ValueError("Need at least 3 data points for calibration")
 
-    temperatures = np.array([d['temperature'] for d in data_points])
-    times = np.array([d['time'] for d in data_points])
-    fractions = np.array([d['fraction_transformed'] for d in data_points])
+    temperatures = np.array([d["temperature"] for d in data_points])
+    times = np.array([d["time"] for d in data_points])
+    fractions = np.array([d["fraction_transformed"] for d in data_points])
 
     n_value, model_type, b_params = fit_jmak_parameters(
-        temperatures, times, fractions, model_type='gaussian'
+        temperatures, times, fractions, model_type="gaussian"
     )
 
     return n_value, model_type, b_params
 
 
 def calibrate_b_function(
-    temperature_b_pairs: List[Tuple[float, float]],
-    model_type: str = 'gaussian'
+    temperature_b_pairs: list[tuple[float, float]], model_type: str = "gaussian"
 ) -> dict:
     """Fit b(T) function from temperature-b value pairs.
 
@@ -72,7 +68,7 @@ def calibrate_b_function(
     temps = np.array([p[0] for p in temperature_b_pairs])
     b_vals = np.array([p[1] for p in temperature_b_pairs])
 
-    if model_type == 'gaussian':
+    if model_type == "gaussian":
         idx_max = np.argmax(b_vals)
         b_max_init = b_vals[idx_max]
         t_nose_init = temps[idx_max]
@@ -83,32 +79,35 @@ def calibrate_b_function(
 
         try:
             popt, _ = curve_fit(
-                gaussian, temps, b_vals,
+                gaussian,
+                temps,
+                b_vals,
                 p0=[b_max_init, t_nose_init, sigma_init],
-                bounds=([0, temps.min() - 100, 10],
-                        [np.inf, temps.max() + 100, 500])
+                bounds=([0, temps.min() - 100, 10], [np.inf, temps.max() + 100, 500]),
             )
-            return {'b_max': float(popt[0]), 't_nose': float(popt[1]), 'sigma': float(popt[2])}
+            return {"b_max": float(popt[0]), "t_nose": float(popt[1]), "sigma": float(popt[2])}
         except RuntimeError:
-            return {'b_max': float(b_max_init), 't_nose': float(t_nose_init), 'sigma': float(sigma_init)}
+            return {
+                "b_max": float(b_max_init),
+                "t_nose": float(t_nose_init),
+                "sigma": float(sigma_init),
+            }
 
-    elif model_type == 'arrhenius':
+    elif model_type == "arrhenius":
         R = 8.314
         T_K = temps + 273.15
         valid = b_vals > 0
         ln_b = np.log(b_vals[valid])
         inv_T = 1.0 / T_K[valid]
         coeffs = np.polyfit(inv_T, ln_b, 1)
-        return {'b0': float(math.exp(coeffs[1])), 'Q': float(-coeffs[0] * R)}
+        return {"b0": float(math.exp(coeffs[1])), "Q": float(-coeffs[0] * R)}
 
     raise ValueError(f"Unknown model type: {model_type}")
 
 
 def calibrate_from_cct(
-    cct_data_points: List[Dict],
-    n_initial: float = 2.0,
-    model_type: str = 'gaussian'
-) -> Tuple[float, str, dict]:
+    cct_data_points: list[dict], n_initial: float = 2.0, model_type: str = "gaussian"
+) -> tuple[float, str, dict]:
     """Calibrate JMAK parameters from CCT dilatometry data.
 
     Uses an optimization approach: for each candidate (n, b_params),
@@ -132,10 +131,11 @@ def calibrate_from_cct(
     if len(cct_data_points) < 3:
         raise ValueError("Need at least 3 CCT data points")
 
-    cooling_rates = np.array([d['cooling_rate'] for d in cct_data_points])
-    start_temps = np.array([d['start_temperature'] for d in cct_data_points])
-    finish_temps = np.array([d.get('finish_temperature', d['start_temperature'] - 50)
-                             for d in cct_data_points])
+    cooling_rates = np.array([d["cooling_rate"] for d in cct_data_points])
+    start_temps = np.array([d["start_temperature"] for d in cct_data_points])
+    finish_temps = np.array(
+        [d.get("finish_temperature", d["start_temperature"] - 50) for d in cct_data_points]
+    )
 
     # Initial estimates from CCT data
     # Nose temperature: temperature where start occurs at shortest time
@@ -147,7 +147,7 @@ def calibrate_from_cct(
     # At nose: t_start ~ (ln(100)/b_max)^(1/n) => b_max ~ ln(100) / t_start^n
     # t_start for slowest CR that still shows transformation
     t_start_est = (900 - start_temps[min_cr_idx]) / cooling_rates[min_cr_idx]
-    b_max_init = max(math.log(100) / max(t_start_est ** n_initial, 0.01), 1e-10)
+    b_max_init = max(math.log(100) / max(t_start_est**n_initial, 0.01), 1e-10)
 
     def objective(params):
         n, b_max, t_nose, sigma = params
@@ -177,36 +177,44 @@ def calibrate_from_cct(
         return error
 
     from scipy.optimize import differential_evolution
+
     bounds = [
-        (0.5, 4.0),       # n
-        (1e-15, 1e5),     # b_max
-        (200, 800),        # t_nose
-        (20, 300),         # sigma
+        (0.5, 4.0),  # n
+        (1e-15, 1e5),  # b_max
+        (200, 800),  # t_nose
+        (20, 300),  # sigma
     ]
 
     try:
-        result = differential_evolution(objective, bounds, maxiter=200, tol=0.01,
-                                         seed=42, polish=True)
+        result = differential_evolution(
+            objective, bounds, maxiter=200, tol=0.01, seed=42, polish=True
+        )
         n_opt, b_max_opt, t_nose_opt, sigma_opt = result.x
-        return float(n_opt), model_type, {
-            'b_max': float(b_max_opt),
-            't_nose': float(t_nose_opt),
-            'sigma': float(sigma_opt),
-        }
+        return (
+            float(n_opt),
+            model_type,
+            {
+                "b_max": float(b_max_opt),
+                "t_nose": float(t_nose_opt),
+                "sigma": float(sigma_opt),
+            },
+        )
     except Exception:
         # Return initial estimates
-        return n_initial, model_type, {
-            'b_max': float(b_max_init),
-            't_nose': float(t_nose_init),
-            'sigma': float(sigma_init),
-        }
+        return (
+            n_initial,
+            model_type,
+            {
+                "b_max": float(b_max_init),
+                "t_nose": float(t_nose_init),
+                "sigma": float(sigma_init),
+            },
+        )
 
 
 def extract_jmak_from_isothermal_curve(
-    times: np.ndarray,
-    fractions: np.ndarray,
-    temperature: float
-) -> Tuple[float, float]:
+    times: np.ndarray, fractions: np.ndarray, temperature: float
+) -> tuple[float, float]:
     """Extract n and b from a single isothermal transformation curve.
 
     Linearizes: ln(-ln(1-X)) = n*ln(t) + ln(b)

@@ -1,0 +1,55 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+markers = [
+    "comsol: marks tests as requiring a real COMSOL installation (deselect with '-m \"not comsol\"')",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    "migrations",
+    "instance",
+    "data",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E501",  # line length is enforced by the formatter
+    "E402",  # module-level imports not at top — Flask blueprints need this
+    # --- Baseline tech debt (clean up incrementally) -------------------------
+    # The following were present in the codebase when ruff was first wired
+    # in. Each represents real but low-priority work; remove the ignore once
+    # the corresponding files are cleaned up.
+    "B904",  # raise ... from err inside except (18 sites)
+    "B007",  # unused loop control var (18 sites)
+    "B023",  # function-uses-loop-variable (1 site)
+    "E711",  # comparison to None (2 sites)
+    "E712",  # comparison to True/False (2 sites)
+    "E722",  # bare except (2 sites)
+    "E731",  # lambda assigned to name (2 sites)
+    "E741",  # ambiguous variable name (1 site)
+    "UP038", # isinstance with X | Y (6 sites)
+    "F841",  # unused local variable (20 sites — many are deliberate)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can have unused imports (fixtures), longer assertions, and
+# assignments-for-side-effects.
+"tests/*" = ["F401", "E501", "F841", "B017", "B023", "F821"]
+# Service __init__ re-exports modules used by importers but not in __all__.
+"app/services/__init__.py" = ["F401"]
+"app/models/__init__.py" = ["F401"]
+"app/__init__.py" = ["F401"]
+# Optional-dependency availability probes (try: import pyvista / mph).
+"app/services/comsol/*.py" = ["F401"]
+"app/services/visualization_3d.py" = ["F401"]
+# String-typed forward annotation references numpy without importing it.
+"app/services/phase_transformation/martensite_model.py" = ["F821"]

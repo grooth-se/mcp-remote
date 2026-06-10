@@ -1,7 +1,7 @@
 """Models for measured thermocouple data from heat treatment logging."""
-from datetime import datetime
-from typing import List, Dict, Optional
+
 import json
+from datetime import datetime
 
 from app import db
 
@@ -12,17 +12,18 @@ class MeasuredData(db.Model):
     Stores uploaded CSV data from temperature loggers with up to 8 channels.
     Can be linked to a simulation for comparison.
     """
-    __bind_key__ = 'materials'
-    __tablename__ = 'measured_data'
+
+    __bind_key__ = "materials"
+    __tablename__ = "measured_data"
 
     id = db.Column(db.Integer, primary_key=True)
-    simulation_id = db.Column(db.Integer, db.ForeignKey('simulations.id'), nullable=True)
+    simulation_id = db.Column(db.Integer, db.ForeignKey("simulations.id"), nullable=True)
 
     # Metadata
     name = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text)
     filename = db.Column(db.Text)  # Original uploaded filename
-    process_step = db.Column(db.Text, default='full')  # 'full', 'heating', 'quenching', 'tempering'
+    process_step = db.Column(db.Text, default="full")  # 'full', 'heating', 'quenching', 'tempering'
 
     # Time range
     start_time = db.Column(db.DateTime)
@@ -47,46 +48,49 @@ class MeasuredData(db.Model):
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationship
-    simulation = db.relationship('Simulation', backref=db.backref('measured_data', lazy='dynamic', cascade='all, delete-orphan'))
+    simulation = db.relationship(
+        "Simulation",
+        backref=db.backref("measured_data", lazy="dynamic", cascade="all, delete-orphan"),
+    )
 
     @property
-    def channel_labels_dict(self) -> Dict[str, str]:
+    def channel_labels_dict(self) -> dict[str, str]:
         """Get channel labels as dict."""
         if self.channel_labels:
             return json.loads(self.channel_labels)
         return {}
 
     @channel_labels_dict.setter
-    def channel_labels_dict(self, labels: Dict[str, str]):
+    def channel_labels_dict(self, labels: dict[str, str]):
         """Set channel labels from dict."""
         self.channel_labels = json.dumps(labels)
 
     @property
-    def times(self) -> List[float]:
+    def times(self) -> list[float]:
         """Get time array."""
         if self.times_json:
             return json.loads(self.times_json)
         return []
 
     @times.setter
-    def times(self, times: List[float]):
+    def times(self, times: list[float]):
         """Set time array."""
         self.times_json = json.dumps(times)
 
     @property
-    def channels(self) -> Dict[str, List[float]]:
+    def channels(self) -> dict[str, list[float]]:
         """Get channel data as dict."""
         if self.channels_json:
             return json.loads(self.channels_json)
         return {}
 
     @channels.setter
-    def channels(self, channels: Dict[str, List[float]]):
+    def channels(self, channels: dict[str, list[float]]):
         """Set channel data from dict."""
         self.channels_json = json.dumps(channels)
 
     @property
-    def channel_times(self) -> Dict[str, List[float]]:
+    def channel_times(self) -> dict[str, list[float]]:
         """Get per-channel times as dict."""
         if self.channel_times_json:
             return json.loads(self.channel_times_json)
@@ -97,11 +101,11 @@ class MeasuredData(db.Model):
         return {}
 
     @channel_times.setter
-    def channel_times(self, channel_times: Dict[str, List[float]]):
+    def channel_times(self, channel_times: dict[str, list[float]]):
         """Set per-channel times from dict."""
         self.channel_times_json = json.dumps(channel_times)
 
-    def get_channel_times(self, channel: str) -> List[float]:
+    def get_channel_times(self, channel: str) -> list[float]:
         """Get times array for a specific channel."""
         ct = self.channel_times
         if channel in ct:
@@ -110,19 +114,19 @@ class MeasuredData(db.Model):
         return self.times
 
     @property
-    def statistics(self) -> Dict[str, Dict[str, float]]:
+    def statistics(self) -> dict[str, dict[str, float]]:
         """Get statistics per channel."""
         if self.statistics_json:
             return json.loads(self.statistics_json)
         return {}
 
     @statistics.setter
-    def statistics(self, stats: Dict[str, Dict[str, float]]):
+    def statistics(self, stats: dict[str, dict[str, float]]):
         """Set statistics."""
         self.statistics_json = json.dumps(stats)
 
     @property
-    def available_channels(self) -> List[str]:
+    def available_channels(self) -> list[str]:
         """Get list of available channel names."""
         return list(self.channels.keys())
 
@@ -136,7 +140,7 @@ class MeasuredData(db.Model):
         """Get number of data points."""
         return len(self.times)
 
-    def get_channel_data(self, channel: str) -> Optional[List[float]]:
+    def get_channel_data(self, channel: str) -> list[float] | None:
         """Get temperature data for a specific channel."""
         return self.channels.get(channel)
 
@@ -146,4 +150,4 @@ class MeasuredData(db.Model):
         return labels.get(channel, channel)
 
     def __repr__(self):
-        return f'<MeasuredData {self.id}: {self.name}>'
+        return f"<MeasuredData {self.id}: {self.name}>"

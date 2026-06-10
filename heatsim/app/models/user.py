@@ -1,21 +1,22 @@
 """User model for authentication."""
+
 from datetime import datetime
 from functools import wraps
+
 from flask import flash, redirect, url_for
 from flask_login import UserMixin, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db, login_manager
 
-
 # User roles (simplified for initial deployment)
-ROLE_ENGINEER = 'engineer'
-ROLE_ADMIN = 'admin'
+ROLE_ENGINEER = "engineer"
+ROLE_ADMIN = "admin"
 
 ROLES = [ROLE_ENGINEER, ROLE_ADMIN]
 ROLE_LABELS = {
-    ROLE_ENGINEER: 'Materials Engineer',
-    ROLE_ADMIN: 'Administrator',
+    ROLE_ENGINEER: "Materials Engineer",
+    ROLE_ADMIN: "Administrator",
 }
 
 
@@ -37,7 +38,8 @@ class User(UserMixin, db.Model):
     last_login : datetime
         Last login timestamp
     """
-    __tablename__ = 'users'
+
+    __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
@@ -49,11 +51,13 @@ class User(UserMixin, db.Model):
     last_login = db.Column(db.DateTime)
 
     # Portal relationships
-    permissions = db.relationship('UserPermission', back_populates='user',
-                                  foreign_keys='UserPermission.user_id',
-                                  cascade='all, delete-orphan')
-    sessions = db.relationship('UserSession', back_populates='user',
-                               cascade='all, delete-orphan')
+    permissions = db.relationship(
+        "UserPermission",
+        back_populates="user",
+        foreign_keys="UserPermission.user_id",
+        cascade="all, delete-orphan",
+    )
+    sessions = db.relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 
     @property
     def is_active(self) -> bool:
@@ -88,27 +92,43 @@ class User(UserMixin, db.Model):
             return True
         from .application import Application
         from .permission import UserPermission
-        return db.session.query(UserPermission).join(Application).filter(
-            UserPermission.user_id == self.id,
-            Application.app_code == app_code,
-            Application.is_active == True,  # noqa: E712
-        ).first() is not None
+
+        return (
+            db.session.query(UserPermission)
+            .join(Application)
+            .filter(
+                UserPermission.user_id == self.id,
+                Application.app_code == app_code,
+                Application.is_active == True,  # noqa: E712
+            )
+            .first()
+            is not None
+        )
 
     def get_permitted_apps(self):
         """Return list of Application objects the user can access."""
         from .application import Application
+
         if self.is_admin:
-            return Application.query.filter_by(is_active=True).order_by(
-                Application.display_order).all()
+            return (
+                Application.query.filter_by(is_active=True)
+                .order_by(Application.display_order)
+                .all()
+            )
         from .permission import UserPermission
-        app_ids = [p.app_id for p in
-                   UserPermission.query.filter_by(user_id=self.id).all()]
-        return Application.query.filter(
-            Application.id.in_(app_ids), Application.is_active == True  # noqa: E712
-        ).order_by(Application.display_order).all()
+
+        app_ids = [p.app_id for p in UserPermission.query.filter_by(user_id=self.id).all()]
+        return (
+            Application.query.filter(
+                Application.id.in_(app_ids),
+                Application.is_active == True,  # noqa: E712
+            )
+            .order_by(Application.display_order)
+            .all()
+        )
 
     def __repr__(self) -> str:
-        return f'<User {self.username}>'
+        return f"<User {self.username}>"
 
 
 @login_manager.user_loader
@@ -119,13 +139,15 @@ def load_user(user_id: str) -> User | None:
 
 def admin_required(f):
     """Decorator to require admin role."""
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
-            flash('Please log in to access this page.', 'warning')
-            return redirect(url_for('auth.login'))
+            flash("Please log in to access this page.", "warning")
+            return redirect(url_for("auth.login"))
         if not current_user.is_admin:
-            flash('Administrator access required.', 'danger')
-            return redirect(url_for('main.dashboard'))
+            flash("Administrator access required.", "danger")
+            return redirect(url_for("main.dashboard"))
         return f(*args, **kwargs)
+
     return decorated_function

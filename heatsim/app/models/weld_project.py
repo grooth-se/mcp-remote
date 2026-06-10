@@ -3,67 +3,80 @@
 Uses the 'materials' bind key to store in PostgreSQL alongside material data.
 Supports GTAW, MIG/MAG, SAW welding with up to 6 layers x 12 strings per layer.
 """
-from datetime import datetime
-from typing import Optional, List
+
 import json
+from datetime import datetime
 
 from app.extensions import db
 
-
 # Project status constants
-STATUS_DRAFT = 'draft'
-STATUS_CONFIGURED = 'configured'
-STATUS_QUEUED = 'queued'
-STATUS_RUNNING = 'running'
-STATUS_COMPLETED = 'completed'
-STATUS_FAILED = 'failed'
-STATUS_CANCELLED = 'cancelled'
+STATUS_DRAFT = "draft"
+STATUS_CONFIGURED = "configured"
+STATUS_QUEUED = "queued"
+STATUS_RUNNING = "running"
+STATUS_COMPLETED = "completed"
+STATUS_FAILED = "failed"
+STATUS_CANCELLED = "cancelled"
 
-PROJECT_STATUSES = [STATUS_DRAFT, STATUS_CONFIGURED, STATUS_QUEUED, STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED, STATUS_CANCELLED]
+PROJECT_STATUSES = [
+    STATUS_DRAFT,
+    STATUS_CONFIGURED,
+    STATUS_QUEUED,
+    STATUS_RUNNING,
+    STATUS_COMPLETED,
+    STATUS_FAILED,
+    STATUS_CANCELLED,
+]
 
 # Welding process types
-PROCESS_GTAW = 'gtaw'
-PROCESS_MIG_MAG = 'mig_mag'
-PROCESS_SAW = 'saw'
-PROCESS_SMAW = 'smaw'
+PROCESS_GTAW = "gtaw"
+PROCESS_MIG_MAG = "mig_mag"
+PROCESS_SAW = "saw"
+PROCESS_SMAW = "smaw"
 
 WELD_PROCESS_TYPES = [PROCESS_GTAW, PROCESS_MIG_MAG, PROCESS_SAW, PROCESS_SMAW]
 
 WELD_PROCESS_LABELS = {
-    PROCESS_GTAW: 'GTAW (TIG)',
-    PROCESS_MIG_MAG: 'MIG/MAG',
-    PROCESS_SAW: 'SAW (Submerged Arc)',
-    PROCESS_SMAW: 'SMAW (Stick)',
+    PROCESS_GTAW: "GTAW (TIG)",
+    PROCESS_MIG_MAG: "MIG/MAG",
+    PROCESS_SAW: "SAW (Submerged Arc)",
+    PROCESS_SMAW: "SMAW (Stick)",
 }
 
 # String status constants
-STRING_PENDING = 'pending'
-STRING_RUNNING = 'running'
-STRING_COMPLETED = 'completed'
-STRING_FAILED = 'failed'
+STRING_PENDING = "pending"
+STRING_RUNNING = "running"
+STRING_COMPLETED = "completed"
+STRING_FAILED = "failed"
 
 STRING_STATUSES = [STRING_PENDING, STRING_RUNNING, STRING_COMPLETED, STRING_FAILED]
 
 # Initial temperature modes
-TEMP_MODE_CALCULATED = 'calculated'
-TEMP_MODE_MANUAL = 'manual'
-TEMP_MODE_SOLIDIFICATION = 'solidification'
+TEMP_MODE_CALCULATED = "calculated"
+TEMP_MODE_MANUAL = "manual"
+TEMP_MODE_SOLIDIFICATION = "solidification"
 
 TEMP_MODES = [TEMP_MODE_CALCULATED, TEMP_MODE_MANUAL, TEMP_MODE_SOLIDIFICATION]
 
 # Result types
-RESULT_THERMAL_CYCLE = 'thermal_cycle'
-RESULT_TEMPERATURE_FIELD = 'temperature_field'
-RESULT_COOLING_RATE = 'cooling_rate'
-RESULT_LINE_PROFILE = 'line_profile'
+RESULT_THERMAL_CYCLE = "thermal_cycle"
+RESULT_TEMPERATURE_FIELD = "temperature_field"
+RESULT_COOLING_RATE = "cooling_rate"
+RESULT_LINE_PROFILE = "line_profile"
 
-RESULT_HAZ_PROFILE = 'haz_profile'
-RESULT_GOLDAK_FIELD = 'goldak_field'
-RESULT_GOLDAK_COMPARISON = 'goldak_comparison'
+RESULT_HAZ_PROFILE = "haz_profile"
+RESULT_GOLDAK_FIELD = "goldak_field"
+RESULT_GOLDAK_COMPARISON = "goldak_comparison"
 
-RESULT_TYPES = [RESULT_THERMAL_CYCLE, RESULT_TEMPERATURE_FIELD, RESULT_COOLING_RATE,
-                RESULT_LINE_PROFILE, RESULT_HAZ_PROFILE,
-                RESULT_GOLDAK_FIELD, RESULT_GOLDAK_COMPARISON]
+RESULT_TYPES = [
+    RESULT_THERMAL_CYCLE,
+    RESULT_TEMPERATURE_FIELD,
+    RESULT_COOLING_RATE,
+    RESULT_LINE_PROFILE,
+    RESULT_HAZ_PROFILE,
+    RESULT_GOLDAK_FIELD,
+    RESULT_GOLDAK_COMPARISON,
+]
 
 
 class WeldProject(db.Model):
@@ -72,8 +85,9 @@ class WeldProject(db.Model):
     Stores project configuration including CAD geometry, material selection,
     welding process parameters, and overall simulation status.
     """
-    __tablename__ = 'weld_projects'
-    __bind_key__ = 'materials'
+
+    __tablename__ = "weld_projects"
+    __bind_key__ = "materials"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.Text, nullable=False)
@@ -83,7 +97,7 @@ class WeldProject(db.Model):
     user_id = db.Column(db.Integer)
 
     # Material selection
-    steel_grade_id = db.Column(db.Integer, db.ForeignKey('steel_grades.id'))
+    steel_grade_id = db.Column(db.Integer, db.ForeignKey("steel_grades.id"))
 
     # CAD geometry
     cad_filename = db.Column(db.Text)  # Original filename
@@ -122,27 +136,32 @@ class WeldProject(db.Model):
     error_message = db.Column(db.Text)
 
     # Relationships
-    steel_grade = db.relationship('SteelGrade', backref='weld_projects')
-    strings = db.relationship('WeldString', backref='project',
-                              lazy='dynamic', cascade='all, delete-orphan',
-                              order_by='WeldString.string_number')
-    results = db.relationship('WeldResult', backref='project',
-                              lazy='dynamic', cascade='all, delete-orphan')
+    steel_grade = db.relationship("SteelGrade", backref="weld_projects")
+    strings = db.relationship(
+        "WeldString",
+        backref="project",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+        order_by="WeldString.string_number",
+    )
+    results = db.relationship(
+        "WeldResult", backref="project", lazy="dynamic", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
-        db.Index('ix_weld_projects_user', 'user_id'),
-        db.Index('ix_weld_projects_status', 'status'),
+        db.Index("ix_weld_projects_user", "user_id"),
+        db.Index("ix_weld_projects_status", "status"),
     )
 
     @property
-    def string_bodies_list(self) -> List[dict]:
+    def string_bodies_list(self) -> list[dict]:
         """Parse string bodies JSON."""
         try:
             return json.loads(self.string_bodies) if self.string_bodies else []
         except json.JSONDecodeError:
             return []
 
-    def set_string_bodies(self, bodies: List[dict]) -> None:
+    def set_string_bodies(self, bodies: list[dict]) -> None:
         """Set string bodies from list."""
         self.string_bodies = json.dumps(bodies)
 
@@ -155,18 +174,18 @@ class WeldProject(db.Model):
     def status_badge_class(self) -> str:
         """Bootstrap badge class for status."""
         classes = {
-            STATUS_DRAFT: 'bg-secondary',
-            STATUS_CONFIGURED: 'bg-info',
-            STATUS_QUEUED: 'bg-info',
-            STATUS_RUNNING: 'bg-warning',
-            STATUS_COMPLETED: 'bg-success',
-            STATUS_FAILED: 'bg-danger',
-            STATUS_CANCELLED: 'bg-dark',
+            STATUS_DRAFT: "bg-secondary",
+            STATUS_CONFIGURED: "bg-info",
+            STATUS_QUEUED: "bg-info",
+            STATUS_RUNNING: "bg-warning",
+            STATUS_COMPLETED: "bg-success",
+            STATUS_FAILED: "bg-danger",
+            STATUS_CANCELLED: "bg-dark",
         }
-        return classes.get(self.status, 'bg-secondary')
+        return classes.get(self.status, "bg-secondary")
 
     @property
-    def duration_seconds(self) -> Optional[float]:
+    def duration_seconds(self) -> float | None:
         """Calculate simulation runtime in seconds."""
         if self.started_at and self.completed_at:
             return (self.completed_at - self.started_at).total_seconds()
@@ -175,8 +194,10 @@ class WeldProject(db.Model):
     @property
     def can_run(self) -> bool:
         """Check if project can be run."""
-        return (self.status in [STATUS_CONFIGURED, STATUS_FAILED, STATUS_CANCELLED, STATUS_COMPLETED] and
-                self.total_strings > 0)
+        return (
+            self.status in [STATUS_CONFIGURED, STATUS_FAILED, STATUS_CANCELLED, STATUS_COMPLETED]
+            and self.total_strings > 0
+        )
 
     @property
     def is_running(self) -> bool:
@@ -189,7 +210,7 @@ class WeldProject(db.Model):
         return self.strings.filter_by(status=STRING_COMPLETED).count()
 
     def __repr__(self) -> str:
-        return f'<WeldProject {self.id}: {self.name}>'
+        return f"<WeldProject {self.id}: {self.name}>"
 
 
 class WeldString(db.Model):
@@ -197,11 +218,12 @@ class WeldString(db.Model):
 
     Represents a single weld pass with its sequence, parameters, and results.
     """
-    __tablename__ = 'weld_strings'
-    __bind_key__ = 'materials'
+
+    __tablename__ = "weld_strings"
+    __bind_key__ = "materials"
 
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('weld_projects.id'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey("weld_projects.id"), nullable=False)
 
     # Identity and sequence
     string_number = db.Column(db.Integer, nullable=False)  # Execution order (1, 2, 3...)
@@ -236,12 +258,13 @@ class WeldString(db.Model):
     error_message = db.Column(db.Text)
 
     # Relationships
-    results = db.relationship('WeldResult', backref='string',
-                              lazy='dynamic', cascade='all, delete-orphan')
+    results = db.relationship(
+        "WeldResult", backref="string", lazy="dynamic", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
-        db.Index('ix_weld_strings_project', 'project_id'),
-        db.Index('ix_weld_strings_number', 'project_id', 'string_number'),
+        db.Index("ix_weld_strings_project", "project_id"),
+        db.Index("ix_weld_strings_number", "project_id", "string_number"),
     )
 
     @property
@@ -283,22 +306,22 @@ class WeldString(db.Model):
     def status_badge_class(self) -> str:
         """Bootstrap badge class for status."""
         classes = {
-            STRING_PENDING: 'bg-secondary',
-            STRING_RUNNING: 'bg-warning',
-            STRING_COMPLETED: 'bg-success',
-            STRING_FAILED: 'bg-danger',
+            STRING_PENDING: "bg-secondary",
+            STRING_RUNNING: "bg-warning",
+            STRING_COMPLETED: "bg-success",
+            STRING_FAILED: "bg-danger",
         }
-        return classes.get(self.status, 'bg-secondary')
+        return classes.get(self.status, "bg-secondary")
 
     @property
-    def duration_seconds(self) -> Optional[float]:
+    def duration_seconds(self) -> float | None:
         """Calculate simulation runtime in seconds."""
         if self.started_at and self.completed_at:
             return (self.completed_at - self.started_at).total_seconds()
         return None
 
     def __repr__(self) -> str:
-        return f'<WeldString {self.id}: #{self.string_number} in project {self.project_id}>'
+        return f"<WeldString {self.id}: #{self.string_number} in project {self.project_id}>"
 
 
 class WeldResult(db.Model):
@@ -307,12 +330,13 @@ class WeldResult(db.Model):
     Stores thermal cycles, temperature fields, cooling rates, and derived
     phase transformation predictions.
     """
-    __tablename__ = 'weld_results'
-    __bind_key__ = 'materials'
+
+    __tablename__ = "weld_results"
+    __bind_key__ = "materials"
 
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('weld_projects.id'), nullable=False)
-    string_id = db.Column(db.Integer, db.ForeignKey('weld_strings.id'))
+    project_id = db.Column(db.Integer, db.ForeignKey("weld_projects.id"), nullable=False)
+    string_id = db.Column(db.Integer, db.ForeignKey("weld_strings.id"))
 
     # Result identification
     result_type = db.Column(db.Text, nullable=False)  # thermal_cycle, temperature_field, etc.
@@ -348,44 +372,44 @@ class WeldResult(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        db.Index('ix_weld_results_project', 'project_id'),
-        db.Index('ix_weld_results_string', 'string_id'),
-        db.Index('ix_weld_results_type', 'result_type'),
+        db.Index("ix_weld_results_project", "project_id"),
+        db.Index("ix_weld_results_string", "string_id"),
+        db.Index("ix_weld_results_type", "result_type"),
     )
 
     @property
-    def time_array(self) -> List[float]:
+    def time_array(self) -> list[float]:
         """Parse time data JSON to list."""
         try:
             return json.loads(self.time_data) if self.time_data else []
         except json.JSONDecodeError:
             return []
 
-    def set_time_data(self, data: List[float]) -> None:
+    def set_time_data(self, data: list[float]) -> None:
         """Set time data from list."""
         self.time_data = json.dumps(data)
 
     @property
-    def temperature_array(self) -> List[float]:
+    def temperature_array(self) -> list[float]:
         """Parse temperature data JSON to list."""
         try:
             return json.loads(self.temperature_data) if self.temperature_data else []
         except json.JSONDecodeError:
             return []
 
-    def set_temperature_data(self, data: List[float]) -> None:
+    def set_temperature_data(self, data: list[float]) -> None:
         """Set temperature data from list."""
         self.temperature_data = json.dumps(data)
 
     @property
-    def position_array(self) -> List[float]:
+    def position_array(self) -> list[float]:
         """Parse position data JSON to list."""
         try:
             return json.loads(self.position_data) if self.position_data else []
         except json.JSONDecodeError:
             return []
 
-    def set_position_data(self, data: List[float]) -> None:
+    def set_position_data(self, data: list[float]) -> None:
         """Set position data from list."""
         self.position_data = json.dumps(data)
 
@@ -420,12 +444,12 @@ class WeldResult(db.Model):
     def result_label(self) -> str:
         """Human-readable result type."""
         labels = {
-            RESULT_THERMAL_CYCLE: 'Thermal Cycle',
-            RESULT_TEMPERATURE_FIELD: 'Temperature Field',
-            RESULT_COOLING_RATE: 'Cooling Rate',
-            RESULT_LINE_PROFILE: 'Line Profile',
+            RESULT_THERMAL_CYCLE: "Thermal Cycle",
+            RESULT_TEMPERATURE_FIELD: "Temperature Field",
+            RESULT_COOLING_RATE: "Cooling Rate",
+            RESULT_LINE_PROFILE: "Line Profile",
         }
         return labels.get(self.result_type, self.result_type)
 
     def __repr__(self) -> str:
-        return f'<WeldResult {self.id}: {self.result_type} at {self.location}>'
+        return f"<WeldResult {self.id}: {self.result_type} at {self.location}>"

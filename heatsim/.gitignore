@@ -72,6 +72,10 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Claude Code (per-user overrides; share .claude/settings.json instead)
+.claude/settings.local.json
+.ruff_cache/
+
 # Data files and assets not part of the codebase
 *.stp
 *.csv

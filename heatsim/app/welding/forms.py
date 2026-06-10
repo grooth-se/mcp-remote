@@ -1,171 +1,170 @@
 """Forms for welding simulation."""
-from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileAllowed
-from wtforms import (
-    StringField, TextAreaField, SelectField, FloatField, IntegerField,
-    BooleanField, HiddenField, FieldList, FormField
-)
-from wtforms.validators import DataRequired, Optional, NumberRange, Length
 
-from app.models.weld_project import (
-    WELD_PROCESS_TYPES, WELD_PROCESS_LABELS, TEMP_MODES
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed, FileField
+from wtforms import (
+    BooleanField,
+    FloatField,
+    HiddenField,
+    IntegerField,
+    SelectField,
+    StringField,
+    TextAreaField,
 )
+from wtforms.validators import DataRequired, Length, NumberRange, Optional
+
+from app.models.weld_project import WELD_PROCESS_LABELS, WELD_PROCESS_TYPES
 
 
 class WeldProjectForm(FlaskForm):
     """Form for creating/editing weld projects."""
 
     name = StringField(
-        'Project Name',
+        "Project Name",
         validators=[DataRequired(), Length(min=1, max=100)],
-        render_kw={'placeholder': 'e.g., Pipe Joint Weld A123'}
+        render_kw={"placeholder": "e.g., Pipe Joint Weld A123"},
     )
 
     description = TextAreaField(
-        'Description',
+        "Description",
         validators=[Optional(), Length(max=1000)],
-        render_kw={'rows': 3, 'placeholder': 'Optional project notes'}
+        render_kw={"rows": 3, "placeholder": "Optional project notes"},
     )
 
-    steel_grade_id = SelectField(
-        'Steel Grade',
-        coerce=int,
-        validators=[DataRequired()]
-    )
+    steel_grade_id = SelectField("Steel Grade", coerce=int, validators=[DataRequired()])
 
     process_type = SelectField(
-        'Welding Process',
+        "Welding Process",
         choices=[(p, WELD_PROCESS_LABELS[p]) for p in WELD_PROCESS_TYPES],
-        validators=[DataRequired()]
+        validators=[DataRequired()],
     )
 
     cad_file = FileField(
-        'CAD Geometry File',
-        validators=[Optional(), FileAllowed(['stp', 'step', 'igs', 'iges', 'stl'],
-                                            'STEP, IGES, or STL files only')]
+        "CAD Geometry File",
+        validators=[
+            Optional(),
+            FileAllowed(["stp", "step", "igs", "iges", "stl"], "STEP, IGES, or STL files only"),
+        ],
     )
 
     preheat_temperature = FloatField(
-        'Preheat Temperature (°C)',
+        "Preheat Temperature (°C)",
         validators=[DataRequired(), NumberRange(min=0, max=500)],
-        default=20.0
+        default=20.0,
     )
 
     interpass_temperature = FloatField(
-        'Max Interpass Temperature (°C)',
+        "Max Interpass Temperature (°C)",
         validators=[DataRequired(), NumberRange(min=50, max=400)],
-        default=150.0
+        default=150.0,
     )
 
     interpass_time_default = FloatField(
-        'Default Interpass Time (s)',
+        "Default Interpass Time (s)",
         validators=[DataRequired(), NumberRange(min=0, max=3600)],
-        default=60.0
+        default=60.0,
     )
 
     default_heat_input = FloatField(
-        'Default Heat Input (kJ/mm)',
+        "Default Heat Input (kJ/mm)",
         validators=[DataRequired(), NumberRange(min=0.1, max=10)],
-        default=1.5
+        default=1.5,
     )
 
     default_travel_speed = FloatField(
-        'Default Travel Speed (mm/s)',
+        "Default Travel Speed (mm/s)",
         validators=[DataRequired(), NumberRange(min=0.5, max=50)],
-        default=5.0
+        default=5.0,
     )
 
     default_solidification_temp = FloatField(
-        'Solidification Temperature (°C)',
+        "Solidification Temperature (°C)",
         validators=[DataRequired(), NumberRange(min=1400, max=1600)],
-        default=1500.0
+        default=1500.0,
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Populate steel grade choices
         from app.models.material import SteelGrade
+
         grades = SteelGrade.query.order_by(SteelGrade.designation).all()
-        self.steel_grade_id.choices = [(0, '-- Select Steel Grade --')] + \
-            [(g.id, g.display_name) for g in grades]
+        self.steel_grade_id.choices = [(0, "-- Select Steel Grade --")] + [
+            (g.id, g.display_name) for g in grades
+        ]
 
 
 class WeldStringForm(FlaskForm):
     """Form for editing a single weld string."""
 
     string_number = IntegerField(
-        'Sequence Number',
-        validators=[DataRequired(), NumberRange(min=1, max=100)]
+        "Sequence Number", validators=[DataRequired(), NumberRange(min=1, max=100)]
     )
 
     name = StringField(
-        'String Name',
+        "String Name",
         validators=[Optional(), Length(max=50)],
-        render_kw={'placeholder': 'e.g., Root Pass'}
+        render_kw={"placeholder": "e.g., Root Pass"},
     )
 
     body_name = StringField(
-        'CAD Body Name',
+        "CAD Body Name",
         validators=[Optional(), Length(max=100)],
-        render_kw={'placeholder': 'CAD body identifier'}
+        render_kw={"placeholder": "CAD body identifier"},
     )
 
     layer = IntegerField(
-        'Layer Number',
-        validators=[DataRequired(), NumberRange(min=1, max=10)],
-        default=1
+        "Layer Number", validators=[DataRequired(), NumberRange(min=1, max=10)], default=1
     )
 
     position_in_layer = IntegerField(
-        'Position in Layer',
-        validators=[DataRequired(), NumberRange(min=1, max=20)],
-        default=1
+        "Position in Layer", validators=[DataRequired(), NumberRange(min=1, max=20)], default=1
     )
 
     heat_input = FloatField(
-        'Heat Input (kJ/mm)',
+        "Heat Input (kJ/mm)",
         validators=[Optional(), NumberRange(min=0.1, max=10)],
-        render_kw={'placeholder': 'Leave blank for default'}
+        render_kw={"placeholder": "Leave blank for default"},
     )
 
     travel_speed = FloatField(
-        'Travel Speed (mm/s)',
+        "Travel Speed (mm/s)",
         validators=[Optional(), NumberRange(min=0.5, max=50)],
-        render_kw={'placeholder': 'Leave blank for default'}
+        render_kw={"placeholder": "Leave blank for default"},
     )
 
     interpass_time = FloatField(
-        'Interpass Time (s)',
+        "Interpass Time (s)",
         validators=[Optional(), NumberRange(min=0, max=3600)],
-        render_kw={'placeholder': 'Leave blank for default'}
+        render_kw={"placeholder": "Leave blank for default"},
     )
 
     initial_temp_mode = SelectField(
-        'Initial Temperature Mode',
+        "Initial Temperature Mode",
         choices=[
-            ('solidification', 'Solidification Temperature'),
-            ('calculated', 'Calculated from Previous'),
-            ('manual', 'Manual Entry'),
+            ("solidification", "Solidification Temperature"),
+            ("calculated", "Calculated from Previous"),
+            ("manual", "Manual Entry"),
         ],
-        default='solidification'
+        default="solidification",
     )
 
     initial_temperature = FloatField(
-        'Manual Initial Temperature (°C)',
+        "Manual Initial Temperature (°C)",
         validators=[Optional(), NumberRange(min=0, max=2000)],
-        render_kw={'placeholder': 'Only for manual mode'}
+        render_kw={"placeholder": "Only for manual mode"},
     )
 
     solidification_temp = FloatField(
-        'Solidification Temperature (°C)',
+        "Solidification Temperature (°C)",
         validators=[Optional(), NumberRange(min=1400, max=1600)],
-        render_kw={'placeholder': 'Leave blank for default'}
+        render_kw={"placeholder": "Leave blank for default"},
     )
 
     simulation_duration = FloatField(
-        'Simulation Duration (s)',
+        "Simulation Duration (s)",
         validators=[DataRequired(), NumberRange(min=10, max=600)],
-        default=120.0
+        default=120.0,
     )
 
 
@@ -173,55 +172,46 @@ class StringSequenceForm(FlaskForm):
     """Form for configuring the string sequence."""
 
     # JSON encoded sequence data
-    sequence_data = HiddenField('sequence_data')
+    sequence_data = HiddenField("sequence_data")
 
 
 class QuickAddStringsForm(FlaskForm):
     """Form for quickly adding multiple strings."""
 
     num_layers = IntegerField(
-        'Number of Layers',
-        validators=[DataRequired(), NumberRange(min=1, max=10)],
-        default=1
+        "Number of Layers", validators=[DataRequired(), NumberRange(min=1, max=10)], default=1
     )
 
     strings_per_layer = IntegerField(
-        'Strings per Layer',
-        validators=[DataRequired(), NumberRange(min=1, max=20)],
-        default=1
+        "Strings per Layer", validators=[DataRequired(), NumberRange(min=1, max=20)], default=1
     )
 
-    use_defaults = BooleanField(
-        'Use project defaults for all parameters',
-        default=True
-    )
+    use_defaults = BooleanField("Use project defaults for all parameters", default=True)
 
 
 class HAZAnalysisForm(FlaskForm):
     """Form for HAZ analysis parameters."""
 
     max_distance_mm = FloatField(
-        'Max Distance from Weld Center (mm)',
+        "Max Distance from Weld Center (mm)",
         validators=[DataRequired(), NumberRange(min=5, max=100)],
-        default=20.0
+        default=20.0,
     )
 
     n_points = IntegerField(
-        'Number of Sample Points',
+        "Number of Sample Points",
         validators=[DataRequired(), NumberRange(min=10, max=200)],
-        default=50
+        default=50,
     )
 
     depth_z_mm = FloatField(
-        'Depth Below Surface (mm)',
-        validators=[Optional(), NumberRange(min=0, max=50)],
-        default=0.0
+        "Depth Below Surface (mm)", validators=[Optional(), NumberRange(min=0, max=50)], default=0.0
     )
 
     hardness_limit = FloatField(
-        'Hardness Limit (HV)',
+        "Hardness Limit (HV)",
         validators=[DataRequired(), NumberRange(min=200, max=600)],
-        default=350.0
+        default=350.0,
     )
 
 
@@ -229,124 +219,106 @@ class PreheatForm(FlaskForm):
     """Form for preheat calculation parameters."""
 
     plate_thickness_mm = FloatField(
-        'Plate Thickness (mm)',
+        "Plate Thickness (mm)",
         validators=[DataRequired(), NumberRange(min=3, max=200)],
-        default=20.0
+        default=20.0,
     )
 
     hydrogen_level = SelectField(
-        'Hydrogen Level',
+        "Hydrogen Level",
         choices=[
-            ('A', 'A — Very Low (≤5 ml/100g)'),
-            ('B', 'B — Low (≤10 ml/100g)'),
-            ('C', 'C — Medium (≤15 ml/100g)'),
-            ('D', 'D — High (≤20 ml/100g)'),
+            ("A", "A — Very Low (≤5 ml/100g)"),
+            ("B", "B — Low (≤10 ml/100g)"),
+            ("C", "C — Medium (≤15 ml/100g)"),
+            ("D", "D — High (≤20 ml/100g)"),
         ],
-        default='B'
+        default="B",
     )
 
     restraint = SelectField(
-        'Restraint Level',
+        "Restraint Level",
         choices=[
-            ('low', 'Low — free joint'),
-            ('medium', 'Medium — moderate restraint'),
-            ('high', 'High — rigid structure'),
+            ("low", "Low — free joint"),
+            ("medium", "Medium — moderate restraint"),
+            ("high", "High — rigid structure"),
         ],
-        default='medium'
+        default="medium",
     )
 
 
 class RunSimulationForm(FlaskForm):
     """Form for starting simulation."""
 
-    use_mock_solver = BooleanField(
-        'Use Mock Solver (for testing)',
-        default=False
-    )
+    use_mock_solver = BooleanField("Use Mock Solver (for testing)", default=False)
 
-    save_intermediate = BooleanField(
-        'Save intermediate results',
-        default=True
-    )
+    save_intermediate = BooleanField("Save intermediate results", default=True)
 
 
 class GoldakAnalysisForm(FlaskForm):
     """Form for Goldak heat source analysis."""
 
     pool_half_width_mm = FloatField(
-        'Pool Half-Width b (mm)',
+        "Pool Half-Width b (mm)",
         validators=[Optional(), NumberRange(min=0.5, max=20)],
-        render_kw={'placeholder': 'Auto-estimate'}
+        render_kw={"placeholder": "Auto-estimate"},
     )
     penetration_depth_mm = FloatField(
-        'Penetration Depth c (mm)',
+        "Penetration Depth c (mm)",
         validators=[Optional(), NumberRange(min=0.5, max=30)],
-        render_kw={'placeholder': 'Auto-estimate'}
+        render_kw={"placeholder": "Auto-estimate"},
     )
     front_length_mm = FloatField(
-        'Front Semi-Axis a_f (mm)',
+        "Front Semi-Axis a_f (mm)",
         validators=[Optional(), NumberRange(min=0.5, max=20)],
-        render_kw={'placeholder': 'Auto-estimate'}
+        render_kw={"placeholder": "Auto-estimate"},
     )
     rear_length_mm = FloatField(
-        'Rear Semi-Axis a_r (mm)',
+        "Rear Semi-Axis a_r (mm)",
         validators=[Optional(), NumberRange(min=1, max=40)],
-        render_kw={'placeholder': 'Auto-estimate'}
+        render_kw={"placeholder": "Auto-estimate"},
     )
     f_front = FloatField(
-        'Front Fraction f_f',
-        validators=[Optional(), NumberRange(min=0.3, max=1.0)],
-        default=0.6
+        "Front Fraction f_f", validators=[Optional(), NumberRange(min=0.3, max=1.0)], default=0.6
     )
     f_rear = FloatField(
-        'Rear Fraction f_r',
-        validators=[Optional(), NumberRange(min=1.0, max=1.7)],
-        default=1.4
+        "Rear Fraction f_r", validators=[Optional(), NumberRange(min=1.0, max=1.7)], default=1.4
     )
     grid_ny = IntegerField(
-        'Grid Points (transverse)',
+        "Grid Points (transverse)",
         validators=[DataRequired(), NumberRange(min=11, max=101)],
-        default=41
+        default=41,
     )
     grid_nz = IntegerField(
-        'Grid Points (depth)',
-        validators=[DataRequired(), NumberRange(min=11, max=61)],
-        default=31
+        "Grid Points (depth)", validators=[DataRequired(), NumberRange(min=11, max=61)], default=31
     )
     domain_half_width_mm = FloatField(
-        'Domain Half-Width (mm)',
+        "Domain Half-Width (mm)",
         validators=[DataRequired(), NumberRange(min=10, max=200)],
-        default=30.0
+        default=30.0,
     )
     plate_thickness_mm = FloatField(
-        'Plate Thickness (mm)',
+        "Plate Thickness (mm)",
         validators=[DataRequired(), NumberRange(min=3, max=200)],
-        default=20.0
+        default=20.0,
     )
     simulation_duration = FloatField(
-        'Simulation Duration (s)',
+        "Simulation Duration (s)",
         validators=[DataRequired(), NumberRange(min=10, max=600)],
-        default=120.0
+        default=120.0,
     )
-    compare_with_rosenthal = BooleanField(
-        'Compare with Rosenthal',
-        default=True
-    )
+    compare_with_rosenthal = BooleanField("Compare with Rosenthal", default=True)
 
 
 class GoldakMultiPassForm(FlaskForm):
     """Form for running Goldak multi-pass simulation."""
 
     grid_resolution = SelectField(
-        'Grid Resolution',
+        "Grid Resolution",
         choices=[
-            ('coarse', 'Coarse (21\u00d711) \u2014 Fast ~5s/pass'),
-            ('medium', 'Medium (41\u00d731) \u2014 Balanced ~15s/pass'),
-            ('fine', 'Fine (61\u00d741) \u2014 Accurate ~60s/pass'),
+            ("coarse", "Coarse (21\u00d711) \u2014 Fast ~5s/pass"),
+            ("medium", "Medium (41\u00d731) \u2014 Balanced ~15s/pass"),
+            ("fine", "Fine (61\u00d741) \u2014 Accurate ~60s/pass"),
         ],
-        default='medium'
+        default="medium",
     )
-    compare_methods = BooleanField(
-        'Generate Rosenthal comparison',
-        default=True
-    )
+    compare_methods = BooleanField("Generate Rosenthal comparison", default=True)

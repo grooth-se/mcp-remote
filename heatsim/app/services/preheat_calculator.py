@@ -11,17 +11,16 @@ References:
 - Yurioka N., "Weldability of steels by carbon equivalent" (CEN formula)
 - AWS D1.1 preheat requirements
 """
-from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
-import math
 
+import math
+from dataclasses import dataclass, field
 
 # Hydrogen scale definitions (ml H2/100g deposited metal)
 HYDROGEN_LEVELS = {
-    'A': 5.0,    # Very low hydrogen
-    'B': 10.0,   # Low hydrogen
-    'C': 15.0,   # Medium hydrogen
-    'D': 20.0,   # High hydrogen
+    "A": 5.0,  # Very low hydrogen
+    "B": 10.0,  # Low hydrogen
+    "C": 15.0,  # Medium hydrogen
+    "D": 20.0,  # High hydrogen
 }
 
 
@@ -52,30 +51,31 @@ class PreheatResult:
     cracking_notes : list
         Explanatory notes about cracking risk factors
     """
+
     ce_iiw: float = 0.0
     ce_pcm: float = 0.0
     ce_cen: float = 0.0
     preheat_en1011_2: float = 20.0
-    preheat_method: str = ''
-    hydrogen_level: str = 'B'
+    preheat_method: str = ""
+    hydrogen_level: str = "B"
     plate_thickness_mm: float = 20.0
     heat_input_kj_mm: float = 1.5
-    cracking_risk: str = 'low'
-    cracking_notes: List[str] = field(default_factory=list)
+    cracking_risk: str = "low"
+    cracking_notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Convert to serializable dictionary."""
         return {
-            'ce_iiw': round(self.ce_iiw, 4),
-            'ce_pcm': round(self.ce_pcm, 4),
-            'ce_cen': round(self.ce_cen, 4),
-            'preheat_en1011_2': round(self.preheat_en1011_2, 0),
-            'preheat_method': self.preheat_method,
-            'hydrogen_level': self.hydrogen_level,
-            'plate_thickness_mm': self.plate_thickness_mm,
-            'heat_input_kj_mm': round(self.heat_input_kj_mm, 2),
-            'cracking_risk': self.cracking_risk,
-            'cracking_notes': self.cracking_notes,
+            "ce_iiw": round(self.ce_iiw, 4),
+            "ce_pcm": round(self.ce_pcm, 4),
+            "ce_cen": round(self.ce_cen, 4),
+            "preheat_en1011_2": round(self.preheat_en1011_2, 0),
+            "preheat_method": self.preheat_method,
+            "hydrogen_level": self.hydrogen_level,
+            "plate_thickness_mm": self.plate_thickness_mm,
+            "heat_input_kj_mm": round(self.heat_input_kj_mm, 2),
+            "cracking_risk": self.cracking_risk,
+            "cracking_notes": self.cracking_notes,
         }
 
 
@@ -103,7 +103,7 @@ class PreheatCalculator:
         self.Ni = composition.nickel or 0.0
         self.Mo = composition.molybdenum or 0.0
         self.V = composition.vanadium or 0.0
-        self.Nb = getattr(composition, 'niobium', 0.0) or 0.0
+        self.Nb = getattr(composition, "niobium", 0.0) or 0.0
         self.B = composition.boron or 0.0
 
     @property
@@ -129,18 +129,20 @@ class PreheatCalculator:
         """
         A_C = 0.75 + 0.25 * math.tanh(20 * (self.C - 0.12))
 
-        alloy_term = (self.Si / 24 + self.Mn / 6 + self.Cu / 15 +
-                      self.Ni / 20 + (self.Cr + self.Mo + self.Nb + self.V) / 5 +
-                      5 * self.B)
+        alloy_term = (
+            self.Si / 24
+            + self.Mn / 6
+            + self.Cu / 15
+            + self.Ni / 20
+            + (self.Cr + self.Mo + self.Nb + self.V) / 5
+            + 5 * self.B
+        )
 
         return self.C + A_C * alloy_term
 
     def preheat_en1011_2(
-        self,
-        heat_input: float,
-        thickness: float,
-        hydrogen: str = 'B'
-    ) -> Tuple[float, str]:
+        self, heat_input: float, thickness: float, hydrogen: str = "B"
+    ) -> tuple[float, str]:
         """Calculate preheat temperature per EN 1011-2 Method B.
 
         This uses a simplified approach based on CEN, plate thickness,
@@ -194,11 +196,11 @@ class PreheatCalculator:
             base_preheat = 200.0
 
         # Hydrogen adjustment
-        if hydrogen == 'D':
+        if hydrogen == "D":
             h_adjustment = 50.0
-        elif hydrogen == 'C':
+        elif hydrogen == "C":
             h_adjustment = 25.0
-        elif hydrogen == 'A':
+        elif hydrogen == "A":
             h_adjustment = -25.0
         else:
             h_adjustment = 0.0
@@ -216,7 +218,7 @@ class PreheatCalculator:
         preheat = base_preheat + t_factor + h_adjustment + hi_adjustment
         preheat = max(preheat, 0.0)  # No negative preheat
 
-        method = f'EN 1011-2 Method B (CEN={cen:.3f}, t={thickness}mm, H={hydrogen})'
+        method = f"EN 1011-2 Method B (CEN={cen:.3f}, t={thickness}mm, H={hydrogen})"
         return preheat, method
 
     def cracking_risk_assessment(
@@ -224,9 +226,9 @@ class PreheatCalculator:
         preheat: float,
         heat_input: float,
         thickness: float,
-        hydrogen: str = 'B',
-        restraint: str = 'medium'
-    ) -> Tuple[str, List[str]]:
+        hydrogen: str = "B",
+        restraint: str = "medium",
+    ) -> tuple[str, list[str]]:
         """Assess hydrogen-induced cracking risk.
 
         Parameters
@@ -255,64 +257,60 @@ class PreheatCalculator:
         # CE assessment
         if ce_iiw > 0.50:
             risk_score += 3
-            notes.append(f'High CE(IIW) = {ce_iiw:.3f} (>0.50): high hardenability')
+            notes.append(f"High CE(IIW) = {ce_iiw:.3f} (>0.50): high hardenability")
         elif ce_iiw > 0.40:
             risk_score += 2
-            notes.append(f'Moderate CE(IIW) = {ce_iiw:.3f} (>0.40)')
+            notes.append(f"Moderate CE(IIW) = {ce_iiw:.3f} (>0.40)")
         elif ce_iiw > 0.30:
             risk_score += 1
-            notes.append(f'Low CE(IIW) = {ce_iiw:.3f}')
+            notes.append(f"Low CE(IIW) = {ce_iiw:.3f}")
         else:
-            notes.append(f'Very low CE(IIW) = {ce_iiw:.3f}: minimal hardenability concern')
+            notes.append(f"Very low CE(IIW) = {ce_iiw:.3f}: minimal hardenability concern")
 
         # Hydrogen level
-        if hydrogen == 'D':
+        if hydrogen == "D":
             risk_score += 3
-            notes.append('High hydrogen (>20 ml/100g): use low-hydrogen consumables')
-        elif hydrogen == 'C':
+            notes.append("High hydrogen (>20 ml/100g): use low-hydrogen consumables")
+        elif hydrogen == "C":
             risk_score += 2
-            notes.append('Medium hydrogen (15 ml/100g): consider lower hydrogen process')
+            notes.append("Medium hydrogen (15 ml/100g): consider lower hydrogen process")
 
         # Thickness
         if thickness > 50:
             risk_score += 2
-            notes.append(f'Thick section ({thickness}mm > 50mm): increased restraint stress')
+            notes.append(f"Thick section ({thickness}mm > 50mm): increased restraint stress")
         elif thickness > 30:
             risk_score += 1
-            notes.append(f'Moderate thickness ({thickness}mm)')
+            notes.append(f"Moderate thickness ({thickness}mm)")
 
         # Restraint
-        if restraint == 'high':
+        if restraint == "high":
             risk_score += 2
-            notes.append('High restraint: consider higher preheat or PWHT')
-        elif restraint == 'medium':
+            notes.append("High restraint: consider higher preheat or PWHT")
+        elif restraint == "medium":
             risk_score += 1
 
         # Heat input (very low heat input with high CE is risky)
         if heat_input < 0.8 and ce_iiw > 0.35:
             risk_score += 2
-            notes.append(f'Low heat input ({heat_input} kJ/mm) with elevated CE: fast cooling')
+            notes.append(f"Low heat input ({heat_input} kJ/mm) with elevated CE: fast cooling")
 
         # Preheat adequacy
         recommended, _ = self.preheat_en1011_2(heat_input, thickness, hydrogen)
         if preheat < recommended:
             risk_score += 2
-            notes.append(
-                f'Applied preheat ({preheat}°C) below recommended ({recommended:.0f}°C)'
-            )
+            notes.append(f"Applied preheat ({preheat}°C) below recommended ({recommended:.0f}°C)")
         elif preheat >= recommended + 25:
             risk_score -= 1
-            notes.append(
-                f'Applied preheat ({preheat}°C) exceeds recommended ({recommended:.0f}°C)'
-            )
+            notes.append(f"Applied preheat ({preheat}°C) exceeds recommended ({recommended:.0f}°C)")
 
         # Determine risk level
         if risk_score <= 2:
-            risk = 'low'
+            risk = "low"
         elif risk_score <= 5:
-            risk = 'medium'
+            risk = "medium"
         else:
-            risk = 'high'
+            risk = "high"
 
         return risk, notes
 
@@ -320,9 +318,9 @@ class PreheatCalculator:
         self,
         heat_input: float,
         thickness: float,
-        hydrogen: str = 'B',
-        restraint: str = 'medium',
-        applied_preheat: Optional[float] = None,
+        hydrogen: str = "B",
+        restraint: str = "medium",
+        applied_preheat: float | None = None,
     ) -> PreheatResult:
         """Run complete preheat calculation.
 

@@ -10,10 +10,10 @@ calculating this from arbitrary 3D CAD geometry, we can create an
 equivalent 1D geometry (cylinder or plate) that produces similar
 thermal behavior in the simulation.
 """
-from dataclasses import dataclass, asdict
-from pathlib import Path
-from typing import Dict, Tuple, Optional
+
 import math
+from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -29,37 +29,38 @@ class CADAnalysisResult:
         equivalent_type: 'cylinder' or 'plate'
         equivalent_params: Parameters for the equivalent 1D geometry
     """
+
     filename: str
     volume: float
     surface_area: float
     characteristic_length: float
-    bounding_box: Tuple[float, float, float]
+    bounding_box: tuple[float, float, float]
     equivalent_type: str
-    equivalent_params: Dict[str, float]
+    equivalent_params: dict[str, float]
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
         return {
-            'filename': self.filename,
-            'volume': self.volume,
-            'surface_area': self.surface_area,
-            'characteristic_length': self.characteristic_length,
-            'bounding_box': list(self.bounding_box),
-            'equivalent_type': self.equivalent_type,
-            'equivalent_params': self.equivalent_params
+            "filename": self.filename,
+            "volume": self.volume,
+            "surface_area": self.surface_area,
+            "characteristic_length": self.characteristic_length,
+            "bounding_box": list(self.bounding_box),
+            "equivalent_type": self.equivalent_type,
+            "equivalent_params": self.equivalent_params,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'CADAnalysisResult':
+    def from_dict(cls, data: dict) -> "CADAnalysisResult":
         """Create from dictionary."""
         return cls(
-            filename=data['filename'],
-            volume=data['volume'],
-            surface_area=data['surface_area'],
-            characteristic_length=data['characteristic_length'],
-            bounding_box=tuple(data['bounding_box']),
-            equivalent_type=data['equivalent_type'],
-            equivalent_params=data['equivalent_params']
+            filename=data["filename"],
+            volume=data["volume"],
+            surface_area=data["surface_area"],
+            characteristic_length=data["characteristic_length"],
+            bounding_box=tuple(data["bounding_box"]),
+            equivalent_type=data["equivalent_type"],
+            equivalent_params=data["equivalent_params"],
         )
 
 
@@ -89,15 +90,14 @@ class CADGeometryAnalyzer:
             import cadquery as cq
         except ImportError:
             raise ImportError(
-                "CadQuery is required for STEP file analysis. "
-                "Install with: pip install cadquery"
+                "CadQuery is required for STEP file analysis. Install with: pip install cadquery"
             )
 
         # Import the STEP file
         result = cq.importers.importStep(str(self.step_path))
 
         # Get the solid(s) from the result
-        if hasattr(result, 'val'):
+        if hasattr(result, "val"):
             self._solid = result.val()
         else:
             self._solid = result.objects[0] if result.objects else None
@@ -121,7 +121,7 @@ class CADGeometryAnalyzer:
         except Exception as e:
             raise ValueError(f"Could not calculate surface area: {e}")
 
-    def _get_bounding_box_mm(self) -> Tuple[float, float, float]:
+    def _get_bounding_box_mm(self) -> tuple[float, float, float]:
         """Get bounding box dimensions in millimeters."""
         try:
             bb = self._solid.BoundingBox()
@@ -129,7 +129,7 @@ class CADGeometryAnalyzer:
         except Exception as e:
             raise ValueError(f"Could not calculate bounding box: {e}")
 
-    def _calculate_equivalent_cylinder(self, V: float, A: float) -> Dict[str, float]:
+    def _calculate_equivalent_cylinder(self, V: float, A: float) -> dict[str, float]:
         """Calculate equivalent cylinder dimensions.
 
         For a cylinder: V = π R² L, A = 2πRL + 2πR² (with end caps)
@@ -151,7 +151,7 @@ class CADGeometryAnalyzer:
         # A = 2πR(2R) + 2πR² = 4πR² + 2πR² = 6πR²
 
         # From V: R = (V / (2π))^(1/3)
-        R_from_V = (V / (2 * math.pi)) ** (1/3)
+        R_from_V = (V / (2 * math.pi)) ** (1 / 3)
 
         # From A: R = sqrt(A / (6π))
         R_from_A = math.sqrt(A / (6 * math.pi))
@@ -160,9 +160,9 @@ class CADGeometryAnalyzer:
         R = math.sqrt(R_from_V * R_from_A)
         L = V / (math.pi * R * R)  # Calculate L to preserve V exactly
 
-        return {'radius': R, 'length': L}
+        return {"radius": R, "length": L}
 
-    def _calculate_equivalent_plate(self, V: float, A: float) -> Dict[str, float]:
+    def _calculate_equivalent_plate(self, V: float, A: float) -> dict[str, float]:
         """Calculate equivalent plate dimensions.
 
         For an infinite plate (1D heat transfer), only thickness matters.
@@ -185,13 +185,9 @@ class CADGeometryAnalyzer:
         # A ≈ 2 × side²  →  side = sqrt(A/2)
         side = math.sqrt(A / 2)
 
-        return {
-            'thickness': thickness,
-            'width': side,
-            'length': side
-        }
+        return {"thickness": thickness, "width": side, "length": side}
 
-    def _determine_best_equivalent(self, bbox: Tuple[float, float, float]) -> str:
+    def _determine_best_equivalent(self, bbox: tuple[float, float, float]) -> str:
         """Determine whether cylinder or plate is better equivalent.
 
         Based on bounding box aspect ratios:
@@ -208,18 +204,18 @@ class CADGeometryAnalyzer:
 
         # Aspect ratio of smallest to largest
         if dims[2] == 0:
-            return 'cylinder'  # Avoid division by zero
+            return "cylinder"  # Avoid division by zero
 
         aspect = dims[0] / dims[2]
 
         # If the smallest dimension is much smaller than others, it's plate-like
         if aspect < 0.3:
-            return 'plate'
+            return "plate"
 
         # Otherwise default to cylinder (more common for heat treatment parts)
-        return 'cylinder'
+        return "cylinder"
 
-    def analyze(self, preferred_equivalent: str = 'auto') -> CADAnalysisResult:
+    def analyze(self, preferred_equivalent: str = "auto") -> CADAnalysisResult:
         """Analyze the STEP file and calculate equivalent geometry.
 
         Args:
@@ -235,20 +231,20 @@ class CADGeometryAnalyzer:
 
         # Convert to SI units (meters)
         volume_m3 = volume_mm3 * 1e-9  # mm³ → m³
-        area_m2 = area_mm2 * 1e-6      # mm² → m²
+        area_m2 = area_mm2 * 1e-6  # mm² → m²
         bbox_m = tuple(d * 1e-3 for d in bbox_mm)  # mm → m
 
         # Calculate characteristic length
         char_length = volume_m3 / area_m2 if area_m2 > 0 else 0
 
         # Determine equivalent geometry type
-        if preferred_equivalent == 'auto':
+        if preferred_equivalent == "auto":
             equiv_type = self._determine_best_equivalent(bbox_m)
         else:
             equiv_type = preferred_equivalent
 
         # Calculate equivalent geometry parameters
-        if equiv_type == 'cylinder':
+        if equiv_type == "cylinder":
             equiv_params = self._calculate_equivalent_cylinder(volume_m3, area_m2)
         else:
             equiv_params = self._calculate_equivalent_plate(volume_m3, area_m2)
@@ -260,11 +256,11 @@ class CADGeometryAnalyzer:
             characteristic_length=char_length,
             bounding_box=bbox_m,
             equivalent_type=equiv_type,
-            equivalent_params=equiv_params
+            equivalent_params=equiv_params,
         )
 
 
-def analyze_step_file(path: Path, equiv_type: str = 'auto') -> CADAnalysisResult:
+def analyze_step_file(path: Path, equiv_type: str = "auto") -> CADAnalysisResult:
     """Convenience function for analyzing a STEP file.
 
     Args:

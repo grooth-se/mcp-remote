@@ -4,37 +4,37 @@ Models for storing JMAK kinetics parameters, martensite transformation
 parameters, calibration data from dilatometry, and cached TTT/CCT curves.
 Uses SQLAlchemy binds to connect to the materials database.
 """
+
 import json
 from datetime import datetime
-from typing import Optional, Dict, List
+from typing import Optional
 
 from app.extensions import db
 
-
 # Data source constants for TTT parameters
-TTT_SOURCE_LITERATURE = 'literature'
-TTT_SOURCE_CALIBRATED = 'calibrated'
-TTT_SOURCE_EMPIRICAL = 'empirical'
+TTT_SOURCE_LITERATURE = "literature"
+TTT_SOURCE_CALIBRATED = "calibrated"
+TTT_SOURCE_EMPIRICAL = "empirical"
 
 TTT_SOURCES = [TTT_SOURCE_LITERATURE, TTT_SOURCE_CALIBRATED, TTT_SOURCE_EMPIRICAL]
 
 # B-function model types for JMAK
-B_MODEL_GAUSSIAN = 'gaussian'
-B_MODEL_ARRHENIUS = 'arrhenius'
-B_MODEL_POLYNOMIAL = 'polynomial'
+B_MODEL_GAUSSIAN = "gaussian"
+B_MODEL_ARRHENIUS = "arrhenius"
+B_MODEL_POLYNOMIAL = "polynomial"
 
 B_MODEL_TYPES = [B_MODEL_GAUSSIAN, B_MODEL_ARRHENIUS, B_MODEL_POLYNOMIAL]
 
 # Curve types
-CURVE_TYPE_TTT = 'TTT'
-CURVE_TYPE_CCT = 'CCT'
+CURVE_TYPE_TTT = "TTT"
+CURVE_TYPE_CCT = "CCT"
 
 CURVE_TYPES = [CURVE_TYPE_TTT, CURVE_TYPE_CCT]
 
 # Curve positions
-CURVE_POS_START = 'start'
-CURVE_POS_FIFTY = 'fifty'
-CURVE_POS_FINISH = 'finish'
+CURVE_POS_START = "start"
+CURVE_POS_FIFTY = "fifty"
+CURVE_POS_FINISH = "finish"
 
 CURVE_POSITIONS = [CURVE_POS_START, CURVE_POS_FIFTY, CURVE_POS_FINISH]
 
@@ -71,13 +71,13 @@ class TTTParameters(db.Model):
     notes : str
         Optional notes about the data
     """
-    __tablename__ = 'ttt_parameters'
-    __bind_key__ = 'materials'
+
+    __tablename__ = "ttt_parameters"
+    __bind_key__ = "materials"
 
     id = db.Column(db.Integer, primary_key=True)
     steel_grade_id = db.Column(
-        db.Integer, db.ForeignKey('steel_grades.id'),
-        nullable=False, unique=True
+        db.Integer, db.ForeignKey("steel_grades.id"), nullable=False, unique=True
     )
 
     # Critical transformation temperatures (deg C)
@@ -98,42 +98,40 @@ class TTTParameters(db.Model):
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
     # Relationships
-    steel_grade = db.relationship('SteelGrade', backref=db.backref(
-        'ttt_parameters', uselist=False, cascade='all, delete-orphan'
-    ))
+    steel_grade = db.relationship(
+        "SteelGrade",
+        backref=db.backref("ttt_parameters", uselist=False, cascade="all, delete-orphan"),
+    )
     jmak_parameters = db.relationship(
-        'JMAKParameters', backref='ttt_parameters',
-        lazy='dynamic', cascade='all, delete-orphan'
+        "JMAKParameters", backref="ttt_parameters", lazy="dynamic", cascade="all, delete-orphan"
     )
     martensite_parameters = db.relationship(
-        'MartensiteParameters', backref='ttt_parameters',
-        uselist=False, cascade='all, delete-orphan'
+        "MartensiteParameters",
+        backref="ttt_parameters",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
     calibration_data = db.relationship(
-        'TTTCalibrationData', backref='ttt_parameters',
-        lazy='dynamic', cascade='all, delete-orphan'
+        "TTTCalibrationData", backref="ttt_parameters", lazy="dynamic", cascade="all, delete-orphan"
     )
     cached_curves = db.relationship(
-        'TTTCurve', backref='ttt_parameters',
-        lazy='dynamic', cascade='all, delete-orphan'
+        "TTTCurve", backref="ttt_parameters", lazy="dynamic", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (
-        db.Index('ix_ttt_parameters_steel_grade', 'steel_grade_id'),
-    )
+    __table_args__ = (db.Index("ix_ttt_parameters_steel_grade", "steel_grade_id"),)
 
     @property
-    def temps_dict(self) -> Dict[str, Optional[float]]:
+    def temps_dict(self) -> dict[str, float | None]:
         """Return transformation temperatures as dict."""
         return {
-            'Ae1': self.ae1,
-            'Ae3': self.ae3,
-            'Bs': self.bs,
-            'Ms': self.ms,
-            'Mf': self.mf,
+            "Ae1": self.ae1,
+            "Ae3": self.ae3,
+            "Bs": self.bs,
+            "Ms": self.ms,
+            "Mf": self.mf,
         }
 
-    def get_jmak_for_phase(self, phase: str) -> Optional['JMAKParameters']:
+    def get_jmak_for_phase(self, phase: str) -> Optional["JMAKParameters"]:
         """Get JMAK parameters for a specific phase."""
         return self.jmak_parameters.filter_by(phase=phase).first()
 
@@ -143,7 +141,7 @@ class TTTParameters(db.Model):
         return self.jmak_parameters.count() > 0
 
     def __repr__(self) -> str:
-        return f'<TTTParameters for grade_id={self.steel_grade_id}>'
+        return f"<TTTParameters for grade_id={self.steel_grade_id}>"
 
 
 class JMAKParameters(db.Model):
@@ -181,14 +179,12 @@ class JMAKParameters(db.Model):
     temp_range_max : float
         Upper bound of valid temperature range (deg C)
     """
-    __tablename__ = 'jmak_parameters'
-    __bind_key__ = 'materials'
+
+    __tablename__ = "jmak_parameters"
+    __bind_key__ = "materials"
 
     id = db.Column(db.Integer, primary_key=True)
-    ttt_parameters_id = db.Column(
-        db.Integer, db.ForeignKey('ttt_parameters.id'),
-        nullable=False
-    )
+    ttt_parameters_id = db.Column(db.Integer, db.ForeignKey("ttt_parameters.id"), nullable=False)
     phase = db.Column(db.Text, nullable=False)
 
     # JMAK kinetics
@@ -209,8 +205,8 @@ class JMAKParameters(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        db.UniqueConstraint('ttt_parameters_id', 'phase', name='uq_ttt_phase'),
-        db.Index('ix_jmak_parameters_ttt', 'ttt_parameters_id'),
+        db.UniqueConstraint("ttt_parameters_id", "phase", name="uq_ttt_phase"),
+        db.Index("ix_jmak_parameters_ttt", "ttt_parameters_id"),
     )
 
     @property
@@ -226,7 +222,7 @@ class JMAKParameters(db.Model):
         self.b_parameters = json.dumps(params)
 
     def __repr__(self) -> str:
-        return f'<JMAKParameters {self.phase} n={self.n_value}>'
+        return f"<JMAKParameters {self.phase} n={self.n_value}>"
 
 
 class MartensiteParameters(db.Model):
@@ -247,13 +243,13 @@ class MartensiteParameters(db.Model):
     alpha_m : float
         Koistinen-Marburger rate parameter (1/K), typically 0.011
     """
-    __tablename__ = 'martensite_parameters'
-    __bind_key__ = 'materials'
+
+    __tablename__ = "martensite_parameters"
+    __bind_key__ = "materials"
 
     id = db.Column(db.Integer, primary_key=True)
     ttt_parameters_id = db.Column(
-        db.Integer, db.ForeignKey('ttt_parameters.id'),
-        nullable=False, unique=True
+        db.Integer, db.ForeignKey("ttt_parameters.id"), nullable=False, unique=True
     )
 
     ms = db.Column(db.Float, nullable=False)
@@ -263,7 +259,7 @@ class MartensiteParameters(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self) -> str:
-        return f'<MartensiteParameters Ms={self.ms} alpha={self.alpha_m}>'
+        return f"<MartensiteParameters Ms={self.ms} alpha={self.alpha_m}>"
 
 
 class TTTCalibrationData(db.Model):
@@ -293,16 +289,14 @@ class TTTCalibrationData(db.Model):
     notes : str
         Optional notes about the data point
     """
-    __tablename__ = 'ttt_calibration_data'
-    __bind_key__ = 'materials'
+
+    __tablename__ = "ttt_calibration_data"
+    __bind_key__ = "materials"
 
     id = db.Column(db.Integer, primary_key=True)
-    ttt_parameters_id = db.Column(
-        db.Integer, db.ForeignKey('ttt_parameters.id'),
-        nullable=False
-    )
+    ttt_parameters_id = db.Column(db.Integer, db.ForeignKey("ttt_parameters.id"), nullable=False)
 
-    test_type = db.Column(db.Text, nullable=False, default='isothermal')
+    test_type = db.Column(db.Text, nullable=False, default="isothermal")
     phase = db.Column(db.Text, nullable=False)
     temperature = db.Column(db.Float, nullable=False)
     time = db.Column(db.Float, nullable=False)
@@ -313,13 +307,15 @@ class TTTCalibrationData(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        db.Index('ix_ttt_calibration_ttt', 'ttt_parameters_id'),
-        db.Index('ix_ttt_calibration_phase', 'phase'),
+        db.Index("ix_ttt_calibration_ttt", "ttt_parameters_id"),
+        db.Index("ix_ttt_calibration_phase", "phase"),
     )
 
     def __repr__(self) -> str:
-        return (f'<TTTCalibrationData {self.phase} T={self.temperature} '
-                f't={self.time} f={self.fraction_transformed}>')
+        return (
+            f"<TTTCalibrationData {self.phase} T={self.temperature} "
+            f"t={self.time} f={self.fraction_transformed}>"
+        )
 
 
 class TTTCurve(db.Model):
@@ -345,14 +341,12 @@ class TTTCurve(db.Model):
     cooling_rate : float
         For CCT curves, the cooling rate this curve corresponds to (K/s)
     """
-    __tablename__ = 'ttt_curves'
-    __bind_key__ = 'materials'
+
+    __tablename__ = "ttt_curves"
+    __bind_key__ = "materials"
 
     id = db.Column(db.Integer, primary_key=True)
-    ttt_parameters_id = db.Column(
-        db.Integer, db.ForeignKey('ttt_parameters.id'),
-        nullable=False
-    )
+    ttt_parameters_id = db.Column(db.Integer, db.ForeignKey("ttt_parameters.id"), nullable=False)
 
     curve_type = db.Column(db.Text, nullable=False)  # TTT or CCT
     phase = db.Column(db.Text, nullable=False)
@@ -363,21 +357,21 @@ class TTTCurve(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        db.Index('ix_ttt_curves_ttt', 'ttt_parameters_id'),
-        db.Index('ix_ttt_curves_type_phase', 'curve_type', 'phase'),
+        db.Index("ix_ttt_curves_ttt", "ttt_parameters_id"),
+        db.Index("ix_ttt_curves_type_phase", "curve_type", "phase"),
     )
 
     @property
-    def points(self) -> List[List[float]]:
+    def points(self) -> list[list[float]]:
         """Parse data_points JSON to list of [time, temperature] pairs."""
         try:
             return json.loads(self.data_points) if self.data_points else []
         except json.JSONDecodeError:
             return []
 
-    def set_points(self, points: List[List[float]]) -> None:
+    def set_points(self, points: list[list[float]]) -> None:
         """Set data_points from list."""
         self.data_points = json.dumps(points)
 
     def __repr__(self) -> str:
-        return f'<TTTCurve {self.curve_type} {self.phase} {self.curve_position}>'
+        return f"<TTTCurve {self.curve_type} {self.phase} {self.curve_position}>"

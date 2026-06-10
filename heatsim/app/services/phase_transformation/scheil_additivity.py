@@ -10,9 +10,10 @@ where tau(T) is the isothermal incubation time at temperature T.
 For phase fraction tracking during continuous cooling, we integrate
 the JMAK rate at each temperature step using a virtual-time approach.
 """
-import numpy as np
-from typing import Dict, List, Optional, Tuple
+
 from dataclasses import dataclass, field
+
+import numpy as np
 
 from .jmak_model import JMAKModel
 from .martensite_model import KoistinenMarburgerModel
@@ -37,20 +38,21 @@ class CoolingTransformationResult:
     transformation_finish : dict of str -> tuple
         (time, temperature) where each phase finishes (99%)
     """
+
     times: np.ndarray = field(default_factory=lambda: np.array([]))
     temperatures: np.ndarray = field(default_factory=lambda: np.array([]))
-    phase_fractions: Dict[str, np.ndarray] = field(default_factory=dict)
-    final_fractions: Dict[str, float] = field(default_factory=dict)
-    transformation_start: Dict[str, Tuple[float, float]] = field(default_factory=dict)
-    transformation_finish: Dict[str, Tuple[float, float]] = field(default_factory=dict)
+    phase_fractions: dict[str, np.ndarray] = field(default_factory=dict)
+    final_fractions: dict[str, float] = field(default_factory=dict)
+    transformation_start: dict[str, tuple[float, float]] = field(default_factory=dict)
+    transformation_finish: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
 def calculate_cct_transformation(
     times: np.ndarray,
     temperatures: np.ndarray,
-    jmak_models: Dict[str, JMAKModel],
-    martensite_model: Optional[KoistinenMarburgerModel] = None,
-    critical_temps: Optional[Dict[str, float]] = None
+    jmak_models: dict[str, JMAKModel],
+    martensite_model: KoistinenMarburgerModel | None = None,
+    critical_temps: dict[str, float] | None = None,
 ) -> CoolingTransformationResult:
     """Calculate phase transformations along a continuous cooling curve.
 
@@ -83,10 +85,10 @@ def calculate_cct_transformation(
     )
 
     ct = critical_temps or {}
-    ae3 = ct.get('Ae3', 900)
-    ae1 = ct.get('Ae1', 727)
-    bs = ct.get('Bs', 550)
-    ms = ct.get('Ms', 350)
+    ae3 = ct.get("Ae3", 900)
+    ae1 = ct.get("Ae1", 727)
+    bs = ct.get("Bs", 550)
+    ms = ct.get("Ms", 350)
 
     # Phase ordering: transformations occur in sequence as temperature drops
     # ferrite (below Ae1), pearlite (below Ae1), bainite (below Bs),
@@ -94,21 +96,21 @@ def calculate_cct_transformation(
     diffusional_phases = []
     phase_temp_limits = {}
 
-    if 'ferrite' in jmak_models:
-        diffusional_phases.append('ferrite')
-        phase_temp_limits['ferrite'] = (bs + 20, ae1)
-    if 'pearlite' in jmak_models:
-        diffusional_phases.append('pearlite')
-        phase_temp_limits['pearlite'] = (bs, ae1)
-    if 'bainite' in jmak_models:
-        diffusional_phases.append('bainite')
-        phase_temp_limits['bainite'] = (ms, bs)
+    if "ferrite" in jmak_models:
+        diffusional_phases.append("ferrite")
+        phase_temp_limits["ferrite"] = (bs + 20, ae1)
+    if "pearlite" in jmak_models:
+        diffusional_phases.append("pearlite")
+        phase_temp_limits["pearlite"] = (bs, ae1)
+    if "bainite" in jmak_models:
+        diffusional_phases.append("bainite")
+        phase_temp_limits["bainite"] = (ms, bs)
 
     # Initialize fraction arrays
     for phase in diffusional_phases:
         result.phase_fractions[phase] = np.zeros(n_steps)
-    result.phase_fractions['martensite'] = np.zeros(n_steps)
-    result.phase_fractions['retained_austenite'] = np.ones(n_steps)
+    result.phase_fractions["martensite"] = np.zeros(n_steps)
+    result.phase_fractions["retained_austenite"] = np.ones(n_steps)
 
     # Track cumulative diffusional fraction
     total_diffusional = np.zeros(n_steps)
@@ -160,29 +162,29 @@ def calculate_cct_transformation(
             result.phase_fractions[phase][i] = min(new_frac_abs, austenite_available)
 
         # Update total diffusional fraction
-        total_diffusional[i] = sum(
-            result.phase_fractions[p][i] for p in diffusional_phases
-        )
+        total_diffusional[i] = sum(result.phase_fractions[p][i] for p in diffusional_phases)
         total_diffusional[i] = min(total_diffusional[i], 1.0)
 
         # Martensite (athermal - depends only on temperature, not time)
         austenite_for_martensite = 1.0 - total_diffusional[i]
         if martensite_model and T < ms and austenite_for_martensite > 0.001:
             f_m = martensite_model.fraction_at_temperature(T)
-            result.phase_fractions['martensite'][i] = f_m * austenite_for_martensite
+            result.phase_fractions["martensite"][i] = f_m * austenite_for_martensite
         else:
-            result.phase_fractions['martensite'][i] = result.phase_fractions['martensite'][max(0, i - 1)]
+            result.phase_fractions["martensite"][i] = result.phase_fractions["martensite"][
+                max(0, i - 1)
+            ]
 
         # Retained austenite
-        total_all = total_diffusional[i] + result.phase_fractions['martensite'][i]
-        result.phase_fractions['retained_austenite'][i] = max(1.0 - total_all, 0.0)
+        total_all = total_diffusional[i] + result.phase_fractions["martensite"][i]
+        result.phase_fractions["retained_austenite"][i] = max(1.0 - total_all, 0.0)
 
     # Extract final fractions
     for phase in list(result.phase_fractions.keys()):
         result.final_fractions[phase] = float(result.phase_fractions[phase][-1])
 
     # Find transformation start/finish points
-    for phase in diffusional_phases + ['martensite']:
+    for phase in diffusional_phases + ["martensite"]:
         frac = result.phase_fractions[phase]
         max_frac = frac[-1]
         if max_frac < 0.001:
@@ -193,7 +195,8 @@ def calculate_cct_transformation(
         start_idx = np.argmax(frac > threshold_start)
         if frac[start_idx] > threshold_start:
             result.transformation_start[phase] = (
-                float(times[start_idx]), float(temperatures[start_idx])
+                float(times[start_idx]),
+                float(temperatures[start_idx]),
             )
 
         # Finish: first point where fraction > 99% of final
@@ -201,7 +204,8 @@ def calculate_cct_transformation(
         finish_idx = np.argmax(frac > threshold_finish)
         if frac[finish_idx] > threshold_finish:
             result.transformation_finish[phase] = (
-                float(times[finish_idx]), float(temperatures[finish_idx])
+                float(times[finish_idx]),
+                float(temperatures[finish_idx]),
             )
 
     return result
@@ -211,8 +215,8 @@ def calculate_scheil_integral(
     times: np.ndarray,
     temperatures: np.ndarray,
     jmak_model: JMAKModel,
-    fraction_threshold: float = 0.01
-) -> Optional[Tuple[float, float]]:
+    fraction_threshold: float = 0.01,
+) -> tuple[float, float] | None:
     """Calculate when transformation starts using Scheil integral.
 
     Integrates dt/tau(T) and returns the (time, temperature) when

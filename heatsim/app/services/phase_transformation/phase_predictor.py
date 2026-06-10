@@ -8,8 +8,8 @@ For phase fraction prediction:
 Tier 2 uses Scheil additivity -> PhaseResult
 Tier 3 falls back to the simplified PhaseTracker
 """
+
 import logging
-from typing import Dict, Optional, List
 
 import numpy as np
 
@@ -41,13 +41,12 @@ class PhasePredictor:
             return
         self._loaded = True
 
-        from app.models.ttt_parameters import TTTParameters, JMAKParameters, MartensiteParameters
+        from app.models.ttt_parameters import TTTParameters
+
         from .jmak_model import JMAKModel, create_b_function
         from .martensite_model import KoistinenMarburgerModel
 
-        self._ttt_params = TTTParameters.query.filter_by(
-            steel_grade_id=self.grade.id
-        ).first()
+        self._ttt_params = TTTParameters.query.filter_by(steel_grade_id=self.grade.id).first()
 
         if self._ttt_params is None:
             return
@@ -72,14 +71,11 @@ class PhasePredictor:
         mart_params = self._ttt_params.martensite_parameters
         if mart_params:
             self._martensite_model = KoistinenMarburgerModel(
-                ms=mart_params.ms,
-                mf=mart_params.mf,
-                alpha=mart_params.alpha_m
+                ms=mart_params.ms, mf=mart_params.mf, alpha=mart_params.alpha_m
             )
         elif self._ttt_params.ms:
             self._martensite_model = KoistinenMarburgerModel(
-                ms=self._ttt_params.ms,
-                mf=self._ttt_params.mf
+                ms=self._ttt_params.ms, mf=self._ttt_params.mf
             )
 
     @property
@@ -92,25 +88,22 @@ class PhasePredictor:
     def tier(self) -> str:
         """Return which prediction tier is active."""
         # Check Tier 1: digitized diagram
-        diagram = self.grade.phase_diagrams.filter_by(diagram_type='CCT').first()
+        diagram = self.grade.phase_diagrams.filter_by(diagram_type="CCT").first()
         if diagram and diagram.curves:
-            return 'digitized'
+            return "digitized"
 
         # Check Tier 2: JMAK
         if self.is_available:
-            return 'jmak'
+            return "jmak"
 
         # Check Tier 3: empirical
         if self.grade.composition:
-            return 'empirical'
+            return "empirical"
 
-        return 'none'
+        return "none"
 
     def predict_phases_scheil(
-        self,
-        times: np.ndarray,
-        temperatures: np.ndarray,
-        t8_5: Optional[float] = None
+        self, times: np.ndarray, temperatures: np.ndarray, t8_5: float | None = None
     ) -> PhaseResult:
         """Predict phases using Scheil additivity (Tier 2).
 
@@ -140,6 +133,7 @@ class PhasePredictor:
 
         # Fallback to simplified PhaseTracker
         from app.services.phase_tracker import PhaseTracker
+
         diagram = self.grade.phase_diagrams.first()
         tracker = PhaseTracker(diagram)
         return tracker.predict_phases(times, temperatures, t8_5)
@@ -149,22 +143,19 @@ class PhasePredictor:
         from .scheil_additivity import calculate_cct_transformation
 
         result = calculate_cct_transformation(
-            times, temperatures,
-            self._jmak_models,
-            self._martensite_model,
-            self._critical_temps
+            times, temperatures, self._jmak_models, self._martensite_model, self._critical_temps
         )
 
         # Convert to PhaseResult
         return PhaseResult(
-            martensite=result.final_fractions.get('martensite', 0.0),
-            bainite=result.final_fractions.get('bainite', 0.0),
-            ferrite=result.final_fractions.get('ferrite', 0.0),
-            pearlite=result.final_fractions.get('pearlite', 0.0),
-            retained_austenite=result.final_fractions.get('retained_austenite', 0.0),
+            martensite=result.final_fractions.get("martensite", 0.0),
+            bainite=result.final_fractions.get("bainite", 0.0),
+            ferrite=result.final_fractions.get("ferrite", 0.0),
+            pearlite=result.final_fractions.get("pearlite", 0.0),
+            retained_austenite=result.final_fractions.get("retained_austenite", 0.0),
         ).normalize()
 
-    def get_cct_curves(self) -> Optional[Dict]:
+    def get_cct_curves(self) -> dict | None:
         """Get CCT curves using three-tier fallback.
 
         Returns
@@ -173,7 +164,7 @@ class PhasePredictor:
             {phase: {'start': [[t,T],...], 'finish': [[t,T],...]}}
         """
         # Tier 1: digitized curves from DB
-        diagram = self.grade.phase_diagrams.filter_by(diagram_type='CCT').first()
+        diagram = self.grade.phase_diagrams.filter_by(diagram_type="CCT").first()
         if diagram and diagram.curves:
             curves = diagram.curves_dict
             if curves:
@@ -185,6 +176,7 @@ class PhasePredictor:
         if self._jmak_models and len(self._jmak_models) > 0:
             try:
                 from .cct_generator import generate_cct_from_ttt
+
                 austenitizing = 900.0
                 if self._ttt_params and self._ttt_params.austenitizing_temperature:
                     austenitizing = self._ttt_params.austenitizing_temperature
@@ -193,7 +185,7 @@ class PhasePredictor:
                     self._jmak_models,
                     self._martensite_model,
                     self._critical_temps,
-                    austenitizing_temp=austenitizing
+                    austenitizing_temp=austenitizing,
                 )
                 if curves:
                     logger.debug("Using JMAK CCT curves for %s", self.grade.designation)
@@ -205,6 +197,7 @@ class PhasePredictor:
         if self.grade.composition:
             try:
                 from app.services.cct_predictor import predict_cct_curves
+
                 comp = self.grade.composition.to_dict()
                 trans_temps = None
                 if diagram:
@@ -218,7 +211,7 @@ class PhasePredictor:
 
         return None
 
-    def get_ttt_curves(self) -> Optional[Dict]:
+    def get_ttt_curves(self) -> dict | None:
         """Get TTT curves (JMAK only, or digitized).
 
         Returns
@@ -227,7 +220,7 @@ class PhasePredictor:
             {phase: {'start': [[t,T],...], 'finish': [[t,T],...]}}
         """
         # Tier 1: digitized TTT from DB
-        diagram = self.grade.phase_diagrams.filter_by(diagram_type='TTT').first()
+        diagram = self.grade.phase_diagrams.filter_by(diagram_type="TTT").first()
         if diagram and diagram.curves:
             curves = diagram.curves_dict
             if curves:
@@ -238,15 +231,14 @@ class PhasePredictor:
         if self._jmak_models and len(self._jmak_models) > 0:
             try:
                 from .ttt_generator import generate_ttt_for_plotting
-                return generate_ttt_for_plotting(
-                    self._jmak_models, self._critical_temps
-                )
+
+                return generate_ttt_for_plotting(self._jmak_models, self._critical_temps)
             except Exception as e:
                 logger.warning("TTT generation failed: %s", e)
 
         return None
 
-    def get_transformation_temps(self) -> Dict[str, Optional[float]]:
+    def get_transformation_temps(self) -> dict[str, float | None]:
         """Get transformation temperatures from best available source."""
         self._load()
 
@@ -262,6 +254,7 @@ class PhasePredictor:
         # From composition (empirical)
         if self.grade.composition:
             from .critical_temperatures import calculate_critical_temperatures
+
             return calculate_critical_temperatures(self.grade.composition.to_dict())
 
         return {}

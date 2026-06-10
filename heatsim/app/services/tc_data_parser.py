@@ -3,13 +3,13 @@
 Supports the format from temperature loggers with up to 8 channels.
 Format: date;time;network ID;device type;device ID;sensor;data channel;data flags;data sequence number;value;
 """
-from datetime import datetime
-from typing import Dict, List, Tuple, Optional
+
 import csv
 import io
+from datetime import datetime
 
 
-def parse_tc_csv(file_content: str) -> Dict:
+def parse_tc_csv(file_content: str) -> dict:
     """Parse thermocouple logger CSV data.
 
     Parameters
@@ -29,38 +29,38 @@ def parse_tc_csv(file_content: str) -> Dict:
         - statistics: dict of {channel_name: {min, max, avg}}
     """
     # Parse CSV with semicolon delimiter
-    reader = csv.DictReader(io.StringIO(file_content), delimiter=';')
+    reader = csv.DictReader(io.StringIO(file_content), delimiter=";")
 
     # Collect data by channel
-    channel_data: Dict[str, List[Tuple[datetime, float]]] = {}
+    channel_data: dict[str, list[tuple[datetime, float]]] = {}
 
     for row in reader:
         try:
             # Parse date and time
-            date_str = row.get('date', '').strip()
-            time_str = row.get('time', '').strip()
+            date_str = row.get("date", "").strip()
+            time_str = row.get("time", "").strip()
             if not date_str or not time_str:
                 continue
 
             timestamp = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
 
             # Get sensor/channel name
-            sensor = row.get('sensor', '').strip()
+            sensor = row.get("sensor", "").strip()
             if not sensor:
                 continue
 
             # Parse value (European decimal format: comma as decimal separator)
-            value_str = row.get('value', '').strip()
+            value_str = row.get("value", "").strip()
             if not value_str:
                 continue
-            value = float(value_str.replace(',', '.'))
+            value = float(value_str.replace(",", "."))
 
             # Add to channel data
             if sensor not in channel_data:
                 channel_data[sensor] = []
             channel_data[sensor].append((timestamp, value))
 
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError):
             # Skip malformed rows
             continue
 
@@ -81,9 +81,9 @@ def parse_tc_csv(file_content: str) -> Dict:
     duration_seconds = (end_time - start_time).total_seconds()
 
     # Extract temperature arrays and times per channel
-    channels: Dict[str, List[float]] = {}
-    channel_times: Dict[str, List[float]] = {}
-    statistics: Dict[str, Dict[str, float]] = {}
+    channels: dict[str, list[float]] = {}
+    channel_times: dict[str, list[float]] = {}
+    statistics: dict[str, dict[str, float]] = {}
 
     for sensor, data in channel_data.items():
         # Each channel gets its own times array (seconds from global start)
@@ -93,10 +93,10 @@ def parse_tc_csv(file_content: str) -> Dict:
 
         # Calculate statistics
         statistics[sensor] = {
-            'min': min(temps),
-            'max': max(temps),
-            'avg': sum(temps) / len(temps),
-            'count': len(temps)
+            "min": min(temps),
+            "max": max(temps),
+            "avg": sum(temps) / len(temps),
+            "count": len(temps),
         }
 
     # For backwards compatibility, also provide unified times from first channel
@@ -104,17 +104,17 @@ def parse_tc_csv(file_content: str) -> Dict:
     times = channel_times[reference_channel]
 
     return {
-        'start_time': start_time,
-        'end_time': end_time,
-        'duration_seconds': duration_seconds,
-        'times': times,
-        'channels': channels,
-        'channel_times': channel_times,  # Per-channel times
-        'statistics': statistics
+        "start_time": start_time,
+        "end_time": end_time,
+        "duration_seconds": duration_seconds,
+        "times": times,
+        "channels": channels,
+        "channel_times": channel_times,  # Per-channel times
+        "statistics": statistics,
     }
 
 
-def validate_tc_csv(file_content: str) -> Tuple[bool, str]:
+def validate_tc_csv(file_content: str) -> tuple[bool, str]:
     """Validate TC CSV file format.
 
     Parameters
@@ -129,20 +129,20 @@ def validate_tc_csv(file_content: str) -> Tuple[bool, str]:
     """
     try:
         # Check if it has the expected header
-        lines = file_content.strip().split('\n')
+        lines = file_content.strip().split("\n")
         if not lines:
             return False, "File is empty"
 
         header = lines[0].lower()
-        if 'date' not in header or 'time' not in header or 'sensor' not in header:
+        if "date" not in header or "time" not in header or "sensor" not in header:
             return False, "Missing required columns (date, time, sensor)"
 
-        if 'value' not in header:
+        if "value" not in header:
             return False, "Missing 'value' column"
 
         # Try parsing
         data = parse_tc_csv(file_content)
-        if not data['channels']:
+        if not data["channels"]:
             return False, "No valid channel data found"
 
         return True, f"Found {len(data['channels'])} channels with {len(data['times'])} data points"

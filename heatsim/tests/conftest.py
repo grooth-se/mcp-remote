@@ -1,19 +1,22 @@
 """Shared test fixtures for Flask integration tests."""
+
 import json
+
 import pytest
 
 from app import create_app
 from app.extensions import db as _db
 
-
 # ---------------------------------------------------------------------------
 # Auto-skip @pytest.mark.comsol when real COMSOL is not available
 # ---------------------------------------------------------------------------
+
 
 def pytest_collection_modifyitems(config, items):
     """Skip tests marked @pytest.mark.comsol when COMSOL is not installed."""
     try:
         import mph  # noqa: F401
+
         _comsol_available = True
     except ImportError:
         _comsol_available = False
@@ -21,40 +24,49 @@ def pytest_collection_modifyitems(config, items):
     if _comsol_available:
         return
 
-    skip_comsol = pytest.mark.skip(reason='COMSOL (mph) not available')
+    skip_comsol = pytest.mark.skip(reason="COMSOL (mph) not available")
     for item in items:
-        if 'comsol' in item.keywords:
+        if "comsol" in item.keywords:
             item.add_marker(skip_comsol)
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def comsol_client():
     """Session-scoped real COMSOL client. Only usable in @pytest.mark.comsol tests."""
     try:
         from app.services.comsol.client import get_shared_client
+
         client = get_shared_client()
         if not client.is_available:
-            pytest.skip('COMSOL server not reachable')
+            pytest.skip("COMSOL server not reachable")
         yield client
     except Exception as e:
-        pytest.skip(f'COMSOL not available: {e}')
+        pytest.skip(f"COMSOL not available: {e}")
+
+
 from app.models import (
-    User, SteelGrade, Simulation, WeldProject, HeatTreatmentTemplate,
-    ROLE_ENGINEER, ROLE_ADMIN,
-    STATUS_DRAFT, DATA_SOURCE_STANDARD,
+    DATA_SOURCE_STANDARD,
     GEOMETRY_CYLINDER,
+    ROLE_ADMIN,
+    ROLE_ENGINEER,
+    STATUS_DRAFT,
+    HeatTreatmentTemplate,
+    Simulation,
+    SteelGrade,
+    User,
+    WeldProject,
 )
-from app.models.simulation import PROCESS_QUENCH_WATER
 from app.models.application import Application
 from app.models.permission import UserPermission
+from app.models.simulation import PROCESS_QUENCH_WATER
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def app():
     """Create application for the test session."""
-    app = create_app('testing')
+    app = create_app("testing")
     # Override binds to ensure in-memory SQLite for materials
-    app.config['SQLALCHEMY_BINDS'] = {'materials': 'sqlite://'}
+    app.config["SQLALCHEMY_BINDS"] = {"materials": "sqlite://"}
     yield app
 
 
@@ -77,8 +89,8 @@ def client(app, db):
 @pytest.fixture()
 def engineer_user(db):
     """User with engineer role."""
-    user = User(username='engineer1', role=ROLE_ENGINEER)
-    user.set_password('password123')
+    user = User(username="engineer1", role=ROLE_ENGINEER)
+    user.set_password("password123")
     db.session.add(user)
     db.session.commit()
     return user
@@ -87,8 +99,8 @@ def engineer_user(db):
 @pytest.fixture()
 def admin_user(db):
     """User with admin role."""
-    user = User(username='admin1', role=ROLE_ADMIN)
-    user.set_password('adminpass')
+    user = User(username="admin1", role=ROLE_ADMIN)
+    user.set_password("adminpass")
     db.session.add(user)
     db.session.commit()
     return user
@@ -97,28 +109,34 @@ def admin_user(db):
 @pytest.fixture()
 def logged_in_client(client, engineer_user):
     """Test client logged in as engineer."""
-    client.post('/auth/login', data={
-        'username': 'engineer1',
-        'password': 'password123',
-    })
+    client.post(
+        "/auth/login",
+        data={
+            "username": "engineer1",
+            "password": "password123",
+        },
+    )
     return client
 
 
 @pytest.fixture()
 def admin_client(client, admin_user):
     """Test client logged in as admin."""
-    client.post('/auth/login', data={
-        'username': 'admin1',
-        'password': 'adminpass',
-    })
+    client.post(
+        "/auth/login",
+        data={
+            "username": "admin1",
+            "password": "adminpass",
+        },
+    )
     return client
 
 
 @pytest.fixture()
 def normal_user(db):
     """User with engineer role (alias for portal test compatibility)."""
-    user = User(username='normaluser', role=ROLE_ENGINEER)
-    user.set_password('normalpass')
+    user = User(username="normaluser", role=ROLE_ENGINEER)
+    user.set_password("normalpass")
     db.session.add(user)
     db.session.commit()
     return user
@@ -128,9 +146,9 @@ def normal_user(db):
 def sample_app(db):
     """A portal application for permission tests."""
     app = Application(
-        app_code='testapp',
-        app_name='Test Application',
-        internal_url='http://localhost:5001',
+        app_code="testapp",
+        app_name="Test Application",
+        internal_url="http://localhost:5001",
         is_active=True,
     )
     db.session.add(app)
@@ -141,7 +159,7 @@ def sample_app(db):
 @pytest.fixture()
 def sample_steel_grade(db):
     """A standard steel grade."""
-    grade = SteelGrade(designation='AISI 4340', data_source=DATA_SOURCE_STANDARD)
+    grade = SteelGrade(designation="AISI 4340", data_source=DATA_SOURCE_STANDARD)
     db.session.add(grade)
     db.session.commit()
     return grade
@@ -151,16 +169,16 @@ def sample_steel_grade(db):
 def sample_simulation(db, engineer_user, sample_steel_grade):
     """A draft simulation owned by engineer_user."""
     sim = Simulation(
-        name='Test Sim',
-        description='A test simulation',
+        name="Test Sim",
+        description="A test simulation",
         steel_grade_id=sample_steel_grade.id,
         user_id=engineer_user.id,
         geometry_type=GEOMETRY_CYLINDER,
         process_type=PROCESS_QUENCH_WATER,
         status=STATUS_DRAFT,
     )
-    sim.set_geometry({'radius': 0.05, 'length': 0.1})
-    sim.set_solver_config({'n_nodes': 21, 'dt': 0.5, 'max_time': 60})
+    sim.set_geometry({"radius": 0.05, "length": 0.1})
+    sim.set_solver_config({"n_nodes": 21, "dt": 0.5, "max_time": 60})
     sim.set_ht_config(sim.create_default_ht_config())
     db.session.add(sim)
     db.session.commit()
@@ -171,12 +189,12 @@ def sample_simulation(db, engineer_user, sample_steel_grade):
 def sample_weld_project(db, engineer_user, sample_steel_grade):
     """A draft weld project owned by engineer_user."""
     proj = WeldProject(
-        name='Test Weld',
-        description='A test weld project',
+        name="Test Weld",
+        description="A test weld project",
         steel_grade_id=sample_steel_grade.id,
         user_id=engineer_user.id,
-        process_type='gtaw',
-        status='draft',
+        process_type="gtaw",
+        status="draft",
     )
     db.session.add(proj)
     db.session.commit()
@@ -187,17 +205,19 @@ def sample_weld_project(db, engineer_user, sample_steel_grade):
 def sample_template(db, engineer_user):
     """A public heat treatment template owned by engineer_user."""
     tmpl = HeatTreatmentTemplate(
-        name='Standard Q&T',
-        description='Standard quench and temper',
+        name="Standard Q&T",
+        description="Standard quench and temper",
         user_id=engineer_user.id,
-        category='quench_temper',
+        category="quench_temper",
         is_public=True,
-        heat_treatment_config=json.dumps({
-            'heating': {'enabled': True, 'target_temperature': 850.0, 'hold_time': 60.0},
-            'transfer': {'enabled': True, 'duration': 10.0},
-            'quenching': {'enabled': True, 'media': 'water', 'duration': 300.0},
-            'tempering': {'enabled': False},
-        }),
+        heat_treatment_config=json.dumps(
+            {
+                "heating": {"enabled": True, "target_temperature": 850.0, "hold_time": 60.0},
+                "transfer": {"enabled": True, "duration": 10.0},
+                "quenching": {"enabled": True, "media": "water", "duration": 300.0},
+                "tempering": {"enabled": False},
+            }
+        ),
     )
     db.session.add(tmpl)
     db.session.commit()

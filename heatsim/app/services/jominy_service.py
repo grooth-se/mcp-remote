@@ -11,14 +11,14 @@ References:
 - ASTM A255 - Standard Test Methods for Determining Hardenability of Steel
 - Jominy, W.E., "A Hardenability Test for Carburizing Steel", Trans. ASM, 1938
 """
+
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 
-from app.models.material import SteelComposition, PhaseDiagram
+from app.models.material import PhaseDiagram, SteelComposition
 from app.services.hardness_predictor import HardnessPredictor
 from app.services.phase_tracker import PhaseTracker
-
 
 # Standard Jominy distances (mm) from quenched end
 JOMINY_DISTANCES_MM = [1.5, 3, 5, 7, 9, 11, 13, 15, 20, 25, 30, 35, 40, 45, 50]
@@ -27,7 +27,7 @@ JOMINY_DISTANCES_MM = [1.5, 3, 5, 7, 9, 11, 13, 15, 20, 25, 30, 35, 40, 45, 50]
 # Based on empirical correlations from literature
 # These represent water jet quench at the end, air cooling elsewhere
 JOMINY_T85_VALUES = {
-    1.5: 1.5,    # Very fast cooling at quenched end
+    1.5: 1.5,  # Very fast cooling at quenched end
     3: 2.5,
     5: 4.0,
     7: 6.0,
@@ -76,34 +76,35 @@ class JominyResult:
     composition : dict
         Steel composition used
     """
-    distances_mm: List[float] = field(default_factory=list)
-    hardness_hv: List[float] = field(default_factory=list)
-    hardness_hrc: List[Optional[float]] = field(default_factory=list)
-    t85_values: List[float] = field(default_factory=list)
-    cooling_rates: List[float] = field(default_factory=list)
-    phase_fractions: List[Dict[str, float]] = field(default_factory=list)
+
+    distances_mm: list[float] = field(default_factory=list)
+    hardness_hv: list[float] = field(default_factory=list)
+    hardness_hrc: list[float | None] = field(default_factory=list)
+    t85_values: list[float] = field(default_factory=list)
+    cooling_rates: list[float] = field(default_factory=list)
+    phase_fractions: list[dict[str, float]] = field(default_factory=list)
     carbon_equivalent: float = 0.0
     ideal_diameter: float = 0.0
-    j_distance_50hrc: Optional[float] = None
-    composition: Dict[str, float] = field(default_factory=dict)
+    j_distance_50hrc: float | None = None
+    composition: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for storage."""
         return {
-            'distances_mm': self.distances_mm,
-            'hardness_hv': self.hardness_hv,
-            'hardness_hrc': self.hardness_hrc,
-            't85_values': self.t85_values,
-            'cooling_rates': self.cooling_rates,
-            'phase_fractions': self.phase_fractions,
-            'carbon_equivalent': self.carbon_equivalent,
-            'ideal_diameter': self.ideal_diameter,
-            'j_distance_50hrc': self.j_distance_50hrc,
-            'composition': self.composition,
+            "distances_mm": self.distances_mm,
+            "hardness_hv": self.hardness_hv,
+            "hardness_hrc": self.hardness_hrc,
+            "t85_values": self.t85_values,
+            "cooling_rates": self.cooling_rates,
+            "phase_fractions": self.phase_fractions,
+            "carbon_equivalent": self.carbon_equivalent,
+            "ideal_diameter": self.ideal_diameter,
+            "j_distance_50hrc": self.j_distance_50hrc,
+            "composition": self.composition,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'JominyResult':
+    def from_dict(cls, data: dict) -> "JominyResult":
         """Create from dictionary."""
         return cls(**data)
 
@@ -111,11 +112,7 @@ class JominyResult:
 class JominySimulator:
     """Simulates Jominy end-quench test for hardenability prediction."""
 
-    def __init__(
-        self,
-        composition: SteelComposition,
-        phase_diagram: Optional[PhaseDiagram] = None
-    ):
+    def __init__(self, composition: SteelComposition, phase_diagram: PhaseDiagram | None = None):
         """Initialize Jominy simulator.
 
         Parameters
@@ -135,9 +132,7 @@ class JominySimulator:
             self.phase_tracker = PhaseTracker(phase_diagram)
 
     def simulate(
-        self,
-        distances: Optional[List[float]] = None,
-        austenitizing_temp: float = 850.0
+        self, distances: list[float] | None = None, austenitizing_temp: float = 850.0
     ) -> JominyResult:
         """Run Jominy end-quench simulation.
 
@@ -160,7 +155,7 @@ class JominySimulator:
             distances_mm=distances,
             carbon_equivalent=self.composition.carbon_equivalent_iiw,
             ideal_diameter=self.composition.ideal_diameter_di,
-            composition=self.composition.to_dict()
+            composition=self.composition.to_dict(),
         )
 
         for d in distances:
@@ -184,9 +179,7 @@ class JominySimulator:
 
         # Calculate J distance for 50 HRC (hardenability metric)
         result.j_distance_50hrc = self._find_j_distance(
-            result.distances_mm,
-            result.hardness_hrc,
-            target_hrc=50.0
+            result.distances_mm, result.hardness_hrc, target_hrc=50.0
         )
 
         return result
@@ -219,11 +212,7 @@ class JominySimulator:
 
         return float(np.interp(distance_mm, std_distances, std_t85))
 
-    def _predict_phases(
-        self,
-        t85: float,
-        austenitizing_temp: float = 850.0
-    ) -> Dict[str, float]:
+    def _predict_phases(self, t85: float, austenitizing_temp: float = 850.0) -> dict[str, float]:
         """Predict phase fractions based on cooling rate.
 
         Parameters
@@ -257,7 +246,7 @@ class JominySimulator:
         # Fallback: empirical phase estimation based on t8/5
         return self._estimate_phases_from_t85(t85)
 
-    def _estimate_phases_from_t85(self, t85: float) -> Dict[str, float]:
+    def _estimate_phases_from_t85(self, t85: float) -> dict[str, float]:
         """Estimate phase fractions from t8/5 using empirical rules.
 
         Based on typical CCT behavior for low-alloy steels.
@@ -272,7 +261,7 @@ class JominySimulator:
         dict
             Estimated phase fractions
         """
-        C = self.composition.to_dict()['C']
+        C = self.composition.to_dict()["C"]
         CE = self.composition.carbon_equivalent_iiw
 
         # Estimate critical cooling times based on CE
@@ -308,19 +297,16 @@ class JominySimulator:
         total = f_m + f_b + f_fp
 
         return {
-            'martensite': f_m / total,
-            'bainite': f_b / total,
-            'ferrite': (f_fp / total) * (1 - C * 2),  # More ferrite with less C
-            'pearlite': (f_fp / total) * (C * 2),
-            'retained_austenite': 0.0,
+            "martensite": f_m / total,
+            "bainite": f_b / total,
+            "ferrite": (f_fp / total) * (1 - C * 2),  # More ferrite with less C
+            "pearlite": (f_fp / total) * (C * 2),
+            "retained_austenite": 0.0,
         }
 
     def _find_j_distance(
-        self,
-        distances: List[float],
-        hardness_hrc: List[Optional[float]],
-        target_hrc: float = 50.0
-    ) -> Optional[float]:
+        self, distances: list[float], hardness_hrc: list[float | None], target_hrc: float = 50.0
+    ) -> float | None:
         """Find Jominy distance where hardness drops to target HRC.
 
         Parameters
@@ -337,10 +323,7 @@ class JominySimulator:
         float or None
             J distance in mm, or None if hardness never reaches target
         """
-        valid_points = [
-            (d, h) for d, h in zip(distances, hardness_hrc)
-            if h is not None
-        ]
+        valid_points = [(d, h) for d, h in zip(distances, hardness_hrc, strict=False) if h is not None]
 
         if len(valid_points) < 2:
             return None
@@ -365,8 +348,8 @@ class JominySimulator:
 
 def simulate_jominy_test(
     composition: SteelComposition,
-    phase_diagram: Optional[PhaseDiagram] = None,
-    austenitizing_temp: float = 850.0
+    phase_diagram: PhaseDiagram | None = None,
+    austenitizing_temp: float = 850.0,
 ) -> JominyResult:
     """Convenience function to simulate Jominy test.
 

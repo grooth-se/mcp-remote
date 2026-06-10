@@ -17,17 +17,19 @@ References:
   for Welding Heat Sources", Metallurgical Transactions B, 1984
 - Lindgren L.-E., "Numerical modelling of welding", CMES, 2006
 """
-from dataclasses import dataclass, field
-from typing import Optional, Tuple, Dict, List
+
 import time as time_module
+from dataclasses import dataclass
+
 import numpy as np
-from scipy.special import erf
 from scipy.linalg import solve_banded
 
 from .rosenthal_solver import (
-    ARC_EFFICIENCIES, DEFAULT_CONDUCTIVITY, DEFAULT_DENSITY, DEFAULT_SPECIFIC_HEAT,
+    ARC_EFFICIENCIES,
+    DEFAULT_CONDUCTIVITY,
+    DEFAULT_DENSITY,
+    DEFAULT_SPECIFIC_HEAT,
 )
-
 
 # Stefan-Boltzmann constant (W/(m²·K⁴))
 STEFAN_BOLTZMANN = 5.67e-8
@@ -81,6 +83,7 @@ class GoldakParams:
     h_conv : float
         Convective HTC for surface BC W/(m²·K)
     """
+
     Q: float = 3000.0
     v: float = 0.005
     a_f: float = 0.004
@@ -128,6 +131,7 @@ class GoldakSolverConfig:
     output_interval : int
         Store snapshot every N steps
     """
+
     ny: int = 41
     nz: int = 31
     dt: float = 0.05
@@ -140,11 +144,11 @@ class GoldakSolverConfig:
 
 # Probe point definitions (name -> (y_fraction_of_half_width, z_fraction_of_thickness))
 PROBE_POINTS = {
-    'center': (0.0, 0.0),
-    'surface_2mm': (0.002, 0.0),   # 2mm from weld line, surface
-    'surface_5mm': (0.005, 0.0),   # 5mm from weld line
-    'surface_10mm': (0.010, 0.0),  # 10mm
-    'mid_depth_center': (0.0, 0.5),  # centerline at mid-depth
+    "center": (0.0, 0.0),
+    "surface_2mm": (0.002, 0.0),  # 2mm from weld line, surface
+    "surface_5mm": (0.005, 0.0),  # 5mm from weld line
+    "surface_10mm": (0.010, 0.0),  # 10mm
+    "mid_depth_center": (0.0, 0.5),  # centerline at mid-depth
 }
 
 
@@ -177,6 +181,7 @@ class GoldakResult:
     solver_info : dict
         Timing, grid, convergence stats
     """
+
     y_coords: np.ndarray
     z_coords: np.ndarray
     times: np.ndarray
@@ -192,29 +197,29 @@ class GoldakResult:
     def to_dict(self) -> dict:
         """Convert to JSON-serializable dictionary."""
         return {
-            'y_coords': (self.y_coords * 1000).tolist(),  # mm
-            'z_coords': (self.z_coords * 1000).tolist(),   # mm
-            'times': self.times.tolist(),
-            'temperature_field': self.temperature_field.tolist(),
-            'peak_temperature_map': self.peak_temperature_map.tolist(),
-            'probe_thermal_cycles': self.probe_thermal_cycles,
-            't8_5_map': self.t8_5_map.tolist(),
-            'weld_pool_boundary': self.weld_pool_boundary,
-            'fusion_zone_area_mm2': self.fusion_zone_area_mm2,
-            'goldak_params': self.goldak_params,
-            'solver_info': self.solver_info,
+            "y_coords": (self.y_coords * 1000).tolist(),  # mm
+            "z_coords": (self.z_coords * 1000).tolist(),  # mm
+            "times": self.times.tolist(),
+            "temperature_field": self.temperature_field.tolist(),
+            "peak_temperature_map": self.peak_temperature_map.tolist(),
+            "probe_thermal_cycles": self.probe_thermal_cycles,
+            "t8_5_map": self.t8_5_map.tolist(),
+            "weld_pool_boundary": self.weld_pool_boundary,
+            "fusion_zone_area_mm2": self.fusion_zone_area_mm2,
+            "goldak_params": self.goldak_params,
+            "solver_info": self.solver_info,
             # Surface-line summaries for HAZ comparison
-            'surface_peak_temps': self.peak_temperature_map[0, :].tolist(),
-            'surface_distances_mm': (self.y_coords * 1000).tolist(),
+            "surface_peak_temps": self.peak_temperature_map[0, :].tolist(),
+            "surface_distances_mm": (self.y_coords * 1000).tolist(),
         }
 
     @property
-    def surface_peak_profile(self) -> Tuple[np.ndarray, np.ndarray]:
+    def surface_peak_profile(self) -> tuple[np.ndarray, np.ndarray]:
         """Peak temperature along surface (z=0) vs transverse distance."""
         return self.y_coords * 1000, self.peak_temperature_map[0, :]
 
     @property
-    def center_t8_5(self) -> Optional[float]:
+    def center_t8_5(self) -> float | None:
         """t8/5 at weld center (y=0, z=0)."""
         ny_mid = len(self.y_coords) // 2
         val = self.t8_5_map[0, ny_mid]
@@ -231,8 +236,7 @@ class GoldakSolver:
     Uses ADI (Alternating Direction Implicit) splitting for efficiency.
     """
 
-    def __init__(self, params: GoldakParams,
-                 config: Optional[GoldakSolverConfig] = None):
+    def __init__(self, params: GoldakParams, config: GoldakSolverConfig | None = None):
         self.params = params
         self.config = config or GoldakSolverConfig()
 
@@ -241,16 +245,14 @@ class GoldakSolver:
             self.config.ny += 1
 
         # Create mesh
-        self.y = np.linspace(-params.plate_half_width, params.plate_half_width,
-                             self.config.ny)
+        self.y = np.linspace(-params.plate_half_width, params.plate_half_width, self.config.ny)
         self.z = np.linspace(0, params.plate_thickness, self.config.nz)
         self.dy = self.y[1] - self.y[0]
         self.dz = self.z[1] - self.z[0]
 
         # Precompute Gaussian y-z envelope (does not change with time)
         Y, Z = np.meshgrid(self.y, self.z)  # shapes (nz, ny)
-        self._yz_envelope = np.exp(-3.0 * Y**2 / params.b**2
-                                   - 3.0 * Z**2 / params.c**2)
+        self._yz_envelope = np.exp(-3.0 * Y**2 / params.b**2 - 3.0 * Z**2 / params.c**2)
 
         # Front/rear amplitude coefficients (after x-integration)
         # Integration of exp(-3x²/a²) from -inf to +inf = a*sqrt(π/3)
@@ -258,22 +260,28 @@ class GoldakSolver:
         sqrt3 = np.sqrt(3.0)
         pi_sqrt_pi = np.pi * np.sqrt(np.pi)
         self._C_f = (6.0 * sqrt3 * params.f_f * params.Q) / (
-            params.a_f * params.b * params.c * pi_sqrt_pi)
+            params.a_f * params.b * params.c * pi_sqrt_pi
+        )
         self._C_r = (6.0 * sqrt3 * params.f_r * params.Q) / (
-            params.a_r * params.b * params.c * pi_sqrt_pi)
+            params.a_r * params.b * params.c * pi_sqrt_pi
+        )
 
     @classmethod
-    def from_weld_project(cls, project, string=None,
-                          config: Optional[GoldakSolverConfig] = None,
-                          b_override: Optional[float] = None,
-                          c_override: Optional[float] = None,
-                          a_f_override: Optional[float] = None,
-                          a_r_override: Optional[float] = None) -> 'GoldakSolver':
+    def from_weld_project(
+        cls,
+        project,
+        string=None,
+        config: GoldakSolverConfig | None = None,
+        b_override: float | None = None,
+        c_override: float | None = None,
+        a_f_override: float | None = None,
+        a_r_override: float | None = None,
+    ) -> "GoldakSolver":
         """Create solver from WeldProject and optional WeldString.
 
         Auto-estimates pool geometry from heat input if overrides not given.
         """
-        process_type = project.process_type or 'mig_mag'
+        process_type = project.process_type or "mig_mag"
         eta = ARC_EFFICIENCIES.get(process_type, 0.80)
 
         if string:
@@ -294,19 +302,19 @@ class GoldakSolver:
         if project.steel_grade:
             grade = project.steel_grade
             try:
-                k_val = grade.get_property('thermal_conductivity')
+                k_val = grade.get_property("thermal_conductivity")
                 if k_val:
                     k = float(k_val)
             except (AttributeError, TypeError):
                 pass
             try:
-                rho_val = grade.get_property('density')
+                rho_val = grade.get_property("density")
                 if rho_val:
                     rho = float(rho_val)
             except (AttributeError, TypeError):
                 pass
             try:
-                cp_val = grade.get_property('specific_heat')
+                cp_val = grade.get_property("specific_heat")
                 if cp_val:
                     Cp = float(cp_val)
             except (AttributeError, TypeError):
@@ -314,16 +322,25 @@ class GoldakSolver:
 
         # Estimate pool geometry
         pool = estimate_pool_params(heat_input_kj_mm, process_type)
-        b = b_override if b_override else pool['b']
-        c = c_override if c_override else pool['c']
-        a_f = a_f_override if a_f_override else pool['a_f']
-        a_r = a_r_override if a_r_override else pool['a_r']
+        b = b_override if b_override else pool["b"]
+        c = c_override if c_override else pool["c"]
+        a_f = a_f_override if a_f_override else pool["a_f"]
+        a_r = a_r_override if a_r_override else pool["a_r"]
 
         T0 = project.preheat_temperature or 20.0
 
         params = GoldakParams(
-            Q=Q, v=v, a_f=a_f, a_r=a_r, b=b, c=c,
-            T0=T0, k=k, rho=rho, Cp=Cp, eta=eta,
+            Q=Q,
+            v=v,
+            a_f=a_f,
+            a_r=a_r,
+            b=b,
+            c=c,
+            T0=T0,
+            k=k,
+            rho=rho,
+            Cp=Cp,
+            eta=eta,
             plate_thickness=0.020,
             plate_half_width=0.030,
         )
@@ -394,8 +411,9 @@ class GoldakSolver:
         # Full 2D source = q_line * yz_envelope
         return q_line * self._yz_envelope
 
-    def _solve_tridiag(self, lower: np.ndarray, main: np.ndarray,
-                       upper: np.ndarray, rhs: np.ndarray) -> np.ndarray:
+    def _solve_tridiag(
+        self, lower: np.ndarray, main: np.ndarray, upper: np.ndarray, rhs: np.ndarray
+    ) -> np.ndarray:
         """Solve tridiagonal system using scipy's banded solver.
 
         Parameters
@@ -406,15 +424,21 @@ class GoldakSolver:
         """
         n = len(main)
         ab = np.zeros((3, n))
-        ab[0, 1:] = upper[:-1]   # superdiagonal
-        ab[1, :] = main           # diagonal
-        ab[2, :-1] = lower[1:]   # subdiagonal
+        ab[0, 1:] = upper[:-1]  # superdiagonal
+        ab[1, :] = main  # diagonal
+        ab[2, :-1] = lower[1:]  # subdiagonal
         return solve_banded((1, 1), ab, rhs)
 
-    def _build_y_system(self, T_row: np.ndarray, T_new_row: np.ndarray,
-                        q_row: np.ndarray, k_arr: np.ndarray,
-                        alpha_arr: np.ndarray,
-                        dt_half: float, theta: float) -> Tuple[np.ndarray, ...]:
+    def _build_y_system(
+        self,
+        T_row: np.ndarray,
+        T_new_row: np.ndarray,
+        q_row: np.ndarray,
+        k_arr: np.ndarray,
+        alpha_arr: np.ndarray,
+        dt_half: float,
+        theta: float,
+    ) -> tuple[np.ndarray, ...]:
         """Build tridiagonal system for one row (fixed z) in y-direction.
 
         Returns (lower, main, upper, rhs) arrays of length ny.
@@ -434,9 +458,11 @@ class GoldakSolver:
             main[i] = 1.0 + 2.0 * theta * Fo_i
             lower[i] = -theta * Fo_i
             upper[i] = -theta * Fo_i
-            rhs[i] = (T_row[i]
-                       + (1.0 - theta) * Fo_i * (T_row[i-1] - 2*T_row[i] + T_row[i+1])
-                       + dt_half * q_row[i] / (self.params.rho * self.params.Cp))
+            rhs[i] = (
+                T_row[i]
+                + (1.0 - theta) * Fo_i * (T_row[i - 1] - 2 * T_row[i] + T_row[i + 1])
+                + dt_half * q_row[i] / (self.params.rho * self.params.Cp)
+            )
 
         # Left boundary (y = -y_max): convection + radiation
         h_eff_l = self._linearized_htc(T_new_row[0])
@@ -444,11 +470,13 @@ class GoldakSolver:
         Fo_l = Fo[0]
         main[0] = 1.0 + theta * (2.0 * Fo_l + 2.0 * Fo_l * Bi_l)
         upper[0] = -2.0 * theta * Fo_l
-        rhs[0] = (T_row[0]
-                  + (1.0 - theta) * (2.0 * Fo_l * (T_row[1] - T_row[0])
-                                     + 2.0 * Fo_l * Bi_l * (self.params.T0 - T_row[0]))
-                  + 2.0 * theta * Fo_l * Bi_l * self.params.T0
-                  + dt_half * q_row[0] / (self.params.rho * self.params.Cp))
+        rhs[0] = (
+            T_row[0]
+            + (1.0 - theta)
+            * (2.0 * Fo_l * (T_row[1] - T_row[0]) + 2.0 * Fo_l * Bi_l * (self.params.T0 - T_row[0]))
+            + 2.0 * theta * Fo_l * Bi_l * self.params.T0
+            + dt_half * q_row[0] / (self.params.rho * self.params.Cp)
+        )
 
         # Right boundary (y = +y_max): convection + radiation
         h_eff_r = self._linearized_htc(T_new_row[-1])
@@ -456,18 +484,29 @@ class GoldakSolver:
         Fo_r = Fo[-1]
         main[-1] = 1.0 + theta * (2.0 * Fo_r + 2.0 * Fo_r * Bi_r)
         lower[-1] = -2.0 * theta * Fo_r
-        rhs[-1] = (T_row[-1]
-                   + (1.0 - theta) * (2.0 * Fo_r * (T_row[-2] - T_row[-1])
-                                      + 2.0 * Fo_r * Bi_r * (self.params.T0 - T_row[-1]))
-                   + 2.0 * theta * Fo_r * Bi_r * self.params.T0
-                   + dt_half * q_row[-1] / (self.params.rho * self.params.Cp))
+        rhs[-1] = (
+            T_row[-1]
+            + (1.0 - theta)
+            * (
+                2.0 * Fo_r * (T_row[-2] - T_row[-1])
+                + 2.0 * Fo_r * Bi_r * (self.params.T0 - T_row[-1])
+            )
+            + 2.0 * theta * Fo_r * Bi_r * self.params.T0
+            + dt_half * q_row[-1] / (self.params.rho * self.params.Cp)
+        )
 
         return lower, main, upper, rhs
 
-    def _build_z_system(self, T_col: np.ndarray, T_new_col: np.ndarray,
-                        q_col: np.ndarray, k_arr: np.ndarray,
-                        alpha_arr: np.ndarray,
-                        dt_half: float, theta: float) -> Tuple[np.ndarray, ...]:
+    def _build_z_system(
+        self,
+        T_col: np.ndarray,
+        T_new_col: np.ndarray,
+        q_col: np.ndarray,
+        k_arr: np.ndarray,
+        alpha_arr: np.ndarray,
+        dt_half: float,
+        theta: float,
+    ) -> tuple[np.ndarray, ...]:
         """Build tridiagonal system for one column (fixed y) in z-direction.
 
         Returns (lower, main, upper, rhs) arrays of length nz.
@@ -487,9 +526,11 @@ class GoldakSolver:
             main[i] = 1.0 + 2.0 * theta * Fo_i
             lower[i] = -theta * Fo_i
             upper[i] = -theta * Fo_i
-            rhs[i] = (T_col[i]
-                       + (1.0 - theta) * Fo_i * (T_col[i-1] - 2*T_col[i] + T_col[i+1])
-                       + dt_half * q_col[i] / (self.params.rho * self.params.Cp))
+            rhs[i] = (
+                T_col[i]
+                + (1.0 - theta) * Fo_i * (T_col[i - 1] - 2 * T_col[i] + T_col[i + 1])
+                + dt_half * q_col[i] / (self.params.rho * self.params.Cp)
+            )
 
         # Top surface (z=0): convection + radiation to air
         h_eff_top = self._linearized_htc(T_new_col[0])
@@ -497,19 +538,26 @@ class GoldakSolver:
         Fo_top = Fo[0]
         main[0] = 1.0 + theta * (2.0 * Fo_top + 2.0 * Fo_top * Bi_top)
         upper[0] = -2.0 * theta * Fo_top
-        rhs[0] = (T_col[0]
-                  + (1.0 - theta) * (2.0 * Fo_top * (T_col[1] - T_col[0])
-                                     + 2.0 * Fo_top * Bi_top * (self.params.T0 - T_col[0]))
-                  + 2.0 * theta * Fo_top * Bi_top * self.params.T0
-                  + dt_half * q_col[0] / (self.params.rho * self.params.Cp))
+        rhs[0] = (
+            T_col[0]
+            + (1.0 - theta)
+            * (
+                2.0 * Fo_top * (T_col[1] - T_col[0])
+                + 2.0 * Fo_top * Bi_top * (self.params.T0 - T_col[0])
+            )
+            + 2.0 * theta * Fo_top * Bi_top * self.params.T0
+            + dt_half * q_col[0] / (self.params.rho * self.params.Cp)
+        )
 
         # Bottom (z=z_max): adiabatic (symmetry or thick plate)
         Fo_bot = Fo[-1]
         main[-1] = 1.0 + 2.0 * theta * Fo_bot
         lower[-1] = -2.0 * theta * Fo_bot
-        rhs[-1] = (T_col[-1]
-                   + 2.0 * (1.0 - theta) * Fo_bot * (T_col[-2] - T_col[-1])
-                   + dt_half * q_col[-1] / (self.params.rho * self.params.Cp))
+        rhs[-1] = (
+            T_col[-1]
+            + 2.0 * (1.0 - theta) * Fo_bot * (T_col[-2] - T_col[-1])
+            + dt_half * q_col[-1] / (self.params.rho * self.params.Cp)
+        )
 
         return lower, main, upper, rhs
 
@@ -558,8 +606,7 @@ class GoldakSolver:
 
         for j in range(nz):
             lower, main, upper, rhs = self._build_y_system(
-                T[j, :], T_half[j, :], q_source[j, :],
-                k_arr_y, alpha_arr_y, dt_half, theta
+                T[j, :], T_half[j, :], q_source[j, :], k_arr_y, alpha_arr_y, dt_half, theta
             )
             T_half[j, :] = self._solve_tridiag(lower, main, upper, rhs)
 
@@ -570,8 +617,7 @@ class GoldakSolver:
 
         for i in range(ny):
             lower, main, upper, rhs = self._build_z_system(
-                T_half[:, i], T_new[:, i], q_source[:, i],
-                k_arr_z, alpha_arr_z, dt_half, theta
+                T_half[:, i], T_new[:, i], q_source[:, i], k_arr_z, alpha_arr_z, dt_half, theta
             )
             T_new[:, i] = self._solve_tridiag(lower, main, upper, rhs)
 
@@ -580,8 +626,9 @@ class GoldakSolver:
 
         return T_new
 
-    def solve(self, initial_field: Optional[np.ndarray] = None,
-              progress_callback=None) -> GoldakResult:
+    def solve(
+        self, initial_field: np.ndarray | None = None, progress_callback=None
+    ) -> GoldakResult:
         """Run the full 2D transient simulation.
 
         Parameters
@@ -704,35 +751,35 @@ class GoldakSolver:
         probe_cycles = {}
         for name in PROBE_POINTS:
             probe_cycles[name] = {
-                'times': probe_times[name],
-                'temps': probe_temps[name],
+                "times": probe_times[name],
+                "temps": probe_temps[name],
             }
 
         # Goldak params summary
         params_dict = {
-            'Q_W': p.Q,
-            'v_mm_s': p.v * 1000,
-            'a_f_mm': p.a_f * 1000,
-            'a_r_mm': p.a_r * 1000,
-            'b_mm': p.b * 1000,
-            'c_mm': p.c * 1000,
-            'f_f': p.f_f,
-            'f_r': p.f_r,
-            'T0_C': p.T0,
-            'k': p.k,
-            'rho': p.rho,
-            'Cp': p.Cp,
-            'eta': p.eta,
+            "Q_W": p.Q,
+            "v_mm_s": p.v * 1000,
+            "a_f_mm": p.a_f * 1000,
+            "a_r_mm": p.a_r * 1000,
+            "b_mm": p.b * 1000,
+            "c_mm": p.c * 1000,
+            "f_f": p.f_f,
+            "f_r": p.f_r,
+            "T0_C": p.T0,
+            "k": p.k,
+            "rho": p.rho,
+            "Cp": p.Cp,
+            "eta": p.eta,
         }
 
         solver_info = {
-            'ny': ny,
-            'nz': nz,
-            'dt': cfg.dt,
-            'total_time': cfg.total_time,
-            'n_steps': n_steps,
-            'n_snapshots': snap_idx,
-            'wall_time_s': round(wall_time, 2),
+            "ny": ny,
+            "nz": nz,
+            "dt": cfg.dt,
+            "total_time": cfg.total_time,
+            "n_steps": n_steps,
+            "n_snapshots": snap_idx,
+            "wall_time_s": round(wall_time, 2),
         }
 
         return GoldakResult(
@@ -756,21 +803,21 @@ class GoldakSolver:
         """
         try:
             import matplotlib
-            matplotlib.use('Agg')
+
+            matplotlib.use("Agg")
             import matplotlib.pyplot as plt
 
             fig, ax = plt.subplots()
-            cs = ax.contour(self.y * 1000, self.z * 1000, peak_map,
-                           levels=[SOLIDUS_TEMP])
+            cs = ax.contour(self.y * 1000, self.z * 1000, peak_map, levels=[SOLIDUS_TEMP])
             boundary_y = []
             boundary_z = []
             for seg in cs.allsegs[0]:
                 boundary_y.extend(seg[:, 0].tolist())
                 boundary_z.extend(seg[:, 1].tolist())
             plt.close(fig)
-            return {'y_mm': boundary_y, 'z_mm': boundary_z}
+            return {"y_mm": boundary_y, "z_mm": boundary_z}
         except Exception:
-            return {'y_mm': [], 'z_mm': []}
+            return {"y_mm": [], "z_mm": []}
 
     def extract_haz_from_field(self) -> dict:
         """Extract HAZ zone data from a solved result's peak temperature map.
@@ -778,7 +825,9 @@ class GoldakSolver:
         Compatible with HAZResult-style output for comparison with Rosenthal.
         Uses the surface (z=0) peak temperature profile.
         """
-        peak_surface = self.solve_result.peak_temperature_map[0, :] if hasattr(self, 'solve_result') else None
+        peak_surface = (
+            self.solve_result.peak_temperature_map[0, :] if hasattr(self, "solve_result") else None
+        )
         if peak_surface is None:
             return {}
 
@@ -790,31 +839,33 @@ class GoldakSolver:
 
         # Find zone boundaries by interpolation
         boundaries = {}
-        zone_temps = {'fusion': SOLIDUS_TEMP, 'cghaz': 1100.0, 'fghaz': 900.0, 'ichaz': 727.0}
+        zone_temps = {"fusion": SOLIDUS_TEMP, "cghaz": 1100.0, "fghaz": 900.0, "ichaz": 727.0}
         for zone_name, target_temp in zone_temps.items():
             idx = np.where(temps_right < target_temp)[0]
             if len(idx) > 0 and idx[0] > 0:
                 # Linear interpolation
                 i = idx[0]
-                frac = (target_temp - temps_right[i]) / (temps_right[i-1] - temps_right[i])
-                boundaries[zone_name] = float(dist_right[i] - frac * (dist_right[i] - dist_right[i-1]))
+                frac = (target_temp - temps_right[i]) / (temps_right[i - 1] - temps_right[i])
+                boundaries[zone_name] = float(
+                    dist_right[i] - frac * (dist_right[i] - dist_right[i - 1])
+                )
             else:
                 boundaries[zone_name] = 0.0
 
-        fz_w = boundaries.get('fusion', 0)
-        cghaz_b = boundaries.get('cghaz', 0)
-        fghaz_b = boundaries.get('fghaz', 0)
-        ichaz_b = boundaries.get('ichaz', 0)
+        fz_w = boundaries.get("fusion", 0)
+        cghaz_b = boundaries.get("cghaz", 0)
+        fghaz_b = boundaries.get("fghaz", 0)
+        ichaz_b = boundaries.get("ichaz", 0)
 
         return {
-            'fusion_zone_width': fz_w,
-            'cghaz_width': max(0, cghaz_b - fz_w),
-            'fghaz_width': max(0, fghaz_b - cghaz_b),
-            'ichaz_width': max(0, ichaz_b - fghaz_b),
-            'total_haz_width': max(0, ichaz_b - fz_w),
-            'zone_boundaries': boundaries,
-            'distances_mm': dist_right.tolist(),
-            'peak_temperatures': temps_right.tolist(),
+            "fusion_zone_width": fz_w,
+            "cghaz_width": max(0, cghaz_b - fz_w),
+            "fghaz_width": max(0, fghaz_b - cghaz_b),
+            "ichaz_width": max(0, ichaz_b - fghaz_b),
+            "total_haz_width": max(0, ichaz_b - fz_w),
+            "zone_boundaries": boundaries,
+            "distances_mm": dist_right.tolist(),
+            "peak_temperatures": temps_right.tolist(),
         }
 
 
@@ -844,25 +895,25 @@ def estimate_pool_params(heat_input_kj_mm: float, process_type: str) -> dict:
 
     # Penetration depends on process
     penetration_factors = {
-        'gtaw': 0.6,    # Shallow for TIG
-        'mig_mag': 0.8,
-        'saw': 1.2,     # Deep penetration
-        'smaw': 0.7,
+        "gtaw": 0.6,  # Shallow for TIG
+        "mig_mag": 0.8,
+        "saw": 1.2,  # Deep penetration
+        "smaw": 0.7,
     }
     pen_factor = penetration_factors.get(process_type, 0.8)
     c_mm = b_mm * pen_factor
 
     # Front/rear semi-axes
-    a_f_mm = b_mm * 0.8   # Front shorter
-    a_r_mm = b_mm * 1.6   # Rear elongated
+    a_f_mm = b_mm * 0.8  # Front shorter
+    a_r_mm = b_mm * 1.6  # Rear elongated
 
     return {
-        'b': b_mm / 1000.0,
-        'c': c_mm / 1000.0,
-        'a_f': a_f_mm / 1000.0,
-        'a_r': a_r_mm / 1000.0,
-        'b_mm': b_mm,
-        'c_mm': c_mm,
-        'a_f_mm': a_f_mm,
-        'a_r_mm': a_r_mm,
+        "b": b_mm / 1000.0,
+        "c": c_mm / 1000.0,
+        "a_f": a_f_mm / 1000.0,
+        "a_r": a_r_mm / 1000.0,
+        "b_mm": b_mm,
+        "c_mm": c_mm,
+        "a_f_mm": a_f_mm,
+        "a_r_mm": a_r_mm,
     }

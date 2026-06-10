@@ -11,10 +11,11 @@ Also installs a WSGI middleware that reads the X-Script-Name header
 /app/<code> prefix automatically.
 """
 
-import urllib.request
-import urllib.error
 import json
-from flask import session, request, redirect, abort, current_app, g
+import urllib.error
+import urllib.request
+
+from flask import abort, current_app, g, redirect, request, session
 
 
 def validate_token_with_portal(token):
@@ -25,8 +26,10 @@ def validate_token_with_portal(token):
 
     payload = json.dumps({"token": token, "app_code": app_code}).encode("utf-8")
     req = urllib.request.Request(
-        url, data=payload,
-        headers={"Content-Type": "application/json"}, method="POST",
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
     try:
         resp = urllib.request.urlopen(req, timeout=5)
@@ -46,6 +49,7 @@ def _ensure_local_user(portal_user):
     """
     try:
         from flask_login import login_user
+
         from app.extensions import db
         from app.models import User
 
@@ -75,6 +79,7 @@ def _ensure_local_user(portal_user):
                         pass
             if hasattr(user, "set_password"):
                 import secrets
+
                 user.set_password(secrets.token_hex(32))
             db.session.add(user)
             db.session.commit()
@@ -84,7 +89,7 @@ def _ensure_local_user(portal_user):
             if portal_role and hasattr(user, "role"):
                 try:
                     if getattr(user, "role", None) != portal_role:
-                        setattr(user, "role", portal_role)
+                        user.role = portal_role
                         changed = True
                 except (AttributeError, TypeError):
                     pass
@@ -104,6 +109,7 @@ def _is_flask_login_authenticated():
     """
     try:
         from flask_login import current_user
+
         return current_user.is_authenticated
     except Exception:
         return None
@@ -123,7 +129,7 @@ class ScriptNameMiddleware:
             # Strip script_name from PATH_INFO if present
             path_info = environ.get("PATH_INFO", "")
             if path_info.startswith(script_name):
-                environ["PATH_INFO"] = path_info[len(script_name):] or "/"
+                environ["PATH_INFO"] = path_info[len(script_name) :] or "/"
         return self.wsgi_app(environ, start_response)
 
 
@@ -156,7 +162,8 @@ def init_portal_auth(app):
                 _ensure_local_user(user)
                 # Redirect to clean URL without token parameter.
                 # url_for / redirect will auto-include the SCRIPT_NAME prefix.
-                from urllib.parse import urlencode, urlparse, parse_qs
+                from urllib.parse import parse_qs, urlencode, urlparse
+
                 parsed = urlparse(request.url)
                 params = parse_qs(parsed.query)
                 params.pop("token", None)
@@ -166,7 +173,10 @@ def init_portal_auth(app):
                     clean_url += "?" + clean_query
                 return redirect(clean_url)
             else:
-                abort(403, description="Invalid or expired token. Please launch this app from the portal.")
+                abort(
+                    403,
+                    description="Invalid or expired token. Please launch this app from the portal.",
+                )
 
         if "portal_user" in session:
             # Session exists — ensure Flask-Login user is set (if app uses it)

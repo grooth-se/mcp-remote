@@ -1,10 +1,15 @@
 """Tests for Goldak double-ellipsoid heat source solver."""
-import pytest
+
 import numpy as np
+import pytest
 
 from app.services.goldak_solver import (
-    GoldakSolver, GoldakParams, GoldakSolverConfig, GoldakResult,
-    estimate_pool_params, SOLIDUS_TEMP,
+    SOLIDUS_TEMP,
+    GoldakParams,
+    GoldakResult,
+    GoldakSolver,
+    GoldakSolverConfig,
+    estimate_pool_params,
 )
 
 
@@ -39,7 +44,6 @@ class TestGoldakParams:
 
 
 class TestGoldakSolverConfig:
-
     def test_default_grid(self):
         config = GoldakSolverConfig()
         assert config.ny == 41
@@ -112,9 +116,7 @@ class TestGoldakSource:
         q = solver._goldak_source_2d(t_pass)
         # Compare left and right halves at surface
         ny_mid = config.ny // 2
-        np.testing.assert_allclose(
-            q[0, :ny_mid], q[0, ny_mid + 1:][::-1], rtol=1e-10
-        )
+        np.testing.assert_allclose(q[0, :ny_mid], q[0, ny_mid + 1 :][::-1], rtol=1e-10)
 
 
 class TestGoldakSolver:
@@ -122,8 +124,7 @@ class TestGoldakSolver:
 
     def _make_solver(self, Q=5000, total_time=30.0, ny=21, nz=11):
         params = GoldakParams(Q=Q, v=0.005)
-        config = GoldakSolverConfig(ny=ny, nz=nz, dt=0.1,
-                                    total_time=total_time, output_interval=10)
+        config = GoldakSolverConfig(ny=ny, nz=nz, dt=0.1, total_time=total_time, output_interval=10)
         return GoldakSolver(params, config)
 
     def test_solver_completes(self):
@@ -153,9 +154,7 @@ class TestGoldakSolver:
         solver = self._make_solver(Q=0.0, total_time=10.0)
         result = solver.solve()
         # All temperatures should be approximately T0
-        np.testing.assert_allclose(
-            result.peak_temperature_map, solver.params.T0, atol=1.0
-        )
+        np.testing.assert_allclose(result.peak_temperature_map, solver.params.T0, atol=1.0)
 
     def test_snapshots_stored(self):
         """Temperature field snapshots are stored at output intervals."""
@@ -168,10 +167,10 @@ class TestGoldakSolver:
         """Thermal cycles at probe points are recorded."""
         solver = self._make_solver(Q=5000, total_time=30.0)
         result = solver.solve()
-        assert 'center' in result.probe_thermal_cycles
-        center_cycle = result.probe_thermal_cycles['center']
-        assert len(center_cycle['times']) > 1
-        assert len(center_cycle['temps']) == len(center_cycle['times'])
+        assert "center" in result.probe_thermal_cycles
+        center_cycle = result.probe_thermal_cycles["center"]
+        assert len(center_cycle["times"]) > 1
+        assert len(center_cycle["temps"]) == len(center_cycle["times"])
 
     def test_t8_5_map_shape(self):
         """t8/5 map has correct shape."""
@@ -183,17 +182,17 @@ class TestGoldakSolver:
         """Solver info dict is populated."""
         solver = self._make_solver(total_time=10.0)
         result = solver.solve()
-        assert 'wall_time_s' in result.solver_info
-        assert 'n_steps' in result.solver_info
-        assert result.solver_info['ny'] == 21
-        assert result.solver_info['nz'] == 11
+        assert "wall_time_s" in result.solver_info
+        assert "n_steps" in result.solver_info
+        assert result.solver_info["ny"] == 21
+        assert result.solver_info["nz"] == 11
 
     def test_goldak_params_in_result(self):
         """Goldak parameters are included in result."""
         solver = self._make_solver()
         result = solver.solve()
-        assert 'Q_W' in result.goldak_params
-        assert 'b_mm' in result.goldak_params
+        assert "Q_W" in result.goldak_params
+        assert "b_mm" in result.goldak_params
 
     def test_initial_field_used(self):
         """Custom initial field is used as starting condition."""
@@ -215,13 +214,14 @@ class TestGoldakSolver:
     def test_to_dict_serializable(self):
         """Result.to_dict() returns JSON-serializable data."""
         import json
+
         solver = self._make_solver(total_time=10.0)
         result = solver.solve()
         d = result.to_dict()
         # Should not raise
         json.dumps(d)
-        assert 'peak_temperature_map' in d
-        assert 'surface_peak_temps' in d
+        assert "peak_temperature_map" in d
+        assert "surface_peak_temps" in d
 
     def test_center_t8_5_property(self):
         """center_t8_5 property returns float or None."""
@@ -235,37 +235,37 @@ class TestPoolEstimation:
     """Test weld pool parameter estimation."""
 
     def test_reasonable_width_for_mig(self):
-        est = estimate_pool_params(1.5, 'mig_mag')
-        assert 0.002 < est['b'] < 0.010  # 2-10mm
+        est = estimate_pool_params(1.5, "mig_mag")
+        assert 0.002 < est["b"] < 0.010  # 2-10mm
 
     def test_reasonable_penetration_for_saw(self):
-        est = estimate_pool_params(2.0, 'saw')
-        assert est['c'] > est['b'] * 0.5  # SAW has deep penetration
+        est = estimate_pool_params(2.0, "saw")
+        assert est["c"] > est["b"] * 0.5  # SAW has deep penetration
 
     def test_gtaw_shallower_than_saw(self):
-        est_gtaw = estimate_pool_params(1.0, 'gtaw')
-        est_saw = estimate_pool_params(1.0, 'saw')
-        assert est_gtaw['c'] < est_saw['c']
+        est_gtaw = estimate_pool_params(1.0, "gtaw")
+        est_saw = estimate_pool_params(1.0, "saw")
+        assert est_gtaw["c"] < est_saw["c"]
 
     def test_higher_heat_input_wider_pool(self):
-        est_low = estimate_pool_params(0.5, 'mig_mag')
-        est_high = estimate_pool_params(3.0, 'mig_mag')
-        assert est_high['b'] > est_low['b']
+        est_low = estimate_pool_params(0.5, "mig_mag")
+        est_high = estimate_pool_params(3.0, "mig_mag")
+        assert est_high["b"] > est_low["b"]
 
     def test_rear_longer_than_front(self):
-        est = estimate_pool_params(1.5, 'mig_mag')
-        assert est['a_r'] > est['a_f']
+        est = estimate_pool_params(1.5, "mig_mag")
+        assert est["a_r"] > est["a_f"]
 
     def test_returns_mm_values(self):
-        est = estimate_pool_params(1.5, 'mig_mag')
-        assert 'b_mm' in est
-        assert est['b_mm'] == pytest.approx(est['b'] * 1000)
+        est = estimate_pool_params(1.5, "mig_mag")
+        assert "b_mm" in est
+        assert est["b_mm"] == pytest.approx(est["b"] * 1000)
 
     def test_all_processes(self):
-        for process in ['gtaw', 'mig_mag', 'saw', 'smaw']:
+        for process in ["gtaw", "mig_mag", "saw", "smaw"]:
             est = estimate_pool_params(1.5, process)
-            assert est['b'] > 0
-            assert est['c'] > 0
+            assert est["b"] > 0
+            assert est["c"] > 0
 
 
 class TestGoldakHAZExtraction:
@@ -274,15 +274,14 @@ class TestGoldakHAZExtraction:
     def test_haz_extraction_structure(self):
         """extract_haz_from_field returns expected keys."""
         params = GoldakParams(Q=5000, v=0.005)
-        config = GoldakSolverConfig(ny=31, nz=21, dt=0.1,
-                                    total_time=40.0, output_interval=20)
+        config = GoldakSolverConfig(ny=31, nz=21, dt=0.1, total_time=40.0, output_interval=20)
         solver = GoldakSolver(params, config)
         result = solver.solve()
         solver.solve_result = result  # Set for extraction
         haz = solver.extract_haz_from_field()
-        assert 'zone_boundaries' in haz
-        assert 'distances_mm' in haz
-        assert 'peak_temperatures' in haz
+        assert "zone_boundaries" in haz
+        assert "distances_mm" in haz
+        assert "peak_temperatures" in haz
 
 
 class TestGoldakSolverEdgeCases:
@@ -297,8 +296,7 @@ class TestGoldakSolverEdgeCases:
     def test_very_small_time_step(self):
         """Solver handles small dt without error."""
         params = GoldakParams(Q=3000)
-        config = GoldakSolverConfig(ny=11, nz=11, dt=0.01, total_time=2.0,
-                                    output_interval=10)
+        config = GoldakSolverConfig(ny=11, nz=11, dt=0.01, total_time=2.0, output_interval=10)
         solver = GoldakSolver(params, config)
         result = solver.solve()
         assert result is not None
@@ -306,18 +304,16 @@ class TestGoldakSolverEdgeCases:
     def test_weld_pool_boundary_extraction(self):
         """Weld pool boundary is a dict with y_mm and z_mm."""
         params = GoldakParams(Q=5000)
-        config = GoldakSolverConfig(ny=21, nz=11, dt=0.1, total_time=30.0,
-                                    output_interval=20)
+        config = GoldakSolverConfig(ny=21, nz=11, dt=0.1, total_time=30.0, output_interval=20)
         solver = GoldakSolver(params, config)
         result = solver.solve()
-        assert 'y_mm' in result.weld_pool_boundary
-        assert 'z_mm' in result.weld_pool_boundary
+        assert "y_mm" in result.weld_pool_boundary
+        assert "z_mm" in result.weld_pool_boundary
 
     def test_fusion_zone_area(self):
         """Fusion zone area is non-negative."""
         params = GoldakParams(Q=5000)
-        config = GoldakSolverConfig(ny=21, nz=11, dt=0.1, total_time=30.0,
-                                    output_interval=20)
+        config = GoldakSolverConfig(ny=21, nz=11, dt=0.1, total_time=30.0, output_interval=20)
         solver = GoldakSolver(params, config)
         result = solver.solve()
         assert result.fusion_zone_area_mm2 >= 0
