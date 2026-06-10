@@ -1,60 +1,73 @@
 """Routes for materials management."""
+
 import json
-from flask import (
-    render_template, redirect, url_for, flash, request,
-    send_file, Response
-)
-from flask_login import login_required
 from io import BytesIO
+
+from flask import Response, flash, redirect, render_template, request, send_file, url_for
+from flask_login import login_required
 
 from app.extensions import db
 from app.models import (
-    SteelGrade, MaterialProperty, PhaseDiagram, PhaseProperty, SteelComposition,
-    PROPERTY_TYPE_CONSTANT, PROPERTY_TYPE_CURVE,
-    PROPERTY_TYPE_POLYNOMIAL, PROPERTY_TYPE_EQUATION,
-    DATA_SOURCE_STANDARD,
-    PHASES, PHASE_LABELS,
+    PHASE_LABELS,
+    PROPERTY_TYPE_CONSTANT,
+    PROPERTY_TYPE_CURVE,
+    PROPERTY_TYPE_EQUATION,
+    PROPERTY_TYPE_POLYNOMIAL,
+    MaterialProperty,
+    PhaseDiagram,
+    PhaseProperty,
+    SteelComposition,
+    SteelGrade,
 )
-from app.services import PropertyEvaluator, PropertyPlotter, ExcelImporter, seed_standard_grades, seed_standard_compositions
+from app.services import (
+    ExcelImporter,
+    PropertyEvaluator,
+    PropertyPlotter,
+    seed_standard_compositions,
+    seed_standard_grades,
+)
+from app.services.curve_validation import parse_curve_data
 from app.services.material_change_tracker import MaterialChangeTracker
 
 from . import materials_bp
 from .forms import (
-    SteelGradeForm, MaterialPropertyForm, PhaseDiagramForm,
-    ImportForm, PropertyEvaluateForm, PhasePropertyForm, SteelCompositionForm
+    ImportForm,
+    MaterialPropertyForm,
+    PhaseDiagramForm,
+    PhasePropertyForm,
+    PropertyEvaluateForm,
+    SteelCompositionForm,
+    SteelGradeForm,
 )
-
 
 # ============================================================================
 # Steel Grade CRUD
 # ============================================================================
 
-@materials_bp.route('/')
+
+@materials_bp.route("/")
 @login_required
 def index():
     """List all steel grades."""
     # Filters
-    data_source = request.args.get('source', '')
-    search = request.args.get('search', '')
+    data_source = request.args.get("source", "")
+    search = request.args.get("search", "")
 
     query = SteelGrade.query
 
     if data_source:
         query = query.filter_by(data_source=data_source)
     if search:
-        query = query.filter(SteelGrade.designation.ilike(f'%{search}%'))
+        query = query.filter(SteelGrade.designation.ilike(f"%{search}%"))
 
     grades = query.order_by(SteelGrade.designation).all()
 
     return render_template(
-        'materials/index.html',
-        grades=grades,
-        current_source=data_source,
-        search=search
+        "materials/index.html", grades=grades, current_source=data_source, search=search
     )
 
 
-@materials_bp.route('/new', methods=['GET', 'POST'])
+@materials_bp.route("/new", methods=["GET", "POST"])
 @login_required
 def new():
     """Create new steel grade."""
@@ -63,29 +76,28 @@ def new():
     if form.validate_on_submit():
         # Check for duplicate
         existing = SteelGrade.query.filter_by(
-            designation=form.designation.data,
-            data_source=form.data_source.data
+            designation=form.designation.data, data_source=form.data_source.data
         ).first()
 
         if existing:
-            flash('A steel grade with this designation and source already exists.', 'danger')
-            return render_template('materials/new.html', form=form)
+            flash("A steel grade with this designation and source already exists.", "danger")
+            return render_template("materials/new.html", form=form)
 
         grade = SteelGrade(
             designation=form.designation.data,
             data_source=form.data_source.data,
-            description=form.description.data
+            description=form.description.data,
         )
         db.session.add(grade)
         db.session.commit()
 
-        flash(f'Steel grade {grade.designation} created successfully.', 'success')
-        return redirect(url_for('materials.view', id=grade.id))
+        flash(f"Steel grade {grade.designation} created successfully.", "success")
+        return redirect(url_for("materials.view", id=grade.id))
 
-    return render_template('materials/new.html', form=form)
+    return render_template("materials/new.html", form=form)
 
 
-@materials_bp.route('/<int:id>')
+@materials_bp.route("/<int:id>")
 @login_required
 def view(id):
     """View steel grade details."""
@@ -97,15 +109,15 @@ def view(id):
     eval_form = PropertyEvaluateForm()
 
     return render_template(
-        'materials/view.html',
+        "materials/view.html",
         grade=grade,
         properties=properties,
         diagrams=diagrams,
-        eval_form=eval_form
+        eval_form=eval_form,
     )
 
 
-@materials_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
+@materials_bp.route("/<int:id>/edit", methods=["GET", "POST"])
 @login_required
 def edit(id):
     """Edit steel grade."""
@@ -117,32 +129,35 @@ def edit(id):
         existing = SteelGrade.query.filter(
             SteelGrade.id != id,
             SteelGrade.designation == form.designation.data,
-            SteelGrade.data_source == form.data_source.data
+            SteelGrade.data_source == form.data_source.data,
         ).first()
 
         if existing:
-            flash('Another steel grade with this designation and source exists.', 'danger')
-            return render_template('materials/edit.html', form=form, grade=grade)
+            flash("Another steel grade with this designation and source exists.", "danger")
+            return render_template("materials/edit.html", form=form, grade=grade)
 
-        changes = MaterialChangeTracker.detect_changes(grade, {
-            'designation': form.designation.data,
-            'data_source': form.data_source.data,
-            'description': form.description.data,
-        })
+        changes = MaterialChangeTracker.detect_changes(
+            grade,
+            {
+                "designation": form.designation.data,
+                "data_source": form.data_source.data,
+                "description": form.description.data,
+            },
+        )
         grade.designation = form.designation.data
         grade.data_source = form.data_source.data
         grade.description = form.description.data
         if changes:
-            MaterialChangeTracker.log_update('steel_grade', grade.id, grade.id, changes)
+            MaterialChangeTracker.log_update("steel_grade", grade.id, grade.id, changes)
         db.session.commit()
 
-        flash(f'Steel grade {grade.designation} updated successfully.', 'success')
-        return redirect(url_for('materials.view', id=grade.id))
+        flash(f"Steel grade {grade.designation} updated successfully.", "success")
+        return redirect(url_for("materials.view", id=grade.id))
 
-    return render_template('materials/edit.html', form=form, grade=grade)
+    return render_template("materials/edit.html", form=form, grade=grade)
 
 
-@materials_bp.route('/<int:id>/delete', methods=['POST'])
+@materials_bp.route("/<int:id>/delete", methods=["POST"])
 @login_required
 def delete(id):
     """Delete steel grade."""
@@ -152,15 +167,16 @@ def delete(id):
     db.session.delete(grade)
     db.session.commit()
 
-    flash(f'Steel grade {designation} deleted successfully.', 'success')
-    return redirect(url_for('materials.index'))
+    flash(f"Steel grade {designation} deleted successfully.", "success")
+    return redirect(url_for("materials.index"))
 
 
 # ============================================================================
 # Material Properties
 # ============================================================================
 
-@materials_bp.route('/<int:id>/properties', methods=['GET', 'POST'])
+
+@materials_bp.route("/<int:id>/properties", methods=["GET", "POST"])
 @login_required
 def properties(id):
     """Manage properties for a steel grade."""
@@ -170,28 +186,44 @@ def properties(id):
     if form.validate_on_submit():
         # Determine property name
         prop_name = form.property_name.data
-        if prop_name == 'custom' and form.custom_name.data:
-            prop_name = form.custom_name.data.lower().replace(' ', '_')
+        if prop_name == "custom" and form.custom_name.data:
+            prop_name = form.custom_name.data.lower().replace(" ", "_")
 
         # Build data based on property type
         prop_type = form.property_type.data
         data = {}
 
         if prop_type == PROPERTY_TYPE_CONSTANT:
-            data = {'value': form.constant_value.data}
+            data = {"value": form.constant_value.data}
         elif prop_type == PROPERTY_TYPE_CURVE:
-            try:
-                data = json.loads(form.curve_data.data) if form.curve_data.data else {}
-            except json.JSONDecodeError:
-                flash('Invalid JSON for curve data.', 'danger')
-                return render_template('materials/properties.html', form=form, grade=grade)
+            data, errors = parse_curve_data(form.curve_data.data)
+            if errors:
+                for error in errors:
+                    flash(error, "danger")
+                return render_template(
+                    "materials/properties.html",
+                    form=form,
+                    grade=grade,
+                    properties=grade.properties.all(),
+                )
         elif prop_type == PROPERTY_TYPE_POLYNOMIAL:
             coeffs = []
             if form.polynomial_coefficients.data:
-                coeffs = [float(c.strip()) for c in form.polynomial_coefficients.data.split(',')]
+                try:
+                    coeffs = [
+                        float(c.strip()) for c in form.polynomial_coefficients.data.split(",")
+                    ]
+                except ValueError:
+                    flash("Polynomial coefficients must be comma-separated numbers.", "danger")
+                    return render_template(
+                        "materials/properties.html",
+                        form=form,
+                        grade=grade,
+                        properties=grade.properties.all(),
+                    )
             data = {
-                'variable': form.polynomial_variable.data or 'temperature',
-                'coefficients': coeffs
+                "variable": form.polynomial_variable.data or "temperature",
+                "coefficients": coeffs,
             }
         elif prop_type == PROPERTY_TYPE_EQUATION:
             variables = {}
@@ -199,37 +231,43 @@ def properties(id):
                 try:
                     variables = json.loads(form.equation_variables.data)
                 except json.JSONDecodeError:
-                    flash('Invalid JSON for equation variables.', 'danger')
-                    return render_template('materials/properties.html', form=form, grade=grade)
-            data = {
-                'equation': form.equation.data,
-                'variables': variables
-            }
+                    flash("Invalid JSON for equation variables.", "danger")
+                    return render_template(
+                        "materials/properties.html",
+                        form=form,
+                        grade=grade,
+                        properties=grade.properties.all(),
+                    )
+            data = {"equation": form.equation.data, "variables": variables}
 
         # Check if property already exists
         existing = MaterialProperty.query.filter_by(
-            steel_grade_id=grade.id,
-            property_name=prop_name
+            steel_grade_id=grade.id, property_name=prop_name
         ).first()
 
         if existing:
             # Update existing
-            changes = MaterialChangeTracker.detect_changes(existing, {
-                'property_type': prop_type,
-                'units': form.units.data,
-                'dependencies': form.dependencies.data,
-                'notes': form.notes.data,
-            })
+            changes = MaterialChangeTracker.detect_changes(
+                existing,
+                {
+                    "property_type": prop_type,
+                    "units": form.units.data,
+                    "dependencies": form.dependencies.data,
+                    "notes": form.notes.data,
+                },
+            )
             if existing.data_dict != data:
-                changes['data'] = (existing.data_dict, data)
+                changes["data"] = (existing.data_dict, data)
             existing.property_type = prop_type
             existing.units = form.units.data
             existing.dependencies = form.dependencies.data
             existing.notes = form.notes.data
             existing.set_data(data)
             if changes:
-                MaterialChangeTracker.log_update('material_property', existing.id, grade.id, changes)
-            flash(f'Property {prop_name} updated.', 'success')
+                MaterialChangeTracker.log_update(
+                    "material_property", existing.id, grade.id, changes
+                )
+            flash(f"Property {prop_name} updated.", "success")
         else:
             # Create new
             prop = MaterialProperty(
@@ -238,59 +276,65 @@ def properties(id):
                 property_type=prop_type,
                 units=form.units.data,
                 dependencies=form.dependencies.data,
-                notes=form.notes.data
+                notes=form.notes.data,
             )
             prop.set_data(data)
             db.session.add(prop)
             db.session.flush()
-            MaterialChangeTracker.log_create('material_property', prop, grade.id)
-            flash(f'Property {prop_name} created.', 'success')
+            MaterialChangeTracker.log_create("material_property", prop, grade.id)
+            flash(f"Property {prop_name} created.", "success")
 
         db.session.commit()
-        return redirect(url_for('materials.properties', id=grade.id))
+        return redirect(url_for("materials.properties", id=grade.id))
 
     existing_props = grade.properties.all()
     return render_template(
-        'materials/properties.html',
-        form=form,
-        grade=grade,
-        properties=existing_props
+        "materials/properties.html", form=form, grade=grade, properties=existing_props
     )
 
 
-@materials_bp.route('/<int:id>/properties/<int:prop_id>/delete', methods=['POST'])
+@materials_bp.route("/<int:id>/properties/<int:prop_id>/delete", methods=["POST"])
 @login_required
 def delete_property(id, prop_id):
     """Delete a material property."""
     prop = MaterialProperty.query.get_or_404(prop_id)
     if prop.steel_grade_id != id:
-        flash('Property not found.', 'danger')
-        return redirect(url_for('materials.properties', id=id))
+        flash("Property not found.", "danger")
+        return redirect(url_for("materials.properties", id=id))
 
     name = prop.property_name
-    MaterialChangeTracker.log_delete('material_property', prop.id, id, name)
+    MaterialChangeTracker.log_delete("material_property", prop.id, id, name)
     db.session.delete(prop)
     db.session.commit()
 
-    flash(f'Property {name} deleted.', 'success')
-    return redirect(url_for('materials.properties', id=id))
+    flash(f"Property {name} deleted.", "success")
+    return redirect(url_for("materials.properties", id=id))
 
 
-@materials_bp.route('/<int:id>/evaluate', methods=['POST'])
+@materials_bp.route("/<int:id>/evaluate", methods=["POST"])
 @login_required
 def evaluate_property(id):
     """Evaluate a property at given conditions."""
     grade = SteelGrade.query.get_or_404(id)
     form = PropertyEvaluateForm()
 
-    prop_id = request.form.get('property_id')
-    temperature = request.form.get('temperature')
+    prop_id = request.form.get("property_id")
+    temperature = request.form.get("temperature")
 
     if not prop_id:
-        flash('No property selected.', 'warning')
-        return redirect(url_for('materials.view', id=id))
+        flash("No property selected.", "warning")
+        return redirect(url_for("materials.view", id=id))
 
-    prop = MaterialProperty.query.get_or_404(int(prop_id))
+    try:
+        prop_id = int(prop_id)
+    except (TypeError, ValueError):
+        flash("Property not found.", "danger")
+        return redirect(url_for("materials.view", id=id))
+
+    prop = MaterialProperty.query.get_or_404(prop_id)
+    if prop.steel_grade_id != grade.id:
+        flash("Property not found.", "danger")
+        return redirect(url_for("materials.view", id=id))
 
     try:
         temp_value = float(temperature) if temperature else None
@@ -298,20 +342,23 @@ def evaluate_property(id):
         result = evaluator.evaluate(temperature=temp_value)
 
         if result is not None:
-            flash(f'{prop.display_name} at {temp_value}°C = {result:.4g} {prop.units or ""}', 'info')
+            flash(
+                f"{prop.display_name} at {temp_value}°C = {result:.4g} {prop.units or ''}", "info"
+            )
         else:
-            flash('Could not evaluate property at given conditions.', 'warning')
+            flash("Could not evaluate property at given conditions.", "warning")
     except Exception as e:
-        flash(f'Evaluation error: {str(e)}', 'danger')
+        flash(f"Evaluation error: {str(e)}", "danger")
 
-    return redirect(url_for('materials.view', id=id))
+    return redirect(url_for("materials.view", id=id))
 
 
 # ============================================================================
 # Phase Diagrams
 # ============================================================================
 
-@materials_bp.route('/<int:id>/phase-diagram', methods=['GET', 'POST'])
+
+@materials_bp.route("/<int:id>/phase-diagram", methods=["GET", "POST"])
 @login_required
 def phase_diagram(id):
     """Manage phase diagram for a steel grade."""
@@ -320,32 +367,32 @@ def phase_diagram(id):
 
     # Pre-populate form if diagram exists
     existing = grade.phase_diagrams.first()
-    if request.method == 'GET' and existing:
+    if request.method == "GET" and existing:
         form.diagram_type.data = existing.diagram_type
         temps = existing.temps_dict
-        form.ac1.data = temps.get('Ac1')
-        form.ac3.data = temps.get('Ac3')
-        form.ms.data = temps.get('Ms')
-        form.mf.data = temps.get('Mf')
-        form.bs.data = temps.get('Bs')
-        form.bf.data = temps.get('Bf')
-        form.curves_data.data = existing.curves if existing.curves else ''
+        form.ac1.data = temps.get("Ac1")
+        form.ac3.data = temps.get("Ac3")
+        form.ms.data = temps.get("Ms")
+        form.mf.data = temps.get("Mf")
+        form.bs.data = temps.get("Bs")
+        form.bf.data = temps.get("Bf")
+        form.curves_data.data = existing.curves if existing.curves else ""
 
     if form.validate_on_submit():
         # Build transformation temps dict
         temps = {}
         if form.ac1.data is not None:
-            temps['Ac1'] = form.ac1.data
+            temps["Ac1"] = form.ac1.data
         if form.ac3.data is not None:
-            temps['Ac3'] = form.ac3.data
+            temps["Ac3"] = form.ac3.data
         if form.ms.data is not None:
-            temps['Ms'] = form.ms.data
+            temps["Ms"] = form.ms.data
         if form.mf.data is not None:
-            temps['Mf'] = form.mf.data
+            temps["Mf"] = form.mf.data
         if form.bs.data is not None:
-            temps['Bs'] = form.bs.data
+            temps["Bs"] = form.bs.data
         if form.bf.data is not None:
-            temps['Bf'] = form.bf.data
+            temps["Bf"] = form.bf.data
 
         # Parse curves if provided
         curves = None
@@ -353,8 +400,8 @@ def phase_diagram(id):
             try:
                 curves = json.loads(form.curves_data.data)
             except json.JSONDecodeError:
-                flash('Invalid JSON for curves data.', 'danger')
-                return render_template('materials/phase_diagram.html', form=form, grade=grade)
+                flash("Invalid JSON for curves data.", "danger")
+                return render_template("materials/phase_diagram.html", form=form, grade=grade)
 
         # Handle image upload
         image_data = None
@@ -363,9 +410,12 @@ def phase_diagram(id):
 
         if existing:
             # Track changes before update
-            changes = MaterialChangeTracker.detect_changes(existing, {
-                'diagram_type': form.diagram_type.data,
-            })
+            changes = MaterialChangeTracker.detect_changes(
+                existing,
+                {
+                    "diagram_type": form.diagram_type.data,
+                },
+            )
             # Update existing
             existing.diagram_type = form.diagram_type.data
             existing.set_temps(temps)
@@ -374,35 +424,32 @@ def phase_diagram(id):
             if image_data:
                 existing.source_image = image_data
             if changes:
-                MaterialChangeTracker.log_update('phase_diagram', existing.id, grade.id, changes)
-            flash('Phase diagram updated.', 'success')
+                MaterialChangeTracker.log_update("phase_diagram", existing.id, grade.id, changes)
+            flash("Phase diagram updated.", "success")
         else:
             # Create new
             diagram = PhaseDiagram(
                 steel_grade_id=grade.id,
                 diagram_type=form.diagram_type.data,
-                source_image=image_data
+                source_image=image_data,
             )
             diagram.set_temps(temps)
             if curves:
                 diagram.set_curves(curves)
             db.session.add(diagram)
             db.session.flush()
-            MaterialChangeTracker.log_create('phase_diagram', diagram, grade.id)
-            flash('Phase diagram created.', 'success')
+            MaterialChangeTracker.log_create("phase_diagram", diagram, grade.id)
+            flash("Phase diagram created.", "success")
 
         db.session.commit()
-        return redirect(url_for('materials.view', id=grade.id))
+        return redirect(url_for("materials.view", id=grade.id))
 
     return render_template(
-        'materials/phase_diagram.html',
-        form=form,
-        grade=grade,
-        existing=existing
+        "materials/phase_diagram.html", form=form, grade=grade, existing=existing
     )
 
 
-@materials_bp.route('/<int:id>/phase-diagram/image')
+@materials_bp.route("/<int:id>/phase-diagram/image")
 @login_required
 def phase_diagram_image(id):
     """Serve phase diagram image."""
@@ -410,12 +457,12 @@ def phase_diagram_image(id):
     diagram = grade.phase_diagrams.first()
 
     if not diagram or not diagram.source_image:
-        return '', 404
+        return "", 404
 
-    return Response(diagram.source_image, mimetype='image/png')
+    return Response(diagram.source_image, mimetype="image/png")
 
 
-@materials_bp.route('/<int:id>/phase-diagram/delete', methods=['POST'])
+@materials_bp.route("/<int:id>/phase-diagram/delete", methods=["POST"])
 @login_required
 def delete_phase_diagram(id):
     """Delete phase diagram."""
@@ -423,21 +470,24 @@ def delete_phase_diagram(id):
     diagram = grade.phase_diagrams.first()
 
     if diagram:
-        MaterialChangeTracker.log_delete('phase_diagram', diagram.id, grade.id, f'{diagram.diagram_type} diagram')
+        MaterialChangeTracker.log_delete(
+            "phase_diagram", diagram.id, grade.id, f"{diagram.diagram_type} diagram"
+        )
         db.session.delete(diagram)
         db.session.commit()
-        flash('Phase diagram deleted.', 'success')
+        flash("Phase diagram deleted.", "success")
     else:
-        flash('No phase diagram to delete.', 'warning')
+        flash("No phase diagram to delete.", "warning")
 
-    return redirect(url_for('materials.view', id=id))
+    return redirect(url_for("materials.view", id=id))
 
 
 # ============================================================================
 # Phase Properties
 # ============================================================================
 
-@materials_bp.route('/<int:id>/phase-properties', methods=['GET', 'POST'])
+
+@materials_bp.route("/<int:id>/phase-properties", methods=["GET", "POST"])
 @login_required
 def phase_properties(id):
     """Manage phase-specific properties for a steel grade."""
@@ -447,20 +497,22 @@ def phase_properties(id):
     if form.validate_on_submit():
         # Check if phase property already exists
         existing = PhaseProperty.query.filter_by(
-            steel_grade_id=grade.id,
-            phase=form.phase.data
+            steel_grade_id=grade.id, phase=form.phase.data
         ).first()
 
         # Parse expansion data if temperature-dependent
         expansion_data = None
-        if form.expansion_type.data == 'temperature_dependent' and form.expansion_data.data:
+        if form.expansion_type.data == "temperature_dependent" and form.expansion_data.data:
             try:
                 expansion_data = json.loads(form.expansion_data.data)
             except json.JSONDecodeError:
-                flash('Invalid JSON for expansion data.', 'danger')
-                return render_template('materials/phase_properties.html',
-                                      form=form, grade=grade,
-                                      phase_props=grade.phase_properties.all())
+                flash("Invalid JSON for expansion data.", "danger")
+                return render_template(
+                    "materials/phase_properties.html",
+                    form=form,
+                    grade=grade,
+                    phase_props=grade.phase_properties.all(),
+                )
 
         # Convert expansion coefficient from µ/K to 1/K
         expansion_coeff = None
@@ -469,27 +521,30 @@ def phase_properties(id):
 
         if existing:
             # Track changes before update
-            changes = MaterialChangeTracker.detect_changes(existing, {
-                'relative_density': form.relative_density.data,
-                'thermal_expansion_coeff': expansion_coeff,
-                'expansion_type': form.expansion_type.data,
-                'reference_temperature': form.reference_temperature.data,
-                'notes': form.notes.data,
-            })
+            changes = MaterialChangeTracker.detect_changes(
+                existing,
+                {
+                    "relative_density": form.relative_density.data,
+                    "thermal_expansion_coeff": expansion_coeff,
+                    "expansion_type": form.expansion_type.data,
+                    "reference_temperature": form.reference_temperature.data,
+                    "notes": form.notes.data,
+                },
+            )
             # Update existing
             existing.relative_density = form.relative_density.data
             existing.thermal_expansion_coeff = expansion_coeff
             existing.expansion_type = form.expansion_type.data
             if expansion_data:
                 # Convert expansion data values from µ/K to 1/K
-                if 'value' in expansion_data:
-                    expansion_data['value'] = [v * 1e-6 for v in expansion_data['value']]
+                if "value" in expansion_data:
+                    expansion_data["value"] = [v * 1e-6 for v in expansion_data["value"]]
                 existing.set_expansion_data(expansion_data)
             existing.reference_temperature = form.reference_temperature.data
             existing.notes = form.notes.data
             if changes:
-                MaterialChangeTracker.log_update('phase_property', existing.id, grade.id, changes)
-            flash(f'Phase property for {PHASE_LABELS[form.phase.data]} updated.', 'success')
+                MaterialChangeTracker.log_update("phase_property", existing.id, grade.id, changes)
+            flash(f"Phase property for {PHASE_LABELS[form.phase.data]} updated.", "success")
         else:
             # Create new
             pp = PhaseProperty(
@@ -499,53 +554,54 @@ def phase_properties(id):
                 thermal_expansion_coeff=expansion_coeff,
                 expansion_type=form.expansion_type.data,
                 reference_temperature=form.reference_temperature.data,
-                notes=form.notes.data
+                notes=form.notes.data,
             )
             if expansion_data:
-                if 'value' in expansion_data:
-                    expansion_data['value'] = [v * 1e-6 for v in expansion_data['value']]
+                if "value" in expansion_data:
+                    expansion_data["value"] = [v * 1e-6 for v in expansion_data["value"]]
                 pp.set_expansion_data(expansion_data)
             db.session.add(pp)
             db.session.flush()
-            MaterialChangeTracker.log_create('phase_property', pp, grade.id)
-            flash(f'Phase property for {PHASE_LABELS[form.phase.data]} created.', 'success')
+            MaterialChangeTracker.log_create("phase_property", pp, grade.id)
+            flash(f"Phase property for {PHASE_LABELS[form.phase.data]} created.", "success")
 
         db.session.commit()
-        return redirect(url_for('materials.phase_properties', id=grade.id))
+        return redirect(url_for("materials.phase_properties", id=grade.id))
 
     existing_props = grade.phase_properties.all()
     return render_template(
-        'materials/phase_properties.html',
+        "materials/phase_properties.html",
         form=form,
         grade=grade,
         phase_props=existing_props,
-        phase_labels=PHASE_LABELS
+        phase_labels=PHASE_LABELS,
     )
 
 
-@materials_bp.route('/<int:id>/phase-properties/<int:pp_id>/delete', methods=['POST'])
+@materials_bp.route("/<int:id>/phase-properties/<int:pp_id>/delete", methods=["POST"])
 @login_required
 def delete_phase_property(id, pp_id):
     """Delete a phase property."""
     pp = PhaseProperty.query.get_or_404(pp_id)
     if pp.steel_grade_id != id:
-        flash('Phase property not found.', 'danger')
-        return redirect(url_for('materials.phase_properties', id=id))
+        flash("Phase property not found.", "danger")
+        return redirect(url_for("materials.phase_properties", id=id))
 
     phase_label = pp.phase_label
-    MaterialChangeTracker.log_delete('phase_property', pp.id, id, phase_label)
+    MaterialChangeTracker.log_delete("phase_property", pp.id, id, phase_label)
     db.session.delete(pp)
     db.session.commit()
 
-    flash(f'Phase property for {phase_label} deleted.', 'success')
-    return redirect(url_for('materials.phase_properties', id=id))
+    flash(f"Phase property for {phase_label} deleted.", "success")
+    return redirect(url_for("materials.phase_properties", id=id))
 
 
 # ============================================================================
 # Steel Composition
 # ============================================================================
 
-@materials_bp.route('/<int:id>/composition', methods=['GET', 'POST'])
+
+@materials_bp.route("/<int:id>/composition", methods=["GET", "POST"])
 @login_required
 def composition(id):
     """Manage chemical composition for a steel grade."""
@@ -554,7 +610,7 @@ def composition(id):
 
     # Pre-populate form if composition exists
     existing = grade.composition
-    if request.method == 'GET' and existing:
+    if request.method == "GET" and existing:
         form.carbon.data = existing.carbon
         form.manganese.data = existing.manganese
         form.silicon.data = existing.silicon
@@ -576,22 +632,22 @@ def composition(id):
         if existing:
             # Track changes before update
             field_values = {
-                'carbon': form.carbon.data,
-                'manganese': form.manganese.data or 0.0,
-                'silicon': form.silicon.data or 0.0,
-                'chromium': form.chromium.data or 0.0,
-                'nickel': form.nickel.data or 0.0,
-                'molybdenum': form.molybdenum.data or 0.0,
-                'vanadium': form.vanadium.data or 0.0,
-                'tungsten': form.tungsten.data or 0.0,
-                'copper': form.copper.data or 0.0,
-                'phosphorus': form.phosphorus.data or 0.0,
-                'sulfur': form.sulfur.data or 0.0,
-                'nitrogen': form.nitrogen.data or 0.0,
-                'boron': form.boron.data or 0.0,
-                'hollomon_jaffe_c': form.hollomon_jaffe_c.data or 20.0,
-                'source': form.source.data,
-                'notes': form.notes.data,
+                "carbon": form.carbon.data,
+                "manganese": form.manganese.data or 0.0,
+                "silicon": form.silicon.data or 0.0,
+                "chromium": form.chromium.data or 0.0,
+                "nickel": form.nickel.data or 0.0,
+                "molybdenum": form.molybdenum.data or 0.0,
+                "vanadium": form.vanadium.data or 0.0,
+                "tungsten": form.tungsten.data or 0.0,
+                "copper": form.copper.data or 0.0,
+                "phosphorus": form.phosphorus.data or 0.0,
+                "sulfur": form.sulfur.data or 0.0,
+                "nitrogen": form.nitrogen.data or 0.0,
+                "boron": form.boron.data or 0.0,
+                "hollomon_jaffe_c": form.hollomon_jaffe_c.data or 20.0,
+                "source": form.source.data,
+                "notes": form.notes.data,
             }
             changes = MaterialChangeTracker.detect_changes(existing, field_values)
             # Update existing
@@ -612,8 +668,8 @@ def composition(id):
             existing.source = form.source.data
             existing.notes = form.notes.data
             if changes:
-                MaterialChangeTracker.log_update('composition', existing.id, grade.id, changes)
-            flash('Composition updated.', 'success')
+                MaterialChangeTracker.log_update("composition", existing.id, grade.id, changes)
+            flash("Composition updated.", "success")
         else:
             # Create new
             comp = SteelComposition(
@@ -633,25 +689,20 @@ def composition(id):
                 boron=form.boron.data or 0.0,
                 hollomon_jaffe_c=form.hollomon_jaffe_c.data or 20.0,
                 source=form.source.data,
-                notes=form.notes.data
+                notes=form.notes.data,
             )
             db.session.add(comp)
             db.session.flush()
-            MaterialChangeTracker.log_create('composition', comp, grade.id)
-            flash('Composition created.', 'success')
+            MaterialChangeTracker.log_create("composition", comp, grade.id)
+            flash("Composition created.", "success")
 
         db.session.commit()
-        return redirect(url_for('materials.view', id=grade.id))
+        return redirect(url_for("materials.view", id=grade.id))
 
-    return render_template(
-        'materials/composition.html',
-        form=form,
-        grade=grade,
-        existing=existing
-    )
+    return render_template("materials/composition.html", form=form, grade=grade, existing=existing)
 
 
-@materials_bp.route('/<int:id>/composition/delete', methods=['POST'])
+@materials_bp.route("/<int:id>/composition/delete", methods=["POST"])
 @login_required
 def delete_composition(id):
     """Delete composition."""
@@ -659,44 +710,46 @@ def delete_composition(id):
     comp = grade.composition
 
     if comp:
-        MaterialChangeTracker.log_delete('composition', comp.id, grade.id, 'composition')
+        MaterialChangeTracker.log_delete("composition", comp.id, grade.id, "composition")
         db.session.delete(comp)
         db.session.commit()
-        flash('Composition deleted.', 'success')
+        flash("Composition deleted.", "success")
     else:
-        flash('No composition to delete.', 'warning')
+        flash("No composition to delete.", "warning")
 
-    return redirect(url_for('materials.view', id=id))
+    return redirect(url_for("materials.view", id=id))
 
 
 # ============================================================================
 # Change History
 # ============================================================================
 
-@materials_bp.route('/<int:id>/history')
+
+@materials_bp.route("/<int:id>/history")
 @login_required
 def grade_history(id):
     """View change history for a steel grade."""
     grade = SteelGrade.query.get_or_404(id)
     from app.models import MaterialChangeLog
-    page = request.args.get('page', 1, type=int)
 
-    query = MaterialChangeLog.query.filter_by(
-        steel_grade_id=grade.id
-    ).order_by(MaterialChangeLog.changed_at.desc())
+    page = request.args.get("page", 1, type=int)
+
+    query = MaterialChangeLog.query.filter_by(steel_grade_id=grade.id).order_by(
+        MaterialChangeLog.changed_at.desc()
+    )
 
     pagination = query.paginate(page=page, per_page=50, error_out=False)
 
     entity_type_labels = {
-        'steel_grade': 'Steel Grade',
-        'material_property': 'Material Property',
-        'phase_diagram': 'Phase Diagram',
-        'composition': 'Composition',
-        'phase_property': 'Phase Property',
+        "steel_grade": "Steel Grade",
+        "material_property": "Material Property",
+        "phase_diagram": "Phase Diagram",
+        "composition": "Composition",
+        "phase_property": "Phase Property",
     }
 
     return render_template(
-        'materials/history.html',
+        "materials/history.html",
         grade=grade,
         entries=pagination.items,
         pagination=pagination,
@@ -708,29 +761,30 @@ def grade_history(id):
 # Property Plots
 # ============================================================================
 
-@materials_bp.route('/<int:id>/property/<int:prop_id>/plot')
+
+@materials_bp.route("/<int:id>/property/<int:prop_id>/plot")
 @login_required
 def property_plot(id, prop_id):
     """Generate and serve a plot of temperature-dependent property."""
     prop = MaterialProperty.query.get_or_404(prop_id)
     if prop.steel_grade_id != id:
-        return '', 404
+        return "", 404
 
     # Only plot temperature-dependent properties
-    if not prop.is_temperature_dependent and prop.property_type == 'constant':
-        return '', 404
+    if not prop.is_temperature_dependent and prop.property_type == "constant":
+        return "", 404
 
     plotter = PropertyPlotter()
     image_data = plotter.plot_property(prop)
 
-    response = Response(image_data, mimetype='image/png')
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+    response = Response(image_data, mimetype="image/png")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     return response
 
 
-@materials_bp.route('/<int:id>/phase-plot/<plot_type>')
+@materials_bp.route("/<int:id>/phase-plot/<plot_type>")
 @login_required
 def phase_plot(id, plot_type):
     """Generate and serve a plot of phase properties.
@@ -744,23 +798,23 @@ def phase_plot(id, plot_type):
     phase_props = grade.phase_properties.all()
 
     if not phase_props:
-        return '', 404
+        return "", 404
 
     plotter = PropertyPlotter()
 
-    if plot_type == 'density':
-        image_data = plotter.plot_phase_properties(phase_props, property_type='density')
-    elif plot_type == 'expansion':
-        image_data = plotter.plot_phase_properties(phase_props, property_type='expansion')
-    elif plot_type == 'expansion_vs_temp':
+    if plot_type == "density":
+        image_data = plotter.plot_phase_properties(phase_props, property_type="density")
+    elif plot_type == "expansion":
+        image_data = plotter.plot_phase_properties(phase_props, property_type="expansion")
+    elif plot_type == "expansion_vs_temp":
         image_data = plotter.plot_expansion_vs_temperature(phase_props)
     else:
-        return '', 404
+        return "", 404
 
-    response = Response(image_data, mimetype='image/png')
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+    response = Response(image_data, mimetype="image/png")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     return response
 
 
@@ -768,21 +822,19 @@ def phase_plot(id, plot_type):
 # Import/Export
 # ============================================================================
 
-@materials_bp.route('/import', methods=['GET', 'POST'])
+
+@materials_bp.route("/import", methods=["GET", "POST"])
 @login_required
 def import_data():
     """Import material data from Excel."""
     form = ImportForm()
 
     if form.validate_on_submit():
-        results = ExcelImporter.import_from_excel(
-            form.file.data,
-            data_source=form.data_source.data
-        )
+        results = ExcelImporter.import_from_excel(form.file.data, data_source=form.data_source.data)
 
-        if results['errors']:
-            for error in results['errors'][:5]:  # Show first 5 errors
-                flash(error, 'warning')
+        if results["errors"]:
+            for error in results["errors"][:5]:  # Show first 5 errors
+                flash(error, "warning")
 
         msg = (
             f"Import complete: {results['grades_created']} grades created, "
@@ -790,13 +842,13 @@ def import_data():
             f"{results['properties_created']} properties, "
             f"{results['diagrams_created']} diagrams"
         )
-        flash(msg, 'success')
-        return redirect(url_for('materials.index'))
+        flash(msg, "success")
+        return redirect(url_for("materials.index"))
 
-    return render_template('materials/import.html', form=form)
+    return render_template("materials/import.html", form=form)
 
 
-@materials_bp.route('/<int:id>/export')
+@materials_bp.route("/<int:id>/export")
 @login_required
 def export(id):
     """Export single steel grade to Excel."""
@@ -805,13 +857,13 @@ def export(id):
 
     return send_file(
         BytesIO(excel_data),
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
-        download_name=f'{grade.designation.replace(" ", "_")}_material_data.xlsx'
+        download_name=f"{grade.designation.replace(' ', '_')}_material_data.xlsx",
     )
 
 
-@materials_bp.route('/export-all')
+@materials_bp.route("/export-all")
 @login_required
 def export_all():
     """Export all steel grades to Excel."""
@@ -819,13 +871,13 @@ def export_all():
 
     return send_file(
         BytesIO(excel_data),
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
-        download_name='all_material_data.xlsx'
+        download_name="all_material_data.xlsx",
     )
 
 
-@materials_bp.route('/template')
+@materials_bp.route("/template")
 @login_required
 def download_template():
     """Download Excel import template."""
@@ -833,9 +885,9 @@ def download_template():
 
     return send_file(
         BytesIO(template_data),
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
-        download_name='material_import_template.xlsx'
+        download_name="material_import_template.xlsx",
     )
 
 
@@ -843,15 +895,16 @@ def download_template():
 # Seed Data
 # ============================================================================
 
-@materials_bp.route('/seed', methods=['POST'])
+
+@materials_bp.route("/seed", methods=["POST"])
 @login_required
 def seed():
     """Load 20 standard steel grades."""
     results = seed_standard_grades()
 
-    if results['errors']:
-        for error in results['errors'][:5]:
-            flash(error, 'warning')
+    if results["errors"]:
+        for error in results["errors"][:5]:
+            flash(error, "warning")
 
     msg = (
         f"Seed complete: {results['grades_created']} grades created, "
@@ -860,65 +913,59 @@ def seed():
         f"{results['diagrams_created']} diagrams, "
         f"{results.get('phase_properties_created', 0)} phase properties"
     )
-    flash(msg, 'success')
-    return redirect(url_for('materials.index'))
+    flash(msg, "success")
+    return redirect(url_for("materials.index"))
 
 
-@materials_bp.route('/seed-compositions', methods=['POST'])
+@materials_bp.route("/seed-compositions", methods=["POST"])
 @login_required
 def seed_compositions():
     """Load standard chemical compositions."""
     results = seed_standard_compositions()
 
-    if results['errors']:
-        for error in results['errors'][:5]:
-            flash(error, 'warning')
+    if results["errors"]:
+        for error in results["errors"][:5]:
+            flash(error, "warning")
 
     msg = (
         f"Compositions seeded: {results['compositions_created']} created, "
         f"{results['compositions_skipped']} skipped (already exist)"
     )
-    flash(msg, 'success')
-    return redirect(url_for('materials.index'))
+    flash(msg, "success")
+    return redirect(url_for("materials.index"))
 
 
 # ============================================================================
 # Jominy End-Quench Test
 # ============================================================================
 
-@materials_bp.route('/<int:id>/jominy')
+
+@materials_bp.route("/<int:id>/jominy")
 @login_required
 def jominy_test(id):
     """Display Jominy end-quench hardenability test results."""
-    from app.services import simulate_jominy_test, visualization
+    from app.services import simulate_jominy_test
 
     grade = SteelGrade.query.get_or_404(id)
 
     # Check if composition is available
     if not grade.composition:
-        flash('Composition data required for Jominy test. Please add composition first.', 'warning')
-        return redirect(url_for('materials.composition', id=id))
+        flash("Composition data required for Jominy test. Please add composition first.", "warning")
+        return redirect(url_for("materials.composition", id=id))
 
     # Get austenitizing temperature from request or use default
-    aust_temp = request.args.get('aust_temp', 850, type=float)
+    aust_temp = request.args.get("aust_temp", 850, type=float)
 
     # Run Jominy simulation
     diagram = grade.phase_diagrams.first()
     result = simulate_jominy_test(
-        composition=grade.composition,
-        phase_diagram=diagram,
-        austenitizing_temp=aust_temp
+        composition=grade.composition, phase_diagram=diagram, austenitizing_temp=aust_temp
     )
 
-    return render_template(
-        'materials/jominy.html',
-        grade=grade,
-        result=result,
-        aust_temp=aust_temp
-    )
+    return render_template("materials/jominy.html", grade=grade, result=result, aust_temp=aust_temp)
 
 
-@materials_bp.route('/<int:id>/jominy/curve')
+@materials_bp.route("/<int:id>/jominy/curve")
 @login_required
 def jominy_curve_plot(id):
     """Generate Jominy hardness curve plot."""
@@ -927,15 +974,13 @@ def jominy_curve_plot(id):
     grade = SteelGrade.query.get_or_404(id)
 
     if not grade.composition:
-        return Response('No composition data', status=400)
+        return Response("No composition data", status=400)
 
-    aust_temp = request.args.get('aust_temp', 850, type=float)
+    aust_temp = request.args.get("aust_temp", 850, type=float)
 
     diagram = grade.phase_diagrams.first()
     result = simulate_jominy_test(
-        composition=grade.composition,
-        phase_diagram=diagram,
-        austenitizing_temp=aust_temp
+        composition=grade.composition, phase_diagram=diagram, austenitizing_temp=aust_temp
     )
 
     plot_data = visualization.create_jominy_curve_plot(
@@ -943,15 +988,15 @@ def jominy_curve_plot(id):
         hardness_hv=result.hardness_hv,
         hardness_hrc=result.hardness_hrc,
         j_distance_50hrc=result.j_distance_50hrc,
-        title=f'Jominy Curve - {grade.designation}'
+        title=f"Jominy Curve - {grade.designation}",
     )
 
-    response = Response(plot_data, mimetype='image/png')
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response = Response(plot_data, mimetype="image/png")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 
-@materials_bp.route('/<int:id>/jominy/phases')
+@materials_bp.route("/<int:id>/jominy/phases")
 @login_required
 def jominy_phases_plot(id):
     """Generate Jominy phase distribution plot."""
@@ -960,23 +1005,21 @@ def jominy_phases_plot(id):
     grade = SteelGrade.query.get_or_404(id)
 
     if not grade.composition:
-        return Response('No composition data', status=400)
+        return Response("No composition data", status=400)
 
-    aust_temp = request.args.get('aust_temp', 850, type=float)
+    aust_temp = request.args.get("aust_temp", 850, type=float)
 
     diagram = grade.phase_diagrams.first()
     result = simulate_jominy_test(
-        composition=grade.composition,
-        phase_diagram=diagram,
-        austenitizing_temp=aust_temp
+        composition=grade.composition, phase_diagram=diagram, austenitizing_temp=aust_temp
     )
 
     plot_data = visualization.create_jominy_phases_plot(
         distances_mm=result.distances_mm,
         phase_fractions=result.phase_fractions,
-        title=f'Phase Distribution - {grade.designation}'
+        title=f"Phase Distribution - {grade.designation}",
     )
 
-    response = Response(plot_data, mimetype='image/png')
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response = Response(plot_data, mimetype="image/png")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response

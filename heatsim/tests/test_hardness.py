@@ -1,9 +1,11 @@
 """Tests for Hollomon-Jaffe tempering hardness calculation."""
+
 import math
-import pytest
 from unittest.mock import MagicMock
 
-from app.services.hardness_predictor import HardnessPredictor, HardnessResult, POSITION_KEYS
+import pytest
+
+from app.services.hardness_predictor import POSITION_KEYS, HardnessPredictor, HardnessResult
 
 
 @pytest.fixture
@@ -11,13 +13,22 @@ def mock_composition():
     """Create a mock SteelComposition for AISI 4340."""
     comp = MagicMock()
     comp.to_dict.return_value = {
-        'C': 0.40, 'Mn': 0.70, 'Si': 0.25,
-        'Cr': 0.80, 'Ni': 1.80, 'Mo': 0.25,
-        'V': 0.0, 'W': 0.0, 'Cu': 0.0,
-        'P': 0.0, 'S': 0.0, 'N': 0.0, 'B': 0.0,
-        'Hp': 20.0,
+        "C": 0.40,
+        "Mn": 0.70,
+        "Si": 0.25,
+        "Cr": 0.80,
+        "Ni": 1.80,
+        "Mo": 0.25,
+        "V": 0.0,
+        "W": 0.0,
+        "Cu": 0.0,
+        "P": 0.0,
+        "S": 0.0,
+        "N": 0.0,
+        "B": 0.0,
+        "Hp": 20.0,
     }
-    comp.carbon_equivalent_iiw = 0.40 + 0.70/6 + (0.80 + 0.25)/5 + 1.80/15
+    comp.carbon_equivalent_iiw = 0.40 + 0.70 / 6 + (0.80 + 0.25) / 5 + 1.80 / 15
     comp.ideal_diameter_di = 3.5
     return comp
 
@@ -92,27 +103,67 @@ class TestTemperedHardness:
     def test_no_tempering_no_tempered_hardness(self):
         """HardnessResult with no tempering should have empty tempered dicts."""
         result = HardnessResult()
-        result.hardness_hv = {'center': 500.0, 'surface': 450.0}
+        result.hardness_hv = {"center": 500.0, "surface": 450.0}
         d = result.to_dict()
-        assert d['tempered_hardness_hv'] == {}
-        assert d['tempered_hardness_hrc'] == {}
-        assert d['hollomon_jaffe_parameter'] == 0.0
+        assert d["tempered_hardness_hv"] == {}
+        assert d["tempered_hardness_hrc"] == {}
+        assert d["hollomon_jaffe_parameter"] == 0.0
 
 
 class TestTemperedResultInDict:
     def test_tempered_result_in_dict(self, mock_composition):
         """to_dict() should include all tempered hardness fields."""
         result = HardnessResult()
-        result.hardness_hv = {'center': 550.0}
-        result.tempered_hardness_hv = {'center': 400.0}
-        result.tempered_hardness_hrc = {'center': 40.0}
+        result.hardness_hv = {"center": 550.0}
+        result.tempered_hardness_hv = {"center": 400.0}
+        result.tempered_hardness_hrc = {"center": 40.0}
         result.hollomon_jaffe_parameter = 17463.0
         result.tempering_temperature = 600.0
         result.tempering_time = 60.0
 
         d = result.to_dict()
-        assert d['tempered_hardness_hv'] == {'center': 400.0}
-        assert d['tempered_hardness_hrc'] == {'center': 40.0}
-        assert d['hollomon_jaffe_parameter'] == 17463.0
-        assert d['tempering_temperature'] == 600.0
-        assert d['tempering_time'] == 60.0
+        assert d["tempered_hardness_hv"] == {"center": 400.0}
+        assert d["tempered_hardness_hrc"] == {"center": 40.0}
+        assert d["hollomon_jaffe_parameter"] == 17463.0
+        assert d["tempering_temperature"] == 600.0
+        assert d["tempering_time"] == 60.0
+
+
+class TestCalculateT85EdgeCases:
+    """_calculate_t8_5 must tolerate degenerate temperature histories."""
+
+    def test_normal_cooling(self):
+        import numpy as np
+
+        from app.services.hardness_predictor import _calculate_t8_5
+
+        times = np.linspace(0, 100, 101)
+        temps = np.linspace(900, 100, 101)
+        t85 = _calculate_t8_5(times, temps)
+        assert t85 > 0
+
+    def test_empty_arrays_return_default(self):
+        import numpy as np
+
+        from app.services.hardness_predictor import _calculate_t8_5
+
+        assert _calculate_t8_5(np.array([]), np.array([])) == 10.0
+
+    def test_flat_history_no_crash(self):
+        import numpy as np
+
+        from app.services.hardness_predictor import _calculate_t8_5
+
+        times = np.linspace(0, 100, 11)
+        temps = np.full(11, 600.0)
+        assert _calculate_t8_5(times, temps) == 10.0
+
+    def test_nan_values_no_crash(self):
+        import numpy as np
+
+        from app.services.hardness_predictor import _calculate_t8_5
+
+        times = np.linspace(0, 100, 6)
+        temps = np.array([900.0, np.nan, 700.0, np.nan, 450.0, 300.0])
+        result = _calculate_t8_5(times, temps)
+        assert result >= 0

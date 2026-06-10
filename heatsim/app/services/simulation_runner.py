@@ -3,23 +3,29 @@
 Extracted from app/simulation/routes.py to run inside the worker thread
 without a Flask request context (no flash() calls).
 """
+
 import logging
 from datetime import datetime
-
-from flask import current_app
 
 from app.extensions import db
 from app.models import AuditLog, SimulationSnapshot
 from app.models.simulation import (
-    Simulation, SimulationResult,
-    STATUS_RUNNING, STATUS_COMPLETED, STATUS_FAILED,
     GEOMETRY_CAD,
+    STATUS_COMPLETED,
+    STATUS_FAILED,
+    STATUS_RUNNING,
+    Simulation,
+    SimulationResult,
 )
 from app.services import (
-    create_geometry, MultiPhaseHeatSolver, SolverConfig,
-    PhaseTracker, predict_hardness_profile, visualization,
+    MultiPhaseHeatSolver,
+    PhaseTracker,
+    SolverConfig,
+    create_geometry,
+    predict_hardness_profile,
+    visualization,
 )
-from app.services.hardness_predictor import HardnessPredictor, POSITION_KEYS
+from app.services.hardness_predictor import POSITION_KEYS, HardnessPredictor
 from app.services.snapshot_service import SnapshotService
 
 logger = logging.getLogger(__name__)
@@ -45,20 +51,19 @@ def run_heat_treatment(simulation_id: int) -> None:
         sim.started_at = datetime.utcnow()
         sim.error_message = None
         db.session.commit()
-        AuditLog.log('run_simulation', resource_type='simulation',
-                      resource_id=sim.id, resource_name=sim.name)
+        AuditLog.log(
+            "run_simulation", resource_type="simulation", resource_id=sim.id, resource_name=sim.name
+        )
 
         # Check solver type: COMSOL or built-in
-        solver_type = sim.solver_dict.get('solver_type', 'builtin')
+        solver_type = sim.solver_dict.get("solver_type", "builtin")
 
-        if solver_type == 'comsol':
+        if solver_type == "comsol":
             try:
                 _run_comsol(sim, snapshot)
                 return
             except Exception as e:
-                logger.warning(
-                    "COMSOL path failed (%s), falling back to builtin solver", e
-                )
+                logger.warning("COMSOL path failed (%s), falling back to builtin solver", e)
                 # Remove partial results from the failed COMSOL attempt
                 SimulationResult.query.filter_by(snapshot_id=snapshot.id).delete()
                 db.session.flush()
@@ -70,7 +75,7 @@ def run_heat_treatment(simulation_id: int) -> None:
         sim.status = STATUS_FAILED
         sim.error_message = str(e)
         if snapshot:
-            SnapshotService.finalize_snapshot(snapshot, 'failed', str(e))
+            SnapshotService.finalize_snapshot(snapshot, "failed", str(e))
         db.session.commit()
         logger.exception("Simulation %d failed: %s", simulation_id, e)
 
@@ -100,14 +105,13 @@ def _predict_phases(sim, snapshot, grade, diagram, times, center_temp, t85):
         phase_result_obj = SimulationResult(
             simulation_id=sim.id,
             snapshot_id=snapshot.id,
-            result_type='phase_fraction',
-            phase='full',
-            location='center',
+            result_type="phase_fraction",
+            phase="full",
+            location="center",
         )
         phase_result_obj.set_phase_fractions(phases.to_dict())
         phase_result_obj.plot_image = visualization.create_phase_fraction_plot(
-            phases.to_dict(),
-            title=f'Predicted Phase Fractions - {sim.name}'
+            phases.to_dict(), title=f"Predicted Phase Fractions - {sim.name}"
         )
         db.session.add(phase_result_obj)
 
@@ -131,16 +135,16 @@ def _predict_hardness(sim, snapshot, grade, ht_config, temperatures_2d, times, t
         hardness_sim_result = SimulationResult(
             simulation_id=sim.id,
             snapshot_id=snapshot.id,
-            result_type='hardness_prediction',
-            phase='full',
-            location='all',
+            result_type="hardness_prediction",
+            phase="full",
+            location="all",
         )
 
-        tempering_cfg = ht_config.get('tempering', {})
-        if tempering_cfg.get('enabled') and grade.composition:
+        tempering_cfg = ht_config.get("tempering", {})
+        if tempering_cfg.get("enabled") and grade.composition:
             hp_c = grade.composition.hollomon_jaffe_c or 20.0
-            temp_c = tempering_cfg.get('temperature', 550)
-            hold_min = tempering_cfg.get('hold_time', 60)
+            temp_c = tempering_cfg.get("temperature", 550)
+            hold_min = tempering_cfg.get("hold_time", 60)
             hp = HardnessPredictor(grade.composition)
             hjp_val = 0.0
             for pos_key in POSITION_KEYS:
@@ -149,19 +153,20 @@ def _predict_hardness(sim, snapshot, grade, ht_config, temperatures_2d, times, t
                     hv_t, hjp_val = hp.tempered_hardness(hv_q, temp_c, hold_min, hp_c)
                     hardness_result.tempered_hardness_hv[pos_key] = round(hv_t, 1)
                     hrc_t = hp.hv_to_hrc(hv_t)
-                    hardness_result.tempered_hardness_hrc[pos_key] = round(hrc_t, 1) if hrc_t else None
+                    hardness_result.tempered_hardness_hrc[pos_key] = (
+                        round(hrc_t, 1) if hrc_t else None
+                    )
             hardness_result.hollomon_jaffe_parameter = round(hjp_val, 0)
             hardness_result.tempering_temperature = temp_c
             hardness_result.tempering_time = hold_min
 
         hardness_sim_result.set_data(hardness_result.to_dict())
         hardness_sim_result.plot_image = visualization.create_hardness_profile_plot(
-            hardness_result,
-            title=f'Predicted Hardness - {sim.name}'
+            hardness_result, title=f"Predicted Hardness - {sim.name}"
         )
         db.session.add(hardness_sim_result)
     except Exception as e:
-        logger.warning('Hardness prediction failed: %s', e)
+        logger.warning("Hardness prediction failed: %s", e)
 
 
 def _run_comsol(sim: Simulation, snapshot: SimulationSnapshot) -> None:
@@ -171,13 +176,15 @@ def _run_comsol(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     full_cycle plot, per-phase curves, cooling rate, phase prediction,
     hardness prediction, CCT overlay, and VTK snapshots/animation.
     """
+    import numpy as np
+
     from app.services.comsol import (
-        COMSOLClient, MockCOMSOLClient, COMSOLNotAvailableError,
-        HeatTreatmentSolver, MockHeatTreatmentSolver,
-        HeatTreatmentResultsExtractor
+        COMSOLNotAvailableError,
+        HeatTreatmentResultsExtractor,
+        HeatTreatmentSolver,
+        MockHeatTreatmentSolver,
     )
     from app.services.comsol.client import get_shared_client
-    import numpy as np
 
     client = None
     use_real_comsol = False
@@ -206,8 +213,10 @@ def _run_comsol(sim: Simulation, snapshot: SimulationSnapshot) -> None:
         diagram = grade.phase_diagrams.first() if grade else None
         trans_temps = diagram.temps_dict if diagram else {}
 
-        combined_times, combined_center, combined_surface = extractor._combine_phases(solver_results)
-        t85 = solver_results.get('summary', {}).get('t_800_500')
+        combined_times, combined_center, combined_surface = extractor._combine_phases(
+            solver_results
+        )
+        t85 = solver_results.get("summary", {}).get("t_800_500")
 
         tracker = None
         if combined_times is not None and combined_center is not None:
@@ -226,6 +235,7 @@ def _run_comsol(sim: Simulation, snapshot: SimulationSnapshot) -> None:
             # --- CCT overlay ---
             try:
                 from app.simulation.routes import _get_cct_curves_for_grade
+
                 cct_curves = _get_cct_curves_for_grade(grade, diagram)
 
                 if cct_curves and combined_center is not None:
@@ -237,33 +247,35 @@ def _run_comsol(sim: Simulation, snapshot: SimulationSnapshot) -> None:
                     cct_result = SimulationResult(
                         simulation_id=sim.id,
                         snapshot_id=snapshot.id,
-                        result_type='cct_overlay',
-                        phase='full',
-                        location='all',
+                        result_type="cct_overlay",
+                        phase="full",
+                        location="all",
                     )
                     cct_result.plot_image = visualization.create_cct_overlay_plot(
-                        combined_times, temp_for_cct, trans_temps,
+                        combined_times,
+                        temp_for_cct,
+                        trans_temps,
                         curves=cct_curves,
-                        title=f'CCT Overlay - {sim.name}'
+                        title=f"CCT Overlay - {sim.name}",
                     )
                     db.session.add(cct_result)
             except Exception as e:
-                logger.warning('COMSOL: CCT overlay failed: %s', e)
+                logger.warning("COMSOL: CCT overlay failed: %s", e)
 
             # --- Absorbed power plots for heating/tempering phases ---
             try:
                 _add_comsol_absorbed_power(sim, snapshot, solver_results)
             except Exception as e:
-                logger.warning('COMSOL: Absorbed power plots failed: %s', e)
+                logger.warning("COMSOL: Absorbed power plots failed: %s", e)
 
         # Update simulation status
         sim.status = STATUS_COMPLETED
         sim.completed_at = datetime.utcnow()
 
         # Update snapshot with summary
-        summary = solver_results.get('summary', {})
-        snapshot.t_800_500 = summary.get('t_800_500')
-        SnapshotService.finalize_snapshot(snapshot, 'completed')
+        summary = solver_results.get("summary", {})
+        snapshot.t_800_500 = summary.get("t_800_500")
+        SnapshotService.finalize_snapshot(snapshot, "completed")
         new_results = SimulationResult.query.filter_by(snapshot_id=snapshot.id).all()
         SnapshotService.update_summary(snapshot, new_results)
         db.session.commit()
@@ -272,7 +284,7 @@ def _run_comsol(sim: Simulation, snapshot: SimulationSnapshot) -> None:
         # Clean up COMSOL model to free server memory (keep server running)
         if use_real_comsol and client is not None:
             try:
-                if hasattr(comsol_solver, '_model') and comsol_solver._model is not None:
+                if hasattr(comsol_solver, "_model") and comsol_solver._model is not None:
                     client.remove_model(comsol_solver._model)
             except Exception as e:
                 logger.warning("Failed to clean up COMSOL model: %s", e)
@@ -282,7 +294,7 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     """Run simulation using built-in 1D FDM solver."""
     # Build geometry (use equivalent geometry for CAD types)
     if sim.geometry_type == GEOMETRY_CAD:
-        equiv_type = sim.cad_equivalent_type or 'cylinder'
+        equiv_type = sim.cad_equivalent_type or "cylinder"
         equiv_params = sim.cad_equivalent_geometry_dict
         geometry = create_geometry(equiv_type, equiv_params)
     else:
@@ -293,18 +305,18 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
 
     # Get material properties
     grade = sim.steel_grade
-    k_prop = grade.get_property('thermal_conductivity')
-    cp_prop = grade.get_property('specific_heat')
-    rho_prop = grade.get_property('density')
-    emiss_prop = grade.get_property('emissivity')
+    k_prop = grade.get_property("thermal_conductivity")
+    cp_prop = grade.get_property("specific_heat")
+    rho_prop = grade.get_property("density")
+    emiss_prop = grade.get_property("emissivity")
 
     density = 7850
     if rho_prop:
-        density = rho_prop.data_dict.get('value', 7850)
+        density = rho_prop.data_dict.get("value", 7850)
 
     emissivity = 0.85
     if emiss_prop:
-        emissivity = emiss_prop.data_dict.get('value', 0.85)
+        emissivity = emiss_prop.data_dict.get("value", 0.85)
 
     # Get heat treatment config
     ht_config = sim.ht_config
@@ -317,11 +329,11 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     solver.configure_from_ht_config(ht_config)
 
     # Determine initial temperature
-    heating_config = ht_config.get('heating', {})
-    if heating_config.get('enabled', False):
-        initial_temp = heating_config.get('initial_temperature', 25.0)
+    heating_config = ht_config.get("heating", {})
+    if heating_config.get("enabled", False):
+        initial_temp = heating_config.get("initial_temperature", 25.0)
     else:
-        initial_temp = heating_config.get('target_temperature', sim.initial_temperature or 850.0)
+        initial_temp = heating_config.get("target_temperature", sim.initial_temperature or 850.0)
 
     # Run simulation
     result = solver.solve(initial_temperature=initial_temp)
@@ -334,29 +346,29 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     cycle_result = SimulationResult(
         simulation_id=sim.id,
         snapshot_id=snapshot.id,
-        result_type='full_cycle',
-        phase='full',
-        location='center',
-        t_800_500=float(result.t8_5) if result.t8_5 is not None else None
+        result_type="full_cycle",
+        phase="full",
+        location="center",
+        t_800_500=float(result.t8_5) if result.t8_5 is not None else None,
     )
     cycle_result.set_time_data(result.time.tolist())
     cycle_result.set_value_data(result.center_temp.tolist())
 
     # Store multi-position temperature data for CCT overlay
     n_pos = result.temperature.shape[1] if result.temperature.ndim > 1 else 1
+    multi_pos_data = {}
     if n_pos > 1:
         idx_center = 0
         idx_one_third = n_pos // 3
         idx_two_thirds = 2 * n_pos // 3
         idx_surface = n_pos - 1
         multi_pos_data = {
-            'positions': ['center', 'one_third', 'two_thirds', 'surface'],
-            'center': result.temperature[:, idx_center].tolist(),
-            'one_third': result.temperature[:, idx_one_third].tolist(),
-            'two_thirds': result.temperature[:, idx_two_thirds].tolist(),
-            'surface': result.temperature[:, idx_surface].tolist(),
+            "positions": ["center", "one_third", "two_thirds", "surface"],
+            "center": result.temperature[:, idx_center].tolist(),
+            "one_third": result.temperature[:, idx_one_third].tolist(),
+            "two_thirds": result.temperature[:, idx_two_thirds].tolist(),
+            "surface": result.temperature[:, idx_surface].tolist(),
         }
-        cycle_result.set_data(multi_pos_data)
 
     # Build furnace/ambient temperature list for plotting (with ramp info)
     furnace_temps = []
@@ -371,44 +383,54 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
             furnace_start_temp = None
             ramp_rate = 0
 
-            if phase_name == 'heating':
-                heating_cfg = ht_config.get('heating', {})
-                temp = heating_cfg.get('target_temperature')
-                cold_furnace = heating_cfg.get('cold_furnace', False)
-                furnace_start_temp = heating_cfg.get('furnace_start_temperature', 25.0)
-                ramp_rate = heating_cfg.get('furnace_ramp_rate', 0)
-            elif phase_name == 'transfer':
-                temp = ht_config.get('transfer', {}).get('ambient_temperature')
-            elif phase_name == 'quenching':
-                temp = ht_config.get('quenching', {}).get('media_temperature')
-            elif phase_name == 'tempering':
-                tempering_cfg = ht_config.get('tempering', {})
-                temp = tempering_cfg.get('temperature')
-                cold_furnace = tempering_cfg.get('cold_furnace', False)
-                furnace_start_temp = tempering_cfg.get('furnace_start_temperature', 25.0)
-                ramp_rate = tempering_cfg.get('furnace_ramp_rate', 0)
-            elif phase_name == 'cooling':
-                temp = ht_config.get('transfer', {}).get('ambient_temperature', 25.0)
+            if phase_name == "heating":
+                heating_cfg = ht_config.get("heating", {})
+                temp = heating_cfg.get("target_temperature")
+                cold_furnace = heating_cfg.get("cold_furnace", False)
+                furnace_start_temp = heating_cfg.get("furnace_start_temperature", 25.0)
+                ramp_rate = heating_cfg.get("furnace_ramp_rate", 0)
+            elif phase_name == "transfer":
+                temp = ht_config.get("transfer", {}).get("ambient_temperature")
+            elif phase_name == "quenching":
+                temp = ht_config.get("quenching", {}).get("media_temperature")
+            elif phase_name == "tempering":
+                tempering_cfg = ht_config.get("tempering", {})
+                temp = tempering_cfg.get("temperature")
+                cold_furnace = tempering_cfg.get("cold_furnace", False)
+                furnace_start_temp = tempering_cfg.get("furnace_start_temperature", 25.0)
+                ramp_rate = tempering_cfg.get("furnace_ramp_rate", 0)
+            elif phase_name == "cooling":
+                temp = ht_config.get("transfer", {}).get("ambient_temperature", 25.0)
 
             if temp is not None:
-                furnace_temps.append({
-                    'start_time': pr.start_time,
-                    'end_time': pr.end_time,
-                    'temperature': temp,
-                    'phase_name': phase_name,
-                    'cold_furnace': cold_furnace,
-                    'furnace_start_temperature': furnace_start_temp if furnace_start_temp else temp,
-                    'furnace_ramp_rate': ramp_rate
-                })
+                furnace_temps.append(
+                    {
+                        "start_time": pr.start_time,
+                        "end_time": pr.end_time,
+                        "temperature": temp,
+                        "phase_name": phase_name,
+                        "cold_furnace": cold_furnace,
+                        "furnace_start_temperature": furnace_start_temp
+                        if furnace_start_temp
+                        else temp,
+                        "furnace_ramp_rate": ramp_rate,
+                    }
+                )
+
+    # Persist furnace profile so interactive plots can rebuild it client-side
+    if furnace_temps:
+        multi_pos_data["furnace_segments"] = furnace_temps
+    if multi_pos_data:
+        cycle_result.set_data(multi_pos_data)
 
     # Create comprehensive plot with phase markers (4 radial positions)
     cycle_result.plot_image = visualization.create_heat_treatment_cycle_plot(
         result.time,
         result.temperature,
         phase_results=result.phase_results,
-        title=f'Heat Treatment Cycle - {sim.name}',
+        title=f"Heat Treatment Cycle - {sim.name}",
         transformation_temps=trans_temps,
-        furnace_temps=furnace_temps
+        furnace_temps=furnace_temps,
     )
     db.session.add(cycle_result)
 
@@ -421,21 +443,39 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
             pr = SimulationResult(
                 simulation_id=sim.id,
                 snapshot_id=snapshot.id,
-                result_type='cooling_curve' if phase_result.phase_name in ('quenching', 'transfer', 'cooling') else 'heating_curve',
+                result_type="cooling_curve"
+                if phase_result.phase_name in ("quenching", "transfer", "cooling")
+                else "heating_curve",
                 phase=phase_result.phase_name,
-                location='center',
-                t_800_500=float(phase_result.t8_5) if phase_result.t8_5 is not None else None
+                location="center",
+                t_800_500=float(phase_result.t8_5) if phase_result.t8_5 is not None else None,
             )
             pr.set_time_data(phase_result.absolute_time.tolist())
             pr.set_value_data(phase_result.center_temp.tolist())
+
+            # Persist multi-position temperatures so interactive plots can
+            # render all four radial positions (and derive dT/dt and power)
+            phase_n_pos = (
+                phase_result.temperature.shape[1] if phase_result.temperature.ndim > 1 else 1
+            )
+            if phase_n_pos > 1:
+                pr.set_data(
+                    {
+                        "positions": ["center", "one_third", "two_thirds", "surface"],
+                        "center": phase_result.temperature[:, 0].tolist(),
+                        "one_third": phase_result.temperature[:, phase_n_pos // 3].tolist(),
+                        "two_thirds": phase_result.temperature[:, 2 * phase_n_pos // 3].tolist(),
+                        "surface": phase_result.temperature[:, phase_n_pos - 1].tolist(),
+                    }
+                )
 
             if phase_result.temperature.size > 0:
                 pr.plot_image = visualization.create_heat_treatment_cycle_plot(
                     phase_result.time,
                     phase_result.temperature,
                     phase_results=None,
-                    title=f'{phase_result.phase_name.title()} - {sim.name}',
-                    transformation_temps=trans_temps
+                    title=f"{phase_result.phase_name.title()} - {sim.name}",
+                    transformation_temps=trans_temps,
                 )
             db.session.add(pr)
 
@@ -443,23 +483,23 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     profile_result = SimulationResult(
         simulation_id=sim.id,
         snapshot_id=snapshot.id,
-        result_type='temperature_profile',
-        phase='full',
-        location='all'
+        result_type="temperature_profile",
+        phase="full",
+        location="all",
     )
 
     n_times = len(result.time)
-    time_indices = [0, n_times//4, n_times//2, 3*n_times//4, n_times-1]
+    time_indices = [0, n_times // 4, n_times // 2, 3 * n_times // 4, n_times - 1]
     time_indices = [i for i in time_indices if i < n_times]
 
-    is_cylindrical = sim.geometry_type in ['cylinder', 'ring', 'hollow_cylinder']
+    is_cylindrical = sim.geometry_type in ["cylinder", "ring", "hollow_cylinder"]
     profile_result.plot_image = visualization.create_temperature_profile_plot(
         result.positions,
         result.temperature,
         result.time,
         time_indices,
-        title=f'Temperature Profile - {sim.name}',
-        is_cylindrical=is_cylindrical
+        title=f"Temperature Profile - {sim.name}",
+        is_cylindrical=is_cylindrical,
     )
     db.session.add(profile_result)
 
@@ -473,22 +513,19 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     rate_result = SimulationResult(
         simulation_id=sim.id,
         snapshot_id=snapshot.id,
-        result_type='cooling_rate',
-        phase='full',
-        location='all'
+        result_type="cooling_rate",
+        phase="full",
+        location="all",
     )
     rate_result.plot_image = visualization.create_cooling_rate_plot(
-        result.time,
-        result.center_temp,
-        result.surface_temp,
-        title=f'Cooling Rate - {sim.name}'
+        result.time, result.center_temp, result.surface_temp, title=f"Cooling Rate - {sim.name}"
     )
     db.session.add(rate_result)
 
     # Generate dT/dt plots for heating and quenching phases
     if result.phase_results:
         for phase_result in result.phase_results:
-            if phase_result.phase_name not in ('heating', 'quenching', 'tempering'):
+            if phase_result.phase_name not in ("heating", "quenching", "tempering"):
                 continue
             if not phase_result.time.size or len(phase_result.time) < 3:
                 continue
@@ -499,15 +536,15 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
             dtdt_time_result = SimulationResult(
                 simulation_id=sim.id,
                 snapshot_id=snapshot.id,
-                result_type='dTdt_vs_time',
+                result_type="dTdt_vs_time",
                 phase=phase_result.phase_name,
-                location='all'
+                location="all",
             )
             dtdt_time_result.plot_image = visualization.create_dTdt_vs_time_plot(
                 phase_result.time,
                 phase_result.temperature,
-                title=f'dT/dt vs Time ({phase_label}) - {sim.name}',
-                phase_name=phase_result.phase_name
+                title=f"dT/dt vs Time ({phase_label}) - {sim.name}",
+                phase_name=phase_result.phase_name,
             )
             db.session.add(dtdt_time_result)
 
@@ -515,15 +552,15 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
             dtdt_temp_result = SimulationResult(
                 simulation_id=sim.id,
                 snapshot_id=snapshot.id,
-                result_type='dTdt_vs_temp',
+                result_type="dTdt_vs_temp",
                 phase=phase_result.phase_name,
-                location='all'
+                location="all",
             )
             dtdt_temp_result.plot_image = visualization.create_dTdt_vs_temperature_plot(
                 phase_result.time,
                 phase_result.temperature,
-                title=f'dT/dt vs Temperature ({phase_label}) - {sim.name}',
-                phase_name=phase_result.phase_name
+                title=f"dT/dt vs Temperature ({phase_label}) - {sim.name}",
+                phase_name=phase_result.phase_name,
             )
             db.session.add(dtdt_temp_result)
 
@@ -538,16 +575,17 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
         def get_cp_at_temp(temp):
             """Get specific heat at given temperature."""
             if cp_prop:
-                if cp_prop.property_type == 'constant':
-                    return cp_prop.data_dict.get('value', 500.0)
-                elif cp_prop.property_type == 'curve':
+                if cp_prop.property_type == "constant":
+                    return cp_prop.data_dict.get("value", 500.0)
+                elif cp_prop.property_type == "curve":
                     from app.services.property_evaluator import evaluate_property
+
                     val = evaluate_property(cp_prop, temperature=temp)
                     return val if val else 500.0
             return 500.0
 
         for phase_result in result.phase_results:
-            if phase_result.phase_name not in ('heating', 'tempering'):
+            if phase_result.phase_name not in ("heating", "tempering"):
                 continue
             if not phase_result.time.size or len(phase_result.time) < 3:
                 continue
@@ -560,17 +598,17 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
             power_result = SimulationResult(
                 simulation_id=sim.id,
                 snapshot_id=snapshot.id,
-                result_type='absorbed_power',
+                result_type="absorbed_power",
                 phase=phase_result.phase_name,
-                location='all'
+                location="all",
             )
             power_result.plot_image = visualization.create_absorbed_power_plot(
                 phase_result.time,
                 phase_result.temperature,
                 mass=mass,
                 cp_values=cp_values,
-                title=f'Absorbed Power ({phase_label}) - {sim.name}',
-                phase_name=phase_result.phase_name
+                title=f"Absorbed Power ({phase_label}) - {sim.name}",
+                phase_name=phase_result.phase_name,
             )
             db.session.add(power_result)
 
@@ -578,16 +616,14 @@ def _run_builtin(sim: Simulation, snapshot: SimulationSnapshot) -> None:
     sim.completed_at = datetime.utcnow()
 
     # Finalize snapshot with summary metrics
-    SnapshotService.finalize_snapshot(snapshot, 'completed')
+    SnapshotService.finalize_snapshot(snapshot, "completed")
     new_results = SimulationResult.query.filter_by(snapshot_id=snapshot.id).all()
     SnapshotService.update_summary(snapshot, new_results)
     db.session.commit()
 
 
 def _add_comsol_absorbed_power(
-    sim: Simulation,
-    snapshot: 'SimulationSnapshot',
-    solver_results: dict
+    sim: Simulation, snapshot: "SimulationSnapshot", solver_results: dict
 ) -> None:
     """Add absorbed power plots for COMSOL heating/tempering phases.
 
@@ -603,35 +639,36 @@ def _add_comsol_absorbed_power(
     # Calculate mass from geometry
     geo_type = sim.geometry_type
     if geo_type == GEOMETRY_CAD:
-        geo_type = sim.cad_equivalent_type or 'cylinder'
+        geo_type = sim.cad_equivalent_type or "cylinder"
         geo_params = sim.cad_equivalent_geometry_dict or sim.geometry_dict
     else:
         geo_params = sim.geometry_dict
 
     geometry = create_geometry(geo_type, geo_params)
 
-    rho_prop = grade.get_property('density')
-    density = rho_prop.data_dict.get('value', 7850) if rho_prop else 7850
+    rho_prop = grade.get_property("density")
+    density = rho_prop.data_dict.get("value", 7850) if rho_prop else 7850
     mass = geometry.volume * density
 
-    cp_prop = grade.get_property('specific_heat')
+    cp_prop = grade.get_property("specific_heat")
 
     def get_cp_at_temp(temp):
         if cp_prop:
-            if cp_prop.property_type == 'constant':
-                return cp_prop.data_dict.get('value', 500.0)
-            elif cp_prop.property_type == 'curve':
+            if cp_prop.property_type == "constant":
+                return cp_prop.data_dict.get("value", 500.0)
+            elif cp_prop.property_type == "curve":
                 from app.services.property_evaluator import evaluate_property
+
                 val = evaluate_property(cp_prop, temperature=temp)
                 return val if val else 500.0
         return 500.0
 
-    for phase_name, phase_data in solver_results.get('phases', {}).items():
-        if phase_name not in ('heating', 'tempering'):
+    for phase_name, phase_data in solver_results.get("phases", {}).items():
+        if phase_name not in ("heating", "tempering"):
             continue
 
-        times = phase_data.get('times', [])
-        center = phase_data.get('center_temps', [])
+        times = phase_data.get("times", [])
+        center = phase_data.get("center_temps", [])
         if not times or len(times) < 3 or not center:
             continue
 
@@ -640,7 +677,7 @@ def _add_comsol_absorbed_power(
         cp_values = np.array([get_cp_at_temp(t) for t in center_arr])
 
         # Build 2D temperature array (same helper approach as extractor)
-        surface = phase_data.get('surface_temps', [])
+        surface = phase_data.get("surface_temps", [])
         if surface and len(surface) == len(center):
             temp_2d = np.column_stack([center_arr, np.array(surface)])
         else:
@@ -651,14 +688,16 @@ def _add_comsol_absorbed_power(
         power_result = SimulationResult(
             simulation_id=sim.id,
             snapshot_id=snapshot.id,
-            result_type='absorbed_power',
+            result_type="absorbed_power",
             phase=phase_name,
-            location='all',
+            location="all",
         )
         power_result.plot_image = visualization.create_absorbed_power_plot(
-            times_arr, temp_2d,
-            mass=mass, cp_values=cp_values,
-            title=f'Absorbed Power ({phase_label}) - {sim.name}',
+            times_arr,
+            temp_2d,
+            mass=mass,
+            cp_values=cp_values,
+            title=f"Absorbed Power ({phase_label}) - {sim.name}",
             phase_name=phase_name,
         )
         db.session.add(power_result)

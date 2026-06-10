@@ -19,17 +19,17 @@ References:
   Welding and Cutting", Welding Journal, 1941
 - Easterling K., "Introduction to the Physical Metallurgy of Welding"
 """
-from dataclasses import dataclass, field
-from typing import Optional, Tuple, Dict
-import numpy as np
-from scipy.special import k0
-from scipy.optimize import brentq
 
+from dataclasses import dataclass
+
+import numpy as np
+from scipy.optimize import brentq
+from scipy.special import k0
 
 # Default thermal properties for structural steel
-DEFAULT_CONDUCTIVITY = 40.0      # W/(m·K)
-DEFAULT_DENSITY = 7850.0         # kg/m³
-DEFAULT_SPECIFIC_HEAT = 500.0    # J/(kg·K)
+DEFAULT_CONDUCTIVITY = 40.0  # W/(m·K)
+DEFAULT_DENSITY = 7850.0  # kg/m³
+DEFAULT_SPECIFIC_HEAT = 500.0  # J/(kg·K)
 
 
 @dataclass
@@ -57,6 +57,7 @@ class RosenthalParams:
     plate_thickness : float
         Plate thickness (m), used for 2D thin-plate model
     """
+
     Q: float = 3000.0
     v: float = 0.005
     T0: float = 20.0
@@ -70,10 +71,10 @@ class RosenthalParams:
 
 # Arc efficiency values for common welding processes
 ARC_EFFICIENCIES = {
-    'gtaw': 0.65,
-    'mig_mag': 0.80,
-    'saw': 0.90,
-    'smaw': 0.75,
+    "gtaw": 0.65,
+    "mig_mag": 0.80,
+    "saw": 0.90,
+    "smaw": 0.75,
 }
 
 
@@ -88,7 +89,7 @@ class RosenthalSolver:
         self.params = params
 
     @classmethod
-    def from_weld_project(cls, project, string=None) -> 'RosenthalSolver':
+    def from_weld_project(cls, project, string=None) -> "RosenthalSolver":
         """Create solver from a WeldProject and optional WeldString.
 
         Parameters
@@ -103,7 +104,7 @@ class RosenthalSolver:
         RosenthalSolver
         """
         # Get process efficiency
-        process_type = project.process_type or 'mig_mag'
+        process_type = project.process_type or "mig_mag"
         eta = ARC_EFFICIENCIES.get(process_type, 0.80)
 
         # Get heat input and travel speed
@@ -129,19 +130,19 @@ class RosenthalSolver:
             grade = project.steel_grade
             # Try to get properties from the grade
             try:
-                k_val = grade.get_property('thermal_conductivity')
+                k_val = grade.get_property("thermal_conductivity")
                 if k_val:
                     k = float(k_val)
             except (AttributeError, TypeError):
                 pass
             try:
-                rho_val = grade.get_property('density')
+                rho_val = grade.get_property("density")
                 if rho_val:
                     rho = float(rho_val)
             except (AttributeError, TypeError):
                 pass
             try:
-                cp_val = grade.get_property('specific_heat')
+                cp_val = grade.get_property("specific_heat")
                 if cp_val:
                     Cp = float(cp_val)
             except (AttributeError, TypeError):
@@ -151,8 +152,14 @@ class RosenthalSolver:
         T0 = project.preheat_temperature or 20.0
 
         params = RosenthalParams(
-            Q=Q, v=v, T0=T0, k=k, alpha=alpha,
-            rho=rho, Cp=Cp, eta=eta,
+            Q=Q,
+            v=v,
+            T0=T0,
+            k=k,
+            alpha=alpha,
+            rho=rho,
+            Cp=Cp,
+            eta=eta,
             plate_thickness=0.020,  # Default 20mm, could be from CAD
         )
         return cls(params)
@@ -231,8 +238,8 @@ class RosenthalSolver:
         z: float = 0.0,
         duration: float = 120.0,
         n_points: int = 200,
-        use_2d: bool = False
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        use_2d: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Compute thermal cycle T(t) at a fixed point (y, z) as the source passes.
 
         The source approaches from far away, passes closest at t=t_peak,
@@ -277,10 +284,7 @@ class RosenthalSolver:
         return times, temps
 
     def peak_temperature_at_distance(
-        self,
-        distances_m: np.ndarray,
-        z: float = 0.0,
-        use_2d: bool = False
+        self, distances_m: np.ndarray, z: float = 0.0, use_2d: bool = False
     ) -> np.ndarray:
         """Calculate peak temperature at various transverse distances.
 
@@ -322,10 +326,7 @@ class RosenthalSolver:
         return peak_temps
 
     def haz_boundary_distance(
-        self,
-        target_temp: float,
-        z: float = 0.0,
-        use_2d: bool = False
+        self, target_temp: float, z: float = 0.0, use_2d: bool = False
     ) -> float:
         """Find the transverse distance where peak temperature equals target.
 
@@ -376,12 +377,7 @@ class RosenthalSolver:
         except ValueError:
             return 0.0
 
-    def t8_5_at_point(
-        self,
-        y: float,
-        z: float = 0.0,
-        use_2d: bool = False
-    ) -> Optional[float]:
+    def t8_5_at_point(self, y: float, z: float = 0.0, use_2d: bool = False) -> float | None:
         """Calculate t8/5 cooling time at a specific point.
 
         Parameters
@@ -403,6 +399,9 @@ class RosenthalSolver:
             y, z, duration=300.0, n_points=500, use_2d=use_2d
         )
 
+        if len(temps) == 0:
+            return None
+
         # Check if peak temperature exceeds 800°C
         if np.max(temps) < 800:
             return None
@@ -418,8 +417,11 @@ class RosenthalSolver:
         idx_800 = None
         for i in range(len(cool_temps) - 1):
             if cool_temps[i] >= 800 and cool_temps[i + 1] < 800:
+                denom = cool_temps[i] - cool_temps[i + 1]
+                if denom <= 0:  # flat/NaN-tainted data
+                    continue
                 # Linear interpolation
-                frac = (800 - cool_temps[i + 1]) / (cool_temps[i] - cool_temps[i + 1])
+                frac = (800 - cool_temps[i + 1]) / denom
                 t_800 = cool_times[i + 1] + frac * (cool_times[i] - cool_times[i + 1])
                 idx_800 = t_800
                 break
@@ -435,7 +437,10 @@ class RosenthalSolver:
         idx_500 = None
         for i in range(len(cool_temps) - 1):
             if cool_temps[i] >= 500 and cool_temps[i + 1] < 500:
-                frac = (500 - cool_temps[i + 1]) / (cool_temps[i] - cool_temps[i + 1])
+                denom = cool_temps[i] - cool_temps[i + 1]
+                if denom <= 0:  # flat/NaN-tainted data
+                    continue
+                frac = (500 - cool_temps[i + 1]) / denom
                 t_500 = cool_times[i + 1] + frac * (cool_times[i] - cool_times[i + 1])
                 idx_500 = t_500
                 break

@@ -75,7 +75,8 @@
                                 {% if prop.property_type == 'constant' %}
                                     {{ prop.data_dict.get('value', '-') }}
                                 {% elif prop.property_type == 'curve' %}
-                                    <small class="text-muted">{{ prop.data_dict.get('temperature', [])|length }} points</small>
+                                    {% set curve_temps = prop.data_dict.get('temperature', []) %}
+                                    <small class="text-muted">{{ curve_temps|length }} points{% if curve_temps|length >= 2 and curve_temps[0] is number and curve_temps[-1] is number %} ({{ curve_temps|min }}–{{ curve_temps|max }} °C){% endif %}</small>
                                 {% elif prop.property_type == 'polynomial' %}
                                     <small class="text-muted">{{ prop.data_dict.get('coefficients', [])|length }} coefficients</small>
                                 {% elif prop.property_type == 'equation' %}

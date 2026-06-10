@@ -194,9 +194,7 @@
             {% endif %}
         </div>
         <div class="card-body text-center">
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Full Cycle">
-            {% endif %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='full_cycle') }}" style="min-height: 420px;"></div>
         </div>
     </div>
     {% endif %}
@@ -317,9 +315,9 @@
             </div>
         </div>
         <div class="text-center mt-2">
-            <img id="compPlotImg"
-                 src="{{ url_for('simulation.comparison_plot_channel', id=sim.id, channel=all_measured_channels[0]) }}"
-                 class="img-fluid" alt="Channel comparison" style="max-height: 400px;">
+            <div id="compPlot" class="js-plot"
+                 data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='comparison_channel', channel=all_measured_channels[0]) }}"
+                 style="min-height: 400px;"></div>
         </div>
     </div>
 </div>
@@ -334,11 +332,7 @@
         </div>
         <div class="card-body text-center">
             {% if heating_curves %}
-            {% for result in heating_curves %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Heating">
-            {% endif %}
-            {% endfor %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='phase_curve', phase='heating') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
@@ -351,11 +345,7 @@
         </div>
         <div class="card-body text-center">
             {% if quenching_curves %}
-            {% for result in quenching_curves %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Quenching">
-            {% endif %}
-            {% endfor %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='phase_curve', phase='quenching') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
@@ -368,11 +358,7 @@
         </div>
         <div class="card-body text-center">
             {% if tempering_curves %}
-            {% for result in tempering_curves %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Tempering">
-            {% endif %}
-            {% endfor %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='phase_curve', phase='tempering') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
@@ -389,7 +375,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_heating %}
-            <img src="{{ url_for('simulation.measured_tc_plot_step', id=sim.id, step='heating') }}" class="img-fluid" alt="Measured Heating">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_tc', step='heating') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -402,7 +388,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_quenching %}
-            <img src="{{ url_for('simulation.measured_tc_plot_step', id=sim.id, step='quenching') }}" class="img-fluid" alt="Measured Quenching">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_tc', step='quenching') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -415,7 +401,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_tempering %}
-            <img src="{{ url_for('simulation.measured_tc_plot_step', id=sim.id, step='tempering') }}" class="img-fluid" alt="Measured Tempering">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_tc', step='tempering') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -436,12 +422,9 @@
             <span class="badge bg-warning text-dark">Heating</span> dT/dt vs Time (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in dtdt_time_heating %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="dT/dt Heating">
-            {% endif %}
-            {% endfor %}
-            {% if not dtdt_time_heating %}
+            {% if dtdt_time_heating %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='dtdt_time', phase='heating') }}" style="min-height: 320px;"></div>
+            {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
         </div>
@@ -452,12 +435,9 @@
             <span class="badge bg-info">Quenching</span> dT/dt vs Time (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in dtdt_time_quenching %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="dT/dt Quenching">
-            {% endif %}
-            {% endfor %}
-            {% if not dtdt_time_quenching %}
+            {% if dtdt_time_quenching %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='dtdt_time', phase='quenching') }}" style="min-height: 320px;"></div>
+            {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
         </div>
@@ -468,12 +448,9 @@
             <span class="badge bg-secondary">Tempering</span> dT/dt vs Time (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in dtdt_time_tempering %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="dT/dt Tempering">
-            {% endif %}
-            {% endfor %}
-            {% if not dtdt_time_tempering %}
+            {% if dtdt_time_tempering %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='dtdt_time', phase='tempering') }}" style="min-height: 320px;"></div>
+            {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
         </div>
@@ -489,7 +466,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_heating %}
-            <img src="{{ url_for('simulation.measured_dtdt_plot_step', id=sim.id, step='heating') }}" class="img-fluid" alt="Measured dT/dt Heating">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_dtdt', step='heating') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -502,7 +479,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_quenching %}
-            <img src="{{ url_for('simulation.measured_dtdt_plot_step', id=sim.id, step='quenching') }}" class="img-fluid" alt="Measured dT/dt Quenching">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_dtdt', step='quenching') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -515,7 +492,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_tempering %}
-            <img src="{{ url_for('simulation.measured_dtdt_plot_step', id=sim.id, step='tempering') }}" class="img-fluid" alt="Measured dT/dt Tempering">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_dtdt', step='tempering') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -536,12 +513,9 @@
             <span class="badge bg-warning text-dark">Heating</span> dT/dt vs Temp (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in dtdt_temp_heating %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="dT/dt vs T Heating">
-            {% endif %}
-            {% endfor %}
-            {% if not dtdt_temp_heating %}
+            {% if dtdt_temp_heating %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='dtdt_temp', phase='heating') }}" style="min-height: 320px;"></div>
+            {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
         </div>
@@ -552,12 +526,9 @@
             <span class="badge bg-info">Quenching</span> dT/dt vs Temp (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in dtdt_temp_quenching %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="dT/dt vs T Quenching">
-            {% endif %}
-            {% endfor %}
-            {% if not dtdt_temp_quenching %}
+            {% if dtdt_temp_quenching %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='dtdt_temp', phase='quenching') }}" style="min-height: 320px;"></div>
+            {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
         </div>
@@ -568,12 +539,9 @@
             <span class="badge bg-secondary">Tempering</span> dT/dt vs Temp (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in dtdt_temp_tempering %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="dT/dt vs T Tempering">
-            {% endif %}
-            {% endfor %}
-            {% if not dtdt_temp_tempering %}
+            {% if dtdt_temp_tempering %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='dtdt_temp', phase='tempering') }}" style="min-height: 320px;"></div>
+            {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
         </div>
@@ -589,7 +557,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_heating %}
-            <img src="{{ url_for('simulation.measured_dtdt_temp_plot_step', id=sim.id, step='heating') }}" class="img-fluid" alt="Measured dT/dt vs T Heating">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_dtdt_temp', step='heating') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -602,7 +570,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_quenching %}
-            <img src="{{ url_for('simulation.measured_dtdt_temp_plot_step', id=sim.id, step='quenching') }}" class="img-fluid" alt="Measured dT/dt vs T Quenching">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_dtdt_temp', step='quenching') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -615,7 +583,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_tempering %}
-            <img src="{{ url_for('simulation.measured_dtdt_temp_plot_step', id=sim.id, step='tempering') }}" class="img-fluid" alt="Measured dT/dt vs T Tempering">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_dtdt_temp', step='tempering') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -636,12 +604,9 @@
             <span class="badge bg-warning text-dark">Heating</span> Absorbed Power (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in power_heating %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Absorbed Power Heating">
-            {% endif %}
-            {% endfor %}
-            {% if not power_heating %}
+            {% if power_heating %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='absorbed_power', phase='heating') }}" style="min-height: 320px;"></div>
+            {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
         </div>
@@ -661,12 +626,9 @@
             <span class="badge bg-secondary">Tempering</span> Absorbed Power (Sim)
         </div>
         <div class="card-body text-center">
-            {% for result in power_tempering %}
-            {% if result.has_plot %}
-            <img src="{{ url_for('simulation.result_image', id=sim.id, result_id=result.id) }}" class="img-fluid" alt="Absorbed Power Tempering">
-            {% endif %}
-            {% endfor %}
-            {% if not power_tempering %}
+            {% if power_tempering %}
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='absorbed_power', phase='tempering') }}" style="min-height: 320px;"></div>
+            {% else %}
             <p class="text-muted my-4">-</p>
             {% endif %}
         </div>
@@ -682,7 +644,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_heating %}
-            <img src="{{ url_for('simulation.measured_absorbed_power_plot_step', id=sim.id, step='heating') }}" class="img-fluid" alt="Measured Absorbed Power Heating">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_power', step='heating') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -704,7 +666,7 @@
         </div>
         <div class="card-body text-center">
             {% if measured_tempering %}
-            <img src="{{ url_for('simulation.measured_absorbed_power_plot_step', id=sim.id, step='tempering') }}" class="img-fluid" alt="Measured Absorbed Power Tempering">
+            <div class="js-plot" data-plot-url="{{ url_for('simulation.plot_data', id=sim.id, kind='measured_power', step='tempering') }}" style="min-height: 320px;"></div>
             {% else %}
             <p class="text-muted my-4">No data uploaded</p>
             {% endif %}
@@ -1214,6 +1176,8 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<script src="{{ url_for('static', filename='js/plots.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const runForm = document.getElementById('runForm');
@@ -1250,19 +1214,19 @@ function updateVtkSnapshot(select, phaseName) {
     const offsetSlider = document.getElementById('compOffset');
     const offsetLabel = document.getElementById('offsetLabel');
     const updateBtn = document.getElementById('compUpdateBtn');
-    const plotImg = document.getElementById('compPlotImg');
+    const plotDiv = document.getElementById('compPlot');
 
-    if (!channelSel || !plotImg) return;
+    if (!channelSel || !plotDiv) return;
 
     offsetSlider.addEventListener('input', function() {
         offsetLabel.textContent = this.value;
     });
 
     updateBtn.addEventListener('click', function() {
-        const ch = channelSel.value;
-        const offset = offsetSlider.value;
-        const baseUrl = '{{ url_for("simulation.comparison_plot_channel", id=sim.id, channel="__CH__") }}'.replace('__CH__', ch);
-        plotImg.src = baseUrl + '?offset=' + offset + '&_t=' + Date.now();
+        const baseUrl = '{{ url_for("simulation.plot_data", id=sim.id, kind="comparison_channel") }}';
+        const url = baseUrl + '?channel=' + encodeURIComponent(channelSel.value) +
+            '&offset=' + offsetSlider.value;
+        window.heatsimPlots.renderPlot(plotDiv, url, true);
     });
 })();
 </script>

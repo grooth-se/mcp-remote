@@ -1,343 +1,344 @@
 """Forms for materials management."""
+
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileAllowed
+from flask_wtf.file import FileAllowed, FileField
 from wtforms import (
-    StringField, TextAreaField, SelectField, FloatField,
-    SubmitField, HiddenField, BooleanField
+    FloatField,
+    HiddenField,
+    SelectField,
+    StringField,
+    SubmitField,
+    TextAreaField,
 )
-from wtforms.validators import DataRequired, Optional, Length, NumberRange
+from wtforms.validators import DataRequired, Length, NumberRange, Optional
 
 from app.models import (
-    DATA_SOURCES, DATA_SOURCE_STANDARD,
-    PROPERTY_TYPES, PROPERTY_TYPE_CONSTANT,
-    DIAGRAM_TYPES, DIAGRAM_TYPE_CCT,
-    PHASES, PHASE_LABELS,
+    DATA_SOURCE_STANDARD,
+    DATA_SOURCES,
+    DIAGRAM_TYPE_CCT,
+    DIAGRAM_TYPES,
+    PHASE_LABELS,
+    PHASES,
+    PROPERTY_TYPE_CONSTANT,
+    PROPERTY_TYPE_CURVE,
+    PROPERTY_TYPES,
 )
 
 
 class SteelGradeForm(FlaskForm):
     """Form for creating/editing steel grades."""
+
     designation = StringField(
-        'Designation',
+        "Designation",
         validators=[DataRequired(), Length(max=100)],
-        render_kw={'placeholder': 'e.g., AISI 4340'}
+        render_kw={"placeholder": "e.g., AISI 4340"},
     )
     data_source = SelectField(
-        'Data Source',
-        choices=[(s, s) for s in DATA_SOURCES],
-        default=DATA_SOURCE_STANDARD
+        "Data Source", choices=[(s, s) for s in DATA_SOURCES], default=DATA_SOURCE_STANDARD
     )
     description = TextAreaField(
-        'Description',
+        "Description",
         validators=[Optional(), Length(max=500)],
-        render_kw={'placeholder': 'Optional description or notes', 'rows': 3}
+        render_kw={"placeholder": "Optional description or notes", "rows": 3},
     )
-    submit = SubmitField('Save')
+    submit = SubmitField("Save")
 
 
 class MaterialPropertyForm(FlaskForm):
     """Form for creating/editing material properties."""
+
     property_name = SelectField(
-        'Property',
+        "Property",
         choices=[
             # Thermal properties - Conduction
-            ('thermal_conductivity', 'Thermal Conductivity (k)'),
-            ('specific_heat', 'Specific Heat (Cp)'),
-            ('density', 'Density (ρ)'),
-            ('thermal_diffusivity', 'Thermal Diffusivity (α = k/ρCp)'),
+            ("thermal_conductivity", "Thermal Conductivity (k)"),
+            ("specific_heat", "Specific Heat (Cp)"),
+            ("density", "Density (ρ)"),
+            ("thermal_diffusivity", "Thermal Diffusivity (α = k/ρCp)"),
             # Radiation heat transfer
-            ('emissivity', 'Emissivity (ε) - Total hemispherical'),
-            ('absorptivity', 'Absorptivity (α) - Solar/thermal'),
-            ('emissivity_spectral', 'Spectral Emissivity'),
-            ('reflectivity', 'Reflectivity (ρ)'),
+            ("emissivity", "Emissivity (ε) - Total hemispherical"),
+            ("absorptivity", "Absorptivity (α) - Solar/thermal"),
+            ("emissivity_spectral", "Spectral Emissivity"),
+            ("reflectivity", "Reflectivity (ρ)"),
             # Convection heat transfer
-            ('surface_roughness', 'Surface Roughness (Ra)'),
-            ('htc_natural_convection', 'Natural Convection HTC'),
-            ('htc_forced_convection', 'Forced Convection HTC'),
-            ('nusselt_correlation', 'Nusselt Number Correlation'),
+            ("surface_roughness", "Surface Roughness (Ra)"),
+            ("htc_natural_convection", "Natural Convection HTC"),
+            ("htc_forced_convection", "Forced Convection HTC"),
+            ("nusselt_correlation", "Nusselt Number Correlation"),
             # Mechanical properties
-            ('youngs_modulus', 'Young\'s Modulus (E)'),
-            ('poissons_ratio', 'Poisson\'s Ratio (ν)'),
-            ('thermal_expansion', 'Thermal Expansion Coefficient (CTE)'),
-            ('yield_strength', 'Yield Strength'),
-            ('tensile_strength', 'Ultimate Tensile Strength'),
+            ("youngs_modulus", "Young's Modulus (E)"),
+            ("poissons_ratio", "Poisson's Ratio (ν)"),
+            ("thermal_expansion", "Thermal Expansion Coefficient (CTE)"),
+            ("yield_strength", "Yield Strength"),
+            ("tensile_strength", "Ultimate Tensile Strength"),
             # Custom
-            ('custom', 'Custom Property...'),
+            ("custom", "Custom Property..."),
         ],
-        validators=[DataRequired()]
+        validators=[DataRequired()],
     )
     custom_name = StringField(
-        'Custom Property Name',
+        "Custom Property Name",
         validators=[Optional(), Length(max=100)],
-        render_kw={'placeholder': 'Enter custom property name'}
+        render_kw={"placeholder": "Enter custom property name"},
     )
     property_type = SelectField(
-        'Type',
-        choices=[(t, t.title()) for t in PROPERTY_TYPES],
-        default=PROPERTY_TYPE_CONSTANT
+        "Type", choices=[(t, t.title()) for t in PROPERTY_TYPES], default=PROPERTY_TYPE_CONSTANT
     )
     units = StringField(
-        'Units',
-        validators=[Optional(), Length(max=50)],
-        render_kw={'placeholder': 'e.g., W/(m·K)'}
+        "Units", validators=[Optional(), Length(max=50)], render_kw={"placeholder": "e.g., W/(m·K)"}
     )
     dependencies = StringField(
-        'Dependencies',
+        "Dependencies",
         validators=[Optional(), Length(max=100)],
-        render_kw={'placeholder': 'e.g., temperature (comma-separated)'}
+        render_kw={"placeholder": "e.g., temperature (comma-separated)"},
     )
 
     # Constant value
-    constant_value = FloatField(
-        'Value',
-        validators=[Optional()]
-    )
+    constant_value = FloatField("Value", validators=[Optional()])
 
-    # Curve data (JSON)
-    curve_data = TextAreaField(
-        'Curve Data (JSON)',
-        validators=[Optional()],
-        render_kw={
-            'placeholder': '{"temperature": [20, 200, 400], "value": [50, 45, 40]}',
-            'rows': 5
-        }
-    )
+    # Curve data (JSON, serialized from the table editor on submit)
+    curve_data = HiddenField("Curve Data", validators=[Optional()])
 
     # Polynomial coefficients
-    polynomial_variable = StringField(
-        'Variable',
-        validators=[Optional()],
-        default='temperature'
-    )
+    polynomial_variable = StringField("Variable", validators=[Optional()], default="temperature")
     polynomial_coefficients = StringField(
-        'Coefficients (comma-separated)',
+        "Coefficients (comma-separated)",
         validators=[Optional()],
-        render_kw={'placeholder': 'a0, a1, a2, ... (a0 + a1*x + a2*x² + ...)'}
+        render_kw={"placeholder": "a0, a1, a2, ... (a0 + a1*x + a2*x² + ...)"},
     )
 
     # Equation
     equation = StringField(
-        'Equation',
+        "Equation",
         validators=[Optional(), Length(max=200)],
-        render_kw={'placeholder': 'e.g., 42.5 - 0.015*T'}
+        render_kw={"placeholder": "e.g., 42.5 - 0.015*T"},
     )
     equation_variables = StringField(
-        'Variable Mapping (JSON)',
+        "Variable Mapping (JSON)",
         validators=[Optional()],
-        render_kw={'placeholder': '{"T": "temperature"}'}
+        render_kw={"placeholder": '{"T": "temperature"}'},
     )
 
     notes = TextAreaField(
-        'Notes',
+        "Notes",
         validators=[Optional(), Length(max=500)],
-        render_kw={'placeholder': 'Optional notes about data source', 'rows': 2}
+        render_kw={"placeholder": "Optional notes about data source", "rows": 2},
     )
 
-    submit = SubmitField('Save Property')
+    submit = SubmitField("Save Property")
+
+    def validate(self, extra_validators=None):
+        if not super().validate(extra_validators=extra_validators):
+            return False
+        if self.property_type.data == PROPERTY_TYPE_CONSTANT and self.constant_value.data is None:
+            self.constant_value.errors.append("A value is required for constant properties.")
+            return False
+        if (
+            self.property_type.data == PROPERTY_TYPE_CURVE
+            and not (self.curve_data.data or "").strip()
+        ):
+            self.curve_data.errors.append(
+                "Enter at least 2 temperature/value points for a curve property."
+            )
+            return False
+        return True
 
 
 class PhaseDiagramForm(FlaskForm):
     """Form for creating/editing phase diagrams."""
+
     diagram_type = SelectField(
-        'Diagram Type',
-        choices=[(t, t) for t in DIAGRAM_TYPES],
-        default=DIAGRAM_TYPE_CCT
+        "Diagram Type", choices=[(t, t) for t in DIAGRAM_TYPES], default=DIAGRAM_TYPE_CCT
     )
 
     # Transformation temperatures
-    ac1 = FloatField('Ac1 (°C)', validators=[Optional()])
-    ac3 = FloatField('Ac3 (°C)', validators=[Optional()])
-    ms = FloatField('Ms (°C)', validators=[Optional()])
-    mf = FloatField('Mf (°C)', validators=[Optional()])
-    bs = FloatField('Bs (°C)', validators=[Optional()])
-    bf = FloatField('Bf (°C)', validators=[Optional()])
+    ac1 = FloatField("Ac1 (°C)", validators=[Optional()])
+    ac3 = FloatField("Ac3 (°C)", validators=[Optional()])
+    ms = FloatField("Ms (°C)", validators=[Optional()])
+    mf = FloatField("Mf (°C)", validators=[Optional()])
+    bs = FloatField("Bs (°C)", validators=[Optional()])
+    bf = FloatField("Bf (°C)", validators=[Optional()])
 
     # Curves data (JSON)
     curves_data = TextAreaField(
-        'Curves Data (JSON)',
+        "Curves Data (JSON)",
         validators=[Optional()],
-        render_kw={'placeholder': 'Optional: digitized transformation curves', 'rows': 5}
+        render_kw={"placeholder": "Optional: digitized transformation curves", "rows": 5},
     )
 
     # Source image
     source_image = FileField(
-        'Source Diagram Image',
-        validators=[FileAllowed(['png', 'jpg', 'jpeg'], 'Images only!')]
+        "Source Diagram Image", validators=[FileAllowed(["png", "jpg", "jpeg"], "Images only!")]
     )
 
-    submit = SubmitField('Save Diagram')
+    submit = SubmitField("Save Diagram")
 
 
 class ImportForm(FlaskForm):
     """Form for importing material data from Excel."""
+
     file = FileField(
-        'Excel File',
-        validators=[
-            DataRequired(),
-            FileAllowed(['xlsx', 'xls'], 'Excel files only!')
-        ]
+        "Excel File", validators=[DataRequired(), FileAllowed(["xlsx", "xls"], "Excel files only!")]
     )
     data_source = SelectField(
-        'Data Source',
-        choices=[(s, s) for s in DATA_SOURCES],
-        default=DATA_SOURCE_STANDARD
+        "Data Source", choices=[(s, s) for s in DATA_SOURCES], default=DATA_SOURCE_STANDARD
     )
-    submit = SubmitField('Import')
+    submit = SubmitField("Import")
 
 
 class PropertyEvaluateForm(FlaskForm):
     """Form for evaluating property at specific conditions."""
+
     property_id = HiddenField()
-    temperature = FloatField(
-        'Temperature (°C)',
-        validators=[Optional()]
-    )
-    submit = SubmitField('Evaluate')
+    temperature = FloatField("Temperature (°C)", validators=[Optional()])
+    submit = SubmitField("Evaluate")
 
 
 class SteelCompositionForm(FlaskForm):
     """Form for creating/editing steel chemical composition."""
+
     # Primary elements (wt%)
     carbon = FloatField(
-        'Carbon (C) %',
+        "Carbon (C) %",
         validators=[DataRequired(), NumberRange(min=0, max=3.0)],
-        render_kw={'placeholder': 'e.g., 0.40', 'step': '0.01'}
+        render_kw={"placeholder": "e.g., 0.40", "step": "0.01"},
     )
     manganese = FloatField(
-        'Manganese (Mn) %',
+        "Manganese (Mn) %",
         validators=[Optional(), NumberRange(min=0, max=3.0)],
-        render_kw={'placeholder': 'e.g., 0.70', 'step': '0.01'}
+        render_kw={"placeholder": "e.g., 0.70", "step": "0.01"},
     )
     silicon = FloatField(
-        'Silicon (Si) %',
+        "Silicon (Si) %",
         validators=[Optional(), NumberRange(min=0, max=3.0)],
-        render_kw={'placeholder': 'e.g., 0.25', 'step': '0.01'}
+        render_kw={"placeholder": "e.g., 0.25", "step": "0.01"},
     )
 
     # Secondary alloying elements
     chromium = FloatField(
-        'Chromium (Cr) %',
+        "Chromium (Cr) %",
         validators=[Optional(), NumberRange(min=0, max=20.0)],
-        render_kw={'placeholder': 'e.g., 0.80', 'step': '0.01'}
+        render_kw={"placeholder": "e.g., 0.80", "step": "0.01"},
     )
     nickel = FloatField(
-        'Nickel (Ni) %',
+        "Nickel (Ni) %",
         validators=[Optional(), NumberRange(min=0, max=20.0)],
-        render_kw={'placeholder': 'e.g., 1.80', 'step': '0.01'}
+        render_kw={"placeholder": "e.g., 1.80", "step": "0.01"},
     )
     molybdenum = FloatField(
-        'Molybdenum (Mo) %',
+        "Molybdenum (Mo) %",
         validators=[Optional(), NumberRange(min=0, max=5.0)],
-        render_kw={'placeholder': 'e.g., 0.25', 'step': '0.01'}
+        render_kw={"placeholder": "e.g., 0.25", "step": "0.01"},
     )
     vanadium = FloatField(
-        'Vanadium (V) %',
+        "Vanadium (V) %",
         validators=[Optional(), NumberRange(min=0, max=3.0)],
-        render_kw={'placeholder': 'e.g., 0.05', 'step': '0.001'}
+        render_kw={"placeholder": "e.g., 0.05", "step": "0.001"},
     )
 
     # Additional elements (collapsible)
     tungsten = FloatField(
-        'Tungsten (W) %',
+        "Tungsten (W) %",
         validators=[Optional(), NumberRange(min=0, max=10.0)],
-        render_kw={'placeholder': '0.0', 'step': '0.01'}
+        render_kw={"placeholder": "0.0", "step": "0.01"},
     )
     copper = FloatField(
-        'Copper (Cu) %',
+        "Copper (Cu) %",
         validators=[Optional(), NumberRange(min=0, max=3.0)],
-        render_kw={'placeholder': '0.0', 'step': '0.01'}
+        render_kw={"placeholder": "0.0", "step": "0.01"},
     )
     phosphorus = FloatField(
-        'Phosphorus (P) %',
+        "Phosphorus (P) %",
         validators=[Optional(), NumberRange(min=0, max=0.5)],
-        render_kw={'placeholder': '0.0', 'step': '0.001'}
+        render_kw={"placeholder": "0.0", "step": "0.001"},
     )
     sulfur = FloatField(
-        'Sulfur (S) %',
+        "Sulfur (S) %",
         validators=[Optional(), NumberRange(min=0, max=0.5)],
-        render_kw={'placeholder': '0.0', 'step': '0.001'}
+        render_kw={"placeholder": "0.0", "step": "0.001"},
     )
     nitrogen = FloatField(
-        'Nitrogen (N) %',
+        "Nitrogen (N) %",
         validators=[Optional(), NumberRange(min=0, max=0.5)],
-        render_kw={'placeholder': '0.0', 'step': '0.001'}
+        render_kw={"placeholder": "0.0", "step": "0.001"},
     )
     boron = FloatField(
-        'Boron (B) %',
+        "Boron (B) %",
         validators=[Optional(), NumberRange(min=0, max=0.01)],
-        render_kw={'placeholder': '0.0', 'step': '0.0001'}
+        render_kw={"placeholder": "0.0", "step": "0.0001"},
     )
 
     # Tempering properties
     hollomon_jaffe_c = FloatField(
-        'Hollomon-Jaffe Constant (Hp)',
+        "Hollomon-Jaffe Constant (Hp)",
         validators=[Optional(), NumberRange(min=10, max=30)],
-        render_kw={'placeholder': '20.0', 'step': '0.1'}
+        render_kw={"placeholder": "20.0", "step": "0.1"},
     )
 
     # Metadata
     source = StringField(
-        'Data Source',
+        "Data Source",
         validators=[Optional(), Length(max=200)],
-        render_kw={'placeholder': 'e.g., ASTM A29, Mill certificate'}
+        render_kw={"placeholder": "e.g., ASTM A29, Mill certificate"},
     )
     notes = TextAreaField(
-        'Notes',
+        "Notes",
         validators=[Optional(), Length(max=500)],
-        render_kw={'placeholder': 'Optional notes', 'rows': 2}
+        render_kw={"placeholder": "Optional notes", "rows": 2},
     )
 
-    submit = SubmitField('Save Composition')
+    submit = SubmitField("Save Composition")
 
 
 class PhasePropertyForm(FlaskForm):
     """Form for creating/editing phase-specific properties."""
+
     phase = SelectField(
-        'Phase/Structure',
+        "Phase/Structure",
         choices=[(p, PHASE_LABELS[p]) for p in PHASES],
-        validators=[DataRequired()]
+        validators=[DataRequired()],
     )
 
     relative_density = FloatField(
-        'Relative Density',
+        "Relative Density",
         validators=[Optional(), NumberRange(min=0.8, max=1.2)],
-        render_kw={'placeholder': 'e.g., 1.000 (Ferrite at 20°C = 1.0)', 'step': '0.0001'}
+        render_kw={"placeholder": "e.g., 1.000 (Ferrite at 20°C = 1.0)", "step": "0.0001"},
     )
 
     thermal_expansion_coeff = FloatField(
-        'Thermal Expansion Coefficient (10⁻⁶/K)',
+        "Thermal Expansion Coefficient (10⁻⁶/K)",
         validators=[Optional(), NumberRange(min=0, max=50)],
-        render_kw={'placeholder': 'e.g., 12.5 (mean value)', 'step': '0.1'}
+        render_kw={"placeholder": "e.g., 12.5 (mean value)", "step": "0.1"},
     )
 
     expansion_type = SelectField(
-        'Expansion Data Type',
+        "Expansion Data Type",
         choices=[
-            ('constant', 'Constant (mean value)'),
-            ('temperature_dependent', 'Temperature-dependent curve'),
+            ("constant", "Constant (mean value)"),
+            ("temperature_dependent", "Temperature-dependent curve"),
         ],
-        default='constant'
+        default="constant",
     )
 
     expansion_data = TextAreaField(
-        'Temperature-Dependent Expansion Data (JSON)',
+        "Temperature-Dependent Expansion Data (JSON)",
         validators=[Optional()],
         render_kw={
-            'placeholder': '{"temperature": [20, 200, 400, 600], "value": [11.5, 12.0, 13.0, 14.0]}',
-            'rows': 4
-        }
+            "placeholder": '{"temperature": [20, 200, 400, 600], "value": [11.5, 12.0, 13.0, 14.0]}',
+            "rows": 4,
+        },
     )
 
     reference_temperature = FloatField(
-        'Reference Temperature (°C)',
+        "Reference Temperature (°C)",
         validators=[Optional(), NumberRange(min=-273, max=1500)],
-        default=20.0
+        default=20.0,
     )
 
     notes = TextAreaField(
-        'Notes',
+        "Notes",
         validators=[Optional(), Length(max=500)],
-        render_kw={'placeholder': 'Optional notes about data source', 'rows': 2}
+        render_kw={"placeholder": "Optional notes about data source", "rows": 2},
     )
 
-    submit = SubmitField('Save Phase Property')
+    submit = SubmitField("Save Phase Property")

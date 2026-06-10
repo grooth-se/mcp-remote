@@ -9,23 +9,23 @@ References:
   Applications to Steel, AIME, 1978
 - ASTM E140 for HV to HRC conversion
 """
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+
 import math
+from dataclasses import dataclass, field
+
 import numpy as np
 
 from app.models.material import SteelComposition
 
-
 # Position labels for 4-point radial analysis
 POSITION_LABELS = {
-    'center': 'Center',
-    'one_third': '1/3 R',
-    'two_thirds': '2/3 R',
-    'surface': 'Surface',
+    "center": "Center",
+    "one_third": "1/3 R",
+    "two_thirds": "2/3 R",
+    "surface": "Surface",
 }
 
-POSITION_KEYS = ['center', 'one_third', 'two_thirds', 'surface']
+POSITION_KEYS = ["center", "one_third", "two_thirds", "surface"]
 
 
 @dataclass
@@ -49,21 +49,22 @@ class HardnessResult:
     composition : dict
         Steel composition used for prediction
     """
-    hardness_hv: Dict[str, float] = field(default_factory=dict)
-    hardness_hrc: Dict[str, float] = field(default_factory=dict)
-    t8_5_values: Dict[str, float] = field(default_factory=dict)
-    phase_fractions: Dict[str, Dict[str, float]] = field(default_factory=dict)
+
+    hardness_hv: dict[str, float] = field(default_factory=dict)
+    hardness_hrc: dict[str, float] = field(default_factory=dict)
+    t8_5_values: dict[str, float] = field(default_factory=dict)
+    phase_fractions: dict[str, dict[str, float]] = field(default_factory=dict)
     carbon_equivalent: float = 0.0
     ideal_diameter: float = 0.0
-    composition: Dict[str, float] = field(default_factory=dict)
+    composition: dict[str, float] = field(default_factory=dict)
     # Mechanical properties
-    uts_mpa: Dict[str, float] = field(default_factory=dict)
-    ys_mpa: Dict[str, float] = field(default_factory=dict)
-    elongation_pct: Dict[str, float] = field(default_factory=dict)
-    toughness_rating: Dict[str, str] = field(default_factory=dict)
+    uts_mpa: dict[str, float] = field(default_factory=dict)
+    ys_mpa: dict[str, float] = field(default_factory=dict)
+    elongation_pct: dict[str, float] = field(default_factory=dict)
+    toughness_rating: dict[str, str] = field(default_factory=dict)
     # Tempered hardness
-    tempered_hardness_hv: Dict[str, float] = field(default_factory=dict)
-    tempered_hardness_hrc: Dict[str, float] = field(default_factory=dict)
+    tempered_hardness_hv: dict[str, float] = field(default_factory=dict)
+    tempered_hardness_hrc: dict[str, float] = field(default_factory=dict)
     hollomon_jaffe_parameter: float = 0.0
     tempering_temperature: float = 0.0
     tempering_time: float = 0.0
@@ -71,22 +72,22 @@ class HardnessResult:
     def to_dict(self) -> dict:
         """Convert to dictionary for storage."""
         return {
-            'hardness_hv': self.hardness_hv,
-            'hardness_hrc': self.hardness_hrc,
-            't8_5_values': self.t8_5_values,
-            'phase_fractions': self.phase_fractions,
-            'carbon_equivalent': self.carbon_equivalent,
-            'ideal_diameter': self.ideal_diameter,
-            'composition': self.composition,
-            'uts_mpa': self.uts_mpa,
-            'ys_mpa': self.ys_mpa,
-            'elongation_pct': self.elongation_pct,
-            'toughness_rating': self.toughness_rating,
-            'tempered_hardness_hv': self.tempered_hardness_hv,
-            'tempered_hardness_hrc': self.tempered_hardness_hrc,
-            'hollomon_jaffe_parameter': self.hollomon_jaffe_parameter,
-            'tempering_temperature': self.tempering_temperature,
-            'tempering_time': self.tempering_time,
+            "hardness_hv": self.hardness_hv,
+            "hardness_hrc": self.hardness_hrc,
+            "t8_5_values": self.t8_5_values,
+            "phase_fractions": self.phase_fractions,
+            "carbon_equivalent": self.carbon_equivalent,
+            "ideal_diameter": self.ideal_diameter,
+            "composition": self.composition,
+            "uts_mpa": self.uts_mpa,
+            "ys_mpa": self.ys_mpa,
+            "elongation_pct": self.elongation_pct,
+            "toughness_rating": self.toughness_rating,
+            "tempered_hardness_hv": self.tempered_hardness_hv,
+            "tempered_hardness_hrc": self.tempered_hardness_hrc,
+            "hollomon_jaffe_parameter": self.hollomon_jaffe_parameter,
+            "tempering_temperature": self.tempering_temperature,
+            "tempering_time": self.tempering_time,
         }
 
 
@@ -125,17 +126,16 @@ class HardnessPredictor:
         float
             Martensite hardness in HV
         """
-        C = self.comp['C']
-        Si = self.comp['Si']
-        Mn = self.comp['Mn']
-        Ni = self.comp['Ni']
-        Cr = self.comp['Cr']
+        C = self.comp["C"]
+        Si = self.comp["Si"]
+        Mn = self.comp["Mn"]
+        Ni = self.comp["Ni"]
+        Cr = self.comp["Cr"]
 
         # Clamp cooling rate to avoid log of zero
         vr = max(vr, 0.1)
 
-        hv = (127 + 949*C + 27*Si + 11*Mn + 8*Ni + 16*Cr +
-              21*math.log10(vr))
+        hv = 127 + 949 * C + 27 * Si + 11 * Mn + 8 * Ni + 16 * Cr + 21 * math.log10(vr)
 
         return max(hv, 100.0)  # Minimum reasonable hardness
 
@@ -158,22 +158,31 @@ class HardnessPredictor:
         float
             Bainite hardness in HV
         """
-        C = self.comp['C']
-        Si = self.comp['Si']
-        Mn = self.comp['Mn']
-        Ni = self.comp['Ni']
-        Cr = self.comp['Cr']
-        Mo = self.comp['Mo']
+        C = self.comp["C"]
+        Si = self.comp["Si"]
+        Mn = self.comp["Mn"]
+        Ni = self.comp["Ni"]
+        Cr = self.comp["Cr"]
+        Mo = self.comp["Mo"]
 
         # Clamp t8/5 to reasonable range
         t8_5 = max(t8_5, 0.1)
 
         # Simplified Maynier bainite equation
-        hv = (-109 + 1.7*C + 75*C + 19*Si + 4*Mn + 1.1*Ni + 8*Cr + 21*Mo +
-              18.1*math.log10(t8_5) * (72*C + 13*Si + 5*Mn + 3*Ni + 2*Cr + 6*Mo))
+        hv = (
+            -109
+            + 1.7 * C
+            + 75 * C
+            + 19 * Si
+            + 4 * Mn
+            + 1.1 * Ni
+            + 8 * Cr
+            + 21 * Mo
+            + 18.1 * math.log10(t8_5) * (72 * C + 13 * Si + 5 * Mn + 3 * Ni + 2 * Cr + 6 * Mo)
+        )
 
         # More practical simplified form
-        hv = 200 + 500*C + 30*Si + 20*Mn + 10*Ni + 30*Cr + 50*Mo - 5*math.log10(t8_5)
+        hv = 200 + 500 * C + 30 * Si + 20 * Mn + 10 * Ni + 30 * Cr + 50 * Mo - 5 * math.log10(t8_5)
 
         return max(hv, 150.0)
 
@@ -193,13 +202,13 @@ class HardnessPredictor:
         float
             Ferrite+pearlite hardness in HV
         """
-        C = self.comp['C']
-        Si = self.comp['Si']
-        Mn = self.comp['Mn']
-        Ni = self.comp['Ni']
-        Cr = self.comp['Cr']
-        Mo = self.comp['Mo']
-        V = self.comp['V']
+        C = self.comp["C"]
+        Si = self.comp["Si"]
+        Mn = self.comp["Mn"]
+        Ni = self.comp["Ni"]
+        Cr = self.comp["Cr"]
+        Mo = self.comp["Mo"]
+        V = self.comp["V"]
 
         # Clamp t8/5 to reasonable range
         t8_5 = max(t8_5, 0.1)
@@ -207,16 +216,20 @@ class HardnessPredictor:
         # Convert t8/5 to cooling rate (300 K / t8_5 seconds)
         vr = 300.0 / t8_5
 
-        hv = (42 + 223*C + 53*Si + 30*Mn + 12.6*Ni + 7*Cr + 19*Mo +
-              (10 - 19*Si + 4*Ni + 8*Cr + 130*V) * math.log10(vr))
+        hv = (
+            42
+            + 223 * C
+            + 53 * Si
+            + 30 * Mn
+            + 12.6 * Ni
+            + 7 * Cr
+            + 19 * Mo
+            + (10 - 19 * Si + 4 * Ni + 8 * Cr + 130 * V) * math.log10(vr)
+        )
 
         return max(hv, 100.0)
 
-    def predict_hardness(
-        self,
-        phase_fractions: Dict[str, float],
-        t8_5: float
-    ) -> float:
+    def predict_hardness(self, phase_fractions: dict[str, float], t8_5: float) -> float:
         """Predict composite hardness at a single position.
 
         Uses rule of mixtures to combine phase-specific hardness values
@@ -243,18 +256,17 @@ class HardnessPredictor:
         hv_fp = self._ferrite_pearlite_hardness(t8_5)
 
         # Get phase fractions
-        f_m = phase_fractions.get('martensite', 0.0)
-        f_b = phase_fractions.get('bainite', 0.0)
-        f_f = phase_fractions.get('ferrite', 0.0)
-        f_p = phase_fractions.get('pearlite', 0.0)
-        f_ra = phase_fractions.get('retained_austenite', 0.0)
+        f_m = phase_fractions.get("martensite", 0.0)
+        f_b = phase_fractions.get("bainite", 0.0)
+        f_f = phase_fractions.get("ferrite", 0.0)
+        f_p = phase_fractions.get("pearlite", 0.0)
+        f_ra = phase_fractions.get("retained_austenite", 0.0)
 
         # Combine using rule of mixtures
         # Treat ferrite and pearlite together, retained austenite as soft
-        hv_composite = (f_m * hv_m +
-                        f_b * hv_b +
-                        (f_f + f_p) * hv_fp +
-                        f_ra * 200.0)  # Retained austenite ~200 HV
+        hv_composite = (
+            f_m * hv_m + f_b * hv_b + (f_f + f_p) * hv_fp + f_ra * 200.0
+        )  # Retained austenite ~200 HV
 
         return max(hv_composite, 100.0)
 
@@ -275,7 +287,7 @@ class HardnessPredictor:
         """
         return 3.45 * hv
 
-    def predict_ys(self, uts: float, phase_fractions: Dict[str, float]) -> float:
+    def predict_ys(self, uts: float, phase_fractions: dict[str, float]) -> float:
         """Estimate yield strength from UTS, adjusted by dominant microstructure.
 
         Martensite-dominant: YS ~ 0.90 * UTS
@@ -294,8 +306,8 @@ class HardnessPredictor:
         float
             Estimated yield strength in MPa
         """
-        f_m = phase_fractions.get('martensite', 0.0)
-        f_b = phase_fractions.get('bainite', 0.0)
+        f_m = phase_fractions.get("martensite", 0.0)
+        f_b = phase_fractions.get("bainite", 0.0)
         if f_m > 0.5:
             ratio = 0.90
         elif f_b > 0.3:
@@ -304,7 +316,7 @@ class HardnessPredictor:
             ratio = 0.70
         return ratio * uts
 
-    def predict_elongation(self, phase_fractions: Dict[str, float]) -> float:
+    def predict_elongation(self, phase_fractions: dict[str, float]) -> float:
         """Estimate elongation (%) from phase fractions using rule of mixtures.
 
         Typical elongation by phase:
@@ -323,14 +335,14 @@ class HardnessPredictor:
         float
             Estimated elongation in percent
         """
-        f_m = phase_fractions.get('martensite', 0.0)
-        f_b = phase_fractions.get('bainite', 0.0)
-        f_f = phase_fractions.get('ferrite', 0.0)
-        f_p = phase_fractions.get('pearlite', 0.0)
-        f_ra = phase_fractions.get('retained_austenite', 0.0)
+        f_m = phase_fractions.get("martensite", 0.0)
+        f_b = phase_fractions.get("bainite", 0.0)
+        f_f = phase_fractions.get("ferrite", 0.0)
+        f_p = phase_fractions.get("pearlite", 0.0)
+        f_ra = phase_fractions.get("retained_austenite", 0.0)
         return f_m * 8.0 + f_b * 16.0 + (f_f + f_p) * 25.0 + f_ra * 20.0
 
-    def predict_toughness_rating(self, phase_fractions: Dict[str, float]) -> str:
+    def predict_toughness_rating(self, phase_fractions: dict[str, float]) -> str:
         """Qualitative impact toughness rating based on microstructure.
 
         High untempered martensite (>80%) is brittle: 'poor'.
@@ -347,20 +359,20 @@ class HardnessPredictor:
         str
             'good', 'acceptable', or 'poor'
         """
-        f_m = phase_fractions.get('martensite', 0.0)
+        f_m = phase_fractions.get("martensite", 0.0)
         if f_m > 0.80:
-            return 'poor'
+            return "poor"
         elif f_m > 0.40:
-            return 'acceptable'
+            return "acceptable"
         else:
-            return 'good'
+            return "good"
 
     def tempered_hardness(
         self,
         hv_quenched: float,
         tempering_temp_c: float,
         hold_time_min: float,
-        hp_constant: float = 20.0
+        hp_constant: float = 20.0,
     ) -> tuple:
         """Calculate tempered hardness using Hollomon-Jaffe parameter.
 
@@ -394,8 +406,8 @@ class HardnessPredictor:
         hjp = T_K * (hp_constant + math.log10(t_hours))
 
         # Equilibrium floor: ferrite-pearlite hardness from composition
-        C = self.comp['C']
-        hv_floor = 42 + 223 * C + 53 * self.comp.get('Si', 0) + 30 * self.comp.get('Mn', 0)
+        C = self.comp["C"]
+        hv_floor = 42 + 223 * C + 53 * self.comp.get("Si", 0) + 30 * self.comp.get("Mn", 0)
         hv_floor = max(hv_floor, 100.0)
 
         # Softening fraction based on HJP
@@ -416,7 +428,7 @@ class HardnessPredictor:
 
         return (hv_tempered, hjp)
 
-    def hv_to_hrc(self, hv: float) -> Optional[float]:
+    def hv_to_hrc(self, hv: float) -> float | None:
         """Convert Vickers hardness to Rockwell C.
 
         Uses ASTM E140 approximation. HRC is only valid for HV > ~200.
@@ -450,7 +462,7 @@ def predict_hardness_profile(
     temperatures: np.ndarray,
     times: np.ndarray,
     phase_tracker,
-    t8_5_values: Optional[Dict[str, float]] = None
+    t8_5_values: dict[str, float] | None = None,
 ) -> HardnessResult:
     """Predict hardness at 4 radial positions.
 
@@ -481,17 +493,17 @@ def predict_hardness_profile(
     result = HardnessResult(
         carbon_equivalent=composition.carbon_equivalent_iiw,
         ideal_diameter=composition.ideal_diameter_di,
-        composition=composition.to_dict()
+        composition=composition.to_dict(),
     )
 
     n_positions = temperatures.shape[1]
 
     # Calculate indices for the 4 positions
     indices = {
-        'center': 0,
-        'one_third': n_positions // 3,
-        'two_thirds': 2 * n_positions // 3,
-        'surface': n_positions - 1,
+        "center": 0,
+        "one_third": n_positions // 3,
+        "two_thirds": 2 * n_positions // 3,
+        "surface": n_positions - 1,
     }
 
     for pos_key, idx in indices.items():
@@ -510,7 +522,13 @@ def predict_hardness_profile(
         phases = phase_tracker.predict_phases(times, temp_at_pos, t8_5)
         if phases is None:
             # Default to ferrite-pearlite if phase prediction fails
-            phase_dict = {'martensite': 0.0, 'bainite': 0.0, 'ferrite': 0.5, 'pearlite': 0.5, 'retained_austenite': 0.0}
+            phase_dict = {
+                "martensite": 0.0,
+                "bainite": 0.0,
+                "ferrite": 0.5,
+                "pearlite": 0.5,
+                "retained_austenite": 0.0,
+            }
         else:
             phase_dict = phases.to_dict()
         result.phase_fractions[pos_key] = phase_dict
@@ -548,15 +566,21 @@ def _calculate_t8_5(times: np.ndarray, temperatures: np.ndarray) -> float:
     float
         Cooling time from 800 to 500 degC in seconds
     """
+    if len(times) == 0 or len(temperatures) == 0:
+        return 10.0
+
     # Find when temperature crosses 800 and 500 during cooling
     idx_800 = None
     idx_500 = None
 
     # Look for first crossing of 800 from above (cooling)
     for i in range(1, len(temperatures)):
-        if temperatures[i-1] > 800 and temperatures[i] <= 800:
+        if temperatures[i - 1] > 800 and temperatures[i] <= 800:
+            denom = temperatures[i - 1] - temperatures[i]
+            if denom <= 0:  # flat/NaN-tainted data
+                continue
             # Interpolate for more accuracy
-            frac = (800 - temperatures[i]) / (temperatures[i-1] - temperatures[i])
+            frac = (800 - temperatures[i]) / denom
             idx_800 = i - frac
             break
 
@@ -564,8 +588,11 @@ def _calculate_t8_5(times: np.ndarray, temperatures: np.ndarray) -> float:
     if idx_800 is not None:
         start_idx = int(idx_800) + 1
         for i in range(start_idx, len(temperatures)):
-            if temperatures[i-1] > 500 and temperatures[i] <= 500:
-                frac = (500 - temperatures[i]) / (temperatures[i-1] - temperatures[i])
+            if temperatures[i - 1] > 500 and temperatures[i] <= 500:
+                denom = temperatures[i - 1] - temperatures[i]
+                if denom <= 0:  # flat/NaN-tainted data
+                    continue
+                frac = (500 - temperatures[i]) / denom
                 idx_500 = i - frac
                 break
 

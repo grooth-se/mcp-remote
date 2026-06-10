@@ -3,21 +3,29 @@
 A single daemon thread polls the database for queued jobs and executes
 them one at a time.  No Celery, no Redis — just a thread + DB polling.
 """
+
 import logging
 import threading
-import time
-from datetime import datetime
-from typing import Optional, Tuple
 
 from flask import Flask
 
 from app.extensions import db
-from app.models.simulation import Simulation, STATUS_QUEUED as SIM_QUEUED, STATUS_RUNNING as SIM_RUNNING, STATUS_FAILED as SIM_FAILED
-from app.models.weld_project import WeldProject, STATUS_QUEUED as WELD_QUEUED, STATUS_RUNNING as WELD_RUNNING, STATUS_FAILED as WELD_FAILED
+from app.models.simulation import (
+    STATUS_FAILED as SIM_FAILED,
+)
+from app.models.simulation import (
+    Simulation,
+)
+from app.models.weld_project import (
+    STATUS_FAILED as WELD_FAILED,
+)
+from app.models.weld_project import (
+    WeldProject,
+)
 
 logger = logging.getLogger(__name__)
 
-_worker_thread: Optional[threading.Thread] = None
+_worker_thread: threading.Thread | None = None
 _shutdown_event = threading.Event()
 
 # Poll interval in seconds
@@ -32,7 +40,7 @@ def start_worker(app: Flask) -> None:
     """
     global _worker_thread
 
-    if app.config.get('TESTING'):
+    if app.config.get("TESTING"):
         return
 
     if _worker_thread is not None and _worker_thread.is_alive():
@@ -42,7 +50,7 @@ def start_worker(app: Flask) -> None:
     _worker_thread = threading.Thread(
         target=_worker_loop,
         args=(app,),
-        name='job-queue-worker',
+        name="job-queue-worker",
         daemon=True,
     )
     _worker_thread.start()
@@ -74,23 +82,19 @@ def _worker_loop(app: Flask) -> None:
         _shutdown_event.wait(timeout=POLL_INTERVAL)
 
 
-def _claim_next_job() -> Optional[Tuple[str, int]]:
+def _claim_next_job() -> tuple[str, int] | None:
     """Find and claim the oldest queued job.
 
     Returns (job_type, job_id) or None if no queued jobs.
     job_type is 'simulation' or 'weld'.
     """
     # Find oldest queued simulation
-    sim = (Simulation.query
-           .filter_by(status='queued')
-           .order_by(Simulation.created_at.asc())
-           .first())
+    sim = Simulation.query.filter_by(status="queued").order_by(Simulation.created_at.asc()).first()
 
     # Find oldest queued weld project
-    weld = (WeldProject.query
-            .filter_by(status='queued')
-            .order_by(WeldProject.created_at.asc())
-            .first())
+    weld = (
+        WeldProject.query.filter_by(status="queued").order_by(WeldProject.created_at.asc()).first()
+    )
 
     if sim is None and weld is None:
         return None
@@ -101,13 +105,13 @@ def _claim_next_job() -> Optional[Tuple[str, int]]:
         # Both are queued — pick whichever was queued earlier
         # We use started_at as None for queued items, so fallback to id ordering
         if sim.id < weld.id:
-            job_type, job_id = 'simulation', sim.id
+            job_type, job_id = "simulation", sim.id
         else:
-            job_type, job_id = 'weld', weld.id
+            job_type, job_id = "weld", weld.id
     elif sim:
-        job_type, job_id = 'simulation', sim.id
+        job_type, job_id = "simulation", sim.id
     else:
-        job_type, job_id = 'weld', weld.id
+        job_type, job_id = "weld", weld.id
 
     return (job_type, job_id)
 
@@ -117,33 +121,36 @@ def _execute_job(job_type: str, job_id: int) -> None:
     logger.info("Executing %s job #%d", job_type, job_id)
 
     try:
-        if job_type == 'simulation':
+        if job_type == "simulation":
             from app.services.simulation_runner import run_heat_treatment
+
             run_heat_treatment(job_id)
-        elif job_type == 'weld':
+        elif job_type == "weld":
             from app.services.weld_runner import run_weld_simulation
+
             run_weld_simulation(job_id)
         else:
             logger.error("Unknown job type: %s", job_type)
-    except Exception:
+    except Exception as exc:
         logger.exception("Job %s #%d failed with uncaught exception", job_type, job_id)
-        _mark_failed(job_type, job_id)
+        _mark_failed(job_type, job_id, str(exc))
 
 
-def _mark_failed(job_type: str, job_id: int) -> None:
+def _mark_failed(job_type: str, job_id: int, message: str | None = None) -> None:
     """Safety net: mark a job as failed if an uncaught exception occurs."""
+    error_message = (message or "Unexpected worker error")[:500]
     try:
-        if job_type == 'simulation':
+        if job_type == "simulation":
             sim = db.session.get(Simulation, job_id)
-            if sim and sim.status in ('queued', 'running'):
+            if sim and sim.status in ("queued", "running"):
                 sim.status = SIM_FAILED
-                sim.error_message = 'Unexpected worker error'
+                sim.error_message = error_message
                 db.session.commit()
-        elif job_type == 'weld':
+        elif job_type == "weld":
             proj = db.session.get(WeldProject, job_id)
-            if proj and proj.status in ('queued', 'running'):
+            if proj and proj.status in ("queued", "running"):
                 proj.status = WELD_FAILED
-                proj.error_message = 'Unexpected worker error'
+                proj.error_message = error_message
                 db.session.commit()
     except Exception:
         logger.exception("Failed to mark job as failed: %s #%d", job_type, job_id)
@@ -160,51 +167,51 @@ def get_queue_status() -> dict:
     queued_jobs = []
 
     # Check running
-    running_sim = Simulation.query.filter_by(status='running').first()
+    running_sim = Simulation.query.filter_by(status="running").first()
     if running_sim:
-        running_job = {'type': 'simulation', 'id': running_sim.id, 'name': running_sim.name}
+        running_job = {"type": "simulation", "id": running_sim.id, "name": running_sim.name}
 
-    running_weld = WeldProject.query.filter_by(status='running').first()
+    running_weld = WeldProject.query.filter_by(status="running").first()
     if running_weld:
-        running_job = {'type': 'weld', 'id': running_weld.id, 'name': running_weld.name}
+        running_job = {"type": "weld", "id": running_weld.id, "name": running_weld.name}
 
     # Collect queued items
-    queued_sims = (Simulation.query
-                   .filter_by(status='queued')
-                   .order_by(Simulation.created_at.asc())
-                   .all())
-    queued_welds = (WeldProject.query
-                    .filter_by(status='queued')
-                    .order_by(WeldProject.created_at.asc())
-                    .all())
+    queued_sims = (
+        Simulation.query.filter_by(status="queued").order_by(Simulation.created_at.asc()).all()
+    )
+    queued_welds = (
+        WeldProject.query.filter_by(status="queued").order_by(WeldProject.created_at.asc()).all()
+    )
 
     # Merge into single ordered list by id (FIFO approximation)
     all_queued = []
     for s in queued_sims:
-        all_queued.append(('simulation', s.id, s.name, s.created_at))
+        all_queued.append(("simulation", s.id, s.name, s.created_at))
     for w in queued_welds:
-        all_queued.append(('weld', w.id, w.name, w.created_at))
+        all_queued.append(("weld", w.id, w.name, w.created_at))
 
     all_queued.sort(key=lambda x: (x[3], x[1]))  # Sort by created_at, then id
 
     for pos, (jtype, jid, jname, _) in enumerate(all_queued, 1):
-        queued_jobs.append({
-            'type': jtype,
-            'id': jid,
-            'name': jname,
-            'position': pos,
-        })
+        queued_jobs.append(
+            {
+                "type": jtype,
+                "id": jid,
+                "name": jname,
+                "position": pos,
+            }
+        )
 
     return {
-        'running': running_job,
-        'queued': queued_jobs,
+        "running": running_job,
+        "queued": queued_jobs,
     }
 
 
-def get_queue_position(job_type: str, job_id: int) -> Optional[int]:
+def get_queue_position(job_type: str, job_id: int) -> int | None:
     """Get the queue position for a specific job, or None if not queued."""
     status = get_queue_status()
-    for item in status['queued']:
-        if item['type'] == job_type and item['id'] == job_id:
-            return item['position']
+    for item in status["queued"]:
+        if item["type"] == job_type and item["id"] == job_id:
+            return item["position"]
     return None

@@ -38,6 +38,16 @@
                             <td><span class="badge bg-secondary">{{ prop.property_type }}</span></td>
                             <td>{{ prop.units or '-' }}</td>
                             <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary js-edit-prop"
+                                        title="Edit"
+                                        data-prop-name="{{ prop.property_name }}"
+                                        data-prop-type="{{ prop.property_type }}"
+                                        data-prop-units="{{ prop.units or '' }}"
+                                        data-prop-deps="{{ prop.dependencies or '' }}"
+                                        data-prop-notes="{{ prop.notes or '' }}"
+                                        data-prop-data="{{ prop.data_dict | tojson | forceescape }}">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
                                 <form method="post" action="{{ url_for('materials.delete_property', id=grade.id, prop_id=prop.id) }}" class="d-inline" onsubmit="return confirm('Delete this property?');">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
@@ -105,10 +115,25 @@
                     <!-- Curve Data -->
                     <div id="curve_fields" class="property-type-fields" style="display: none;">
                         <div class="mb-3">
-                            {{ form.curve_data.label(class="form-label") }}
-                            {{ form.curve_data(class="form-control font-monospace") }}
+                            <label class="form-label">Curve Data (temperature-dependent)</label>
+                            {{ form.curve_data(id="curve_data") }}
+                            <table class="table table-sm align-middle mb-2" id="curveTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Temperature (°C)</th>
+                                        <th>Value</th>
+                                        <th style="width: 3rem;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="curveAddRow">
+                                <i class="bi bi-plus-lg"></i> Add row
+                            </button>
+                            <div id="curveErrors" class="invalid-feedback d-block"></div>
                             <div class="form-text">
-                                JSON format: <code>{"temperature": [20, 200, 400], "value": [50, 45, 40]}</code>
+                                Enter at least 2 points (numbers only). You can paste two columns
+                                directly from Excel into the table. Decimal commas are accepted.
                             </div>
                         </div>
                     </div>
@@ -188,4 +213,5 @@ document.addEventListener('DOMContentLoaded', function() {
     updateTypeFields();
 });
 </script>
+<script src="{{ url_for('static', filename='js/curve_editor.js') }}"></script>
 {% endblock %}

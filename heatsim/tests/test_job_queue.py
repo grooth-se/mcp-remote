@@ -1,18 +1,36 @@
 """Tests for the background job queue service."""
-import json
-import pytest
-from unittest.mock import patch, MagicMock
 
-from app.models.simulation import Simulation, STATUS_QUEUED, STATUS_RUNNING, STATUS_FAILED, STATUS_READY
+import json
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from app.models.simulation import (
+    STATUS_FAILED,
+    STATUS_QUEUED,
+    STATUS_READY,
+    STATUS_RUNNING,
+    Simulation,
+)
 from app.models.weld_project import (
-    WeldProject, WeldString,
-    STATUS_QUEUED as WELD_QUEUED,
     STATUS_CONFIGURED,
-    STATUS_RUNNING as WELD_RUNNING,
+    WeldProject,
+    WeldString,
+)
+from app.models.weld_project import (
     STATUS_FAILED as WELD_FAILED,
 )
+from app.models.weld_project import (
+    STATUS_QUEUED as WELD_QUEUED,
+)
+from app.models.weld_project import (
+    STATUS_RUNNING as WELD_RUNNING,
+)
 from app.services.job_queue import (
-    _claim_next_job, _mark_failed, get_queue_status, get_queue_position,
+    _claim_next_job,
+    _mark_failed,
+    get_queue_position,
+    get_queue_status,
 )
 
 
@@ -30,7 +48,7 @@ class TestClaimNextJob:
 
         result = _claim_next_job()
         assert result is not None
-        assert result[0] == 'simulation'
+        assert result[0] == "simulation"
         assert result[1] == sample_simulation.id
 
     def test_single_queued_weld(self, db, sample_weld_project):
@@ -41,24 +59,30 @@ class TestClaimNextJob:
 
         result = _claim_next_job()
         assert result is not None
-        assert result[0] == 'weld'
+        assert result[0] == "weld"
         assert result[1] == sample_weld_project.id
 
     def test_fifo_ordering(self, db, engineer_user, sample_steel_grade):
         """Earlier ID is picked first when both types are queued."""
         sim = Simulation(
-            name='First', steel_grade_id=sample_steel_grade.id,
-            user_id=engineer_user.id, geometry_type='cylinder',
-            process_type='quench_water', status=STATUS_QUEUED,
+            name="First",
+            steel_grade_id=sample_steel_grade.id,
+            user_id=engineer_user.id,
+            geometry_type="cylinder",
+            process_type="quench_water",
+            status=STATUS_QUEUED,
         )
         db.session.add(sim)
         db.session.flush()
         sim_id = sim.id
 
         proj = WeldProject(
-            name='Second', steel_grade_id=sample_steel_grade.id,
-            user_id=engineer_user.id, process_type='gtaw',
-            status=WELD_QUEUED, total_strings=1,
+            name="Second",
+            steel_grade_id=sample_steel_grade.id,
+            user_id=engineer_user.id,
+            process_type="gtaw",
+            status=WELD_QUEUED,
+            total_strings=1,
         )
         db.session.add(proj)
         db.session.commit()
@@ -83,17 +107,17 @@ class TestMarkFailed:
         sample_simulation.status = STATUS_QUEUED
         db.session.commit()
 
-        _mark_failed('simulation', sample_simulation.id)
+        _mark_failed("simulation", sample_simulation.id)
 
         sim = db.session.get(Simulation, sample_simulation.id)
         assert sim.status == STATUS_FAILED
-        assert sim.error_message == 'Unexpected worker error'
+        assert sim.error_message == "Unexpected worker error"
 
     def test_marks_running_sim_as_failed(self, db, sample_simulation):
         sample_simulation.status = STATUS_RUNNING
         db.session.commit()
 
-        _mark_failed('simulation', sample_simulation.id)
+        _mark_failed("simulation", sample_simulation.id)
 
         sim = db.session.get(Simulation, sample_simulation.id)
         assert sim.status == STATUS_FAILED
@@ -102,24 +126,59 @@ class TestMarkFailed:
         sample_weld_project.status = WELD_QUEUED
         db.session.commit()
 
-        _mark_failed('weld', sample_weld_project.id)
+        _mark_failed("weld", sample_weld_project.id)
 
         proj = db.session.get(WeldProject, sample_weld_project.id)
         assert proj.status == WELD_FAILED
 
     def test_ignores_completed(self, db, sample_simulation):
         """Don't overwrite completed status."""
-        sample_simulation.status = 'completed'
+        sample_simulation.status = "completed"
         db.session.commit()
 
-        _mark_failed('simulation', sample_simulation.id)
+        _mark_failed("simulation", sample_simulation.id)
 
         sim = db.session.get(Simulation, sample_simulation.id)
-        assert sim.status == 'completed'
+        assert sim.status == "completed"
 
     def test_nonexistent_id(self, db):
         """Non-existent ID doesn't raise."""
-        _mark_failed('simulation', 99999)  # Should not raise
+        _mark_failed("simulation", 99999)  # Should not raise
+
+    def test_stores_exception_message(self, db, sample_simulation):
+        sample_simulation.status = STATUS_RUNNING
+        db.session.commit()
+
+        _mark_failed("simulation", sample_simulation.id, "Material has no density property")
+
+        sim = db.session.get(Simulation, sample_simulation.id)
+        assert sim.error_message == "Material has no density property"
+
+    def test_truncates_long_message(self, db, sample_simulation):
+        sample_simulation.status = STATUS_RUNNING
+        db.session.commit()
+
+        _mark_failed("simulation", sample_simulation.id, "x" * 2000)
+
+        sim = db.session.get(Simulation, sample_simulation.id)
+        assert len(sim.error_message) == 500
+
+    def test_execute_job_records_exception_text(self, db, sample_simulation):
+        """A crash inside the runner surfaces its message on the simulation."""
+        from app.services.job_queue import _execute_job
+
+        sample_simulation.status = STATUS_RUNNING
+        db.session.commit()
+
+        with patch(
+            "app.services.simulation_runner.run_heat_treatment",
+            side_effect=RuntimeError("boom in solver"),
+        ):
+            _execute_job("simulation", sample_simulation.id)
+
+        sim = db.session.get(Simulation, sample_simulation.id)
+        assert sim.status == STATUS_FAILED
+        assert sim.error_message == "boom in solver"
 
 
 class TestGetQueueStatus:
@@ -127,36 +186,42 @@ class TestGetQueueStatus:
 
     def test_empty(self, db):
         status = get_queue_status()
-        assert status['running'] is None
-        assert status['queued'] == []
+        assert status["running"] is None
+        assert status["queued"] == []
 
     def test_running_simulation(self, db, sample_simulation):
         sample_simulation.status = STATUS_RUNNING
         db.session.commit()
 
         status = get_queue_status()
-        assert status['running'] is not None
-        assert status['running']['type'] == 'simulation'
-        assert status['running']['name'] == 'Test Sim'
+        assert status["running"] is not None
+        assert status["running"]["type"] == "simulation"
+        assert status["running"]["name"] == "Test Sim"
 
     def test_queued_list(self, db, engineer_user, sample_steel_grade):
         sim1 = Simulation(
-            name='Q1', steel_grade_id=sample_steel_grade.id,
-            user_id=engineer_user.id, geometry_type='cylinder',
-            process_type='quench_water', status=STATUS_QUEUED,
+            name="Q1",
+            steel_grade_id=sample_steel_grade.id,
+            user_id=engineer_user.id,
+            geometry_type="cylinder",
+            process_type="quench_water",
+            status=STATUS_QUEUED,
         )
         sim2 = Simulation(
-            name='Q2', steel_grade_id=sample_steel_grade.id,
-            user_id=engineer_user.id, geometry_type='cylinder',
-            process_type='quench_water', status=STATUS_QUEUED,
+            name="Q2",
+            steel_grade_id=sample_steel_grade.id,
+            user_id=engineer_user.id,
+            geometry_type="cylinder",
+            process_type="quench_water",
+            status=STATUS_QUEUED,
         )
         db.session.add_all([sim1, sim2])
         db.session.commit()
 
         status = get_queue_status()
-        assert len(status['queued']) == 2
-        assert status['queued'][0]['position'] == 1
-        assert status['queued'][1]['position'] == 2
+        assert len(status["queued"]) == 2
+        assert status["queued"][0]["position"] == 1
+        assert status["queued"][1]["position"] == 2
 
 
 class TestGetQueuePosition:
@@ -166,18 +231,18 @@ class TestGetQueuePosition:
         sample_simulation.status = STATUS_QUEUED
         db.session.commit()
 
-        pos = get_queue_position('simulation', sample_simulation.id)
+        pos = get_queue_position("simulation", sample_simulation.id)
         assert pos == 1
 
     def test_non_queued_returns_none(self, db, sample_simulation):
         sample_simulation.status = STATUS_READY
         db.session.commit()
 
-        pos = get_queue_position('simulation', sample_simulation.id)
+        pos = get_queue_position("simulation", sample_simulation.id)
         assert pos is None
 
     def test_nonexistent_returns_none(self, db):
-        pos = get_queue_position('simulation', 99999)
+        pos = get_queue_position("simulation", 99999)
         assert pos is None
 
 
@@ -190,19 +255,17 @@ class TestSimulationQueueRoutes:
         db.session.commit()
 
         rv = logged_in_client.post(
-            f'/simulation/{sample_simulation.id}/run',
-            follow_redirects=False)
+            f"/simulation/{sample_simulation.id}/run", follow_redirects=False
+        )
         assert rv.status_code == 302
-        assert '/progress' in rv.headers.get('Location', '')
+        assert "/progress" in rv.headers.get("Location", "")
 
         sim = db.session.get(Simulation, sample_simulation.id)
         assert sim.status == STATUS_QUEUED
 
     def test_run_draft_blocked(self, logged_in_client, sample_simulation, db):
         """Draft simulation cannot be queued."""
-        rv = logged_in_client.post(
-            f'/simulation/{sample_simulation.id}/run',
-            follow_redirects=True)
+        rv = logged_in_client.post(f"/simulation/{sample_simulation.id}/run", follow_redirects=True)
         assert rv.status_code == 200
         sim = db.session.get(Simulation, sample_simulation.id)
         assert sim.status != STATUS_QUEUED
@@ -212,21 +275,20 @@ class TestSimulationQueueRoutes:
         sample_simulation.status = STATUS_QUEUED
         db.session.commit()
 
-        rv = logged_in_client.get(f'/simulation/{sample_simulation.id}/progress')
+        rv = logged_in_client.get(f"/simulation/{sample_simulation.id}/progress")
         assert rv.status_code == 200
-        assert b'Queued' in rv.data
+        assert b"Queued" in rv.data
 
     def test_progress_status_json(self, logged_in_client, sample_simulation, db):
         """Progress status endpoint returns JSON."""
         sample_simulation.status = STATUS_QUEUED
         db.session.commit()
 
-        rv = logged_in_client.get(
-            f'/simulation/{sample_simulation.id}/progress/status')
+        rv = logged_in_client.get(f"/simulation/{sample_simulation.id}/progress/status")
         assert rv.status_code == 200
         data = rv.get_json()
-        assert data['status'] == 'queued'
-        assert data['queue_position'] == 1
+        assert data["status"] == "queued"
+        assert data["queue_position"] == 1
 
     def test_cancel_queued(self, logged_in_client, sample_simulation, db):
         """Cancelling a queued simulation returns it to ready."""
@@ -234,8 +296,8 @@ class TestSimulationQueueRoutes:
         db.session.commit()
 
         rv = logged_in_client.post(
-            f'/simulation/{sample_simulation.id}/cancel',
-            follow_redirects=False)
+            f"/simulation/{sample_simulation.id}/cancel", follow_redirects=False
+        )
         assert rv.status_code == 302
 
         sim = db.session.get(Simulation, sample_simulation.id)
@@ -247,8 +309,8 @@ class TestSimulationQueueRoutes:
         db.session.commit()
 
         rv = logged_in_client.post(
-            f'/simulation/{sample_simulation.id}/cancel',
-            follow_redirects=True)
+            f"/simulation/{sample_simulation.id}/cancel", follow_redirects=True
+        )
         assert rv.status_code == 200
         sim = db.session.get(Simulation, sample_simulation.id)
         assert sim.status == STATUS_RUNNING
@@ -256,15 +318,17 @@ class TestSimulationQueueRoutes:
     def test_progress_access_denied(self, logged_in_client, db, sample_steel_grade, admin_user):
         """Cannot view another user's progress page."""
         sim = Simulation(
-            name='Other', steel_grade_id=sample_steel_grade.id,
-            user_id=admin_user.id, geometry_type='cylinder',
-            process_type='quench_water', status=STATUS_QUEUED,
+            name="Other",
+            steel_grade_id=sample_steel_grade.id,
+            user_id=admin_user.id,
+            geometry_type="cylinder",
+            process_type="quench_water",
+            status=STATUS_QUEUED,
         )
         db.session.add(sim)
         db.session.commit()
 
-        rv = logged_in_client.get(f'/simulation/{sim.id}/progress',
-                                   follow_redirects=False)
+        rv = logged_in_client.get(f"/simulation/{sim.id}/progress", follow_redirects=False)
         assert rv.status_code == 302
 
 
@@ -276,8 +340,11 @@ class TestWeldQueueRoutes:
         # Make project runnable
         ws = WeldString(
             project_id=sample_weld_project.id,
-            string_number=1, layer=1, position_in_layer=1,
-            name='Root', status='pending',
+            string_number=1,
+            layer=1,
+            position_in_layer=1,
+            name="Root",
+            status="pending",
         )
         db.session.add(ws)
         sample_weld_project.status = STATUS_CONFIGURED
@@ -285,23 +352,25 @@ class TestWeldQueueRoutes:
         db.session.commit()
 
         rv = logged_in_client.post(
-            f'/welding/{sample_weld_project.id}/run',
-            data={'use_mock_solver': True},
-            follow_redirects=False)
+            f"/welding/{sample_weld_project.id}/run",
+            data={"use_mock_solver": True},
+            follow_redirects=False,
+        )
         assert rv.status_code == 302
-        assert '/progress' in rv.headers.get('Location', '')
+        assert "/progress" in rv.headers.get("Location", "")
 
         proj = db.session.get(WeldProject, sample_weld_project.id)
         assert proj.status == WELD_QUEUED
 
-    def test_progress_status_includes_queue_position(self, logged_in_client, sample_weld_project, db):
+    def test_progress_status_includes_queue_position(
+        self, logged_in_client, sample_weld_project, db
+    ):
         """Progress status JSON includes queue_position."""
         sample_weld_project.status = WELD_QUEUED
         sample_weld_project.total_strings = 1
         db.session.commit()
 
-        rv = logged_in_client.get(
-            f'/welding/{sample_weld_project.id}/progress/status')
+        rv = logged_in_client.get(f"/welding/{sample_weld_project.id}/progress/status")
         assert rv.status_code == 200
         data = rv.get_json()
-        assert 'queue_position' in data
+        assert "queue_position" in data
