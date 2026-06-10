@@ -181,17 +181,22 @@ services:
       - durabler2
     restart: unless-stopped
 
-  # --- Uncomment when ready ---
-
-  # heattreattracker:
-  #   build: ../heattreattracker
-  #   environment:
-  #     - FLASK_CONFIG=production
-  #     - PORTAL_URL=http://portal:5000
-  #     - PORTAL_AUTH_ENABLED=true
-  #   depends_on:
-  #     - portal
-  #   restart: unless-stopped
+  heattreattracker:
+    build: ../HTtracker
+    environment:
+      - SECRET_KEY=${HEATTREATTRACKER_SECRET_KEY:-change-me}
+      - APP_CODE=heattreattracker
+      - PORTAL_URL=http://portal:5000
+      - PORTAL_EXTERNAL_URL=/
+      - PORTAL_AUTH_ENABLED=true
+      - HT_DATA_DIR=/data
+      - HT_DB_PATH=/data/heat_treatment.db
+      - HT_CERTS_DIR=/data/certs
+    volumes:
+      - heattreattracker_data:/data
+    depends_on:
+      - portal
+    restart: unless-stopped
 
 volumes:
   portal_data:
@@ -212,3 +217,4 @@ volumes:
   subcalc_data:
   trb_data:
   trb_output:
+  heattreattracker_data:
