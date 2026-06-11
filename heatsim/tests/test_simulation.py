@@ -675,6 +675,68 @@ class TestPlotData:
         assert b"js-plot" in rv.data
         assert b"plot-data/full_cycle" in rv.data
 
+    def _add_run(self, db, sim, version, peak_temp):
+        """Attach a completed snapshot with one cooling curve + full cycle."""
+        from app.models import SimulationSnapshot
+
+        snapshot = SimulationSnapshot(
+            simulation_id=sim.id,
+            version=version,
+            geometry_type=sim.geometry_type,
+            steel_grade_designation="AISI 4340",
+            status="completed",
+        )
+        db.session.add(snapshot)
+        db.session.flush()
+        times = [0.0, 10.0, 20.0]
+        temps = [peak_temp, peak_temp - 200, peak_temp - 400]
+        for result_type, phase in [("full_cycle", "full"), ("cooling_curve", "quenching")]:
+            row = SimulationResult(
+                simulation_id=sim.id,
+                snapshot_id=snapshot.id,
+                result_type=result_type,
+                location="center",
+                phase=phase,
+            )
+            row.set_time_data(times)
+            row.set_value_data(temps)
+            db.session.add(row)
+        db.session.commit()
+        return snapshot
+
+    def test_rerun_shows_only_latest_run(self, logged_in_client, db, completed_sim):
+        """Re-running a simulation must not mix old and new curves in charts."""
+        self._add_run(db, completed_sim, version=1, peak_temp=900.0)
+        self._add_run(db, completed_sim, version=2, peak_temp=700.0)
+
+        rv = logged_in_client.get(
+            f"/simulation/{completed_sim.id}/plot-data/phase_curve?phase=quenching"
+        )
+        assert rv.status_code == 200
+        traces = rv.get_json()["traces"]
+        # One run's worth of traces, not two
+        assert len(traces) == 1
+        # ...and it's the latest run (v2, peak 700)
+        assert traces[0]["y"][0] == 700.0
+
+        rv = logged_in_client.get(f"/simulation/{completed_sim.id}/plot-data/full_cycle")
+        assert rv.status_code == 200
+        data = rv.get_json()
+        assert data["traces"][0]["y"][0] == 700.0
+
+    def test_dtdt_uses_latest_run(self, logged_in_client, db, completed_sim):
+        self._add_run(db, completed_sim, version=1, peak_temp=900.0)
+        self._add_run(db, completed_sim, version=2, peak_temp=700.0)
+
+        rv = logged_in_client.get(
+            f"/simulation/{completed_sim.id}/plot-data/dtdt_time?phase=quenching"
+        )
+        assert rv.status_code == 200
+        traces = rv.get_json()["traces"]
+        assert len(traces) == 1
+        # v2 cools 700->500 over 10 s = -20 °C/s
+        assert traces[0]["y"][0] == pytest.approx(-20.0)
+
 
 class TestSetupBadInput:
     def test_non_numeric_geometry_falls_back_to_defaults(

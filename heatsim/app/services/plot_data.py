@@ -76,8 +76,23 @@ def _layout(title, xaxis_title, yaxis_title):
     return {"title": title, "xaxis_title": xaxis_title, "yaxis_title": yaxis_title}
 
 
+def _latest_results(sim):
+    """Result rows from the latest completed run only.
+
+    Every run keeps its results under a snapshot for the history feature, so
+    unscoped queries would mix old and new runs in one chart. Mirrors the
+    scoping used by the simulation view route.
+    """
+    from app.models.simulation import SimulationResult
+
+    snapshot = sim.snapshots.filter_by(status="completed").first()
+    if snapshot:
+        return SimulationResult.query.filter_by(snapshot_id=snapshot.id)
+    return sim.results
+
+
 def _full_cycle_result(sim):
-    return sim.results.filter_by(result_type="full_cycle").first()
+    return _latest_results(sim).filter_by(result_type="full_cycle").first()
 
 
 def _position_traces(times, data_dict, fallback_values=None):
@@ -271,7 +286,7 @@ def phase_curve(sim, phase):
     """Temperature vs time for one process phase (all stored positions)."""
     rows = [
         r
-        for r in sim.results.filter_by(phase=phase).all()
+        for r in _latest_results(sim).filter_by(phase=phase).all()
         if r.result_type in ("cooling_curve", "heating_curve")
     ]
     if not rows:
@@ -292,7 +307,7 @@ def _phase_position_series(sim, phase):
     """(times, {position: temps}) for a phase, falling back to center-only."""
     rows = [
         r
-        for r in sim.results.filter_by(phase=phase).all()
+        for r in _latest_results(sim).filter_by(phase=phase).all()
         if r.result_type in ("cooling_curve", "heating_curve")
     ]
     for row in rows:
