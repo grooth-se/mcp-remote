@@ -460,10 +460,12 @@ def specimen():
                 # NORMAL MODE: E from extensometer
                 E = analyzer.calculate_youngs_modulus(stress, strain, area_unc, L0)
 
-                # Correct extensometer strain zero (ISO 6892-1 Annex G)
-                # Removes extensometer settling offset so Rp0.2 offset line
-                # intersects the curve at the correct strain
-                strain = analyzer.correct_strain_origin(stress, strain)
+                # Establish strain zero (ISO 6892-1 Annex G): if a setup
+                # error left negative extensometer readings at test start,
+                # zero at the lowest reading, then extrapolate the elastic
+                # line (slope = E) to the origin. This corrected zero is the
+                # starting point for strain and Rp calculations.
+                strain = analyzer.prepare_extensometer_strain(stress, strain)
 
                 # E_disp - Young's modulus from displacement (using 15-40% Rm range)
                 try:
@@ -592,6 +594,16 @@ def specimen():
 
             # ===== ELONGATION AND REDUCTION OF AREA =====
 
+            # Extension measured from the corrected strain zero. In normal
+            # mode the corrected strain accounts for negative extensometer
+            # readings at test start (setup error) and the Annex G origin;
+            # in displacement-only mode no correction was made, so use the
+            # raw extensometer channel.
+            if use_displacement_only:
+                extension_corrected = data.extension
+            else:
+                extension_corrected = strain * L0
+
             # A% - Elongation at fracture
             if L1 and L0:
                 # Manual measurement: A% = (L1 - L0) / L0 * 100
@@ -602,12 +614,12 @@ def specimen():
             else:
                 # From extensometer data
                 A_percent = analyzer.calculate_elongation_at_fracture(
-                    data.extension, data.force, L0
+                    extension_corrected, data.force, L0
                 )
 
             # Ag - Uniform elongation (at max force)
             Ag = analyzer.calculate_uniform_elongation(
-                data.extension, data.force, L0
+                extension_corrected, data.force, L0
             )
 
             # Z% - Reduction of area

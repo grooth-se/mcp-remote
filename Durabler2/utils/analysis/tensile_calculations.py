@@ -204,6 +204,38 @@ class TensileAnalyzer:
         strain_offset = -intercept / slope
         return strain - strain_offset
 
+    def prepare_extensometer_strain(
+        self,
+        stress: np.ndarray,
+        strain: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Establish the strain zero point for extensometer data.
+
+        Handles setup errors where the extensometer reads negative at the
+        start of the test (seating/settling against the specimen):
+
+        1. If negative strain exists on the loading branch, the zero point
+           is first set at the lowest extensometer reading, so the strain
+           signal runs in the positive direction throughout the test.
+        2. The elastic line (slope = evaluated Young's modulus, fitted via
+           Theil-Sen on the stress window) is then extrapolated to zero
+           stress, and the strain axis is shifted so the line passes
+           through the X/Y origin (ISO 6892-1 Annex G).  This corrected
+           zero is the starting point for strain and Rp calculations.
+
+        Returns corrected strain array (same length as input).
+        """
+        # Step 1: zero at the lowest extensometer reading on the loading
+        # branch (data after max stress is removal/fracture artifacts)
+        imax = int(np.argmax(stress))
+        strain_min = float(np.min(strain[:imax + 1]))
+        if strain_min < 0:
+            strain = strain - strain_min
+
+        # Step 2: extrapolate the elastic line to the origin
+        return self.correct_strain_origin(stress, strain)
+
     def calculate_youngs_modulus(
         self,
         stress: np.ndarray,
