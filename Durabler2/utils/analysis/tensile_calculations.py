@@ -22,7 +22,11 @@ class TensileAnalysisConfig:
     offset_strain : float
         Strain offset for yield strength calculation (default 0.002 = 0.2%)
     elastic_strain_range : tuple
-        (min, max) strain range for modulus determination
+        (min, max) strain range for modulus determination (legacy fallback)
+    elastic_stress_fraction_range : tuple
+        (min, max) stress range as fraction of max stress for modulus
+        determination. Primary selection method: unlike a strain window it
+        is immune to extensometer settling/seating offsets.
     preload_threshold : float
         Force threshold in kN below which data is ignored
     smoothing_window : int
@@ -34,6 +38,7 @@ class TensileAnalysisConfig:
     """
     offset_strain: float = 0.002
     elastic_strain_range: Tuple[float, float] = (0.0005, 0.0025)
+    elastic_stress_fraction_range: Tuple[float, float] = (0.20, 0.50)
     preload_threshold: float = 0.1
     smoothing_window: int = 5
     force_calibration_uncertainty: float = 0.0031  # 0.31%
@@ -111,27 +116,49 @@ class TensileAnalyzer:
         highly resistant to outliers and noise in the extensometer data
         (e.g. settling at test start, micro-yielding at top of range).
 
-        The elastic region is selected by the configured strain range.
-        If few points fall in that range a wider window is attempted.
+        The elastic region is selected on the loading branch (up to max
+        stress) by a stress window relative to max stress.  Selecting by
+        stress instead of strain makes the window immune to extensometer
+        settling/seating offsets, which shift the strain axis and would
+        otherwise place a fixed strain window on the wrong part of the
+        curve.  The legacy strain window is kept as a last fallback.
 
         Returns (elastic_stress, elastic_strain, slope, intercept, r², std_err).
         """
         from scipy.stats import theilslopes
 
-        min_strain, max_strain = self.config.elastic_strain_range
+        # Use only the loading branch: data after max stress (necking,
+        # fracture, extensometer removal sweeping back through the window)
+        # must not enter the fit.
+        imax = int(np.argmax(stress))
+        loading_stress = stress[:imax + 1]
+        loading_strain = strain[:imax + 1]
+        max_stress = stress[imax]
 
-        # Select elastic region
-        mask = (strain >= min_strain) & (strain <= max_strain) & (stress > 0)
+        if max_stress <= 0:
+            raise ValueError("Insufficient data points in elastic region")
+
+        # Primary selection: stress fraction window on the loading branch
+        lo_frac, hi_frac = self.config.elastic_stress_fraction_range
+        mask = ((loading_stress >= lo_frac * max_stress) &
+                (loading_stress <= hi_frac * max_stress))
 
         if np.sum(mask) < 10:
-            # Widen the window
-            mask = (strain >= min_strain * 0.5) & (strain <= max_strain * 1.5) & (stress > 0)
+            # Widen the stress window
+            mask = ((loading_stress >= 0.10 * max_stress) &
+                    (loading_stress <= 0.60 * max_stress))
+
+        if np.sum(mask) < 5:
+            # Legacy fallback: strain-range selection
+            min_strain, max_strain = self.config.elastic_strain_range
+            mask = ((loading_strain >= min_strain) &
+                    (loading_strain <= max_strain) & (loading_stress > 0))
 
         if np.sum(mask) < 5:
             raise ValueError("Insufficient data points in elastic region")
 
-        elastic_strain = strain[mask]
-        elastic_stress = stress[mask]
+        elastic_strain = loading_strain[mask]
+        elastic_stress = loading_stress[mask]
 
         # Theil-Sen robust regression (median of pairwise slopes)
         slope, intercept, lo_slope, hi_slope = theilslopes(

@@ -181,15 +181,21 @@ def parse_mts_csv(filepath: Path) -> MTSTestData:
         if np.median(upper) < 0:
             force = -force
 
+    # Direction is judged at maximum force (after the force sign fix): the
+    # specimen is always elongated at Fmax.  Comparing last-vs-first sample
+    # fails because the extensometer is removed before fracture (its signal
+    # returns to ~0 at the end) and both channels carry noise around zero
+    # before the test starts.
+    max_force_idx = int(np.argmax(force)) if len(force) else 0
+
     if len(displacement) > 10:
-        # Displacement should increase during tension.
-        # If net displacement change is negative, flip the sign.
-        if displacement[-1] - displacement[0] < 0:
+        # Crosshead must have moved in the tension direction at max force.
+        if displacement[max_force_idx] - displacement[0] < 0:
             displacement = -displacement
 
     if len(extension) > 10:
-        # Extension should increase during tension.
-        if extension[-1] - extension[0] < 0:
+        # Extensometer must read elongation at max force.
+        if extension[max_force_idx] - extension[0] < 0:
             extension = -extension
 
     return MTSTestData(
