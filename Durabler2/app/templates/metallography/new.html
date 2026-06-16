@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}New Metallographic Examination{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('metallography.index') }}">Metallographic Examinations</a></li>
+        <li class="breadcrumb-item active">New Examination</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-lg-10">
+        <div class="card shadow">
+            <div class="card-header text-white" style="background-color: #6610f2 !important;">
+                <h4 class="mb-0"><i class="bi bi-zoom-in"></i> New Metallographic Examination (ASTM E45/E381 · ISO 4967/4969)</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <!-- Test Identification -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-tag"></i> Test Identification</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-1">
+                                    {{ form.certificate_id.label(class="form-label") }}
+                                    {{ form.certificate_id(class="form-select") }}
+                                </div>
+                                <div class="col-md-6 mb-1">
+                                    {{ form.specimen_id.label(class="form-label") }}
+                                    {{ form.specimen_id(class="form-control") }}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-1">
+                                    {{ form.material.label(class="form-label") }}
+                                    {{ form.material(class="form-control", placeholder="e.g., S355J2") }}
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.test_date.label(class="form-label") }}
+                                    {{ form.test_date(class="form-control", type="date") }}
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.location_orientation.label(class="form-label") }}
+                                    {{ form.location_orientation(class="form-control", placeholder="e.g., transverse") }}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-1">
+                                    {{ form.customer_specimen_info.label(class="form-label") }}
+                                    {{ form.customer_specimen_info(class="form-control") }}
+                                </div>
+                                <div class="col-md-6 mb-1">
+                                    {{ form.requirement.label(class="form-label") }}
+                                    {{ form.requirement(class="form-control") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Micro: Inclusion Content -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-grid-3x3"></i> Inclusion Content (Micro) — ASTM E45 / ISO 4967</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-1">
+                                    {{ form.rating_method.label(class="form-label") }}
+                                    {{ form.rating_method(class="form-select") }}
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.magnification.label(class="form-label") }}
+                                    {{ form.magnification(class="form-control") }}
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.micro_etchant.label(class="form-label") }}
+                                    {{ form.micro_etchant(class="form-control") }}
+                                </div>
+                            </div>
+                            <table class="table table-sm align-middle mb-1">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Inclusion Type</th>
+                                        <th>Severity (0–5)</th>
+                                        <th>Acceptance Limit (optional)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>A</strong> — Sulfide</td>
+                                        <td>{{ form.incl_A(class="form-control form-control-sm", step="0.5", min="0", max="5") }}</td>
+                                        <td>{{ form.incl_A_max(class="form-control form-control-sm", step="0.5", min="0", max="5") }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>B</strong> — Alumina</td>
+                                        <td>{{ form.incl_B(class="form-control form-control-sm", step="0.5", min="0", max="5") }}</td>
+                                        <td>{{ form.incl_B_max(class="form-control form-control-sm", step="0.5", min="0", max="5") }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>C</strong> — Silicate</td>
+                                        <td>{{ form.incl_C(class="form-control form-control-sm", step="0.5", min="0", max="5") }}</td>
+                                        <td>{{ form.incl_C_max(class="form-control form-control-sm", step="0.5", min="0", max="5") }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>D</strong> — Globular oxide</td>
+                                        <td>{{ form.incl_D(class="form-control form-control-sm", step="0.5", min="0", max="5") }}</td>
+                                        <td>{{ form.incl_D_max(class="form-control form-control-sm", step="0.5", min="0", max="5") }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <small class="text-muted">Leave a limit blank to report the severity without a pass/fail judgement.</small>
+                            <div class="mt-1">
+                                {{ form.micro_observations.label(class="form-label") }}
+                                {{ form.micro_observations(class="form-control", rows="2") }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Macro: Macroetch Evaluation -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-card-image"></i> Macroetch Evaluation (Macro) — ASTM E381 / ISO 4969</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-1">
+                                {{ form.macro_etchant.label(class="form-label") }}
+                                {{ form.macro_etchant(class="form-control") }}
+                            </div>
+                            <div class="mb-1">
+                                {{ form.macro_evaluation.label(class="form-label") }}
+                                {{ form.macro_evaluation(class="form-control", rows="3", placeholder="Segregation, porosity, flow lines, cracks, etc.") }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Photos -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-camera"></i> Micrographs / Macrographs</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-2">Attach up to 6 images, each with a caption (magnification, etchant, location).</p>
+                            {% for i in range(1, 7) %}
+                            {% set photo = form['photo_' ~ i] %}
+                            {% set caption = form['photo_' ~ i ~ '_caption'] %}
+                            <div class="row mb-1 align-items-center">
+                                <div class="col-md-5">
+                                    {{ photo(class="form-control form-control-sm") }}
+                                </div>
+                                <div class="col-md-7">
+                                    {{ caption(class="form-control form-control-sm", placeholder="Caption " ~ i ~ " — e.g. 100x, Nital 2%, edge") }}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            {{ form.notes.label(class="form-label") }}
+                            {{ form.notes(class="form-control", rows="2") }}
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-lg text-white", style="background-color: #6610f2;") }}
+                        <a href="{{ url_for('metallography.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

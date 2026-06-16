@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Metallographic - {{ test.test_id }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('metallography.index') }}">Metallographic Examinations</a></li>
+        <li class="breadcrumb-item active">{{ test.test_id }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+        <h2><i class="bi bi-zoom-in"></i> {{ test.test_id }}</h2>
+        <p class="text-muted mb-0">
+            {{ test.specimen_id or 'No specimen ID' }} |
+            {{ test.material or 'No material' }} |
+            {{ test.test_date.strftime('%Y-%m-%d') if test.test_date else 'No date' }}
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('metallography.report', test_id=test.id) }}" class="btn btn-success">
+            <i class="bi bi-file-earmark-pdf"></i> Generate Report
+        </a>
+        <a href="{{ url_for('metallography.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left column -->
+    <div class="col-lg-5">
+        <!-- Inclusion rating -->
+        <div class="card mb-2">
+            <div class="card-header text-white" style="background-color: #6610f2;">
+                <h5 class="mb-0"><i class="bi bi-grid-3x3"></i> Inclusion Content (Micro)</h5>
+            </div>
+            <div class="card-body">
+                {% if inclusion_rows %}
+                <table class="table table-sm mb-2">
+                    <thead class="table-light">
+                        <tr><th>Type</th><th>Severity</th><th>Limit</th><th>Result</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for r in inclusion_rows %}
+                        <tr>
+                            <td>{{ r.label }}</td>
+                            <td><strong>{{ '%.1f'|format(r.severity) if r.severity is not none else '-' }}</strong></td>
+                            <td>{{ '%.1f'|format(r.limit) if r.limit is not none else '-' }}</td>
+                            <td>
+                                {% if r.status %}
+                                <span class="badge bg-{{ 'success' if r.status == 'PASS' else 'danger' }}">{{ r.status }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if overall %}
+                <div class="alert alert-{{ 'success' if overall == 'PASS' else 'danger' }} mb-0 py-2">
+                    <strong>Overall result: {{ overall }}</strong>
+                </div>
+                {% endif %}
+                {% else %}
+                <p class="text-muted mb-0">No inclusion rating recorded.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Examination conditions -->
+        <div class="card mb-2">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-gear"></i> Examination Conditions</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td>Rating Method</td><td>{{ test_params.get('rating_method', '-') }}</td></tr>
+                    <tr><td>Magnification</td><td>{{ test_params.get('magnification', '-') }}</td></tr>
+                    <tr><td>Etchant (micro)</td><td>{{ test_params.get('micro_etchant', '-') or '-' }}</td></tr>
+                    <tr><td>Etchant (macro)</td><td>{{ test_params.get('macro_etchant', '-') or '-' }}</td></tr>
+                    <tr><td>Location/Orientation</td><td>{{ test_params.get('location_orientation', '-') or '-' }}</td></tr>
+                    {% if test.certificate_number %}
+                    <tr><td>Certificate</td><td>{{ test.certificate_number }}</td></tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Observations / Macro -->
+        {% if test_params.get('micro_observations') %}
+        <div class="card mb-2">
+            <div class="card-header bg-light"><h6 class="mb-0">Micro Observations</h6></div>
+            <div class="card-body"><p class="mb-0" style="white-space: pre-wrap;">{{ test_params.micro_observations }}</p></div>
+        </div>
+        {% endif %}
+        {% if test_params.get('macro_evaluation') %}
+        <div class="card mb-2">
+            <div class="card-header bg-light"><h6 class="mb-0">Macro Evaluation</h6></div>
+            <div class="card-body"><p class="mb-0" style="white-space: pre-wrap;">{{ test_params.macro_evaluation }}</p></div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right column: photos -->
+    <div class="col-lg-7">
+        <div class="card mb-2">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-images"></i> Micrographs / Macrographs</h6>
+            </div>
+            <div class="card-body">
+                {% if photos %}
+                <div class="row g-2">
+                    {% for p in photos %}
+                    <div class="col-md-6">
+                        <div class="border rounded p-1 h-100">
+                            <img src="{{ p.url }}" class="img-fluid rounded" alt="metallographic image" style="width: 100%;">
+                            {% if p.caption %}
+                            <div class="small text-muted mt-1 text-center">{{ p.caption }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">No images attached.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if test_params.get('notes') %}
+        <div class="card mb-2">
+            <div class="card-header bg-light"><h6 class="mb-0">Notes</h6></div>
+            <div class="card-body"><p class="mb-0" style="white-space: pre-wrap;">{{ test_params.notes }}</p></div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

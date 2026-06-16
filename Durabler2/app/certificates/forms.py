@@ -42,6 +42,10 @@ class CertificateForm(FlaskForm):
         ('ISO 6506-1', 'ISO 6506-1 - Brinell'),
         ('ASTM E23', 'ASTM E23 - Charpy Impact'),
         ('ISO 148-1', 'ISO 148-1 - Charpy Impact'),
+        ('ASTM E45', 'ASTM E45 - Inclusion Content (micro)'),
+        ('ISO 4967', 'ISO 4967 - Inclusion Content (micro)'),
+        ('ASTM E381', 'ASTM E381 - Macroetch'),
+        ('ISO 4969', 'ISO 4969 - Macroetch'),
         ('Other', 'Other')
     ], validators=[Optional()])
 

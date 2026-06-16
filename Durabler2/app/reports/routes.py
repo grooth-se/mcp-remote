@@ -367,6 +367,10 @@ def generate_report(cert_id):
             # Generate Charpy report
             _generate_charpy_report(certificate, test_record, output_path)
 
+        elif test_record.test_method == 'METALLO':
+            # Generate Metallographic Examination report
+            _generate_metallo_report(certificate, test_record, output_path)
+
         else:
             flash(f'Report generation for {test_record.test_method} not yet implemented.', 'warning')
             return redirect(url_for('certificates.view', cert_id=cert_id))
@@ -2773,6 +2777,259 @@ def _generate_charpy_report(certificate, test_record, output_path):
     if chart_path and chart_path.exists():
         import os
         os.remove(chart_path)
+
+
+def _generate_metallo_report(certificate, test_record, output_path, include_photos=True):
+    """Generate Metallographic Examination Word report (ASTM E45/E381, ISO 4967/4969)."""
+    import tempfile
+    from docx import Document
+    from docx.shared import Inches, Pt, Cm, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    from app.models import TestPhoto
+    from app.metallography.routes import evaluate_inclusions
+
+    tp = test_record.geometry if test_record.geometry else {}
+    rows, overall = evaluate_inclusions(tp.get('inclusions', {}), tp.get('inclusion_limits', {}))
+
+    cert = certificate
+    test_info = {
+        'certificate_number': cert.certificate_number_with_rev if cert else test_record.test_id,
+        'test_project': cert.test_order if cert else '',
+        'customer': cert.customer if cert else '',
+        'customer_order': cert.customer_order if cert else '',
+        'product_sn': cert.product_sn if cert else '',
+        'specimen_id': test_record.specimen_id or '',
+        'customer_specimen_info': cert.customer_specimen_info if cert else '',
+        'material': cert.material if cert else (test_record.material or ''),
+        'requirement': cert.requirement if cert else '',
+        'location_orientation': tp.get('location_orientation', cert.location_orientation if cert else ''),
+        'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
+        'operator': current_user.full_name if current_user.full_name else current_user.username,
+    }
+
+    doc = Document()
+    style = doc.styles['Normal']
+    style.paragraph_format.space_before = Pt(0)
+    style.paragraph_format.space_after = Pt(3)
+    style.paragraph_format.line_spacing = 1.0
+    style.font.size = Pt(10)
+
+    dark_green = RGBColor(0x00, 0x64, 0x00)
+    for i in range(1, 4):
+        hs = doc.styles[f'Heading {i}']
+        hs.paragraph_format.space_before = Pt(8)
+        hs.paragraph_format.space_after = Pt(4)
+        hs.font.color.rgb = dark_green
+
+    logo_path = _get_logo_path()
+
+    for section in doc.sections:
+        section.top_margin = Cm(1.5)
+        section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(2.0)
+        section.right_margin = Cm(2.0)
+        header = section.header
+        header.is_linked_to_previous = False
+
+        lp = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+        lp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        lp.paragraph_format.space_after = Pt(0)
+        if logo_path:
+            lp.add_run().add_picture(str(logo_path), width=Cm(5.0))
+
+        tp_para = header.add_paragraph()
+        tp_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        tp_para.paragraph_format.space_before = Pt(0)
+        tp_para.paragraph_format.space_after = Pt(0)
+        tr = tp_para.add_run('Metallographic Examination Report')
+        tr.bold = True
+        tr.font.size = Pt(12)
+
+        sp = header.add_paragraph()
+        sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        sp.paragraph_format.space_before = Pt(0)
+        sp.paragraph_format.space_after = Pt(0)
+        sp.add_run('ASTM E45 / E381 · ISO 4967 / 4969').font.size = Pt(8)
+
+        cp = header.add_paragraph()
+        cp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        cp.paragraph_format.space_before = Pt(0)
+        cp.paragraph_format.space_after = Pt(0)
+        cp.add_run(f"Certificate: {test_info.get('certificate_number', '')}").font.size = Pt(8)
+
+        dp = header.add_paragraph()
+        dp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        dp.paragraph_format.space_before = Pt(0)
+        dp.paragraph_format.space_after = Pt(0)
+        dp.add_run(f"Date: {test_info.get('test_date', '')}").font.size = Pt(8)
+
+    # Test Information
+    heading = doc.add_heading('Test Information', level=1)
+    heading.paragraph_format.space_before = Pt(0)
+    heading.paragraph_format.space_after = Pt(6)
+
+    info_data = [
+        ('Test Project:', test_info.get('test_project', ''), 'Examination Date:', test_info.get('test_date', '')),
+        ('Customer:', test_info.get('customer', ''), 'Test Standard:', 'ASTM E45/E381, ISO 4967/4969'),
+        ('Customer Order:', test_info.get('customer_order', ''), 'Rating Method:', tp.get('rating_method', '')),
+        ('Product S/N:', test_info.get('specimen_id', ''), 'Magnification:', tp.get('magnification', '')),
+        ('Material:', test_info.get('material', ''), 'Etchant (micro):', tp.get('micro_etchant', '')),
+        ('Customer Specimen Info:', test_info.get('customer_specimen_info', ''), 'Etchant (macro):', tp.get('macro_etchant', '')),
+        ('Requirement:', test_info.get('requirement', ''), 'Location/Orientation:', test_info.get('location_orientation', '')),
+    ]
+    table = doc.add_table(rows=len(info_data), cols=4)
+    table.style = 'Table Grid'
+    for i, (l1, v1, l2, v2) in enumerate(info_data):
+        table.rows[i].cells[0].text = l1
+        table.rows[i].cells[1].text = str(v1) if v1 else ''
+        table.rows[i].cells[2].text = l2
+        table.rows[i].cells[3].text = str(v2) if v2 else ''
+        if table.rows[i].cells[0].paragraphs[0].runs:
+            table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+        if table.rows[i].cells[2].paragraphs[0].runs:
+            table.rows[i].cells[2].paragraphs[0].runs[0].bold = True
+        for cell in table.rows[i].cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+    # Micro: Inclusion Content
+    heading = doc.add_heading('Inclusion Content (Micro)', level=1)
+    heading.paragraph_format.space_before = Pt(12)
+    heading.paragraph_format.space_after = Pt(6)
+
+    if rows:
+        has_limit = any(r['limit'] is not None for r in rows)
+        cols = ['Inclusion Type', 'Severity']
+        if has_limit:
+            cols += ['Acceptance Limit', 'Result']
+        table = doc.add_table(rows=len(rows) + 1, cols=len(cols))
+        table.style = 'Table Grid'
+        for i, h in enumerate(cols):
+            table.rows[0].cells[i].text = h
+            table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
+        for i, r in enumerate(rows):
+            table.rows[i+1].cells[0].text = r['label']
+            table.rows[i+1].cells[1].text = f"{r['severity']:.1f}" if r['severity'] is not None else '-'
+            if has_limit:
+                table.rows[i+1].cells[2].text = f"{r['limit']:.1f}" if r['limit'] is not None else '-'
+                table.rows[i+1].cells[3].text = r['status'] or '-'
+        for row in table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
+        if overall:
+            p = doc.add_paragraph()
+            p.add_run('Overall result: ').bold = True
+            res_run = p.add_run(overall)
+            res_run.bold = True
+            res_run.font.color.rgb = (RGBColor(0x00, 0x80, 0x00) if overall == 'PASS'
+                                      else RGBColor(0xC0, 0x00, 0x00))
+    else:
+        doc.add_paragraph('No inclusion rating recorded.')
+
+    if tp.get('micro_observations'):
+        doc.add_paragraph().add_run('Observations:').bold = True
+        doc.add_paragraph(tp['micro_observations'])
+
+    # Macro: Macroetch Evaluation
+    if tp.get('macro_evaluation'):
+        heading = doc.add_heading('Macroetch Evaluation (Macro)', level=1)
+        heading.paragraph_format.space_before = Pt(12)
+        heading.paragraph_format.space_after = Pt(6)
+        doc.add_paragraph(tp['macro_evaluation'])
+
+    # Photos with captions
+    temp_files = []
+    if include_photos:
+        db_photos = test_record.photos.order_by(TestPhoto.photo_number).all()
+        photo_items = []
+        for ph in db_photos:
+            if ph.data:
+                ext = (ph.original_filename or 'photo.jpg').rsplit('.', 1)[-1]
+                tmp = tempfile.NamedTemporaryFile(suffix=f'.{ext}', delete=False)
+                tmp.write(ph.data)
+                tmp.close()
+                temp_files.append(Path(tmp.name))
+                photo_items.append((Path(tmp.name), ph.description or ''))
+
+        if photo_items:
+            heading = doc.add_heading('Micrographs / Macrographs', level=1)
+            heading.paragraph_format.space_before = Pt(12)
+            heading.paragraph_format.space_after = Pt(6)
+            for img_path, caption in photo_items:
+                if img_path.exists():
+                    doc.add_picture(str(img_path), width=Inches(4.5))
+                    doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    if caption:
+                        cap = doc.add_paragraph()
+                        cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        cap_run = cap.add_run(caption)
+                        cap_run.italic = True
+                        cap_run.font.size = Pt(8)
+
+    if tp.get('notes'):
+        doc.add_paragraph().add_run('Notes:').bold = True
+        doc.add_paragraph(tp['notes'])
+
+    # Approval signatures
+    heading = doc.add_heading('Approval', level=1)
+    heading.paragraph_format.space_before = Pt(12)
+    heading.paragraph_format.space_after = Pt(6)
+
+    sig_table = doc.add_table(rows=4, cols=2)
+    sig_table.style = 'Table Grid'
+    sig_table.rows[0].cells[0].text = 'Role'
+    sig_table.rows[0].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[0].cells[1].text = 'Name / Signature'
+    sig_table.rows[0].cells[1].paragraphs[0].runs[0].bold = True
+    sig_table.rows[1].cells[0].text = 'Test Engineer:'
+    sig_table.rows[1].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[1].cells[1].text = test_info.get('operator', '')
+    sig_table.rows[2].cells[0].text = 'Approved by:'
+    sig_table.rows[2].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[2].cells[1].text = ''
+    sig_table.rows[3].cells[0].text = 'Third Party Approval:'
+    sig_table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
+    sig_table.rows[3].cells[1].text = ''
+
+    sig_row_height = Cm(1.5)
+    for row in sig_table.rows:
+        for cell in row.cells:
+            cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+            cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+    for row in [sig_table.rows[1], sig_table.rows[2], sig_table.rows[3]]:
+        tr_el = row._tr
+        trPr = tr_el.get_or_add_trPr()
+        trHeight = trPr.find(qn('w:trHeight'))
+        if trHeight is None:
+            trHeight = OxmlElement('w:trHeight')
+            trPr.append(trHeight)
+        trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))
+        trHeight.set(qn('w:hRule'), 'exact')
+
+    # Disclaimer footer
+    disclaimer_text = (
+        "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
+        "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
+        "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
+        "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
+        "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
+    )
+    for section in doc.sections:
+        footer = section.footer
+        footer.is_linked_to_previous = False
+        footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        footer_para.clear()
+        fr = footer_para.add_run(disclaimer_text)
+        fr.font.size = Pt(7)
+        fr.italic = True
+
+    doc.save(output_path)
+
+    _cleanup_temp_files(temp_files)
 
 
 # Context processor for pending count in navbar
