@@ -20,6 +20,7 @@ from app.extensions import db
 from app.models import (
     ReportApproval, TestRecord, AuditLog, Certificate,
     STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_PUBLISHED,
+    STATUS_REVOKED,
     APPROVAL_STATUS_LABELS, STATUS_COLORS,
     approver_required, engineer_required
 )
@@ -28,13 +29,22 @@ from app.models import (
 @reports_bp.route('/')
 @login_required
 def index():
-    """List all reports with approval status."""
-    status_filter = request.args.get('status', '')
+    """List all reports with approval status.
+
+    Only the latest revision of each certificate is shown. The status
+    filter defaults to 'active', which hides Revoked (superseded) reports;
+    the trace-back to revoked revisions stays available in the certificate
+    window. Choose 'all' or 'REVOKED' explicitly to see them.
+    """
+    # Default to 'active' = hide revoked superseded reports
+    status_filter = request.args.get('status', 'active')
     test_method_filter = request.args.get('test_method', '')
 
     query = ReportApproval.query
 
-    if status_filter:
+    if status_filter == 'active':
+        query = query.filter(ReportApproval.status != STATUS_REVOKED)
+    elif status_filter and status_filter != 'all':
         query = query.filter(ReportApproval.status == status_filter)
 
     if test_method_filter:
@@ -45,6 +55,23 @@ def index():
         ))
 
     reports = query.order_by(ReportApproval.created_at.desc()).all()
+
+    # Collapse to the latest revision of each certificate family (year, cert_id).
+    # Approvals not linked to a certificate (legacy test-record approvals) are
+    # always kept. Within a family the highest cert.revision wins.
+    latest_by_family = {}
+    standalone = []
+    for ap in reports:
+        cert = ap.cert
+        if cert is None:
+            standalone.append(ap)
+            continue
+        key = (cert.year, cert.cert_id)
+        current = latest_by_family.get(key)
+        if current is None or cert.revision > current.cert.revision:
+            latest_by_family[key] = ap
+    reports = list(latest_by_family.values()) + standalone
+    reports.sort(key=lambda a: a.created_at or datetime.min, reverse=True)
 
     test_methods = [m[0] for m in db.session.query(TestRecord.test_method)
                     .distinct().order_by(TestRecord.test_method).all() if m[0]]

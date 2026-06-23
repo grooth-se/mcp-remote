@@ -6,9 +6,34 @@ from flask import render_template, request, jsonify, Response
 from flask_login import login_required
 from sqlalchemy import func, and_, or_
 
+from sqlalchemy.orm import aliased
+
 from . import statistics_bp
 from app.extensions import db
 from app.models import TestRecord, AnalysisResult, Certificate
+
+
+def _latest_revision_filter():
+    """Build a filter that keeps only the latest revision of each certificate.
+
+    A certificate revision is superseded when another certificate exists with
+    the same (year, cert_id) and a higher revision number. Test records linked
+    to a superseded revision are excluded so statistics use only the current
+    revision's data. Test records with no certificate are always kept.
+    """
+    c_other = aliased(Certificate)
+    superseded = db.session.query(Certificate.id).join(
+        c_other,
+        and_(
+            c_other.year == Certificate.year,
+            c_other.cert_id == Certificate.cert_id,
+            c_other.revision > Certificate.revision,
+        )
+    )
+    return or_(
+        TestRecord.certificate_id.is_(None),
+        ~TestRecord.certificate_id.in_(superseded),
+    )
 
 
 # Parameter mappings for each test method
@@ -134,6 +159,9 @@ def query():
         AnalysisResult.parameter_name == parameter
     )
 
+    # Only the latest revision of each certificate contributes to statistics
+    query = query.filter(_latest_revision_filter())
+
     if material:
         query = query.filter(TestRecord.material.ilike(f'%{material}%'))
 
@@ -254,6 +282,9 @@ def export():
         TestRecord.test_method == test_method,
         AnalysisResult.parameter_name == parameter
     )
+
+    # Only the latest revision of each certificate contributes to statistics
+    query = query.filter(_latest_revision_filter())
 
     if material:
         query = query.filter(TestRecord.material.ilike(f'%{material}%'))

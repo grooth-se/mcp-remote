@@ -15,8 +15,10 @@ STATUS_PENDING = 'PENDING_REVIEW'
 STATUS_APPROVED = 'APPROVED'
 STATUS_REJECTED = 'REJECTED'
 STATUS_PUBLISHED = 'PUBLISHED'
+STATUS_REVOKED = 'REVOKED'  # Published report superseded by a newer certificate revision
 
-APPROVAL_STATUSES = [STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_PUBLISHED]
+APPROVAL_STATUSES = [STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED,
+                     STATUS_PUBLISHED, STATUS_REVOKED]
 
 STATUS_LABELS = {
     STATUS_DRAFT: 'Draft',
@@ -24,6 +26,7 @@ STATUS_LABELS = {
     STATUS_APPROVED: 'Approved',
     STATUS_REJECTED: 'Rejected',
     STATUS_PUBLISHED: 'Published',
+    STATUS_REVOKED: 'Revoked',
 }
 
 STATUS_COLORS = {
@@ -32,6 +35,7 @@ STATUS_COLORS = {
     STATUS_APPROVED: 'success',
     STATUS_REJECTED: 'danger',
     STATUS_PUBLISHED: 'primary',
+    STATUS_REVOKED: 'dark',
 }
 
 
@@ -152,6 +156,14 @@ class ReportApproval(db.Model):
         self.signed_pdf_path = pdf_path
         self.pdf_hash = pdf_hash
         self.signature_timestamp = datetime.utcnow()
+
+    def revoke(self) -> None:
+        """Revoke a published report (superseded by a newer revision).
+
+        The signed PDF and trace-back fields are preserved; only the
+        status changes so the old revision drops out of the active list.
+        """
+        self.status = STATUS_REVOKED
 
     @classmethod
     def get_or_create_for_certificate(cls, certificate, user):

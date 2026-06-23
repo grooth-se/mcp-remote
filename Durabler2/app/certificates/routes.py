@@ -150,9 +150,17 @@ def view(cert_id):
     # Get linked test records
     test_records = cert.test_records.all() if cert.test_records else []
 
+    # Revision history for this certificate family (year, cert_id) — keeps the
+    # revision log and change trace-back available even when older revisions
+    # have been revoked and hidden from the report register.
+    revisions = Certificate.query.filter_by(
+        year=cert.year, cert_id=cert.cert_id
+    ).order_by(Certificate.revision.desc()).all()
+
     return render_template('certificates/view.html',
                            cert=cert,
                            test_records=test_records,
+                           revisions=revisions,
                            status_colors=STATUS_COLORS,
                            status_labels=APPROVAL_STATUS_LABELS)
 
@@ -260,9 +268,31 @@ def create_revision(cert_id):
     )
     db.session.add(audit)
 
+    # Revoke the superseded revision's published report (ISO 17025: the old
+    # certificate stays on record but is marked Revoked so it drops out of
+    # the active report register). Only a PUBLISHED report is revoked.
+    revoked_msg = ''
+    from app.models import STATUS_PUBLISHED
+    if cert.approval and cert.approval.status == STATUS_PUBLISHED:
+        cert.approval.revoke()
+        db.session.add(AuditLog(
+            user_id=current_user.id,
+            action='REVOKE',
+            table_name='report_approvals',
+            record_id=cert.approval.id,
+            old_values={'status': STATUS_PUBLISHED},
+            new_values={
+                'status': 'REVOKED',
+                'certificate_number': cert.certificate_number_with_rev,
+                'superseded_by': new_cert.certificate_number_with_rev,
+            },
+            ip_address=request.remote_addr
+        ))
+        revoked_msg = f' {cert.certificate_number_with_rev} marked as Revoked.'
+
     db.session.commit()
 
-    flash(f'Created revision {new_cert.certificate_number_with_rev}', 'success')
+    flash(f'Created revision {new_cert.certificate_number_with_rev}.{revoked_msg}', 'success')
     return redirect(url_for('certificates.edit', cert_id=new_cert.id))
 
 
@@ -337,12 +367,13 @@ def delete(cert_id):
         flash(f'Cannot delete {cert.certificate_number} - has linked test records.', 'danger')
         return redirect(url_for('certificates.view', cert_id=cert_id))
 
-    # Published reports must never be deleted (ISO 17025) - supersede with a revision instead
+    # Published/revoked reports must never be deleted (ISO 17025): both carry a
+    # signed PDF on record. Supersede with a revision instead.
     if cert.approval:
-        from app.models import STATUS_PUBLISHED
-        if cert.approval.status == STATUS_PUBLISHED:
-            flash(f'Cannot delete {cert.certificate_number} - a published report exists. '
-                  f'Create a revision to supersede it instead.', 'danger')
+        from app.models import STATUS_PUBLISHED, STATUS_REVOKED
+        if cert.approval.status in (STATUS_PUBLISHED, STATUS_REVOKED):
+            flash(f'Cannot delete {cert.certificate_number} - a published or revoked report '
+                  f'exists. Create a revision to supersede it instead.', 'danger')
             return redirect(url_for('certificates.view', cert_id=cert_id))
         # Remove the approval record along with the certificate (avoids orphans)
         db.session.delete(cert.approval)

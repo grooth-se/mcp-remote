@@ -457,6 +457,45 @@
             </div>
         </div>
 
+        <!-- Revision History -->
+        <div class="card mb-2">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-diagram-2"></i> Revision History</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for rev in revisions %}
+                    <div class="list-group-item {{ 'list-group-item-primary' if rev.id == cert.id else '' }}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                {% if rev.id == cert.id %}
+                                <strong>{{ rev.certificate_number_with_rev }}</strong>
+                                <span class="badge bg-secondary ms-1">current</span>
+                                {% else %}
+                                <a href="{{ url_for('certificates.view', cert_id=rev.id) }}">
+                                    {{ rev.certificate_number_with_rev }}
+                                </a>
+                                {% endif %}
+                                <br>
+                                <small class="text-muted">
+                                    {{ rev.cert_date.strftime('%Y-%m-%d') if rev.cert_date else '-' }}
+                                    {% if rev.comment %} · {{ rev.comment }}{% endif %}
+                                </small>
+                            </div>
+                            <div>
+                                {% if rev.approval %}
+                                <span class="badge bg-{{ rev.approval.status_color }}">{{ rev.approval.status_label }}</span>
+                                {% else %}
+                                <span class="badge bg-light text-dark">No report</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
         <!-- Audit Info -->
         <div class="card">
             <div class="card-header">
