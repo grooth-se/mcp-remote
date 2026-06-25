@@ -173,6 +173,9 @@
                                 <th>#</th>
                                 <th>Location</th>
                                 <th>Hardness ({{ test_params.get('load_level', 'HV') }})</th>
+                                {% if include_brinell %}
+                                <th>{{ brinell_header }}</th>
+                                {% endif %}
                             </tr>
                         </thead>
                         <tbody>
@@ -183,6 +186,9 @@
                                 <td>
                                     <strong>{{ "%.1f"|format(r.hardness_value) }}</strong>
                                 </td>
+                                {% if include_brinell %}
+                                <td>{{ "%.0f"|format(r.hbw) if r.get('hbw') is not none else '-' }}</td>
+                                {% endif %}
                             </tr>
                             {% endfor %}
                         </tbody>

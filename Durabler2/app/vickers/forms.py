@@ -57,11 +57,22 @@ class SpecimenForm(FlaskForm):
     dwell_time = SelectField(
         'Dwell Time',
         choices=[
-            ('10', '10 seconds'),
-            ('15', '15 seconds (standard)'),
+            ('10', '10 seconds (standard)'),
+            ('15', '15 seconds'),
             ('30', '30 seconds'),
         ],
-        default='15',
+        default='10',
+        validators=[Optional()]
+    )
+
+    # Optional Brinell (HBW) conversion column per ASTM E140
+    include_brinell = SelectField(
+        'Add Brinell (HBW) column - ASTM E140',
+        choices=[
+            ('no', 'No'),
+            ('yes', 'Yes - convert HV to HBW (ASTM E140, non-austenitic steels)'),
+        ],
+        default='no',
         validators=[Optional()]
     )
 

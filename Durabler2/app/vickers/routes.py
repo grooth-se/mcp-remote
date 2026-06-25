@@ -23,18 +23,19 @@ from utils.models.vickers_specimen import VickersTestData, VickersReading, Vicke
 
 
 def parse_vickers_csv(file_content):
-    """Parse Vickers hardness CSV from q-ness test machine.
+    """Parse Vickers hardness CSV from the QATM QNESS test machine.
 
     Format: semicolon-separated, Swedish decimal comma.
+    The FIRST column is the location/position label for the reading.
     Structure:
         Name:;value
         <specimen name>
         Name:;value
         LINE <n>
-        <number>;<HV>;<method>;<d1 mm>;<d2 mm>
+        <location>;<HV>;<method>;<d1 mm>;<d2 mm>
         ...
 
-    Returns list of dicts with keys: line, number, hardness_value, method, d1_mm, d2_mm, location
+    Returns list of dicts with keys: line, hardness_value, method, d1_mm, d2_mm, location
     """
     readings = []
     current_line = None
@@ -55,32 +56,53 @@ def parse_vickers_csv(file_content):
         if row.startswith('Name:') or row.startswith('name:'):
             continue
 
-        # Try to parse as data row: number;HV;method;d1;d2
+        # Try to parse as data row: location;HV;method;d1;d2
+        # (first column is location data, not a running number)
         fields = row.split(';')
         if len(fields) >= 5:
             try:
-                number = int(fields[0].strip())
+                location = fields[0].strip()
                 hv = float(fields[1].strip().replace(',', '.'))
                 method = fields[2].strip()
                 d1 = float(fields[3].strip().replace(',', '.'))
                 d2 = float(fields[4].strip().replace(',', '.'))
-
-                location = f'Line {current_line}, Pos {number}' if current_line else f'Pos {number}'
-                readings.append({
-                    'line': current_line,
-                    'number': number,
-                    'hardness_value': hv,
-                    'method': method,
-                    'd1_mm': d1,
-                    'd2_mm': d2,
-                    'location': location,
-                    'reading_number': len(readings) + 1,
-                })
             except (ValueError, IndexError):
                 continue
-        # Also try: just specimen name line (single value, no semicolons with data)
+
+            # Fall back to a synthesised label only when the location is blank
+            if not location:
+                pos = len(readings) + 1
+                location = f'Line {current_line}, Pos {pos}' if current_line else f'Pos {pos}'
+
+            readings.append({
+                'line': current_line,
+                'hardness_value': hv,
+                'method': method,
+                'd1_mm': d1,
+                'd2_mm': d2,
+                'location': location,
+                'reading_number': len(readings) + 1,
+            })
 
     return readings
+
+
+BRINELL_COLUMN_HEADER = 'HBW (ASTM E140)'
+
+
+def augment_readings_with_brinell(readings):
+    """Return readings with an 'hbw' field added (ASTM E140 HV->HBW).
+
+    'hbw' is the converted Brinell value (float) or None. A reading also
+    gets 'hbw_clamped'=True when its HV was outside the E140 table range.
+    The input list is not mutated.
+    """
+    from utils.analysis.hardness_conversion import vickers_to_brinell
+    out = []
+    for r in readings:
+        hbw, clamped = vickers_to_brinell(r.get('hardness_value'))
+        out.append({**r, 'hbw': hbw, 'hbw_clamped': clamped})
+    return out
 
 
 def generate_vickers_test_id():
@@ -240,6 +262,7 @@ def new():
             'dwell_time': form.dwell_time.data,
             'num_readings': form.num_readings.data,
             'location_orientation': form.location_orientation.data,
+            'include_brinell': form.include_brinell.data == 'yes',
             'notes': form.notes.data,
         }
 
@@ -484,6 +507,11 @@ def view(test_id):
     results['load_level'] = test_params.get('load_level', 'HV')
     results['uncertainty_budget'] = test_params.get('uncertainty_budget', {})
 
+    # Optional Brinell (HBW) conversion column per ASTM E140
+    include_brinell = test_params.get('include_brinell', False)
+    if include_brinell and readings:
+        readings = augment_readings_with_brinell(readings)
+
     # Create plot if we have readings
     hardness_plot = None
     if readings:
@@ -503,6 +531,8 @@ def view(test_id):
                            test_params=test_params,
                            readings=readings,
                            results=results,
+                           include_brinell=include_brinell,
+                           brinell_header=BRINELL_COLUMN_HEADER,
                            hardness_plot=hardness_plot,
                            photo_url=photo_url)
 
@@ -607,7 +637,7 @@ def report(test_id):
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'temperature': test.temperature or 23,
                 'load_level': test_params.get('load_level', 'HV 10'),
-                'dwell_time': test_params.get('dwell_time', '15'),
+                'dwell_time': test_params.get('dwell_time', '10'),
                 'notes': test_params.get('notes', ''),
                 'operator': current_user.full_name if current_user.full_name else current_user.username,
             }
@@ -754,9 +784,9 @@ def report(test_id):
             info_data = [
                 ('Test Project:', test_info.get('test_project', ''), 'Temperature:', f"{test_info.get('temperature', '23')} °C"),
                 ('Customer:', test_info.get('customer', ''), 'Test Standard:', 'ASTM E92 / ISO 6507'),
-                ('Customer Order:', test_info.get('customer_order', ''), 'Test Equipment:', 'q-ness ATM test machine'),
+                ('Customer Order:', test_info.get('customer_order', ''), 'Test Equipment:', 'QATM QNESS'),
                 ('Product S/N:', test_info.get('specimen_id', ''), 'Load Level:', test_info.get('load_level', '')),
-                ('Material:', test_info.get('material', ''), 'Dwell Time:', f"{test_info.get('dwell_time', '15')} s"),
+                ('Material:', test_info.get('material', ''), 'Dwell Time:', f"{test_info.get('dwell_time', '10')} s"),
                 ('Customer Specimen Info:', test_info.get('customer_specimen_info', ''), 'Location/Orientation:', test_info.get('location_orientation', '')),
                 ('Requirement:', test_info.get('requirement', ''), 'Operator:', test_info.get('operator', '')),
             ]
@@ -821,10 +851,18 @@ def report(test_id):
             heading.paragraph_format.space_before = Pt(12)
             heading.paragraph_format.space_after = Pt(6)
 
-            table = doc.add_table(rows=len(readings) + 1, cols=3)
+            include_brinell = test_params.get('include_brinell', False)
+            if include_brinell:
+                readings = augment_readings_with_brinell(readings)
+
+            load_unit = test_params.get('load_level', 'HV')
+            headers = ['#', 'Location', f'Hardness ({load_unit})']
+            if include_brinell:
+                headers.append(BRINELL_COLUMN_HEADER)
+
+            table = doc.add_table(rows=len(readings) + 1, cols=len(headers))
             table.style = 'Table Grid'
 
-            headers = ['#', 'Location', 'Hardness']
             for i, h in enumerate(headers):
                 table.rows[0].cells[i].text = h
                 table.rows[0].cells[i].paragraphs[0].runs[0].bold = True
@@ -833,6 +871,9 @@ def report(test_id):
                 table.rows[i+1].cells[0].text = str(r.get('reading_number', i+1))
                 table.rows[i+1].cells[1].text = r.get('location', f'Point {i+1}')
                 table.rows[i+1].cells[2].text = f"{r.get('hardness_value', 0):.1f}"
+                if include_brinell:
+                    hbw = r.get('hbw')
+                    table.rows[i+1].cells[3].text = f"{hbw:.0f}" if hbw is not None else '-'
 
             # Compact table rows
             for row in table.rows:

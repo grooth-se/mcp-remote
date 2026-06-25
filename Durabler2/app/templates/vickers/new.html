@@ -79,6 +79,13 @@
                                     {{ form.num_readings(class="form-select", id="num_readings", onchange="updateReadingsTable()") }}
                                 </div>
                             </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-1">
+                                    {{ form.include_brinell.label(class="form-label") }}
+                                    {{ form.include_brinell(class="form-select") }}
+                                    <small class="text-muted">Adds an HBW column converted from HV per ASTM E140 (non-austenitic steels).</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -92,7 +99,7 @@
                                 <div class="col-md-6 mb-1">
                                     {{ form.csv_file.label(class="form-label") }}
                                     {{ form.csv_file(class="form-control", id="csvFileInput") }}
-                                    <small class="text-muted">q-ness CSV file (semicolon-separated)</small>
+                                    <small class="text-muted">QATM QNESS CSV file (semicolon-separated; first column = location)</small>
                                 </div>
                                 <div class="col-md-3 mb-1">
                                     <button type="button" class="btn btn-outline-primary" id="importCsvBtn" disabled>
