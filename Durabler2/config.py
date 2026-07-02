@@ -25,7 +25,7 @@ class Config:
 
     # File uploads (inside static folder for web access)
     UPLOAD_FOLDER = basedir / 'app' / 'static' / 'uploads'
-    MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50 MB max upload
+    MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB max upload (allows up to 8 high-res images)
     ALLOWED_EXTENSIONS = {'csv', 'xlsx', 'xls', 'png', 'jpg', 'jpeg', 'gif'}
 
     # Reports output
