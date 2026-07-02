@@ -82,6 +82,10 @@ class SpecimenForm(FlaskForm):
     photo_5_caption = StringField('Caption 5', validators=[Optional()])
     photo_6 = FileField('Photo 6', validators=[Optional(), FileAllowed(['jpg', 'jpeg', 'png'], 'Images only')])
     photo_6_caption = StringField('Caption 6', validators=[Optional()])
+    photo_7 = FileField('Photo 7', validators=[Optional(), FileAllowed(['jpg', 'jpeg', 'png'], 'Images only')])
+    photo_7_caption = StringField('Caption 7', validators=[Optional()])
+    photo_8 = FileField('Photo 8', validators=[Optional(), FileAllowed(['jpg', 'jpeg', 'png'], 'Images only')])
+    photo_8_caption = StringField('Caption 8', validators=[Optional()])
 
     notes = TextAreaField('Notes', validators=[Optional()])
 

@@ -145,8 +145,8 @@
                             <h6 class="mb-0"><i class="bi bi-camera"></i> Micrographs / Macrographs</h6>
                         </div>
                         <div class="card-body">
-                            <p class="text-muted small mb-2">Attach up to 6 images, each with a caption (magnification, etchant, location).</p>
-                            {% for i in range(1, 7) %}
+                            <p class="text-muted small mb-2">Attach up to 8 images, each with a caption (magnification, etchant, location).</p>
+                            {% for i in range(1, 9) %}
                             {% set photo = form['photo_' ~ i] %}
                             {% set caption = form['photo_' ~ i ~ '_caption'] %}
                             <div class="row mb-1 align-items-center">

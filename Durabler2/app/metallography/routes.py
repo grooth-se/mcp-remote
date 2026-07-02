@@ -182,7 +182,7 @@ def new():
 
         # Photos with captions
         photo_number = 0
-        for i in range(1, 7):
+        for i in range(1, 9):
             photo_field = getattr(form, f'photo_{i}', None)
             caption_field = getattr(form, f'photo_{i}_caption', None)
             if photo_field and photo_field.data and getattr(photo_field.data, 'filename', ''):
