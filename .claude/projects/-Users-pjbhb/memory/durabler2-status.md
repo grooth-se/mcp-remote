@@ -9,6 +9,14 @@ metadata:
 
 # Durabler2 Development Status (2026-06-16)
 
+## 2026-07-06 — Tensile records 31–35 RE-ANALYZED server-side (DONE; the long-pending June-12 task)
+- Records 31–35 (TEN-20260612-001..005, specimens D27/D27/D28/D28/D29, certs DUR-2026-1027/1027/1028/1028/1029) were **status=ANALYZED, approval=None** (never published) — still held pre-fix values. Re-analyzed via a script driving the REAL `/tensile/specimen` route (test client) so fixed `mts_csv_parser` + `TensileAnalyzer` both ran.
+- Method that worked: feed each record's **pristine original CSV from `RawTestData` BLOB** (`get_data()`, zlib) back to a temp file; set session `_user_id`(admin=1)/`tensile_csv_path`/`tensile_reanalyze_id`/`tensile_certificate_id`; rebuild SpecimenForm POST from record fields + geometry (reanalyze branch OVERWRITES specimen_id/material/batch/test_standard/temperature from the form — must feed them back or they wipe). `test_standard` must match SelectField choices (`ASTM E8/E8M-22`/`ISO 6892-1:2019`).
+- **GOTCHA**: in the container `PORTAL_AUTH_ENABLED=true` installs a before_request that bounces test-client requests to `/` (302) before the route runs. Set `os.environ["PORTAL_AUTH_ENABLED"]="false"` BEFORE `from app import create_app`, and `WTF_CSRF_ENABLED=False`, so plain flask_login (`_user_id` session) satisfies `@login_required`.
+- **GOTCHA**: reanalyze branch appends a NEW `raw_test_data` row without deleting the old → dedupe after (delete rows not in pre-run id set). Records 34 & 35 already had 2 csv raw rows pre-existing (harmless identical copies) — left as-is.
+- Results (BEFORE→AFTER): **31 D27** Rp0.2 124.9→**606.0**, E 98.4→**214.8**, Ag 9.27→9.41 (the garbage-value fix). **33/34 D28** Ag **−8.37→+8.37** (parser sign fix). **32** (use_displacement_only) unchanged — correct, extensometer fix N/A. **35 D29** unchanged (already fixed-code output). All 5 have REANALYZE audit entries.
+- DB backed up first at `/data/durabler_pre_reanalyze_20260706.db` (in durabler2 volume). No git change (data-only, in prod DB).
+
 ## 2026-07-02 — Upload limit 50MB→100MB (413 fix; durabler2 commit `6c6c5e8a5`, app_portal commit `ad0fa0e41`, DEPLOYED + pushed)
 - Uploading 8 high-res micrographs hit HTTP 413. BOTH caps were 50MB: Flask `MAX_CONTENT_LENGTH` in `config.py` AND nginx `client_max_body_size` in `app_portal/nginx/nginx.conf` (server block, line ~22 — applies to all locations incl. durabler2). Raised both to 100M.
 - nginx.conf is a **mounted volume** in `app_portal-nginx-1` (at `/etc/nginx/conf.d/default.conf`) — scp + `docker exec app_portal-nginx-1 nginx -s reload` applies it live, no rebuild. durabler2 bakes config.py via `COPY . .` so it needs a `--no-cache` rebuild.

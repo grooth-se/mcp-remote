@@ -129,6 +129,7 @@
 - Fresh DB on server (user chose not to migrate local records); awaiting user end-to-end test via portal
 
 ## Durabler2 Status (2026-06-16)
+- **2026-07-06 Tensile records 31–35 RE-ANALYZED server-side (DONE)**: closed the pending June-12 task. Drove real `/tensile/specimen` route via test client, fed pristine CSV from RawTestData BLOB. rec31 Rp0.2 606.0/E 214.8 (was 124.9/98.4 garbage); rec33/34 Ag sign fixed −8.37→+8.37. GOTCHA: set `PORTAL_AUTH_ENABLED=false` before create_app or test-client bounces to `/`. DB backup `/data/durabler_pre_reanalyze_20260706.db`. Details in durabler2-status.md
 - **2026-07-02 Upload 413 fix (durabler2 `6c6c5e8a5` + app_portal `ad0fa0e41`, deployed + pushed)**: 8 high-res images exceeded 50MB; raised Flask MAX_CONTENT_LENGTH (config.py) + nginx client_max_body_size (app_portal/nginx/nginx.conf, mounted volume→reload) to 100M. app_portal shares Durabler2's git remote. Details in durabler2-status.md
 - **2026-07-02 Metallographic image limit 6→8 (commit `8f783fed9`, deployed + pushed)**: photo_7/photo_8 in forms.py, `range(1,9)` in routes.py + new.html; report/view iterate test.photos (no fixed limit). Details in durabler2-status.md
 - **2026-06-25 Vickers adjustments (commit `658c796fa`, deployed + pushed)**: machine name → "QATM QNESS"; dwell default 10s; CSV first column = location; operator-selectable ASTM E140 HV→HBW column (non-austenitic steels, clamps out-of-range); units in readings header. New `utils/analysis/hardness_conversion.py`. NOTE: reports/routes.py is CRLF — don't flatten to LF. Details in durabler2-status.md
@@ -136,7 +137,7 @@
 - **2026-06-16 Metallographic module (commit `0b4ddfb83`, DEPLOYED + pushed)**: 9th test type METALLO, ASTM E45/E381 + ISO 4967/4969, mirrors Charpy. Per-type inclusion severity A/B/C/D + acceptance limits → pass/fail, free-text macro, multiple captioned photos. Details in durabler2-status.md
 - **subseavm01 disk gotcha (2026-06-16)**: `/` filled to 100% from accumulated Docker build cache; `docker builder prune -f` freed 55.9GB. Prune periodically.
 - **2026-06-12b negative-strain-at-start fix (commit `67f6d9536`, deployed)**: `prepare_extensometer_strain()` zeroes at lowest reading + Annex G origin extrapolation; Ag/A% now from corrected strain
-- **2026-06-12 tensile fixes (commit `43dd89fcb`, deployed 2026-06-12)**: extensometer sign now judged at max force (was last-sample → negated traces); elastic E window now 20-50% of max stress on loading branch (was absolute strain window → E=98.4/Rp0.2=124.9 garbage). Re-analyze records 31-35 after deploy. Details in durabler2-status.md
+- **2026-06-12 tensile fixes (commit `43dd89fcb`, deployed 2026-06-12)**: extensometer sign now judged at max force (was last-sample → negated traces); elastic E window now 20-50% of max stress on loading branch (was absolute strain window → E=98.4/Rp0.2=124.9 garbage). Records 31-35 re-analyzed 2026-07-06 (DONE). Details in durabler2-status.md
 - See [durabler2-status.md](durabler2-status.md) for full details
 - Single portal-managed instance on SQLite, port 5002 (standalone retired 2026-05-12)
 - Certificate approval workflow working for ALL 6 test types (TENSILE, CTOD, SONIC, FCGR, KIC, VICKERS) + Brinell + Charpy
