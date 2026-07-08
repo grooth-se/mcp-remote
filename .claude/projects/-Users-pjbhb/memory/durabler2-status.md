@@ -9,6 +9,11 @@ metadata:
 
 # Durabler2 Development Status (2026-06-16)
 
+## 2026-07-08b — Statistics: dedup to latest record per specimen (commit `e3789e189`, DEPLOYED + pushed)
+- Follow-up: chart still showed duplicate specimens (D28/D29/D30/D60). Cause: re-tested/modified specimens create NEW test records under the SAME published cert (new test_id, later created_at) instead of superseding via revision — so approved+latest-revision filters can't tell them apart. E.g. D28/cert1028: 4 records (ids 33,34,38,39).
+- Fix: new `_latest_record_per_specimen_ids()` — `func.max(TestRecord.id)` grouped by (certificate_id, specimen_id, test_method) over the approved+latest-revision population; main query adds `.filter(TestRecord.id.in_(...))`. max(id)=newest (ids monotonic since 2026-05-13 CASCADE fix, no recycling). Applied to query + export.
+- Prod verified: D28/D29/D30/D60 now appear once each (ids 39/45/42/60, the newest); TENSILE Rm rows 28→22. Local synthetic test extended with a 3x re-tested specimen → only newest kept. ALL PASS.
+
 ## 2026-07-08 — Statistics: approved-only latest report per cert + multi-material (commit `dcb061307`, DEPLOYED + pushed)
 - `app/statistics/routes.py`: new `_approved_only(query)` joins `ReportApproval` on `certificate_id` and keeps `STATUS_APPROVED`/`STATUS_PUBLISHED` only. Applied to `query`, `export`, and the `index` material dropdown. Combined with existing `_latest_revision_filter()` → only the latest approved report per certificate number feeds statistics. Certificate join changed outer→inner (approved report always has a cert). Drafts/pending/rejected/revoked/no-cert excluded.
 - Approval is **per-certificate** (ReportApproval.certificate_id, one-to-one). KEY: inclusion keys on the CERTIFICATE's approval, NOT the test-record's `.approval` backref. A published cert includes ALL its test records' AnalysisResults.
