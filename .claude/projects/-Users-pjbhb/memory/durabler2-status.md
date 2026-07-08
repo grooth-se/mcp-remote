@@ -9,6 +9,14 @@ metadata:
 
 # Durabler2 Development Status (2026-06-16)
 
+## 2026-07-08 — Statistics: approved-only latest report per cert + multi-material (commit `dcb061307`, DEPLOYED + pushed)
+- `app/statistics/routes.py`: new `_approved_only(query)` joins `ReportApproval` on `certificate_id` and keeps `STATUS_APPROVED`/`STATUS_PUBLISHED` only. Applied to `query`, `export`, and the `index` material dropdown. Combined with existing `_latest_revision_filter()` → only the latest approved report per certificate number feeds statistics. Certificate join changed outer→inner (approved report always has a cert). Drafts/pending/rejected/revoked/no-cert excluded.
+- Approval is **per-certificate** (ReportApproval.certificate_id, one-to-one). KEY: inclusion keys on the CERTIFICATE's approval, NOT the test-record's `.approval` backref. A published cert includes ALL its test records' AnalysisResults.
+- Multi-material: `request.form.getlist('material')` + `TestRecord.material.in_(materials)` (was single `.get()` + ilike). Template `app/templates/statistics/index.html`: material text input → `<select multiple size=4>` (name still `material`). No JS change — FormData emits one entry per selected option; query fetch + export handler already iterate entries. JSON `filters.material`→`filters.materials`.
+- Prod data (2026-07-08): 42 PUBLISHED approvals (0 APPROVED — signing auto-progresses), all with certificate_id. TENSILE 'n' returns 28 (approved-only 40 − 12 superseded revisions). Re-analyzed rec 31/32 (cert 1027 rev1, superseded) correctly EXCLUDED; rec 33/34/35 (certs 1028/1029 published, current rev) correctly INCLUDED.
+- Verified: local synthetic test client (all cases: published/draft/pending/revoked, 2-revision cert, multi+single material, export) ALL PASS; prod read-only checks reconciled. Scratchpad scripts local_test_stats.py / diag_stats.py.
+- GOTCHA: container Python 3.11 rejects backslash in f-string expressions (3.12 allows) — compute the substring outside the f-string in verify scripts.
+
 ## 2026-07-06 — Tensile records 31–35 RE-ANALYZED server-side (DONE; the long-pending June-12 task)
 - Records 31–35 (TEN-20260612-001..005, specimens D27/D27/D28/D28/D29, certs DUR-2026-1027/1027/1028/1028/1029) were **status=ANALYZED, approval=None** (never published) — still held pre-fix values. Re-analyzed via a script driving the REAL `/tensile/specimen` route (test client) so fixed `mts_csv_parser` + `TensileAnalyzer` both ran.
 - Method that worked: feed each record's **pristine original CSV from `RawTestData` BLOB** (`get_data()`, zlib) back to a temp file; set session `_user_id`(admin=1)/`tensile_csv_path`/`tensile_reanalyze_id`/`tensile_certificate_id`; rebuild SpecimenForm POST from record fields + geometry (reanalyze branch OVERWRITES specimen_id/material/batch/test_standard/temperature from the form — must feed them back or they wipe). `test_standard` must match SelectField choices (`ASTM E8/E8M-22`/`ISO 6892-1:2019`).
