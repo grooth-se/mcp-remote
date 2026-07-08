@@ -58,14 +58,13 @@
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Material</label>
-                        <input type="text" class="form-control" name="material" id="material"
-                               list="materialList" placeholder="e.g., A182 F22">
-                        <datalist id="materialList">
+                        <label class="form-label">Material(s)</label>
+                        <select class="form-select" name="material" id="material" multiple size="4">
                             {% for mat in materials %}
-                            <option value="{{ mat }}">
+                            <option value="{{ mat }}">{{ mat }}</option>
                             {% endfor %}
-                        </datalist>
+                        </select>
+                        <small class="text-muted">Hold Ctrl/Cmd to select several. Leave empty for all.</small>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Temperature Range</label>

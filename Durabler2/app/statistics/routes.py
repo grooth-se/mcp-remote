@@ -10,7 +10,24 @@ from sqlalchemy.orm import aliased
 
 from . import statistics_bp
 from app.extensions import db
-from app.models import TestRecord, AnalysisResult, Certificate
+from app.models import TestRecord, AnalysisResult, Certificate, ReportApproval
+from app.models.report_approval import STATUS_APPROVED, STATUS_PUBLISHED
+
+
+def _approved_only(query):
+    """Restrict a query to the latest approved report per certificate number.
+
+    Joins each certificate's approval and keeps only approved/published reports.
+    Because publishing a new revision revokes the previous one, this yields exactly
+    the latest approved report per certificate number. Test records without an
+    approved certificate (drafts, pending, rejected, revoked, or no certificate)
+    are excluded from statistics.
+    """
+    return query.join(
+        ReportApproval, ReportApproval.certificate_id == Certificate.id
+    ).filter(
+        ReportApproval.status.in_([STATUS_APPROVED, STATUS_PUBLISHED])
+    )
 
 
 def _latest_revision_filter():
@@ -81,12 +98,15 @@ def index():
     test_methods = db.session.query(TestRecord.test_method).distinct().all()
     test_methods = [m[0] for m in test_methods if m[0]]
 
-    # Get available materials
-    materials = db.session.query(TestRecord.material).distinct().filter(
+    # Get available materials (only from approved reports, matching what statistics use)
+    materials_q = db.session.query(TestRecord.material).distinct().join(
+        Certificate, TestRecord.certificate_id == Certificate.id
+    )
+    materials_q = _approved_only(materials_q).filter(
         TestRecord.material.isnot(None),
         TestRecord.material != ''
-    ).order_by(TestRecord.material).all()
-    materials = [m[0] for m in materials]
+    ).order_by(TestRecord.material)
+    materials = [m[0] for m in materials_q.all()]
 
     # Get temperature range
     temp_range = db.session.query(
@@ -127,7 +147,7 @@ def query():
     # Get filter parameters
     test_method = request.form.get('test_method')
     parameter = request.form.get('parameter')
-    material = request.form.get('material', '').strip()
+    materials = [m.strip() for m in request.form.getlist('material') if m.strip()]
     temp_min = request.form.get('temp_min', type=float)
     temp_max = request.form.get('temp_max', type=float)
     date_from = request.form.get('date_from')
@@ -149,7 +169,7 @@ def query():
         Certificate.cert_id
     ).select_from(AnalysisResult).join(
         TestRecord, AnalysisResult.test_record_id == TestRecord.id
-    ).outerjoin(
+    ).join(
         Certificate, TestRecord.certificate_id == Certificate.id
     )
 
@@ -159,11 +179,11 @@ def query():
         AnalysisResult.parameter_name == parameter
     )
 
-    # Only the latest revision of each certificate contributes to statistics
-    query = query.filter(_latest_revision_filter())
+    # Only the latest approved report per certificate number contributes to statistics
+    query = _approved_only(query).filter(_latest_revision_filter())
 
-    if material:
-        query = query.filter(TestRecord.material.ilike(f'%{material}%'))
+    if materials:
+        query = query.filter(TestRecord.material.in_(materials))
 
     if temp_min is not None:
         query = query.filter(TestRecord.temperature >= temp_min)
@@ -235,7 +255,7 @@ def query():
         'parameter_label': PARAMETER_LABELS.get(test_method, {}).get(parameter, parameter),
         'test_method': test_method,
         'filters': {
-            'material': material,
+            'materials': materials,
             'temp_min': temp_min,
             'temp_max': temp_max,
             'date_from': date_from,
@@ -251,7 +271,7 @@ def export():
     # Get filter parameters (same as query)
     test_method = request.form.get('test_method')
     parameter = request.form.get('parameter')
-    material = request.form.get('material', '').strip()
+    materials = [m.strip() for m in request.form.getlist('material') if m.strip()]
     temp_min = request.form.get('temp_min', type=float)
     temp_max = request.form.get('temp_max', type=float)
     date_from = request.form.get('date_from')
@@ -274,7 +294,7 @@ def export():
         Certificate.cert_id
     ).select_from(AnalysisResult).join(
         TestRecord, AnalysisResult.test_record_id == TestRecord.id
-    ).outerjoin(
+    ).join(
         Certificate, TestRecord.certificate_id == Certificate.id
     )
 
@@ -283,11 +303,11 @@ def export():
         AnalysisResult.parameter_name == parameter
     )
 
-    # Only the latest revision of each certificate contributes to statistics
-    query = query.filter(_latest_revision_filter())
+    # Only the latest approved report per certificate number contributes to statistics
+    query = _approved_only(query).filter(_latest_revision_filter())
 
-    if material:
-        query = query.filter(TestRecord.material.ilike(f'%{material}%'))
+    if materials:
+        query = query.filter(TestRecord.material.in_(materials))
     if temp_min is not None:
         query = query.filter(TestRecord.temperature >= temp_min)
     if temp_max is not None:
