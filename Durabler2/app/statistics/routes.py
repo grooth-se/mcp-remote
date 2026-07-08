@@ -53,6 +53,30 @@ def _latest_revision_filter():
     )
 
 
+def _latest_record_per_specimen_ids():
+    """Subquery of the id of the newest test record per (certificate, specimen, method).
+
+    When a specimen is re-tested or its analysis is modified under the same
+    certificate, a new test record is created rather than superseding via a
+    certificate revision. Only the most recent of these is valid, so statistics
+    must keep just the latest record per specimen. The candidate set is first
+    restricted to approved, latest-revision records; the highest id within each
+    group is the newest (ids are monotonic since the ON DELETE CASCADE fix, so
+    they are no longer recycled).
+    """
+    return db.session.query(func.max(TestRecord.id)).join(
+        Certificate, TestRecord.certificate_id == Certificate.id
+    ).join(
+        ReportApproval, ReportApproval.certificate_id == Certificate.id
+    ).filter(
+        ReportApproval.status.in_([STATUS_APPROVED, STATUS_PUBLISHED])
+    ).filter(
+        _latest_revision_filter()
+    ).group_by(
+        TestRecord.certificate_id, TestRecord.specimen_id, TestRecord.test_method
+    )
+
+
 # Parameter mappings for each test method
 PARAMETER_LABELS = {
     'CTOD': {
@@ -179,8 +203,10 @@ def query():
         AnalysisResult.parameter_name == parameter
     )
 
-    # Only the latest approved report per certificate number contributes to statistics
+    # Only the latest approved report per certificate number contributes to statistics,
+    # and only the newest record per specimen (re-tested/modified specimens keep just one)
     query = _approved_only(query).filter(_latest_revision_filter())
+    query = query.filter(TestRecord.id.in_(_latest_record_per_specimen_ids()))
 
     if materials:
         query = query.filter(TestRecord.material.in_(materials))
@@ -303,8 +329,10 @@ def export():
         AnalysisResult.parameter_name == parameter
     )
 
-    # Only the latest approved report per certificate number contributes to statistics
+    # Only the latest approved report per certificate number contributes to statistics,
+    # and only the newest record per specimen (re-tested/modified specimens keep just one)
     query = _approved_only(query).filter(_latest_revision_filter())
+    query = query.filter(TestRecord.id.in_(_latest_record_per_specimen_ids()))
 
     if materials:
         query = query.filter(TestRecord.material.in_(materials))
