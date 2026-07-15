@@ -53,6 +53,16 @@
                             <li><a class="dropdown-item" href="{{ url_for('admin_system.audit_log') }}">
                                 <i class="bi bi-clipboard-check"></i> Audit Log
                             </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.status') }}">
+                                <i class="bi bi-cpu"></i> Server Status
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.workload') }}">
+                                <i class="bi bi-graph-up"></i> Workload History
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_system.usage') }}">
+                                <i class="bi bi-bar-chart"></i> App Usage
+                            </a></li>
                         </ul>
                     </li>
                     {% endif %}

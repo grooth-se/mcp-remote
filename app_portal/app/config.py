@@ -32,6 +32,20 @@ class Config:
     # App health check
     HEALTH_CHECK_TIMEOUT = 3  # seconds
 
+    # Admin monitoring
+    # Read-only docker-socket-proxy URL; empty = container stats hidden
+    DOCKER_PROXY_URL = os.environ.get('DOCKER_PROXY_URL', '')
+    MONITOR_POLL_SECONDS = int(os.environ.get('MONITOR_POLL_SECONDS', 5))
+    COLLECT_INTERVAL_SECONDS = int(os.environ.get('COLLECT_INTERVAL_SECONDS', 60))
+
+    # Retention windows (days)
+    METRICS_RAW_DAYS = int(os.environ.get('METRICS_RAW_DAYS', 7))
+    METRICS_HOURLY_DAYS = int(os.environ.get('METRICS_HOURLY_DAYS', 90))
+    ACCESS_LOG_RETENTION_DAYS = int(os.environ.get('ACCESS_LOG_RETENTION_DAYS', 90))
+
+    # Cap on streamed usage CSV export rows
+    USAGE_EXPORT_MAX_ROWS = int(os.environ.get('USAGE_EXPORT_MAX_ROWS', 100000))
+
     # Set True when running behind nginx reverse proxy (Docker deployment)
     # When False (local dev), launch redirects directly to app's internal_url
     BEHIND_PROXY = os.environ.get('BEHIND_PROXY', 'false').lower() == 'true'

@@ -1,0 +1,155 @@
+{% extends "admin/layout.html" %}
+{% block title %}App Usage - Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="mb-0"><i class="bi bi-bar-chart"></i> App Usage</h3>
+    <a class="btn btn-sm btn-outline-secondary"
+       href="{{ url_for('admin_system.usage_export', **request.args) }}">
+        <i class="bi bi-download"></i> Export CSV
+    </a>
+</div>
+
+<form method="GET" class="row g-2 align-items-end mb-4">
+    <div class="col-auto">
+        <label class="form-label small text-muted mb-1">Application</label>
+        <select name="app_id" class="form-select form-select-sm">
+            <option value="">All apps</option>
+            {% for a in apps %}
+            <option value="{{ a.id }}" {{ 'selected' if request.args.get('app_id')|int == a.id }}>
+                {{ a.app_name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label small text-muted mb-1">User</label>
+        <select name="user_id" class="form-select form-select-sm">
+            <option value="">All users</option>
+            {% for u in users %}
+            <option value="{{ u.id }}" {{ 'selected' if request.args.get('user_id')|int == u.id }}>
+                {{ u.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label small text-muted mb-1">Action</label>
+        <select name="action" class="form-select form-select-sm">
+            <option value="">All actions</option>
+            {% for act in actions %}
+            <option value="{{ act }}" {{ 'selected' if request.args.get('action') == act }}>
+                {{ act }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label small text-muted mb-1">From</label>
+        <input type="date" name="start" class="form-control form-control-sm"
+               value="{{ request.args.get('start', '') }}">
+    </div>
+    <div class="col-auto">
+        <label class="form-label small text-muted mb-1">To</label>
+        <input type="date" name="end" class="form-control form-control-sm"
+               value="{{ request.args.get('end', '') }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary">
+            <i class="bi bi-funnel"></i> Apply</button>
+        <a href="{{ url_for('admin_system.usage') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
+    </div>
+</form>
+
+{% if summary %}
+<div class="card mb-4">
+    <div class="card-header">Usage per Application</div>
+    <div class="card-body">
+        <div id="usage-chart-wrap" data-url="{{ url_for('admin_system.usage_data', **request.args) }}"
+             style="height: 280px;">
+            <canvas id="usage-chart"></canvas>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-header">Per-App Summary</div>
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Application</th>
+                    <th class="text-end">Launches</th>
+                    <th class="text-end">Validations</th>
+                    <th class="text-end">Denied</th>
+                    <th class="text-end">Unique Users</th>
+                    <th>Last Used</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in summary %}
+                <tr>
+                    <td><strong>{{ row.app_name }}</strong></td>
+                    <td class="text-end">{{ row.access_app }}</td>
+                    <td class="text-end">{{ row.validate }}</td>
+                    <td class="text-end">{% if row.denied %}<span class="text-danger">{{ row.denied }}</span>{% else %}0{% endif %}</td>
+                    <td class="text-end">{{ row.unique_users }}</td>
+                    <td><small>{{ row.last_used.strftime('%Y-%m-%d %H:%M') if row.last_used else '-' }}</small></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">No usage recorded for these filters.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Per-User Detail
+        <span class="text-muted small">({{ detail.total }} row{{ 's' if detail.total != 1 }})</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Application</th>
+                    <th>Action</th>
+                    <th class="text-end">Count</th>
+                    <th>Last</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in detail['items'] %}
+                <tr>
+                    <td>{{ item.username }}</td>
+                    <td>{{ item.app_name }}</td>
+                    <td><span class="badge bg-{{ 'danger' if item.action == 'denied' else 'info' if item.action == 'access_app' else 'secondary' }}">{{ item.action }}</span></td>
+                    <td class="text-end">{{ item.count }}</td>
+                    <td><small>{{ item.last_used.strftime('%Y-%m-%d %H:%M') if item.last_used else '-' }}</small></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="text-center text-muted py-4">No entries.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if detail.pages > 1 %}
+{% set args = request.args.to_dict() %}
+{% set _ = args.pop('page', None) %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center">
+        {% for p in range(1, detail.pages + 1) %}
+        <li class="page-item {{ 'active' if p == detail.page }}">
+            <a class="page-link" href="{{ url_for('admin_system.usage', page=p, **args) }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/admin_monitor.js') }}"></script>
+{% endblock %}

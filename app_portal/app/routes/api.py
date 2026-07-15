@@ -4,6 +4,7 @@ from app.models.user import User
 from app.models.permission import UserPermission
 from app.models.application import Application
 from app.extensions import db
+from app.utils.logging import log_access
 
 api_bp = Blueprint('api', __name__)
 
@@ -25,8 +26,14 @@ def validate_token_endpoint():
     if not user or not user.is_active:
         return jsonify({'valid': False, 'error': 'User not found or inactive'}), 401
 
+    target_app = None
+    if app_code:
+        target_app = Application.query.filter_by(app_code=app_code).first()
+
     # Check app permission if app_code provided
     if app_code and not user.has_app_permission(app_code):
+        log_access(user.id, target_app.id if target_app else None, 'denied',
+                   request.remote_addr, details=f'validate-token: {app_code}')
         return jsonify({'valid': False, 'error': 'Access denied for this application'}), 403
 
     # Get user's permitted app codes
@@ -41,16 +48,18 @@ def validate_token_endpoint():
 
     # Resolve role for the requested app
     role = None
-    if app_code:
-        target_app = Application.query.filter_by(app_code=app_code).first()
-        if target_app:
-            perm = UserPermission.query.filter_by(
-                user_id=user.id, app_id=target_app.id
-            ).first()
-            if perm:
-                role = perm.role or target_app.default_role
-            elif user.is_admin:
-                role = 'admin'
+    if target_app:
+        perm = UserPermission.query.filter_by(
+            user_id=user.id, app_id=target_app.id
+        ).first()
+        if perm:
+            role = perm.role or target_app.default_role
+        elif user.is_admin:
+            role = 'admin'
+
+    # Record app-session establishment for usage analytics (never the token)
+    log_access(user.id, target_app.id if target_app else None, 'validate',
+               request.remote_addr, details=app_code)
 
     return jsonify({
         'valid': True,

@@ -33,6 +33,19 @@
                        href="{{ url_for('admin_system.audit_log') }}">
                         <i class="bi bi-clipboard-check"></i> Audit Log
                     </a>
+                    <hr>
+                    <a class="nav-link {{ 'active' if request.endpoint == 'admin_system.status' }}"
+                       href="{{ url_for('admin_system.status') }}">
+                        <i class="bi bi-cpu"></i> Server Status
+                    </a>
+                    <a class="nav-link {{ 'active' if request.endpoint == 'admin_system.workload' }}"
+                       href="{{ url_for('admin_system.workload') }}">
+                        <i class="bi bi-graph-up"></i> Workload History
+                    </a>
+                    <a class="nav-link {{ 'active' if request.endpoint == 'admin_system.usage' }}"
+                       href="{{ url_for('admin_system.usage') }}">
+                        <i class="bi bi-bar-chart"></i> App Usage
+                    </a>
                 </nav>
             </div>
         </div>

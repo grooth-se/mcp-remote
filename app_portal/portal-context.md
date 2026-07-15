@@ -713,3 +713,68 @@ docker-compose exec portal python scripts/create_admin.py
 - **SSH User:** administrator
 - **Services:** Python, Docker installed
 - **Ports:** 80 (HTTP), 443 (HTTPS), 22 (SSH)
+
+## Admin Monitoring & Usage Analytics (added 2026-07)
+
+Admin-only monitoring area under `/admin/system` (all routes `@admin_required`):
+
+| Route | Purpose |
+|-------|---------|
+| `/admin/system/status` | Live host + container dashboard (5 s polling of `/status/data`) |
+| `/admin/system/workload` | Historical charts, 1h/24h raw + 7d/30d hourly (`/workload/data`) |
+| `/admin/system/usage` | Per-app usage analytics over AccessLog (`/usage/data`, `/usage/export.csv`) |
+
+### Components
+
+- **`socket-proxy` service** (`tecnativa/docker-socket-proxy`): read-only Docker API
+  for container stats. Only `CONTAINERS=1` is enabled (`POST=0`); no published
+  ports; reachable only on the internal compose network. *Residual risk:* the
+  container list/stats API still reveals image names, env-var *names* (not values)
+  and mount paths to anyone who can reach the proxy — acceptable because only the
+  portal and collector share that network. Never mount the raw Docker socket into
+  the portal container.
+- **`collector` service**: same image as the portal, entrypoint `flask collect-loop`.
+  Samples host (psutil via read-only `/proc`, `/sys`, `/:/host` mounts — these
+  mounts exist ONLY on the collector, never the portal) + per-container stats
+  every `COLLECT_INTERVAL_SECONDS` (60) into `metric_sample`; hourly it rolls up
+  into `metric_hourly` and runs all retention purges. Runs as a single process so
+  exactly one sampler exists (gunicorn's 2 workers never sample).
+- **SQLite concurrency**: WAL + 15 s busy timeout set on every connection
+  (portal + collector share `/data/portal.db`).
+- **CLI** (`flask <cmd>` in either container): `collect-metrics` (one sample),
+  `rollup-metrics` (roll-up + metric purges), `purge-logs --days N` (access-log
+  purge), `collect-loop` (collector entrypoint).
+
+### Usage signals
+
+`AccessLog` actions: `login`, `logout`, `login_failed`, `access_app` (dashboard
+launch), `validate` (app session established via `POST /api/validate-token`),
+`denied` (permission refused at launch or token validation). Tokens are never
+written to the log. Indexes on timestamp/action/app_id/user_id (created by the
+entrypoint for existing DBs, by the model for fresh ones).
+
+### GDPR (for the Subseatec GDPR register)
+
+- **Data:** `access_log` links identifiable users (user_id, IP address) to app
+  activity with timestamps. `metric_sample`/`metric_hourly` contain no personal data.
+- **Purpose:** operational and security monitoring of the internal app platform.
+- **Access:** admins only (enforced by `@admin_required`).
+- **Retention:** access logs `ACCESS_LOG_RETENTION_DAYS` (default 90), raw metrics
+  `METRICS_RAW_DAYS` (7), hourly metrics `METRICS_HOURLY_DAYS` (90). Enforced
+  hourly by the collector loop; manual override via `flask purge-logs --days N`.
+- **Export cap:** CSV export bounded by `USAGE_EXPORT_MAX_ROWS` (100 000).
+
+### Environment variables (all optional, shown with defaults)
+
+```
+DOCKER_PROXY_URL=            # http://socket-proxy:2375 in compose; empty hides container stats
+MONITOR_POLL_SECONDS=5       # live dashboard refresh
+COLLECT_INTERVAL_SECONDS=60  # collector sampling interval
+METRICS_RAW_DAYS=7
+METRICS_HOURLY_DAYS=90
+ACCESS_LOG_RETENTION_DAYS=90
+USAGE_EXPORT_MAX_ROWS=100000
+```
+
+Future (documented, not built): alerting/notifications, request-level in-app
+logging via nginx access-log ingestion or app self-reporting.

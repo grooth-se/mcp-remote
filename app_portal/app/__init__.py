@@ -39,9 +39,26 @@ def create_app(config_class=Config):
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
+    # CLI commands (metrics collector, retention purges)
+    from app.cli import register_cli
+    register_cli(app)
+
     # Create tables
     with app.app_context():
-        from app.models import user, application, permission, session, log  # noqa: F401
+        # SQLite: WAL + busy timeout so the collector container can write
+        # while the portal's gunicorn workers read the same file. Must be
+        # registered before the first connection (create_all) is pooled.
+        from sqlalchemy import event
+
+        def _sqlite_pragmas(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA busy_timeout=15000')
+            cursor.close()
+
+        event.listen(db.engine, 'connect', _sqlite_pragmas)
+
+        from app.models import user, application, permission, session, log, metrics  # noqa: F401
         db.create_all()
 
     return app

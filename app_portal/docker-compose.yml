@@ -19,8 +19,47 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - BEHIND_PROXY=true
+      - DOCKER_PROXY_URL=http://socket-proxy:2375
     volumes:
       - portal_data:/data
+    depends_on:
+      - socket-proxy
+    restart: unless-stopped
+
+  # Read-only Docker API access for the admin monitoring pages.
+  # Only container listing/stats is enabled; no ports are published, so the
+  # proxy is reachable solely on the internal compose network.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    environment:
+      - CONTAINERS=1
+      - POST=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  # Metrics sampler. Same image as the portal but runs the sampling loop
+  # instead of gunicorn (single process, so exactly one sampler exists).
+  # Carries the read-only host mounts so psutil reports the host, not the
+  # container — these mounts stay OFF the web-facing portal container.
+  collector:
+    build: .
+    entrypoint: ["flask", "collect-loop"]
+    environment:
+      - SECRET_KEY=${PORTAL_SECRET_KEY}
+      - DATABASE_PATH=/data/portal.db
+      - DOCKER_PROXY_URL=http://socket-proxy:2375
+      - COLLECT_INTERVAL_SECONDS=${COLLECT_INTERVAL_SECONDS:-60}
+      - HOST_PROC=/host/proc
+      - HOST_ROOT=/host
+    volumes:
+      - portal_data:/data
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro
+    depends_on:
+      - portal
+      - socket-proxy
     restart: unless-stopped
 
   # --- Apps ---

@@ -34,6 +34,16 @@ with app.app_context():
         if 'role' not in perm_cols:
             conn.execute(sa.text('ALTER TABLE user_permissions ADD COLUMN role VARCHAR(50)'))
             print('  Added role column to user_permission')
+
+        # Indexes for usage analytics / retention purges (names match the
+        # index=True definitions in app/models/log.py so fresh DBs align)
+        for index_sql in [
+            'CREATE INDEX IF NOT EXISTS ix_access_log_timestamp ON access_log (timestamp)',
+            'CREATE INDEX IF NOT EXISTS ix_access_log_action ON access_log (action)',
+            'CREATE INDEX IF NOT EXISTS ix_access_log_app_id ON access_log (app_id)',
+            'CREATE INDEX IF NOT EXISTS ix_access_log_user_id ON access_log (user_id)',
+        ]:
+            conn.execute(sa.text(index_sql))
         conn.commit()
 
     # Seed default applications (insert new, update existing)
