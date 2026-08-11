@@ -288,6 +288,54 @@
 
                     <hr>
 
+                    <!-- Elastic Modulus Evaluation -->
+                    <div class="card mb-2">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-rulers"></i> Elastic Modulus Evaluation (Young's modulus)</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-2">The elastic line (slope = E) is fitted over a stress
+                            window, as a fraction of Rm, on the loading branch. Widen or shift the window to avoid
+                            noisy low-load data. Optionally override E with a manual value. Applies to the
+                            extensometer offset method; the fit quality (R²) is shown on the results page.</p>
+                            <div class="row">
+                                <div class="col-md-4 mb-1">
+                                    {{ form.elastic_window_min.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.elastic_window_min(class="form-control", step="1") }}
+                                        <span class="input-group-text">% Rm</span>
+                                    </div>
+                                    <small class="text-muted">Lower bound (default 30)</small>
+                                    {% for error in form.elastic_window_min.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.elastic_window_max.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.elastic_window_max(class="form-control", step="1") }}
+                                        <span class="input-group-text">% Rm</span>
+                                    </div>
+                                    <small class="text-muted">Upper bound (default 60)</small>
+                                    {% for error in form.elastic_window_max.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                <div class="col-md-4 mb-1">
+                                    {{ form.elastic_modulus_override.label(class="form-label") }}
+                                    <div class="input-group">
+                                        {{ form.elastic_modulus_override(class="form-control", step="0.1", placeholder="auto") }}
+                                        <span class="input-group-text">GPa</span>
+                                    </div>
+                                    <small class="text-muted">Leave blank to use fitted slope</small>
+                                    {% for error in form.elastic_modulus_override.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Uncertainty Parameters (ISO 17025) -->
                     <div class="card mb-2">
                         <div class="card-header bg-light">

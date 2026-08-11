@@ -38,7 +38,7 @@ class TensileAnalysisConfig:
     """
     offset_strain: float = 0.002
     elastic_strain_range: Tuple[float, float] = (0.0005, 0.0025)
-    elastic_stress_fraction_range: Tuple[float, float] = (0.20, 0.50)
+    elastic_stress_fraction_range: Tuple[float, float] = (0.30, 0.60)
     preload_threshold: float = 0.1
     smoothing_window: int = 5
     force_calibration_uncertainty: float = 0.0031  # 0.31%
@@ -241,7 +241,8 @@ class TensileAnalyzer:
         stress: np.ndarray,
         strain: np.ndarray,
         area_uncertainty: float,
-        gauge_length: float
+        gauge_length: float,
+        slope_override_gpa: Optional[float] = None
     ) -> MeasuredValue:
         """
         Calculate Young's modulus E from linear portion of stress-strain curve.
@@ -250,6 +251,13 @@ class TensileAnalyzer:
         computes the median of all pairwise slopes, making it highly
         resistant to outliers from extensometer settling or micro-yielding
         at the edges of the elastic window.
+
+        The elastic region is selected by the stress-fraction window in
+        ``config.elastic_stress_fraction_range`` (operator-adjustable).  An
+        operator may also supply ``slope_override_gpa`` to force the elastic
+        slope to a specific value (e.g. a handbook modulus, or a manually
+        judged line); the fit window is still used to report R² so the
+        operator can see how well the chosen line fits the data.
 
         Parameters
         ----------
@@ -261,11 +269,16 @@ class TensileAnalyzer:
             Uncertainty in cross-sectional area (mm^2)
         gauge_length : float
             Gauge length in mm
+        slope_override_gpa : float, optional
+            Manual Young's modulus in GPa.  When given (and > 0), it replaces
+            the fitted slope; R² is recomputed for the override line vs the
+            selected elastic data.
 
         Returns
         -------
         MeasuredValue
-            Young's modulus with uncertainty in GPa
+            Young's modulus with uncertainty in GPa.  ``r_squared`` reports
+            the goodness-of-fit of the elastic line against the windowed data.
         """
         try:
             (elastic_stress, elastic_strain,
@@ -283,6 +296,24 @@ class TensileAnalyzer:
             elastic_stress = stress[mask]
             slope, intercept, r_value, p_value, std_err = stats.linregress(
                 elastic_strain, elastic_stress)
+            r2 = r_value ** 2
+
+        # Manual slope override: replace the fitted slope, recompute the fit
+        # quality (R²) and regression std error of the override line vs the
+        # selected elastic data.
+        if slope_override_gpa is not None and slope_override_gpa > 0:
+            slope = slope_override_gpa * 1000  # GPa -> MPa
+            # Best intercept for the fixed slope (least squares): line passes
+            # through the centroid of the elastic data.
+            intercept = float(np.mean(elastic_stress) - slope * np.mean(elastic_strain))
+            predicted = slope * elastic_strain + intercept
+            ss_res = float(np.sum((elastic_stress - predicted) ** 2))
+            ss_tot = float(np.sum((elastic_stress - np.mean(elastic_stress)) ** 2))
+            r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+            n = len(elastic_stress)
+            denom = float(np.sum((elastic_strain - np.mean(elastic_strain)) ** 2))
+            std_err = (np.sqrt(ss_res / max(n - 2, 1)) / np.sqrt(denom)
+                       if n > 2 and denom > 0 else 0.0)
 
         # E in GPa
         E = slope / 1000
@@ -306,7 +337,8 @@ class TensileAnalyzer:
             value=round(E, 1),
             uncertainty=round(U, 1),
             unit="GPa",
-            coverage_factor=2.0
+            coverage_factor=2.0,
+            r_squared=round(float(r2), 4)
         )
 
     def calculate_youngs_modulus_displacement(

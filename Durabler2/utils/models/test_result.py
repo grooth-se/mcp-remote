@@ -32,6 +32,7 @@ class MeasuredValue:
     unit: str
     coverage_factor: float = 2.0
     degrees_of_freedom: int = 50
+    r_squared: Optional[float] = None  # goodness-of-fit for regressed values (e.g. E)
 
     @property
     def standard_uncertainty(self) -> float:

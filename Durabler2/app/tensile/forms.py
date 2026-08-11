@@ -127,6 +127,20 @@ class SpecimenForm(FlaskForm):
         NumberRange(min=0.1, max=5)
     ], default=0.5)
 
+    # Elastic modulus evaluation (extensometer, offset yield methods)
+    elastic_window_min = FloatField('Elastic window min (% of Rm)', validators=[
+        Optional(),
+        NumberRange(min=0, max=99)
+    ], default=30.0)
+    elastic_window_max = FloatField('Elastic window max (% of Rm)', validators=[
+        Optional(),
+        NumberRange(min=1, max=100)
+    ], default=60.0)
+    elastic_modulus_override = FloatField('Manual E override (GPa)', validators=[
+        Optional(),
+        NumberRange(min=1, max=1000)
+    ])
+
     # Notes
     notes = TextAreaField('Notes', validators=[Optional()])
 
@@ -151,6 +165,13 @@ class SpecimenForm(FlaskForm):
             if not self.b0.data:
                 self.b0.errors.append('Thickness b0 required for rectangular specimens')
                 return False
+
+        # Elastic window: max must exceed min
+        lo, hi = self.elastic_window_min.data, self.elastic_window_max.data
+        if lo is not None and hi is not None and hi <= lo:
+            self.elastic_window_max.errors.append(
+                'Elastic window max must be greater than min')
+            return False
 
         return True
 

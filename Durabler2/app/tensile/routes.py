@@ -398,6 +398,11 @@ def specimen():
             dim_unc_pct = form.dimension_uncertainty.data or 0.5
             dim_unc_mm = dim_unc_pct / 100  # Convert % to fraction for mm calc
 
+            # Elastic modulus evaluation controls (extensometer offset method)
+            ew_min = form.elastic_window_min.data if form.elastic_window_min.data is not None else 30.0
+            ew_max = form.elastic_window_max.data if form.elastic_window_max.data is not None else 60.0
+            e_override = form.elastic_modulus_override.data  # GPa or None
+
             # Calculate area based on specimen type
             if specimen_type == 'round':
                 D0 = form.D0.data
@@ -424,10 +429,12 @@ def specimen():
                 else:
                     area_final = None
 
-            # Create analyzer with user-specified uncertainty parameters
+            # Create analyzer with user-specified uncertainty parameters and
+            # operator-adjustable elastic stress-fraction window.
             config = TensileAnalysisConfig(
                 force_calibration_uncertainty=force_unc_pct / 100,
                 extensometer_uncertainty=disp_unc_pct / 100 * (L0 or 50) / 1000,
+                elastic_stress_fraction_range=(ew_min / 100.0, ew_max / 100.0),
             )
             analyzer = TensileAnalyzer(config=config)
 
@@ -457,8 +464,9 @@ def specimen():
                 )
                 E_disp = E  # Same value for display
             else:
-                # NORMAL MODE: E from extensometer
-                E = analyzer.calculate_youngs_modulus(stress, strain, area_unc, L0)
+                # NORMAL MODE: E from extensometer (operator may override slope)
+                E = analyzer.calculate_youngs_modulus(
+                    stress, strain, area_unc, L0, slope_override_gpa=e_override)
 
                 # Establish strain zero (ISO 6892-1 Annex G): if a setup
                 # error left negative extensometer readings at test start,
@@ -732,6 +740,13 @@ def specimen():
             # Store yield method and data source option
             geometry['yield_method'] = yield_method
             geometry['use_displacement_only'] = use_displacement_only
+
+            # Store elastic modulus evaluation settings + fit quality (R²).
+            # R² is shown on the analysis page so the operator can judge the
+            # elastic-line fit; it is not printed on the report.
+            geometry['elastic_window'] = [ew_min, ew_max]
+            geometry['elastic_modulus_override'] = e_override
+            geometry['elastic_r2'] = getattr(E, 'r_squared', None)
 
             # Store truncated plot data for report chart (same data as analysis page)
             strain_trunc, stress_trunc = truncate_at_break(strain, stress, break_threshold=0.5)
@@ -1073,6 +1088,21 @@ def reanalyze(test_id):
             form.b0.data = geometry.get('b0')
             form.au.data = geometry.get('au')
             form.bu.data = geometry.get('bu')
+
+        # Uncertainty inputs
+        unc = geometry.get('uncertainty_inputs') or {}
+        if unc.get('force_pct') is not None:
+            form.force_uncertainty.data = unc.get('force_pct')
+        if unc.get('displacement_pct') is not None:
+            form.displacement_uncertainty.data = unc.get('displacement_pct')
+        if unc.get('dimension_pct') is not None:
+            form.dimension_uncertainty.data = unc.get('dimension_pct')
+
+        # Elastic modulus evaluation settings
+        ew = geometry.get('elastic_window') or [30.0, 60.0]
+        form.elastic_window_min.data = ew[0]
+        form.elastic_window_max.data = ew[1]
+        form.elastic_modulus_override.data = geometry.get('elastic_modulus_override')
 
     return render_template('tensile/specimen.html', form=form, csv_info=csv_info,
                           certificate=test.certificate, reanalyze=True, test_id=test_id)

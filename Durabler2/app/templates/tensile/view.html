@@ -191,6 +191,15 @@
                                 <strong>{{ "%.1f"|format(results['E'].value) }}</strong>
                                 <span class="text-muted">± {{ "%.1f"|format(results['E'].uncertainty) }}</span>
                                 GPa
+                                {% set _r2 = (test.geometry or {}).get('elastic_r2') %}
+                                {% if _r2 is not none %}
+                                <span class="badge {{ 'bg-success' if _r2 >= 0.99 else ('bg-warning text-dark' if _r2 >= 0.97 else 'bg-danger') }} ms-1"
+                                      title="Coefficient of determination for the elastic-line fit">R² = {{ "%.4f"|format(_r2) }}</span>
+                                {% endif %}
+                                {% set _ovr = (test.geometry or {}).get('elastic_modulus_override') %}
+                                {% if _ovr %}
+                                <span class="badge bg-secondary ms-1" title="E was set manually">manual</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endif %}
