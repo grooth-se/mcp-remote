@@ -97,6 +97,7 @@
                         <th>Customer</th>
                         <th>Standard</th>
                         <th>Material</th>
+                        <th>Specimen SN</th>
                         <th class="text-center">Tests</th>
                         <th class="text-center">Status</th>
                         <th class="text-center">Approval</th>
@@ -116,6 +117,7 @@
                         <td>{{ cert.customer or '-' }}</td>
                         <td><small>{{ cert.test_standard or '-' }}</small></td>
                         <td><small>{{ cert.material or '-' }}</small></td>
+                        <td><small>{{ cert.test_article_sn or '-' }}</small></td>
                         <td class="text-center">
                             {% set test_count = cert.test_records.count() %}
                             {% if test_count > 0 %}
