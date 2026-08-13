@@ -291,14 +291,10 @@ class TensileReportGenerator:
             ]
             ratio_label = 'Rp0.2/Rm'
 
-        # Add common results: Rm, A, Z, and yield/tensile ratio
-        # Default requirements: A >18%, Z >40%
-        a_req = data.get('A_req', data.get('A5_req', '-'))
-        if a_req == '-' or not a_req:
-            a_req = '>18'
-        z_req = data.get('Z_req', '-')
-        if z_req == '-' or not z_req:
-            z_req = '>40'
+        # Add common results: Rm, A, Z, and yield/tensile ratio.
+        # Requirements are left blank unless supplied (no hardcoded defaults).
+        a_req = data.get('A_req', data.get('A5_req', '-')) or '-'
+        z_req = data.get('Z_req', '-') or '-'
 
         results_data.extend([
             ('Rm', 'MPa', data.get('Rm', '-'), data.get('Rm_req', '-'), data.get('Rm_uncertainty', '-')),
