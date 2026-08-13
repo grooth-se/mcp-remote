@@ -9,6 +9,9 @@ metadata:
 
 # Durabler2 Development Status (2026-06-16)
 
+## 2026-08-13 — Tensile report: removed hardcoded A5>18 / Z>40 requirement defaults (commit `19861ec41`, DEPLOYED + pushed)
+- `utils/reporting/word_report.py` (~line 295): the tensile report injected `>18` for A5 and `>40` for Z when no requirement was supplied. Removed — A5/Z requirement cells now stay blank (`-`) unless supplied, matching Rm/Rp0.2 behaviour. Explicit requirements still pass through. `TensileReportGenerator` is the SOLE tensile report generator (used by app/tensile/routes.py + app/reports/routes.py); no duplicate. Deployed via utils/ rsync + rebuild; verified `>18`/`>40` gone in container.
+
 ## 2026-08-11b — Certificate register: Specimen SN column (commit `3d5a5e2ed`, DEPLOYED + pushed)
 - Added "Specimen SN" column to certificates register list (`app/templates/certificates/index.html`), between Material and Tests, showing `cert.test_article_sn` (Certificate model field; `specimen_id` is a property alias). Template-only; search JS is column-index-independent, no colspan rows.
 - Verified live on server (test-client GET `/certificates/` in container, HTTP 200): header order Certificate No.→Date→Test Order→Customer→Standard→Material→**Specimen SN**→Tests→Status→Approval→Actions; real SNs render (e.g. DUR-2026-1090→D106, 1088→D101-D104).
