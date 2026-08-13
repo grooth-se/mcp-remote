@@ -10,7 +10,8 @@ metadata:
 # Durabler2 Development Status (2026-06-16)
 
 ## 2026-08-11b — Certificate register: Specimen SN column (commit `3d5a5e2ed`, DEPLOYED + pushed)
-- Added "Specimen SN" column to certificates register list (`app/templates/certificates/index.html`), between Material and Tests, showing `cert.test_article_sn` (Certificate model field; `specimen_id` is a property alias). Template-only; search JS is column-index-independent, no colspan rows. Verified live.
+- Added "Specimen SN" column to certificates register list (`app/templates/certificates/index.html`), between Material and Tests, showing `cert.test_article_sn` (Certificate model field; `specimen_id` is a property alias). Template-only; search JS is column-index-independent, no colspan rows.
+- Verified live on server (test-client GET `/certificates/` in container, HTTP 200): header order Certificate No.→Date→Test Order→Customer→Standard→Material→**Specimen SN**→Tests→Status→Approval→Actions; real SNs render (e.g. DUR-2026-1090→D106, 1088→D101-D104).
 
 ## 2026-08-11 — Tensile elastic-modulus fix: adjustable window + manual E override + R² (commit `23703474d`, DEPLOYED + pushed)
 - Problem: extensometer noise at low load biased fitted Young's modulus HIGH (E 238–257 GPa vs physical ~200 for steel/weld metal on certs 1070–1073). E defines the Rp0.2/Rp0.5 offset lines. Verified via read-only diag on prod raw CSVs (RawTestData BLOB): elastic strains are tiny (~0.0004–0.0013 over 20–50% Rm window); apparent E per-point swings 48→886 GPa at low load; tangent-E by band shows the clean bands (R²>0.93) cluster at ~196–201 GPa.
