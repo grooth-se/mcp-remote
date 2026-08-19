@@ -2,7 +2,8 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired, FileAllowed
 from wtforms import (StringField, FloatField, SelectField, TextAreaField,
-                     SubmitField, HiddenField, IntegerField, BooleanField)
+                     SubmitField, HiddenField, IntegerField, BooleanField,
+                     DateField)
 from wtforms.validators import DataRequired, Optional, NumberRange
 
 
@@ -179,6 +180,9 @@ class SpecimenForm(FlaskForm):
 class ReportForm(FlaskForm):
     """Form for report generation options."""
     certificate_number = StringField('Certificate Number', validators=[Optional()])
+    test_date = DateField('Test Date', validators=[Optional()])
+    order_date = DateField('Order Date', validators=[Optional()])
+    arrival_date = DateField('Test Object Arrival Date', validators=[Optional()])
     include_raw_data = SelectField('Include Raw Data', choices=[
         ('no', 'No'),
         ('summary', 'Summary Only'),

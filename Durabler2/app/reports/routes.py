@@ -198,12 +198,15 @@ def generate_report(cert_id):
                 'test_project': certificate.test_order or '',
                 'customer': certificate.customer or '',
                 'customer_order': certificate.customer_order or '',
+                'product': certificate.product or '',
                 'product_sn': certificate.product_sn or '',
                 'specimen_id': test_record.specimen_id or '',
                 'location_orientation': certificate.location_orientation or '',
                 'material': certificate.material or '',
                 'certificate_number': certificate.certificate_number_with_rev,
                 'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
+                'order_date': geometry.get('order_date', ''),
+                'arrival_date': geometry.get('arrival_date', ''),
                 'test_engineer': current_user.full_name or current_user.username,
                 'temperature': str(test_record.temperature) if test_record.temperature else '23',
                 'strain_source': 'Displacement Only' if geometry.get('use_displacement_only') else 'Extensometer',
@@ -353,7 +356,7 @@ def generate_report(cert_id):
                     current_app.logger.warning(f'Chart generation failed: {e}')
                     chart_path = None
 
-            logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
+            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'subseatec_logo.png'
             generator = TensileReportGenerator(None)
             generator.generate_report(
                 output_path=output_path,

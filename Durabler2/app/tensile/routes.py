@@ -1115,27 +1115,48 @@ def report(test_id):
     test = TestRecord.query.get_or_404(test_id)
     form = ReportForm()
 
-    # Pre-fill certificate number if linked
-    if request.method == 'GET' and test.certificate:
-        form.certificate_number.data = test.certificate.certificate_number_with_rev
+    # Pre-fill certificate number and dates on GET
+    if request.method == 'GET':
+        if test.certificate:
+            form.certificate_number.data = test.certificate.certificate_number_with_rev
+        form.test_date.data = test.test_date.date() if test.test_date else None
+        _geom = test.geometry or {}
+        for _fld, _key in (('order_date', 'order_date'), ('arrival_date', 'arrival_date')):
+            _val = _geom.get(_key)
+            if _val:
+                try:
+                    getattr(form, _fld).data = datetime.strptime(_val, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    pass
 
     if form.validate_on_submit():
         try:
             # Get results as dictionary
             results = {r.parameter_name: r for r in test.results.all()}
-            geometry = test.geometry or {}
+            geometry = dict(test.geometry or {})
+
+            # Persist the operator-entered dates. Test date lives on the record;
+            # order/arrival dates (order-level) are kept in the geometry JSON.
+            if form.test_date.data:
+                test.test_date = datetime.combine(form.test_date.data, datetime.min.time())
+            geometry['order_date'] = form.order_date.data.strftime('%Y-%m-%d') if form.order_date.data else ''
+            geometry['arrival_date'] = form.arrival_date.data.strftime('%Y-%m-%d') if form.arrival_date.data else ''
+            test.geometry = geometry  # reassign so SQLAlchemy tracks the JSON change
 
             # Prepare test info
             test_info = {
                 'test_project': test.certificate.test_project if test.certificate else '',
                 'customer': test.certificate.customer if test.certificate else '',
                 'customer_order': test.certificate.customer_order if test.certificate else '',
+                'product': test.certificate.product if test.certificate else '',
                 'product_sn': test.certificate.product_sn if test.certificate else '',
                 'specimen_id': test.specimen_id or '',
                 'location_orientation': test.certificate.location_orientation if test.certificate else '',
                 'material': test.material or '',
                 'certificate_number': form.certificate_number.data or '',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
+                'order_date': geometry.get('order_date', ''),
+                'arrival_date': geometry.get('arrival_date', ''),
                 'test_engineer': current_user.full_name or current_user.username,
                 'temperature': str(test.temperature) if test.temperature else '23',
                 'strain_source': 'Displacement Only' if geometry.get('use_displacement_only') else 'Extensometer',
@@ -1276,7 +1297,7 @@ def report(test_id):
                     current_app.logger.warning(f'Report chart failed: {e}')
 
             # Get logo path (use from-scratch report generation)
-            logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
+            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'subseatec_logo.png'
 
             # Generate report into drafts folder (approval workflow compatible)
             reports_folder = Path(current_app.config['REPORTS_FOLDER'])

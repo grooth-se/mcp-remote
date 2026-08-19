@@ -41,6 +41,22 @@
                         <small class="text-muted">Leave blank to auto-generate</small>
                     </div>
 
+                    <div class="row mb-2">
+                        <div class="col-md-4">
+                            {{ form.test_date.label(class="form-label") }}
+                            {{ form.test_date(class="form-control") }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.order_date.label(class="form-label") }}
+                            {{ form.order_date(class="form-control") }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.arrival_date.label(class="form-label") }}
+                            {{ form.arrival_date(class="form-control") }}
+                        </div>
+                    </div>
+                    <p class="text-muted small mb-2">Dates appear in the report's Test Information table.</p>
+
                     <div class="mb-2">
                         {{ form.include_raw_data.label(class="form-label") }}
                         {{ form.include_raw_data(class="form-select") }}

@@ -102,7 +102,13 @@ class TensileReportGenerator:
             footer.is_linked_to_previous = False
             footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
             footer_para.clear()
-            footer_run = footer_para.add_run(disclaimer_text)
+            footer_text = (
+                "When assessing results, the measurement of uncertainty has not been "
+                "taken under consideration. "
+                + disclaimer_text
+                + " Org. No SE556782-8255"
+            )
+            footer_run = footer_para.add_run(footer_text)
             footer_run.font.size = Pt(7)
             footer_run.italic = True
 
@@ -138,6 +144,9 @@ class TensileReportGenerator:
 
         # Add header with logo on left, certificate info on right (5-line layout)
         for section in doc.sections:
+            # A4 paper (default python-docx is US Letter)
+            section.page_width = Cm(21.0)
+            section.page_height = Cm(29.7)
             # Set narrower margins for compact layout
             section.top_margin = Cm(1.5)
             section.bottom_margin = Cm(1.5)
@@ -192,7 +201,7 @@ class TensileReportGenerator:
         heading.paragraph_format.space_before = Pt(0)
         heading.paragraph_format.space_after = Pt(6)
 
-        table = doc.add_table(rows=7, cols=4)
+        table = doc.add_table(rows=9, cols=4)
         table.style = 'Table Grid'
 
         # Two-column layout: Label | Value | Label | Value
@@ -200,10 +209,12 @@ class TensileReportGenerator:
             ('Test Project:', data.get('test_project', ''), 'Temperature:', f"{data.get('test_temperature', '23')} °C"),
             ('Customer:', data.get('customer', ''), 'Test Standard:', data.get('test_standard', 'ASTM E8/E8M-22')),
             ('Customer Order:', data.get('customer_order', ''), 'Test Equipment:', data.get('test_equipment', 'MTS Landmark 500kN')),
-            ('Product S/N:', data.get('product_sn', ''), 'Specimen ID:', data.get('specimen_id', '')),
-            ('Material:', data.get('material', ''), 'Location/Orientation:', data.get('location_orientation', '')),
-            ('Strain Source:', data.get('strain_source', 'Extensometer'), 'Extensometer:', data.get('extensometer', 'MTS Extensometer')),
-            ('Yield Method:', data.get('yield_method', 'Rp0.2'), 'Operator:', data.get('operator', '')),
+            ('Product:', data.get('product', ''), 'Product S/N:', data.get('product_sn', '')),
+            ('Material:', data.get('material', ''), 'Specimen ID:', data.get('specimen_id', '')),
+            ('Location/Orientation:', data.get('location_orientation', ''), 'Strain Source:', data.get('strain_source', 'Extensometer')),
+            ('Test Date:', data.get('test_date', ''), 'Order Date:', data.get('order_date', '')),
+            ('Test Object Arrival:', data.get('arrival_date', ''), 'Yield Method:', data.get('yield_method', 'Rp0.2')),
+            ('Extensometer:', data.get('extensometer', 'MTS Extensometer'), 'Operator:', data.get('operator', '')),
         ]
 
         for i, (label1, value1, label2, value2) in enumerate(info_data):
@@ -412,7 +423,13 @@ class TensileReportGenerator:
             footer.is_linked_to_previous = False
             footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
             footer_para.clear()
-            footer_run = footer_para.add_run(disclaimer_text)
+            footer_text = (
+                "When assessing results, the measurement of uncertainty has not been "
+                "taken under consideration. "
+                + disclaimer_text
+                + " Org. No SE556782-8255"
+            )
+            footer_run = footer_para.add_run(footer_text)
             footer_run.font.size = Pt(7)
             footer_run.italic = True
 
@@ -523,12 +540,15 @@ class TensileReportGenerator:
         data['test_project'] = test_info.get('test_project', '')
         data['customer'] = test_info.get('customer', '')
         data['customer_order'] = test_info.get('customer_order', '')
+        data['product'] = test_info.get('product', '')
         data['product_sn'] = test_info.get('product_sn', '')
         data['specimen_id'] = test_info.get('specimen_id', '')
         data['location_orientation'] = test_info.get('location_orientation', '')
         data['material'] = test_info.get('material', '')
         data['certificate_number'] = test_info.get('certificate_number', '')
         data['test_date'] = test_info.get('test_date', '')
+        data['order_date'] = test_info.get('order_date', '')
+        data['arrival_date'] = test_info.get('arrival_date', '')
         data['test_standard'] = 'ASTM E8/E8M-22'
         data['yield_method'] = 'Rp0.2/Rp0.5' if yield_type == 'offset' else 'ReH/ReL'
         data['test_engineer'] = test_info.get('test_engineer', '')
