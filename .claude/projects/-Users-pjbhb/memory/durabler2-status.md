@@ -9,6 +9,16 @@ metadata:
 
 # Durabler2 Development Status (2026-06-16)
 
+## 2026-08-19 — Tensile report: Subseatec logo + footer text + Product + dates + A4 (commit `54fb736b2`, DEPLOYED + pushed)
+- Tensile report (`utils/reporting/word_report.py` from-scratch path is the one actually used; template path also updated for parity):
+  - **Logo**: header now uses `app/static/images/subseatec_logo.png` (copied from root `Subseatec-LOGO-_GREEN.png`, 2347×392 RGBA, inserted at 5cm width). Both tensile report callers repointed: `app/tensile/routes.py` report() and `app/reports/routes.py` line ~359 (approval path). Other report types (Vickers/Charpy/etc via `_get_logo_path`) left unchanged — out of scope.
+  - **Footer**: prepend "When assessing results, the measurement of uncertainty has not been taken under consideration." + append " Org. No SE556782-8255" around existing Durabler disclaimer. Applied to BOTH footer blocks in word_report.py.
+  - **Test Information table** grew 7→9 rows: added **Product** (from `Certificate.product`) + **Test Date / Order Date / Test Object Arrival** rows; kept Product S/N, Specimen ID, etc.
+  - **A4**: `section.page_width=Cm(21.0)`, `page_height=Cm(29.7)` in from-scratch sections loop (python-docx default was US Letter).
+- **Dates entry** (user chose per-test form + editable test date): `ReportForm` (app/tensile/forms.py) gained `test_date`/`order_date`/`arrival_date` DateFields; report.html shows them in the Generate Report step. report() route: test_date persisted to `TestRecord.test_date` (DateTime col); order/arrival stored in `geometry` JSON (no migration); all pre-filled on GET. `prepare_report_data` passes product/order_date/arrival_date through (test_date already did).
+- Verified: local real-.docx read-back test (A4/logo/product/dates/footer) + route-level persistence test (test client on synthetic DB) ALL PASS; server read-only doc-gen on real cert DUR-2026-1092 confirmed all 5. Scratchpad: test_report_docx.py, test_report_route.py, verify_report_server.py.
+- CRLF check: `app/reports/routes.py` still CRLF after Edit (targeted replace preserves endings).
+
 ## 2026-08-13 — Tensile report: removed hardcoded A5>18 / Z>40 requirement defaults (commit `19861ec41`, DEPLOYED + pushed)
 - `utils/reporting/word_report.py` (~line 295): the tensile report injected `>18` for A5 and `>40` for Z when no requirement was supplied. Removed — A5/Z requirement cells now stay blank (`-`) unless supplied, matching Rm/Rp0.2 behaviour. Explicit requirements still pass through. `TensileReportGenerator` is the SOLE tensile report generator (used by app/tensile/routes.py + app/reports/routes.py); no duplicate. Deployed via utils/ rsync + rebuild; verified `>18`/`>40` gone in container.
 
