@@ -17,6 +17,7 @@ metadata:
   - **A4**: `section.page_width=Cm(21.0)`, `page_height=Cm(29.7)` in from-scratch sections loop (python-docx default was US Letter).
 - **Dates entry** (user chose per-test form + editable test date): `ReportForm` (app/tensile/forms.py) gained `test_date`/`order_date`/`arrival_date` DateFields; report.html shows them in the Generate Report step. report() route: test_date persisted to `TestRecord.test_date` (DateTime col); order/arrival stored in `geometry` JSON (no migration); all pre-filled on GET. `prepare_report_data` passes product/order_date/arrival_date through (test_date already did).
 - Verified: local real-.docx read-back test (A4/logo/product/dates/footer) + route-level persistence test (test client on synthetic DB) ALL PASS; server read-only doc-gen on real cert DUR-2026-1092 confirmed all 5. Scratchpad: test_report_docx.py, test_report_route.py, verify_report_server.py.
+- Live server re-verify (read-only): HTTP GET `/tensile/97/report` → 200, all 3 date inputs (test_date/order_date/arrival_date) render + test_date prefilled; regenerated doc from real record TEN-20260812-001 confirmed A4 + header logo + Product/Test Date/Order Date/Test Object Arrival rows + footer prefix & suffix. No prod mutation (GET + temp-dir doc). Scratchpad: verify_live.py.
 - CRLF check: `app/reports/routes.py` still CRLF after Edit (targeted replace preserves endings).
 
 ## 2026-08-13 — Tensile report: removed hardcoded A5>18 / Z>40 requirement defaults (commit `19861ec41`, DEPLOYED + pushed)
