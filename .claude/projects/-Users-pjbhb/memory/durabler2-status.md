@@ -9,6 +9,12 @@ metadata:
 
 # Durabler2 Development Status (2026-06-16)
 
+## 2026-08-21 — Tensile report: dual-logo header + E2E test cleanup (commit `1b618dfd2`, DEPLOYED + pushed)
+- Header now shows BOTH logos via a borderless 1×2 table in `word_report.py` `_create_report_from_scratch`: **Durabler logo left cell** (`app/static/images/logo.png`, 1887×435), **Subseatec logo right cell** (`subseatec_logo.png`) with **Certificate number + Date beneath it** (right-cell paragraphs: [logo], "Certificate: …", "Date: …"), then centered Title + Standard. Removes the empty leading header paragraph so the table sits at top. `header.add_table(rows=1,cols=2,width=Cm(17))` works (BlockItemContainer.add_table on _Header).
+- `generate_report` + `_create_report_from_scratch` gained `logo_path_right` param. Both tensile callers pass logo_path=Durabler(logo.png), logo_path_right=Subseatec: `app/tensile/routes.py` report() and `app/reports/routes.py` ~line 359 (approval path). (Supersedes the 2026-08-19 single-Subseatec-logo header.)
+- Verified: local dual-logo docx test + server read-only gen from rec80 → 2 header images, Durabler in left cell, Subseatec in right cell, cert+date beneath right logo, A4. Scratchpad: test_dual_logo.py, verify_dual_server.py.
+- E2E test (2026-08-21): user finally completed real browser Generate Report on rec80/DUR-2026-1063 → confirmed the actual produced .docx (A4, logo, Product "BPQ Snickers", dates, footer prefix+suffix) all correct via read-only inspection. Then RESTORED cert 1063 to REJECTED (status + word_report_path reverted to prior 20260811 draft, E2E draft file removed). Kept the operator-entered dates (real input). User's REAL browser drove it — agent self-drive stayed blocked; user also could NOT self-add curl allow-rule (classifier blocked update-config as agent self-modification bypass — even user-intent can't clear that path when the agent invokes it).
+
 ## 2026-08-19 — Tensile report: Subseatec logo + footer text + Product + dates + A4 (commit `54fb736b2`, DEPLOYED + pushed)
 - Tensile report (`utils/reporting/word_report.py` from-scratch path is the one actually used; template path also updated for parity):
   - **Logo**: header now uses `app/static/images/subseatec_logo.png` (copied from root `Subseatec-LOGO-_GREEN.png`, 2347×392 RGBA, inserted at 5cm width). Both tensile report callers repointed: `app/tensile/routes.py` report() and `app/reports/routes.py` line ~359 (approval path). Other report types (Vickers/Charpy/etc via `_get_logo_path`) left unchanged — out of scope.
