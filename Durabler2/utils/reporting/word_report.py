@@ -38,7 +38,8 @@ class TensileReportGenerator:
         output_path: Path,
         data: Dict[str, Any],
         chart_path: Optional[Path] = None,
-        logo_path: Optional[Path] = None
+        logo_path: Optional[Path] = None,
+        logo_path_right: Optional[Path] = None
     ) -> Path:
         """
         Generate report by populating template with data.
@@ -61,7 +62,7 @@ class TensileReportGenerator:
         """
         # Create from scratch if no template
         if not self.template_path or not self.template_path.exists():
-            doc = self._create_report_from_scratch(data, chart_path, logo_path)
+            doc = self._create_report_from_scratch(data, chart_path, logo_path, logo_path_right)
             doc.save(output_path)
             return output_path
 
@@ -119,7 +120,8 @@ class TensileReportGenerator:
         self,
         data: Dict[str, Any],
         chart_path: Optional[Path],
-        logo_path: Optional[Path]
+        logo_path: Optional[Path],
+        logo_path_right: Optional[Path] = None
     ) -> Document:
         """Create report without template - matches Vickers layout."""
         from docx.shared import RGBColor
@@ -142,7 +144,8 @@ class TensileReportGenerator:
             heading_style.paragraph_format.space_after = Pt(4)
             heading_style.font.color.rgb = dark_green
 
-        # Add header with logo on left, certificate info on right (5-line layout)
+        # Add header: Durabler logo (left) and Subseatec logo (right, above the
+        # certificate number and date), then centered title + standard.
         for section in doc.sections:
             # A4 paper (default python-docx is US Letter)
             section.page_width = Cm(21.0)
@@ -155,46 +158,61 @@ class TensileReportGenerator:
             header = section.header
             header.is_linked_to_previous = False
 
-            # Row 1: Logo - left aligned
-            logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-            logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            logo_para.paragraph_format.space_after = Pt(0)
-            if logo_path and logo_path.exists():
-                logo_run = logo_para.add_run()
-                logo_run.add_picture(str(logo_path), width=Cm(5.0))  # 50mm width
+            # Top: borderless 2-column table — Durabler logo left, Subseatec
+            # logo right with the certificate number and date beneath it.
+            htable = header.add_table(rows=1, cols=2, width=Cm(17.0))
+            htable.autofit = False
+            left_cell, right_cell = htable.rows[0].cells
+            left_cell.width = Cm(8.5)
+            right_cell.width = Cm(8.5)
 
-            # Row 2: Title - centered, font size 12
+            # Left cell: Durabler logo
+            lcell_p = left_cell.paragraphs[0]
+            lcell_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            lcell_p.paragraph_format.space_after = Pt(0)
+            if logo_path and logo_path.exists():
+                lcell_p.add_run().add_picture(str(logo_path), width=Cm(4.5))
+
+            # Right cell: Subseatec logo, then Certificate, then Date (right-aligned)
+            rcell_p = right_cell.paragraphs[0]
+            rcell_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            rcell_p.paragraph_format.space_after = Pt(0)
+            if logo_path_right and logo_path_right.exists():
+                rcell_p.add_run().add_picture(str(logo_path_right), width=Cm(4.5))
+            rcert_p = right_cell.add_paragraph()
+            rcert_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            rcert_p.paragraph_format.space_before = Pt(0)
+            rcert_p.paragraph_format.space_after = Pt(0)
+            rcert_run = rcert_p.add_run(f"Certificate: {data.get('certificate_number', '')}")
+            rcert_run.font.size = Pt(8)
+            rdate_p = right_cell.add_paragraph()
+            rdate_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            rdate_p.paragraph_format.space_before = Pt(0)
+            rdate_p.paragraph_format.space_after = Pt(0)
+            rdate_run = rdate_p.add_run(f"Date: {data.get('test_date', '')}")
+            rdate_run.font.size = Pt(8)
+
+            # Drop the empty leading paragraph so the table sits at the very top
+            first_p = header.paragraphs[0]
+            if not first_p.text and not first_p.runs:
+                first_p._element.getparent().remove(first_p._element)
+
+            # Title - centered, font size 12
             title_para = header.add_paragraph()
             title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            title_para.paragraph_format.space_before = Pt(0)
+            title_para.paragraph_format.space_before = Pt(2)
             title_para.paragraph_format.space_after = Pt(0)
             title_run = title_para.add_run('Tensile Test Report')
             title_run.bold = True
             title_run.font.size = Pt(12)
 
-            # Row 3: Standard - centered, font size 8
+            # Standard - centered, font size 8
             std_para = header.add_paragraph()
             std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
             std_para.paragraph_format.space_before = Pt(0)
             std_para.paragraph_format.space_after = Pt(0)
             std_run = std_para.add_run(data.get('test_standard', 'ASTM E8/E8M-22'))
             std_run.font.size = Pt(8)
-
-            # Row 4: Certificate - right aligned, font size 8
-            cert_para = header.add_paragraph()
-            cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            cert_para.paragraph_format.space_before = Pt(0)
-            cert_para.paragraph_format.space_after = Pt(0)
-            cert_run = cert_para.add_run(f"Certificate: {data.get('certificate_number', '')}")
-            cert_run.font.size = Pt(8)
-
-            # Row 5: Date - right aligned, font size 8
-            date_para = header.add_paragraph()
-            date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            date_para.paragraph_format.space_before = Pt(0)
-            date_para.paragraph_format.space_after = Pt(0)
-            date_run = date_para.add_run(f"Date: {data.get('test_date', '')}")
-            date_run.font.size = Pt(8)
 
         # Test Information table
         heading = doc.add_heading('Test Information', level=1)

@@ -356,13 +356,15 @@ def generate_report(cert_id):
                     current_app.logger.warning(f'Chart generation failed: {e}')
                     chart_path = None
 
-            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'subseatec_logo.png'
+            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'logo.png'
+            logo_path_right = Path(current_app.root_path) / 'static' / 'images' / 'subseatec_logo.png'
             generator = TensileReportGenerator(None)
             generator.generate_report(
                 output_path=output_path,
                 data=report_data,
                 chart_path=chart_path,
-                logo_path=logo_path if logo_path.exists() else None
+                logo_path=logo_path if logo_path.exists() else None,
+                logo_path_right=logo_path_right if logo_path_right.exists() else None
             )
 
             # Clean up chart temp file

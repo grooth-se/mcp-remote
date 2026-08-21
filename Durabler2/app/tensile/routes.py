@@ -1296,8 +1296,9 @@ def report(test_id):
                 except Exception as e:
                     current_app.logger.warning(f'Report chart failed: {e}')
 
-            # Get logo path (use from-scratch report generation)
-            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'subseatec_logo.png'
+            # Header logos: Durabler (left) + Subseatec (right)
+            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'logo.png'
+            logo_path_right = Path(current_app.root_path) / 'static' / 'images' / 'subseatec_logo.png'
 
             # Generate report into drafts folder (approval workflow compatible)
             reports_folder = Path(current_app.config['REPORTS_FOLDER'])
@@ -1315,7 +1316,8 @@ def report(test_id):
                 output_path=output_path,
                 data=report_data,
                 chart_path=chart_path,
-                logo_path=logo_path if logo_path.exists() else None
+                logo_path=logo_path if logo_path.exists() else None,
+                logo_path_right=logo_path_right if logo_path_right.exists() else None
             )
 
             # Clean up chart temp file
