@@ -132,6 +132,23 @@
                         </div>
                     </div>
 
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-3">
+                            {{ form.no_test.label(class="form-label") }}
+                            {{ form.no_test(class="form-select") }}
+                            <div class="form-text small">Invalid test per ASTM E8/E8M §7.14</div>
+                        </div>
+                        <div class="col-md-3">
+                            {{ form.retest_allowed.label(class="form-label") }}
+                            {{ form.retest_allowed(class="form-select") }}
+                            <div class="form-text small">Replacement/retest per ASTM E8/E8M §7.15</div>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.test_validity_note.label(class="form-label") }}
+                            {{ form.test_validity_note(class="form-control", placeholder="e.g. fracture outside gauge marks") }}
+                        </div>
+                    </div>
+
                     <hr>
 
                     <div class="row">

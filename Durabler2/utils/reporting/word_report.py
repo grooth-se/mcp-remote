@@ -293,6 +293,31 @@ class TensileReportGenerator:
             caption.runs[0].font.size = Pt(10)
             caption.runs[0].font.italic = True
 
+        # Additional Information — test validity per ASTM E8/E8M §7.14 / §7.15
+        no_test = str(data.get('no_test', 'no')).lower() == 'yes'
+        retest = str(data.get('retest_allowed', 'no')).lower() == 'yes'
+        validity_note = data.get('test_validity_note', '')
+        ai_heading = doc.add_heading('Additional Information', level=1)
+        ai_heading.paragraph_format.space_before = Pt(12)
+        ai_heading.paragraph_format.space_after = Pt(6)
+        ai_rows = [
+            ('No Test (ASTM E8/E8M §7.14):', 'Yes' if no_test else 'No'),
+            ('Retest Allowed (ASTM E8/E8M §7.15):', 'Yes' if retest else 'No'),
+        ]
+        if validity_note:
+            ai_rows.append(('Reason / Remark:', validity_note))
+        ai_table = doc.add_table(rows=len(ai_rows), cols=2)
+        ai_table.style = 'Table Grid'
+        for i, (label, value) in enumerate(ai_rows):
+            ai_table.rows[i].cells[0].text = label
+            ai_table.rows[i].cells[1].text = str(value)
+            if ai_table.rows[i].cells[0].paragraphs[0].runs:
+                ai_table.rows[i].cells[0].paragraphs[0].runs[0].bold = True
+        for row in ai_table.rows:
+            for cell in row.cells:
+                cell.paragraphs[0].paragraph_format.space_before = Pt(1)
+                cell.paragraphs[0].paragraph_format.space_after = Pt(1)
+
         # Comments section
         comments = data.get('comments', '')
         if comments:
@@ -469,7 +494,11 @@ class TensileReportGenerator:
         data['test_date'] = test_info.get('test_date', '')
         data['order_date'] = test_info.get('order_date', '')
         data['arrival_date'] = test_info.get('arrival_date', '')
-        data['test_standard'] = 'ASTM E8/E8M-22'
+        data['test_standard'] = test_info.get('test_standard') or 'ASTM E8/E8M-25'
+        # Test validity per ASTM E8/E8M §7.14 (no test) / §7.15 (retest allowed)
+        data['no_test'] = test_info.get('no_test', 'no')
+        data['retest_allowed'] = test_info.get('retest_allowed', 'no')
+        data['test_validity_note'] = test_info.get('test_validity_note', '')
         data['yield_method'] = 'Rp0.2/Rp0.5' if yield_type == 'offset' else 'ReH/ReL'
         data['test_engineer'] = test_info.get('test_engineer', '')
         data['strain_source'] = test_info.get('strain_source', 'Extensometer')

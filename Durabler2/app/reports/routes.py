@@ -205,12 +205,16 @@ def generate_report(cert_id):
                 'location_orientation': certificate.location_orientation or '',
                 'material': certificate.material or '',
                 'certificate_number': certificate.certificate_number_with_rev,
+                'test_standard': test_record.test_standard or 'ASTM E8/E8M-25',
                 'test_date': test_record.test_date.strftime('%Y-%m-%d') if test_record.test_date else '',
                 'order_date': geometry.get('order_date', ''),
                 'arrival_date': geometry.get('arrival_date', ''),
                 'test_engineer': current_user.full_name or current_user.username,
                 'temperature': str(test_record.temperature) if test_record.temperature else '23',
                 'strain_source': 'Displacement Only' if geometry.get('use_displacement_only') else 'Extensometer',
+                'no_test': geometry.get('no_test', 'no'),
+                'retest_allowed': geometry.get('retest_allowed', 'no'),
+                'test_validity_note': geometry.get('test_validity_note', ''),
                 'comments': ''
             }
 

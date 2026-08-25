@@ -55,9 +55,21 @@ class SpecimenForm(FlaskForm):
 
     # Test standard
     test_standard = SelectField('Test Standard', choices=[
+        ('ASTM E8/E8M-25', 'ASTM E8/E8M-25'),
         ('ASTM E8/E8M-22', 'ASTM E8/E8M-22'),
         ('ISO 6892-1:2019', 'ISO 6892-1:2019')
     ])
+
+    # Test validity per ASTM E8/E8M §7.14 (no test) and §7.15 (retest allowed)
+    no_test = SelectField('No Test (ASTM E8 §7.14)', choices=[
+        ('no', 'No'),
+        ('yes', 'Yes')
+    ], default='no')
+    retest_allowed = SelectField('Retest Allowed (ASTM E8 §7.15)', choices=[
+        ('no', 'No'),
+        ('yes', 'Yes')
+    ], default='no')
+    test_validity_note = StringField('Reason / Remark (§7.14 / §7.15)', validators=[Optional()])
 
     # Test conditions
     test_temperature = FloatField('Test Temperature (°C)', validators=[Optional()], default=23.0)

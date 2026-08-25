@@ -360,7 +360,7 @@ def specimen():
             if certificate.test_standard:
                 # Map certificate standard to form choices
                 std_map = {
-                    'ASTM E8/E8M': 'ASTM E8/E8M-22',
+                    'ASTM E8/E8M': 'ASTM E8/E8M-25',
                     'ISO 6892-1': 'ISO 6892-1:2019'
                 }
                 form.test_standard.data = std_map.get(certificate.test_standard, form.test_standard.data)
@@ -741,6 +741,11 @@ def specimen():
             geometry['yield_method'] = yield_method
             geometry['use_displacement_only'] = use_displacement_only
 
+            # Test validity per ASTM E8/E8M §7.14 (no test) / §7.15 (retest allowed)
+            geometry['no_test'] = form.no_test.data
+            geometry['retest_allowed'] = form.retest_allowed.data
+            geometry['test_validity_note'] = form.test_validity_note.data or ''
+
             # Store elastic modulus evaluation settings + fit quality (R²).
             # R² is shown on the analysis page so the operator can judge the
             # elastic-line fit; it is not printed on the report.
@@ -1104,6 +1109,11 @@ def reanalyze(test_id):
         form.elastic_window_max.data = ew[1]
         form.elastic_modulus_override.data = geometry.get('elastic_modulus_override')
 
+        # Test validity (ASTM E8 §7.14 / §7.15)
+        form.no_test.data = geometry.get('no_test', 'no')
+        form.retest_allowed.data = geometry.get('retest_allowed', 'no')
+        form.test_validity_note.data = geometry.get('test_validity_note', '')
+
     return render_template('tensile/specimen.html', form=form, csv_info=csv_info,
                           certificate=test.certificate, reanalyze=True, test_id=test_id)
 
@@ -1154,12 +1164,16 @@ def report(test_id):
                 'location_orientation': test.certificate.location_orientation if test.certificate else '',
                 'material': test.material or '',
                 'certificate_number': form.certificate_number.data or '',
+                'test_standard': test.test_standard or 'ASTM E8/E8M-25',
                 'test_date': test.test_date.strftime('%Y-%m-%d') if test.test_date else '',
                 'order_date': geometry.get('order_date', ''),
                 'arrival_date': geometry.get('arrival_date', ''),
                 'test_engineer': current_user.full_name or current_user.username,
                 'temperature': str(test.temperature) if test.temperature else '23',
                 'strain_source': 'Displacement Only' if geometry.get('use_displacement_only') else 'Extensometer',
+                'no_test': geometry.get('no_test', 'no'),
+                'retest_allowed': geometry.get('retest_allowed', 'no'),
+                'test_validity_note': geometry.get('test_validity_note', ''),
                 'comments': ''
             }
 
