@@ -10,7 +10,6 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from flask import current_app
 
 
 class AccruedIncomeCalculator:
@@ -222,7 +221,7 @@ class AccruedIncomeCalculator:
         # Override for fully invoiced projects
         df.loc[df['Utf., intakt'] == df['Forvan. intakt'], 'fardiggrad'] = 1
         df.loc[df['fardiggrad'] == 1, 'accured income'] = 0
-        df.loc[df['incl'] == False, 'accured income'] = 0
+        df.loc[df['incl'].eq(False), 'accured income'] = 0
 
         numeric_cols = df.select_dtypes(include='number').columns
         df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], 0)
@@ -390,14 +389,14 @@ class AccruedIncomeCalculator:
         df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], 0)
         df[numeric_cols] = df[numeric_cols].fillna(0)
 
-        # Remaining income with milestone adjustment
+        # Remaining income with milestone adjustment.
+        # Division by zero must propagate as NaN/inf exactly like the legacy
+        # app: for completed orders (Remaining income val. == 0) the whole
+        # expression becomes NaN, which skips the completion-CUR override
+        # below and is zeroed by the final cleanup — NOT set to Milestone.
         df['Remaining income CUR'] = df['Milestone'] + \
-            np.where(
-                df['Remaining income val.'] != 0,
-                (df['Remaining income val.'] - df['Milestone CUR']) *
-                (df['Remaining income'] / df['Remaining income val.']),
-                0
-            )
+            (df['Remaining income val.'] - df['Milestone CUR']) * \
+            (df['Remaining income'] / df['Remaining income val.'])
         df.loc[df['Remaining income CUR'] > 0, 'Remaining income'] = \
             df['Remaining income CUR']
 
@@ -446,7 +445,7 @@ class AccruedIncomeCalculator:
                'contingency CUR'] = 0
         df.loc[df['completion CUR1'] > self.COMPLETION_THRESHOLD,
                'accured income CUR'] = 0
-        df.loc[df['incl'] == False, 'accured income CUR'] = 0
+        df.loc[df['incl'].eq(False), 'accured income CUR'] = 0
 
         numeric_cols = df.select_dtypes(include='number').columns
         df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], 0)
