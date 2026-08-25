@@ -16,6 +16,7 @@ from flask import (
 from flask_login import login_required, current_user
 
 from . import reports_bp
+from utils.reporting.report_layout import build_report_header, apply_standard_footer
 from app.extensions import db
 from app.models import (
     ReportApproval, TestRecord, AuditLog, Certificate,
@@ -1060,10 +1061,15 @@ def download(id):
 # ---------------------------------------------------------------------------
 
 def _get_logo_path():
-    """Get path to company logo."""
-    logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
+    """Get path to the Durabler logo (left header logo).
+
+    Prefer static/images/logo.png: it is deployed with the app and sits next
+    to subseatec_logo.png, so the shared header helper can auto-resolve the
+    Subseatec (right) logo from the same folder.
+    """
+    logo_path = Path(current_app.root_path) / 'static' / 'images' / 'logo.png'
     if not logo_path.exists():
-        logo_path = Path(current_app.root_path) / 'static' / 'images' / 'logo.png'
+        logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
     return logo_path if logo_path.exists() else None
 
 
@@ -1908,49 +1914,14 @@ def _generate_vickers_report(certificate, test_record, output_path):
 
     logo_path = _get_logo_path()
 
-    for section in doc.sections:
-        section.top_margin = Cm(1.5)
-        section.bottom_margin = Cm(1.5)
-        section.left_margin = Cm(2.0)
-        section.right_margin = Cm(2.0)
-        header = section.header
-        header.is_linked_to_previous = False
-
-        logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-        logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        logo_para.paragraph_format.space_after = Pt(0)
-        if logo_path:
-            logo_run = logo_para.add_run()
-            logo_run.add_picture(str(logo_path), width=Cm(5.0))
-
-        title_para = header.add_paragraph()
-        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        title_para.paragraph_format.space_before = Pt(0)
-        title_para.paragraph_format.space_after = Pt(0)
-        title_run = title_para.add_run('Vickers Hardness Test Report')
-        title_run.bold = True
-        title_run.font.size = Pt(12)
-
-        std_para = header.add_paragraph()
-        std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        std_para.paragraph_format.space_before = Pt(0)
-        std_para.paragraph_format.space_after = Pt(0)
-        std_run = std_para.add_run('ASTM E92 / ISO 6507')
-        std_run.font.size = Pt(8)
-
-        cert_para = header.add_paragraph()
-        cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        cert_para.paragraph_format.space_before = Pt(0)
-        cert_para.paragraph_format.space_after = Pt(0)
-        cert_run = cert_para.add_run(f"Certificate: {test_info.get('certificate_number', '')}")
-        cert_run.font.size = Pt(8)
-
-        date_para = header.add_paragraph()
-        date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        date_para.paragraph_format.space_before = Pt(0)
-        date_para.paragraph_format.space_after = Pt(0)
-        date_run = date_para.add_run(f"Date: {test_info.get('test_date', '')}")
-        date_run.font.size = Pt(8)
+    build_report_header(
+        doc,
+        title='Vickers Hardness Test Report',
+        standard='ASTM E92 / ISO 6507',
+        cert_number=test_info.get('certificate_number', ''),
+        report_date=test_info.get('test_date', ''),
+        logo_left=logo_path,
+    )
 
     # Test Information
     heading = doc.add_heading('Test Information', level=1)
@@ -2115,22 +2086,8 @@ def _generate_vickers_report(certificate, test_record, output_path):
         trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))  # EMU to twips
         trHeight.set(qn('w:hRule'), 'exact')
 
-    # Disclaimer footer
-    disclaimer_text = (
-        "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
-        "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
-        "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
-        "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
-        "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
-    )
-    for section in doc.sections:
-        footer = section.footer
-        footer.is_linked_to_previous = False
-        footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-        footer_para.clear()
-        footer_run = footer_para.add_run(disclaimer_text)
-        footer_run.font.size = Pt(7)
-        footer_run.italic = True
+    # Standard footer (uncertainty prefix + disclaimer + org. no.)
+    apply_standard_footer(doc)
 
     doc.save(output_path)
 
@@ -2267,49 +2224,14 @@ def _generate_brinell_report(certificate, test_record, output_path):
 
     logo_path = _get_logo_path()
 
-    for section in doc.sections:
-        section.top_margin = Cm(1.5)
-        section.bottom_margin = Cm(1.5)
-        section.left_margin = Cm(2.0)
-        section.right_margin = Cm(2.0)
-        header = section.header
-        header.is_linked_to_previous = False
-
-        logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-        logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        logo_para.paragraph_format.space_after = Pt(0)
-        if logo_path:
-            logo_run = logo_para.add_run()
-            logo_run.add_picture(str(logo_path), width=Cm(5.0))
-
-        title_para = header.add_paragraph()
-        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        title_para.paragraph_format.space_before = Pt(0)
-        title_para.paragraph_format.space_after = Pt(0)
-        title_run = title_para.add_run('Brinell Hardness Test Report')
-        title_run.bold = True
-        title_run.font.size = Pt(12)
-
-        std_para = header.add_paragraph()
-        std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        std_para.paragraph_format.space_before = Pt(0)
-        std_para.paragraph_format.space_after = Pt(0)
-        std_run = std_para.add_run('ASTM E10 / ISO 6506')
-        std_run.font.size = Pt(8)
-
-        cert_para = header.add_paragraph()
-        cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        cert_para.paragraph_format.space_before = Pt(0)
-        cert_para.paragraph_format.space_after = Pt(0)
-        cert_run = cert_para.add_run(f"Certificate: {test_info.get('certificate_number', '')}")
-        cert_run.font.size = Pt(8)
-
-        date_para = header.add_paragraph()
-        date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        date_para.paragraph_format.space_before = Pt(0)
-        date_para.paragraph_format.space_after = Pt(0)
-        date_run = date_para.add_run(f"Date: {test_info.get('test_date', '')}")
-        date_run.font.size = Pt(8)
+    build_report_header(
+        doc,
+        title='Brinell Hardness Test Report',
+        standard='ASTM E10 / ISO 6506',
+        cert_number=test_info.get('certificate_number', ''),
+        report_date=test_info.get('test_date', ''),
+        logo_left=logo_path,
+    )
 
     # Test Information
     heading = doc.add_heading('Test Information', level=1)
@@ -2456,22 +2378,8 @@ def _generate_brinell_report(certificate, test_record, output_path):
         trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))
         trHeight.set(qn('w:hRule'), 'exact')
 
-    # Disclaimer footer
-    disclaimer_text = (
-        "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
-        "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
-        "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
-        "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
-        "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
-    )
-    for section in doc.sections:
-        footer = section.footer
-        footer.is_linked_to_previous = False
-        footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-        footer_para.clear()
-        footer_run = footer_para.add_run(disclaimer_text)
-        footer_run.font.size = Pt(7)
-        footer_run.italic = True
+    # Standard footer (uncertainty prefix + disclaimer + org. no.)
+    apply_standard_footer(doc)
 
     doc.save(output_path)
 
@@ -2604,45 +2512,14 @@ def _generate_charpy_report(certificate, test_record, output_path):
 
     logo_path = _get_logo_path()
 
-    for section in doc.sections:
-        section.top_margin = Cm(1.5)
-        section.bottom_margin = Cm(1.5)
-        section.left_margin = Cm(2.0)
-        section.right_margin = Cm(2.0)
-        header = section.header
-        header.is_linked_to_previous = False
-
-        lp = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-        lp.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        lp.paragraph_format.space_after = Pt(0)
-        if logo_path:
-            lp.add_run().add_picture(str(logo_path), width=Cm(5.0))
-
-        tp = header.add_paragraph()
-        tp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        tp.paragraph_format.space_before = Pt(0)
-        tp.paragraph_format.space_after = Pt(0)
-        tr = tp.add_run('Charpy Impact Test Report')
-        tr.bold = True
-        tr.font.size = Pt(12)
-
-        sp = header.add_paragraph()
-        sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        sp.paragraph_format.space_before = Pt(0)
-        sp.paragraph_format.space_after = Pt(0)
-        sp.add_run('ASTM E23 / ISO 148-1').font.size = Pt(8)
-
-        cp = header.add_paragraph()
-        cp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        cp.paragraph_format.space_before = Pt(0)
-        cp.paragraph_format.space_after = Pt(0)
-        cp.add_run(f"Certificate: {test_info.get('certificate_number', '')}").font.size = Pt(8)
-
-        dp = header.add_paragraph()
-        dp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        dp.paragraph_format.space_before = Pt(0)
-        dp.paragraph_format.space_after = Pt(0)
-        dp.add_run(f"Date: {test_info.get('test_date', '')}").font.size = Pt(8)
+    build_report_header(
+        doc,
+        title='Charpy Impact Test Report',
+        standard='ASTM E23 / ISO 148-1',
+        cert_number=test_info.get('certificate_number', ''),
+        report_date=test_info.get('test_date', ''),
+        logo_left=logo_path,
+    )
 
     # Test Information
     heading = doc.add_heading('Test Information', level=1)
@@ -2800,22 +2677,8 @@ def _generate_charpy_report(certificate, test_record, output_path):
         trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))
         trHeight.set(qn('w:hRule'), 'exact')
 
-    # Disclaimer
-    disclaimer_text = (
-        "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
-        "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
-        "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
-        "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
-        "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
-    )
-    for section in doc.sections:
-        footer = section.footer
-        footer.is_linked_to_previous = False
-        footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-        footer_para.clear()
-        fr = footer_para.add_run(disclaimer_text)
-        fr.font.size = Pt(7)
-        fr.italic = True
+    # Standard footer (uncertainty prefix + disclaimer + org. no.)
+    apply_standard_footer(doc)
 
     doc.save(output_path)
 
@@ -2870,45 +2733,14 @@ def _generate_metallo_report(certificate, test_record, output_path, include_phot
 
     logo_path = _get_logo_path()
 
-    for section in doc.sections:
-        section.top_margin = Cm(1.5)
-        section.bottom_margin = Cm(1.5)
-        section.left_margin = Cm(2.0)
-        section.right_margin = Cm(2.0)
-        header = section.header
-        header.is_linked_to_previous = False
-
-        lp = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-        lp.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        lp.paragraph_format.space_after = Pt(0)
-        if logo_path:
-            lp.add_run().add_picture(str(logo_path), width=Cm(5.0))
-
-        tp_para = header.add_paragraph()
-        tp_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        tp_para.paragraph_format.space_before = Pt(0)
-        tp_para.paragraph_format.space_after = Pt(0)
-        tr = tp_para.add_run('Metallographic Examination Report')
-        tr.bold = True
-        tr.font.size = Pt(12)
-
-        sp = header.add_paragraph()
-        sp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        sp.paragraph_format.space_before = Pt(0)
-        sp.paragraph_format.space_after = Pt(0)
-        sp.add_run('ASTM E45 / E381 · ISO 4967 / 4969').font.size = Pt(8)
-
-        cp = header.add_paragraph()
-        cp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        cp.paragraph_format.space_before = Pt(0)
-        cp.paragraph_format.space_after = Pt(0)
-        cp.add_run(f"Certificate: {test_info.get('certificate_number', '')}").font.size = Pt(8)
-
-        dp = header.add_paragraph()
-        dp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        dp.paragraph_format.space_before = Pt(0)
-        dp.paragraph_format.space_after = Pt(0)
-        dp.add_run(f"Date: {test_info.get('test_date', '')}").font.size = Pt(8)
+    build_report_header(
+        doc,
+        title='Metallographic Examination Report',
+        standard='ASTM E45 / E381 · ISO 4967 / 4969',
+        cert_number=test_info.get('certificate_number', ''),
+        report_date=test_info.get('test_date', ''),
+        logo_left=logo_path,
+    )
 
     # Test Information
     heading = doc.add_heading('Test Information', level=1)
@@ -3055,22 +2887,8 @@ def _generate_metallo_report(certificate, test_record, output_path, include_phot
         trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))
         trHeight.set(qn('w:hRule'), 'exact')
 
-    # Disclaimer footer
-    disclaimer_text = (
-        "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
-        "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
-        "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
-        "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
-        "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
-    )
-    for section in doc.sections:
-        footer = section.footer
-        footer.is_linked_to_previous = False
-        footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-        footer_para.clear()
-        fr = footer_para.add_run(disclaimer_text)
-        fr.font.size = Pt(7)
-        fr.italic = True
+    # Standard footer (uncertainty prefix + disclaimer + org. no.)
+    apply_standard_footer(doc)
 
     doc.save(output_path)
 

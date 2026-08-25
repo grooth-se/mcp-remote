@@ -1076,7 +1076,7 @@ def report(test_id):
             )
 
             # Get logo path (use from-scratch report generation)
-            logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
+            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'logo.png'
 
             # Generate chart
             chart_path = None

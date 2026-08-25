@@ -996,7 +996,7 @@ def report(test_id):
             # Get template and logo paths
             # Skip template - use from-scratch generation for better plot layout
             template_path = None
-            logo_path = Path(current_app.root_path).parent / 'templates' / 'logo.png'
+            logo_path = Path(current_app.root_path) / 'static' / 'images' / 'logo.png'
             current_app.logger.info('FCGR: Using from-scratch report generation')
 
             # Generate plots for report

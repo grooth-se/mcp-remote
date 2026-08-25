@@ -11,6 +11,7 @@ from docx import Document
 from docx.shared import Inches, Cm, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
+from .report_layout import build_report_header, apply_standard_footer
 
 
 class TensileReportGenerator:
@@ -90,28 +91,8 @@ class TensileReportGenerator:
                     for paragraph in cell.paragraphs:
                         self._replace_in_paragraph(paragraph, data, chart_path, logo_path)
 
-        # Add disclaimer to page footer (visible on all pages)
-        disclaimer_text = (
-            "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
-            "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
-            "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
-            "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
-            "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
-        )
-        for section in doc.sections:
-            footer = section.footer
-            footer.is_linked_to_previous = False
-            footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-            footer_para.clear()
-            footer_text = (
-                "When assessing results, the measurement of uncertainty has not been "
-                "taken under consideration. "
-                + disclaimer_text
-                + " Org. No SE556782-8255"
-            )
-            footer_run = footer_para.add_run(footer_text)
-            footer_run.font.size = Pt(7)
-            footer_run.italic = True
+        # Standard footer (uncertainty prefix + disclaimer + org. no.)
+        apply_standard_footer(doc)
 
         doc.save(output_path)
         return output_path
@@ -144,75 +125,16 @@ class TensileReportGenerator:
             heading_style.paragraph_format.space_after = Pt(4)
             heading_style.font.color.rgb = dark_green
 
-        # Add header: Durabler logo (left) and Subseatec logo (right, above the
-        # certificate number and date), then centered title + standard.
-        for section in doc.sections:
-            # A4 paper (default python-docx is US Letter)
-            section.page_width = Cm(21.0)
-            section.page_height = Cm(29.7)
-            # Set narrower margins for compact layout
-            section.top_margin = Cm(1.5)
-            section.bottom_margin = Cm(1.5)
-            section.left_margin = Cm(2.0)
-            section.right_margin = Cm(2.0)
-            header = section.header
-            header.is_linked_to_previous = False
-
-            # Top: borderless 2-column table — Durabler logo left, Subseatec
-            # logo right with the certificate number and date beneath it.
-            htable = header.add_table(rows=1, cols=2, width=Cm(17.0))
-            htable.autofit = False
-            left_cell, right_cell = htable.rows[0].cells
-            left_cell.width = Cm(8.5)
-            right_cell.width = Cm(8.5)
-
-            # Left cell: Durabler logo
-            lcell_p = left_cell.paragraphs[0]
-            lcell_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            lcell_p.paragraph_format.space_after = Pt(0)
-            if logo_path and logo_path.exists():
-                lcell_p.add_run().add_picture(str(logo_path), width=Cm(4.5))
-
-            # Right cell: Subseatec logo, then Certificate, then Date (right-aligned)
-            rcell_p = right_cell.paragraphs[0]
-            rcell_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            rcell_p.paragraph_format.space_after = Pt(0)
-            if logo_path_right and logo_path_right.exists():
-                rcell_p.add_run().add_picture(str(logo_path_right), width=Cm(4.5))
-            rcert_p = right_cell.add_paragraph()
-            rcert_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            rcert_p.paragraph_format.space_before = Pt(0)
-            rcert_p.paragraph_format.space_after = Pt(0)
-            rcert_run = rcert_p.add_run(f"Certificate: {data.get('certificate_number', '')}")
-            rcert_run.font.size = Pt(8)
-            rdate_p = right_cell.add_paragraph()
-            rdate_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            rdate_p.paragraph_format.space_before = Pt(0)
-            rdate_p.paragraph_format.space_after = Pt(0)
-            rdate_run = rdate_p.add_run(f"Date: {data.get('test_date', '')}")
-            rdate_run.font.size = Pt(8)
-
-            # Drop the empty leading paragraph so the table sits at the very top
-            first_p = header.paragraphs[0]
-            if not first_p.text and not first_p.runs:
-                first_p._element.getparent().remove(first_p._element)
-
-            # Title - centered, font size 12
-            title_para = header.add_paragraph()
-            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            title_para.paragraph_format.space_before = Pt(2)
-            title_para.paragraph_format.space_after = Pt(0)
-            title_run = title_para.add_run('Tensile Test Report')
-            title_run.bold = True
-            title_run.font.size = Pt(12)
-
-            # Standard - centered, font size 8
-            std_para = header.add_paragraph()
-            std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            std_para.paragraph_format.space_before = Pt(0)
-            std_para.paragraph_format.space_after = Pt(0)
-            std_run = std_para.add_run(data.get('test_standard', 'ASTM E8/E8M-22'))
-            std_run.font.size = Pt(8)
+        # Standard two-logo header + A4 page (shared across all report methods)
+        build_report_header(
+            doc,
+            title='Tensile Test Report',
+            standard=data.get('test_standard', 'ASTM E8/E8M-22'),
+            cert_number=data.get('certificate_number', ''),
+            report_date=data.get('test_date', ''),
+            logo_left=logo_path,
+            logo_right=logo_path_right,
+        )
 
         # Test Information table
         heading = doc.add_heading('Test Information', level=1)
@@ -428,28 +350,8 @@ class TensileReportGenerator:
             trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))  # EMU to twips
             trHeight.set(qn('w:hRule'), 'exact')
 
-        # Add disclaimer to page footer (visible on all pages)
-        disclaimer_text = (
-            "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
-            "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
-            "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
-            "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
-            "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
-        )
-        for section in doc.sections:
-            footer = section.footer
-            footer.is_linked_to_previous = False
-            footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-            footer_para.clear()
-            footer_text = (
-                "When assessing results, the measurement of uncertainty has not been "
-                "taken under consideration. "
-                + disclaimer_text
-                + " Org. No SE556782-8255"
-            )
-            footer_run = footer_para.add_run(footer_text)
-            footer_run.font.size = Pt(7)
-            footer_run.italic = True
+        # Standard footer (uncertainty prefix + disclaimer + org. no.)
+        apply_standard_footer(doc)
 
         return doc
 

@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional
 from docx import Document
 from docx.shared import Inches, Cm, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from .report_layout import build_report_header, apply_standard_footer
 
 
 class SonicReportGenerator:
@@ -88,22 +89,8 @@ class SonicReportGenerator:
                     for paragraph in cell.paragraphs:
                         self._replace_in_paragraph(paragraph, data, chart_path, logo_path)
 
-        # Add disclaimer to page footer (visible on all pages)
-        disclaimer_text = (
-            "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
-            "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
-            "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
-            "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
-            "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
-        )
-        for section in doc.sections:
-            footer = section.footer
-            footer.is_linked_to_previous = False
-            footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-            footer_para.clear()
-            footer_run = footer_para.add_run(disclaimer_text)
-            footer_run.font.size = Pt(7)
-            footer_run.italic = True
+        # Standard footer (uncertainty prefix + disclaimer + org. no.)
+        apply_standard_footer(doc)
 
         doc.save(output_path)
         return output_path
@@ -135,56 +122,15 @@ class SonicReportGenerator:
             heading_style.paragraph_format.space_after = Pt(4)
             heading_style.font.color.rgb = dark_green
 
-        # Add header with logo on left, certificate info on right (5-line layout)
-        for section in doc.sections:
-            # Set narrower margins for compact layout
-            section.top_margin = Cm(1.5)
-            section.bottom_margin = Cm(1.5)
-            section.left_margin = Cm(2.0)
-            section.right_margin = Cm(2.0)
-            header = section.header
-            header.is_linked_to_previous = False
-
-            # Row 1: Logo - left aligned
-            logo_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-            logo_para.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            logo_para.paragraph_format.space_after = Pt(0)
-            if logo_path and logo_path.exists():
-                logo_run = logo_para.add_run()
-                logo_run.add_picture(str(logo_path), width=Cm(5.0))  # 50mm width
-
-            # Row 2: Title - centered, font size 12
-            title_para = header.add_paragraph()
-            title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            title_para.paragraph_format.space_before = Pt(0)
-            title_para.paragraph_format.space_after = Pt(0)
-            title_run = title_para.add_run('Sonic Resonance Test Report')
-            title_run.bold = True
-            title_run.font.size = Pt(12)
-
-            # Row 3: Standard - centered, font size 8
-            std_para = header.add_paragraph()
-            std_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            std_para.paragraph_format.space_before = Pt(0)
-            std_para.paragraph_format.space_after = Pt(0)
-            std_run = std_para.add_run('Modified ASTM E1875')
-            std_run.font.size = Pt(8)
-
-            # Row 4: Certificate - right aligned, font size 8
-            cert_para = header.add_paragraph()
-            cert_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            cert_para.paragraph_format.space_before = Pt(0)
-            cert_para.paragraph_format.space_after = Pt(0)
-            cert_run = cert_para.add_run(f"Certificate: {data.get('certificate_number', '')}")
-            cert_run.font.size = Pt(8)
-
-            # Row 5: Date - right aligned, font size 8
-            date_para = header.add_paragraph()
-            date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            date_para.paragraph_format.space_before = Pt(0)
-            date_para.paragraph_format.space_after = Pt(0)
-            date_run = date_para.add_run(f"Date: {data.get('test_date', '')}")
-            date_run.font.size = Pt(8)
+        # Standard two-logo header + A4 page (shared across all report methods)
+        build_report_header(
+            doc,
+            title='Sonic Resonance Test Report',
+            standard='Modified ASTM E1875',
+            cert_number=data.get('certificate_number', ''),
+            report_date=data.get('test_date', ''),
+            logo_left=logo_path,
+        )
 
         # Test Information table (exclude certificate and date - now in header)
         heading = doc.add_heading('Test Information', level=1)
@@ -397,22 +343,8 @@ class SonicReportGenerator:
             trHeight.set(qn('w:val'), str(int(sig_row_height.emu / 635)))  # EMU to twips
             trHeight.set(qn('w:hRule'), 'exact')
 
-        # Add disclaimer to page footer (visible on all pages)
-        disclaimer_text = (
-            "All work and services carried out by Durabler are subject to, and conducted in accordance with, "
-            "Durabler standard terms and conditions, which are available at durabler.se. This document shall not "
-            "be reproduced other than in full, except with prior written approval of the issuer. The results pertain "
-            "only to the item(s) as sampled by the client unless otherwise indicated. Durabler a part of Subseatec S AB, "
-            "Address: Durabler C/O Subseatec, Dalavägen 23, 68130 Kristinehamn, SWEDEN"
-        )
-        for section in doc.sections:
-            footer = section.footer
-            footer.is_linked_to_previous = False
-            footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-            footer_para.clear()
-            footer_run = footer_para.add_run(disclaimer_text)
-            footer_run.font.size = Pt(7)
-            footer_run.italic = True
+        # Standard footer (uncertainty prefix + disclaimer + org. no.)
+        apply_standard_footer(doc)
 
         return doc
 
