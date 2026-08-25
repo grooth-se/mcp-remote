@@ -5,8 +5,7 @@ current period vs previous month and year-to-date performance.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional
-from datetime import datetime
+from typing import List
 from app.models import FactProjectMonthly
 
 
@@ -124,7 +123,6 @@ class CommentaryGenerator:
         # Year end totals (for YTD)
         ye_revenue = sum_metric(self.year_end_data, 'total_income_cur')
         ye_cost = sum_metric(self.year_end_data, 'total_cost_cur')
-        ye_gm = ye_revenue - ye_cost
 
         # Month-over-month changes
         mom_revenue = curr_revenue - prev_revenue

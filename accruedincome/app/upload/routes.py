@@ -9,7 +9,6 @@ from flask import (
     render_template, request, flash, redirect,
     url_for, current_app
 )
-from werkzeug.utils import secure_filename
 import pandas as pd
 
 from . import upload_bp
@@ -163,7 +162,6 @@ def handle_file_upload(files):
         if file_key in files:
             file = files[file_key]
             if file.filename and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
                 filepath = os.path.join(upload_folder, f'{file_key}.xlsx')
                 file.save(filepath)
                 files_saved[file_key] = filepath

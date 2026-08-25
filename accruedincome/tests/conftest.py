@@ -1,9 +1,6 @@
 """Shared test fixtures for accrued income tests."""
 
-import os
-import json
 import pytest
-import pandas as pd
 
 from app import create_app
 from app.extensions import db as _db

@@ -1,17 +1,11 @@
 """Tests for calculator integration path — load_from_dataframes() and GL summary."""
 
 import os
-import json
 import pytest
 import pandas as pd
-import numpy as np
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from app.calculation.services.calculator import AccruedIncomeCalculator
-from tests.conftest import (
-    build_sample_api_response,
-    SAMPLE_GL_SUMMARY,
-)
 
 
 def _build_minimal_dataframes():

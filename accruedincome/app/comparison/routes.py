@@ -6,7 +6,6 @@ from flask import (
 )
 
 from . import comparison_bp
-from app.models import FactProjectMonthly
 from app.reports.services.report_analysis import (
     compare_two_months,
     get_all_closing_dates,

@@ -17,7 +17,6 @@ from tests.conftest import (
     SAMPLE_PURCHASE_ORDERS,
     SAMPLE_TIME_TRACKING,
     SAMPLE_INVOICES,
-    SAMPLE_GL_SUMMARY,
 )
 
 
@@ -124,7 +123,7 @@ class TestBuildAdjustments:
         ]
         assert len(df) == 2
         assert df.iloc[0]['Projektnummer'] == 'PROJ001'
-        assert df.iloc[0]['Accured'] == True
+        assert df.iloc[0]['Accured']
         assert df.iloc[0]['Contingency'] == 0.05
         assert df.iloc[1]['Incomeadj'] == 5000
 
@@ -293,7 +292,7 @@ class TestBuildAccruedHistory:
         assert df.iloc[0]['closing'] == '2025-12-31'
         assert df.iloc[0]['act income'] == 350000
         assert df.iloc[0]['accured income CUR'] == 75000
-        assert df.iloc[0]['incl'] == True
+        assert df.iloc[0]['incl']
 
     def test_multiple_periods(self, app, db):
         """Builds history with multiple closing dates."""

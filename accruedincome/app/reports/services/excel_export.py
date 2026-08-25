@@ -3,18 +3,11 @@
 Exports comparison reports, project reports, and financial statements to Excel.
 """
 
-import pandas as pd
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.styles import Font, Alignment, PatternFill
 from io import BytesIO
 
 from app.models import FactProjectMonthly
-from .report_analysis import (
-    generate_kpi_report1,
-    generate_kpi_report2,
-    generate_summary_sheet
-)
 
 
 def _style_header(ws, row_num, col_count):
@@ -186,7 +179,7 @@ def export_comparison_to_excel(comparison_result: dict) -> BytesIO:
                 try:
                     if cell.value:
                         max_length = max(max_length, len(str(cell.value)))
-                except:
+                except Exception:
                     pass
             ws.column_dimensions[column_letter].width = min(max_length + 2, 30)
 
@@ -273,7 +266,7 @@ def export_project_report(closing_date: str) -> BytesIO:
             try:
                 if cell.value:
                     max_length = max(max_length, len(str(cell.value)))
-            except:
+            except Exception:
                 pass
         ws.column_dimensions[column_letter].width = min(max_length + 2, 20)
 
@@ -298,7 +291,7 @@ def export_financial_statements(pnl_data: dict, bs_data: dict) -> BytesIO:
 
     # P&L Sheet
     ws_pnl = wb.create_sheet('P&L Statement')
-    ws_pnl['A1'] = f"Profit & Loss Statement"
+    ws_pnl['A1'] = "Profit & Loss Statement"
     ws_pnl['A2'] = f"{pnl_data.get('start_date', '')} to {pnl_data.get('end_date', '')}"
     ws_pnl['A1'].font = Font(bold=True, size=14)
 
@@ -316,7 +309,7 @@ def export_financial_statements(pnl_data: dict, bs_data: dict) -> BytesIO:
 
     # Balance Sheet
     ws_bs = wb.create_sheet('Balance Sheet')
-    ws_bs['A1'] = f"Balance Sheet"
+    ws_bs['A1'] = "Balance Sheet"
     ws_bs['A2'] = f"As at {bs_data.get('closing_date', '')}"
     ws_bs['A1'].font = Font(bold=True, size=14)
 
@@ -501,7 +494,7 @@ def export_management_reports(generator) -> BytesIO:
                 try:
                     if cell.value:
                         max_length = max(max_length, len(str(cell.value)))
-                except:
+                except Exception:
                     pass
             ws.column_dimensions[column_letter].width = min(max_length + 2, 20)
 

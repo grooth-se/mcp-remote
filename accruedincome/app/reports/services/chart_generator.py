@@ -102,7 +102,7 @@ def generate_project_charts(output_folder: str, project_numbers: list = None):
 
             generated[proj] = chart_path
 
-        except Exception as e:
+        except Exception:
             plt.close()
             continue
 

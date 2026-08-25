@@ -10,7 +10,6 @@ import urllib.error
 import pandas as pd
 from flask import current_app
 
-from app.extensions import db
 from app.models import FactProjectMonthly
 
 

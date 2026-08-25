@@ -3,8 +3,7 @@
 import json
 import os
 import pickle
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from app.extensions import db as _db
 from app.models import UploadSession
