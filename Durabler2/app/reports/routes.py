@@ -17,7 +17,7 @@ from flask_login import login_required, current_user
 
 from . import reports_bp
 from utils.reporting.report_layout import build_report_header, apply_standard_footer
-from app.extensions import db
+from app.extensions import db, utcnow
 from app.models import (
     ReportApproval, TestRecord, AuditLog, Certificate,
     STATUS_DRAFT, STATUS_PENDING, STATUS_APPROVED, STATUS_REJECTED, STATUS_PUBLISHED,
@@ -722,7 +722,7 @@ def approve(cert_id):
                                approval=certificate.approval,
                                certificate=certificate,
                                test_record=test_record,
-                               now=datetime.utcnow(),
+                               now=utcnow(),
                                signing_deps=signing_deps,
                                has_certificate=has_certificate,
                                can_sign=can_sign)
@@ -773,7 +773,7 @@ def approve(cert_id):
             pdf_hash = hashlib.sha256(f.read()).hexdigest()
 
         pdf_path = str(output_pdf.relative_to(reports_folder))
-        timestamp = datetime.utcnow()
+        timestamp = utcnow()
         signing_method = 'manual_upload'
     else:
         # Automatic signing
@@ -991,7 +991,7 @@ def replace_pdf(cert_id):
         pdf_hash = hashlib.sha256(f.read()).hexdigest()
 
     pdf_path = str(output_pdf.relative_to(reports_folder))
-    timestamp = datetime.utcnow()
+    timestamp = utcnow()
 
     certificate.approval.publish(pdf_path=pdf_path, pdf_hash=pdf_hash)
     certificate.approval.signature_timestamp = timestamp

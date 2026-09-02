@@ -261,7 +261,7 @@ def specimen():
 
     excel_data = session.get('fcgr_excel_data', {})
     certificate_id = session.get('fcgr_certificate_id')
-    certificate = Certificate.query.get(certificate_id) if certificate_id else None
+    certificate = db.session.get(Certificate,certificate_id) if certificate_id else None
     reanalyze_id = session.get('fcgr_reanalyze_id')
 
     form = SpecimenForm()
@@ -582,7 +582,7 @@ def specimen():
             else:
                 test_id = generate_test_id()
                 selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else None
-                selected_cert = Certificate.query.get(selected_cert_id) if selected_cert_id else None
+                selected_cert = db.session.get(Certificate,selected_cert_id) if selected_cert_id else None
                 cert_number = selected_cert.certificate_number_with_rev if selected_cert else None
 
                 test_record = TestRecord(

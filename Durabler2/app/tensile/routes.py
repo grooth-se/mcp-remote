@@ -339,7 +339,7 @@ def specimen():
 
     csv_info = session.get('tensile_csv_info', {})
     certificate_id = session.get('tensile_certificate_id')
-    certificate = Certificate.query.get(certificate_id) if certificate_id else None
+    certificate = db.session.get(Certificate,certificate_id) if certificate_id else None
 
     form = SpecimenForm()
 
@@ -785,14 +785,14 @@ def specimen():
             certificate_id = session.get('tensile_certificate_id')
             cert_number = None
             if certificate_id:
-                cert = Certificate.query.get(certificate_id)
+                cert = db.session.get(Certificate,certificate_id)
                 if cert:
                     cert_number = cert.certificate_number_with_rev
 
             # Handle re-analysis vs new test
             if reanalyze_id:
                 # Re-analysis: update existing record
-                test_record = TestRecord.query.get(reanalyze_id)
+                test_record = db.session.get(TestRecord,reanalyze_id)
                 if not test_record:
                     flash('Original test record not found.', 'danger')
                     return redirect(url_for('tensile.index'))

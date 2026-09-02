@@ -5,8 +5,7 @@ Certificate-centric workflow:
 - Word document is saved on server and tracked
 - Approval workflow: DRAFT -> PENDING_REVIEW -> APPROVED/REJECTED -> PUBLISHED
 """
-from datetime import datetime
-from app.extensions import db
+from app.extensions import db, utcnow
 
 
 # Approval status constants
@@ -74,7 +73,7 @@ class ReportApproval(db.Model):
 
     # Creation/submission
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
     submitted_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     submitted_at = db.Column(db.DateTime)
 
@@ -133,7 +132,7 @@ class ReportApproval(db.Model):
         """Submit report for approval."""
         self.status = STATUS_PENDING
         self.submitted_by_id = user.id
-        self.submitted_at = datetime.utcnow()
+        self.submitted_at = utcnow()
         # Clear any previous rejection
         self.review_comments = None
 
@@ -141,13 +140,13 @@ class ReportApproval(db.Model):
         """Approve the report."""
         self.status = STATUS_APPROVED
         self.reviewed_by_id = user.id
-        self.reviewed_at = datetime.utcnow()
+        self.reviewed_at = utcnow()
 
     def reject(self, user, comments: str) -> None:
         """Reject the report with comments."""
         self.status = STATUS_REJECTED
         self.reviewed_by_id = user.id
-        self.reviewed_at = datetime.utcnow()
+        self.reviewed_at = utcnow()
         self.review_comments = comments
 
     def publish(self, pdf_path: str, pdf_hash: str) -> None:
@@ -155,7 +154,7 @@ class ReportApproval(db.Model):
         self.status = STATUS_PUBLISHED
         self.signed_pdf_path = pdf_path
         self.pdf_hash = pdf_hash
-        self.signature_timestamp = datetime.utcnow()
+        self.signature_timestamp = utcnow()
 
     def revoke(self) -> None:
         """Revoke a published report (superseded by a newer revision).

@@ -4,8 +4,7 @@ These models enable full data persistence without relying on external files,
 supporting ISO 17025 data traceability requirements.
 """
 import zlib
-from datetime import datetime
-from app.extensions import db
+from app.extensions import db, utcnow
 
 
 class RawTestData(db.Model):
@@ -31,7 +30,7 @@ class RawTestData(db.Model):
     compression_ratio = db.Column(db.Float)  # For info: original_size / compressed_size
 
     # Metadata
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_at = db.Column(db.DateTime, default=utcnow)
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     # Relationships
@@ -87,7 +86,7 @@ class TestPhoto(db.Model):
     data = db.Column(db.LargeBinary, nullable=False)
 
     # Metadata
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_at = db.Column(db.DateTime, default=utcnow)
     uploaded_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     # Relationships
@@ -181,7 +180,7 @@ class ReportFile(db.Model):
     compression_ratio = db.Column(db.Float)
 
     # Metadata
-    generated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    generated_at = db.Column(db.DateTime, default=utcnow)
     generated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     # Relationships

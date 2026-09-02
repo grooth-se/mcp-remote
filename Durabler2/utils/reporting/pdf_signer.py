@@ -21,9 +21,14 @@ import hashlib
 import shutil
 import subprocess
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
+
+
+def _utcnow() -> datetime:
+    """Naive UTC timestamp (replacement for deprecated datetime.utcnow)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 # PDF signing imports
 try:
@@ -321,7 +326,7 @@ def sign_pdf(
     private_key, certificate, ca_chain = load_certificate(cert_path, cert_password)
 
     # Signing timestamp
-    timestamp = datetime.utcnow()
+    timestamp = _utcnow()
 
     # Read the PDF
     with open(pdf_path, 'rb') as f:
@@ -537,7 +542,7 @@ def sign_report(
     unsigned_pdf = signed_folder / pdf_filename
     signed_pdf = signed_folder / signed_filename
 
-    timestamp = datetime.utcnow()
+    timestamp = _utcnow()
 
     # Step 1: Stamp approval into Word doc (work on a temp copy)
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -605,7 +610,7 @@ def create_placeholder_signed_pdf(
     signed_filename = f"{safe_cert_num}_signed.pdf"
     signed_pdf = signed_folder / signed_filename
 
-    timestamp = datetime.utcnow()
+    timestamp = _utcnow()
 
     deps = check_dependencies()
     if deps['can_convert'] and word_report_path.exists():

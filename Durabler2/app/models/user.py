@@ -1,11 +1,10 @@
 """User model for authentication and approval workflow."""
-from datetime import datetime
 from functools import wraps
 from flask import flash, redirect, url_for
 from flask_login import UserMixin, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from app.extensions import db, login_manager
+from app.extensions import db, login_manager, utcnow
 
 
 # User roles
@@ -61,7 +60,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120))
     role = db.Column(db.String(20), default=ROLE_OPERATOR)
     is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
     last_login = db.Column(db.DateTime)
 
     # Relationships
@@ -133,7 +132,7 @@ class User(UserMixin, db.Model):
 
     def update_last_login(self) -> None:
         """Update last login timestamp."""
-        self.last_login = datetime.utcnow()
+        self.last_login = utcnow()
 
     def __repr__(self) -> str:
         return f'<User {self.user_id or self.username}>'
@@ -142,7 +141,7 @@ class User(UserMixin, db.Model):
 @login_manager.user_loader
 def load_user(user_id: str) -> User | None:
     """Load user by ID for Flask-Login."""
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 # Role-based access control decorators

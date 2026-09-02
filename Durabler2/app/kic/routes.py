@@ -301,7 +301,7 @@ def specimen():
 
     excel_data = session.get('kic_excel_data', {})
     certificate_id = session.get('kic_certificate_id')
-    certificate = Certificate.query.get(certificate_id) if certificate_id else None
+    certificate = db.session.get(Certificate,certificate_id) if certificate_id else None
     reanalyze_id = session.get('kic_reanalyze_id')
 
     form = SpecimenForm()
@@ -604,7 +604,7 @@ def specimen():
             else:
                 test_id = form.test_id.data
                 selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else None
-                selected_cert = Certificate.query.get(selected_cert_id) if selected_cert_id else None
+                selected_cert = db.session.get(Certificate,selected_cert_id) if selected_cert_id else None
                 cert_number = selected_cert.certificate_number_with_rev if selected_cert else None
 
                 test = TestRecord(

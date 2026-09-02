@@ -1,6 +1,6 @@
 """Certificate model for test certificate register."""
 from datetime import datetime
-from app.extensions import db
+from app.extensions import db, utcnow
 
 
 class Certificate(db.Model):
@@ -57,8 +57,8 @@ class Certificate(db.Model):
     invoiced = db.Column(db.Boolean, default=False)
 
     # Audit fields
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     # Relationship to test records

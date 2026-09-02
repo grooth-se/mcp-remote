@@ -104,7 +104,7 @@ def new():
     cert_id = request.args.get('certificate', type=int)
     if cert_id and request.method == 'GET':
         form.certificate_id.data = cert_id
-        cert = Certificate.query.get(cert_id)
+        cert = db.session.get(Certificate,cert_id)
         if cert:
             form.material.data = cert.material
             form.specimen_id.data = cert.test_article_sn
@@ -121,7 +121,7 @@ def new():
         certificate_id = None
         cert_number = None
         if form.certificate_id.data and form.certificate_id.data != 0:
-            cert = Certificate.query.get(form.certificate_id.data)
+            cert = db.session.get(Certificate,form.certificate_id.data)
             if cert:
                 certificate_id = cert.id
                 cert_number = cert.certificate_number_with_rev

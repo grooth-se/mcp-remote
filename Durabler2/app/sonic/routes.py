@@ -114,7 +114,7 @@ def new():
 
     # Get selected certificate
     selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else cert_id
-    certificate = Certificate.query.get(selected_cert_id) if selected_cert_id else None
+    certificate = db.session.get(Certificate,selected_cert_id) if selected_cert_id else None
 
     # Pre-fill from certificate (certificate register is the master)
     if request.method == 'GET' and certificate:
@@ -212,7 +212,7 @@ def new():
 
             # Get certificate from form selection
             selected_cert_id = form.certificate_id.data if form.certificate_id.data and form.certificate_id.data > 0 else None
-            selected_cert = Certificate.query.get(selected_cert_id) if selected_cert_id else None
+            selected_cert = db.session.get(Certificate,selected_cert_id) if selected_cert_id else None
             cert_number = selected_cert.certificate_number_with_rev if selected_cert else None
 
             test_record = TestRecord(

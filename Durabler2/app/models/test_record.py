@@ -1,6 +1,5 @@
 """Test record and analysis models."""
-from datetime import datetime
-from app.extensions import db
+from app.extensions import db, utcnow
 
 
 class TestRecord(db.Model):
@@ -55,8 +54,8 @@ class TestRecord(db.Model):
     certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'), index=True)
 
     # Audit fields
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
     operator_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     # Relationships
@@ -86,7 +85,7 @@ class AnalysisResult(db.Model):
     is_valid = db.Column(db.Boolean, default=True)
     validity_notes = db.Column(db.Text)
 
-    calculated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    calculated_at = db.Column(db.DateTime, default=utcnow)
     calculated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
     def __repr__(self) -> str:
@@ -101,7 +100,7 @@ class AuditLog(db.Model):
     __tablename__ = 'audit_log'
 
     id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = db.Column(db.DateTime, default=utcnow, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     ip_address = db.Column(db.String(45))
 
