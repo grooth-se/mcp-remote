@@ -406,7 +406,7 @@ class KICReportGenerator:
         # Row 1: Test Engineer — name only
         sig_table.rows[1].cells[0].text = 'Test Engineer:'
         sig_table.rows[1].cells[0].paragraphs[0].runs[0].bold = True
-        engineer_name = data.get('test_engineer', data.get('operator', ''))
+        engineer_name = test_info.get('test_engineer', test_info.get('operator', ''))
         sig_table.rows[1].cells[1].text = engineer_name
 
         # Row 2: Approved by — digital signature (filled by PDF signing)
@@ -417,7 +417,7 @@ class KICReportGenerator:
         # Row 3: Third Party Approval (if applicable)
         sig_table.rows[3].cells[0].text = 'Third Party Approval:'
         sig_table.rows[3].cells[0].paragraphs[0].runs[0].bold = True
-        sig_table.rows[3].cells[1].text = data.get('third_party_approval', '')
+        sig_table.rows[3].cells[1].text = test_info.get('third_party_approval', '')
 
         # Set row heights — equal height for all signature rows, sized for digital signature
         from docx.shared import Cm as CmShared
